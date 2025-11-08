@@ -1,0 +1,6 @@
+@WebLaptopBE_HostAddress = http://localhost:5068
+
+GET {{WebLaptopBE_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
