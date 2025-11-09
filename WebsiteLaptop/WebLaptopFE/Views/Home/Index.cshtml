@@ -46,24 +46,31 @@
                             }
                             
                             var avatar = (val.avatar && typeof val.avatar === 'string' && val.avatar.trim() !== '') ? `/image/${val.avatar}` : '/image/default-laptop.jpg';
+                            var brandName = (val.brand && val.brand.brandName) ? val.brand.brandName : 'Laptop';
+                            var productDetailUrl = '/Home/ProductDetail?id=' + encodeURIComponent(val.productId || '');
                             str += `
                                 <div class="col-lg-3 col-md-6 col-sm-6 col-12">
                                     <div class="rounded position-relative fruite-item">
-                                        <div class="fruite-img">
+                                        <div class="fruite-img" style="cursor: pointer;" onclick="window.location.href='${productDetailUrl}'">
                                             <img src="${avatar}" class="img-fluid w-100 rounded-top" alt="${val.productName || ''}" style="height: 200px; object-fit: cover;">
                                         </div>
-                                        <div class="text-white bg-secondary px-3 py-1 rounded position-absolute" style="top: 10px; left: 10px;">Laptop</div>
+                                        <div class="text-white bg-secondary px-3 py-1 rounded position-absolute" style="top: 10px; left: 10px;">${brandName}</div>
                                         <div class="p-4 border border-secondary border-top-0 rounded-bottom">
-                                            <h4>${val.productName || 'Chưa có tên'}</h4>
+                                            <h4><a href="${productDetailUrl}" class="text-dark text-decoration-none">${val.productName || 'Chưa có tên'}</a></h4>
                                             <p>${val.productModel || ''}</p>
                                                 <div class="d-flex flex-column align-items-center">
                                                    <div class="d-flex align-items-center flex-wrap gap-2 mb-3">
                                                         ${originalPrice}
                                                         <span class="text-dark fs-5 fw-bold mb-0">${price}</span>
                                                       </div>
-                                                      <a href="#" class="btn border border-secondary rounded-pill px-3 text-primary">
-                                                        <i class="fa fa-shopping-bag me-2 text-primary"></i> Add to cart
-                                                      </a>
+                                                      <div class="d-flex gap-2">
+                                                          <a href="${productDetailUrl}" class="btn border border-secondary rounded-pill px-3 text-primary">
+                                                            <i class="fa fa-eye me-2 text-primary"></i> Xem chi tiết
+                                                          </a>
+                                                          <a href="#" class="btn border border-secondary rounded-pill px-3 text-primary" onclick="event.preventDefault(); toggleFavorite('${val.productId || ''}'); return false;" title="Thêm vào yêu thích">
+                                                            <i class="far fa-heart" id="heart-${val.productId || ''}"></i>
+                                                          </a>
+                                                      </div>
                                                     </div>
                                         </div>
                                     </div>
@@ -81,6 +88,24 @@
                     $('#displayProducts').html('<div class="col-12"><p class="text-center text-danger">Không thể tải sản phẩm. Vui lòng thử lại sau.</p></div>');
                 }
             });
+        }
+
+        // Toggle favorite
+        function toggleFavorite(productId) {
+            if (!productId) return;
+            
+            let heartIcon = $('#heart-' + productId);
+            if (heartIcon.hasClass('fas')) {
+                // Đã yêu thích, bỏ yêu thích
+                heartIcon.removeClass('fas text-danger').addClass('far');
+                // TODO: Gọi API để xóa khỏi danh sách yêu thích
+                console.log('Bỏ yêu thích sản phẩm:', productId);
+            } else {
+                // Chưa yêu thích, thêm yêu thích
+                heartIcon.removeClass('far').addClass('fas text-danger');
+                // TODO: Gọi API để thêm vào danh sách yêu thích
+                console.log('Thêm yêu thích sản phẩm:', productId);
+            }
         }
 
         // Gọi hàm khi trang load

@@ -18,6 +18,12 @@ namespace WebLaptopFE.Controllers
             return View();
         }
 
+        public IActionResult ProductDetail(string id)
+        {
+            ViewBag.ProductId = id;
+            return View();
+        }
+
         public IActionResult Privacy()
         {
             return View();
