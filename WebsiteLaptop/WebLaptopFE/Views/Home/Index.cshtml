@@ -1,8 +1,91 @@
 ﻿@{
     ViewData["Title"] = "Home Page";
+    Layout = "~/Views/Shared/_LayoutHome.cshtml";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div id="displayProducts" class="row g-4">
+    <!-- Sản phẩm sẽ được hiển thị ở đây -->
 </div>
+
+@section Scripts {
+    <script>
+        let url = "http://localhost:5068/";
+        
+        function showProductByCategory() {
+            var str = '';
+            $.ajax({
+                type: 'GET',
+                url: url + "api/ProductAPI/all",
+                dataType: 'json',
+                success: function (data) {
+                    console.log('Dữ liệu sản phẩm:', data);
+                    if (data && data.length > 0) {
+                        $.each(data, function (key, val) {
+                            var price = 'Liên hệ';
+                            var originalPrice = '';
+                            
+                            // Format giá bán
+                            if (val.sellingPrice != null && val.sellingPrice !== undefined) {
+                                try {
+                                    price = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val.sellingPrice);
+                                } catch (e) {
+                                    price = val.sellingPrice.toString() + ' VND';
+                                }
+                            }
+                            
+                            // Format giá gốc (chỉ hiển thị khi có và khác giá bán)
+                            if (val.originalSellingPrice != null && val.originalSellingPrice !== undefined && 
+                                val.sellingPrice != null && val.sellingPrice !== undefined &&
+                                val.originalSellingPrice > val.sellingPrice) {
+                                try {
+                                    var formattedOriginalPrice = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val.originalSellingPrice);
+                                    originalPrice = `<span class="text-muted text-decoration-line-through me-2" style="font-size: 0.9em;">${formattedOriginalPrice}</span>`;
+                                } catch (e) {
+                                    originalPrice = `<span class="text-muted text-decoration-line-through me-2" style="font-size: 0.9em;">${val.originalSellingPrice.toString()} VND</span>`;
+                                }
+                            }
+                            
+                            var avatar = (val.avatar && typeof val.avatar === 'string' && val.avatar.trim() !== '') ? `/image/${val.avatar}` : '/image/default-laptop.jpg';
+                            str += `
+                                <div class="col-lg-3 col-md-6 col-sm-6 col-12">
+                                    <div class="rounded position-relative fruite-item">
+                                        <div class="fruite-img">
+                                            <img src="${avatar}" class="img-fluid w-100 rounded-top" alt="${val.productName || ''}" style="height: 200px; object-fit: cover;">
+                                        </div>
+                                        <div class="text-white bg-secondary px-3 py-1 rounded position-absolute" style="top: 10px; left: 10px;">Laptop</div>
+                                        <div class="p-4 border border-secondary border-top-0 rounded-bottom">
+                                            <h4>${val.productName || 'Chưa có tên'}</h4>
+                                            <p>${val.productModel || ''}</p>
+                                                <div class="d-flex flex-column align-items-center">
+                                                   <div class="d-flex align-items-center flex-wrap gap-2 mb-3">
+                                                        ${originalPrice}
+                                                        <span class="text-dark fs-5 fw-bold mb-0">${price}</span>
+                                                      </div>
+                                                      <a href="#" class="btn border border-secondary rounded-pill px-3 text-primary">
+                                                        <i class="fa fa-shopping-bag me-2 text-primary"></i> Add to cart
+                                                      </a>
+                                                    </div>
+                                        </div>
+                                    </div>
+                                </div>`;
+                        });
+                        $('#displayProducts').html(str);
+                    } else {
+                        $('#displayProducts').html('<div class="col-12"><p class="text-center">Không có sản phẩm nào.</p></div>');
+                    }
+                },
+                error: function (xhr, status, error) {
+                    console.error('Lỗi khi tải sản phẩm:', error);
+                    console.error('Chi tiết:', xhr.responseText);
+                    alert('Lỗi khi tải dữ liệu sản phẩm: ' + error + '\nVui lòng kiểm tra lại kết nối API.');
+                    $('#displayProducts').html('<div class="col-12"><p class="text-center text-danger">Không thể tải sản phẩm. Vui lòng thử lại sau.</p></div>');
+                }
+            });
+        }
+
+        // Gọi hàm khi trang load
+        $(document).ready(function() {
+            showProductByCategory();
+        });
+    </script>
+}
