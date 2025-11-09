@@ -7,7 +7,7 @@ namespace WebLaptopBE.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class ProductAPIController : ControllerBase
+    public class ListProductAPIController : ControllerBase
     {
         private Testlaptop20Context db = new Testlaptop20Context();
         
