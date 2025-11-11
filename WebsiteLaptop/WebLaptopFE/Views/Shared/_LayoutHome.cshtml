@@ -41,78 +41,12 @@
         <!-- Spinner End -->
 
 
-        <!-- Navbar start -->
-        <div class="container-fluid fixed-top">
-            <div class="container topbar bg-primary d-none d-lg-block">
-                <div class="d-flex justify-content-between">
-                    <div class="top-info ps-2">
-                        <small class="me-3"><i class="fas fa-map-marker-alt me-2 text-secondary"></i> <a href="https://www.google.com/maps/search/?api=1&query=21.0281545,105.8034205" target="_blank" rel="noopener noreferrer" class="text-white">3 Đ. Cầu Giấy, Ngọc Khánh, Đống Đa, Hà Nội, Việt Nam</a></small>
-                        <small class="me-3"><i class="fas fa-envelope me-2 text-secondary"></i><a href="#" class="text-white">TenTech@gmail.com</a></small>
-                    </div>
-                    <div class="top-link pe-2">
-                        <a href="warranty.html" class="text-white">
-                            <small class="text-white mx-2">
-                            <i class="fas fa-shield-alt me-1"></i> Chính sách bảo hành 
-                            </small> /
-                        </a>
-                        <a href="#" class="text-white">
-                            <small class="text-white mx-2">
-                            <i class="fas fa-receipt me-1"></i> Tra cứu đơn hàng
-                            </small>
-                        </a>
-                    </div>
-                </div>
-            </div>
-            <div class="container px-0">
-                <nav class="navbar navbar-light bg-white navbar-expand-xl">
-                    <a href="index.html" class="navbar-brand"><h1 class="text-primary display-6">TenTech</h1></a>
-                    <button class="navbar-toggler py-2 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse">
-                        <span class="fa fa-bars text-primary"></span>
-                    </button>
-                    <div class="collapse navbar-collapse bg-white" id="navbarCollapse">
-                        <div class="navbar-nav mx-auto">
-                            <a href="index.html" class="nav-item nav-link active">Home</a>
-                            <a href="shop.html" class="nav-item nav-link">Shop</a>
-                            <a href="shop-detail.html" class="nav-item nav-link">Shop Detail</a>
-                            <div class="nav-item dropdown">
-                                <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">Pages</a>
-                                <div class="dropdown-menu m-0 bg-secondary rounded-0">
-                                    <a href="cart.html" class="dropdown-item">Cart</a>
-                                    <a href="checkout.html" class="dropdown-item">Checkout</a>
-                                    <a href="testimonial.html" class="dropdown-item">Testimonial</a>
-                                    <a href="404.html" class="dropdown-item">404 Page</a>
-                                </div>
-                            </div>
-                            <a href="contact.html" class="nav-item nav-link">Contact</a>
-                        </div>
-                        <div class="d-flex m-3 me-0">
-                            <button class="btn-search btn border border-secondary btn-md-square rounded-circle bg-white me-4" data-bs-toggle="modal" data-bs-target="#searchModal"><i class="fas fa-search text-primary"></i></button>
-                            <a href="#" class="position-relative me-4 my-auto">
-                                <i class="fa fa-shopping-bag fa-2x"></i>
-                                <span class="position-absolute bg-secondary rounded-circle d-flex align-items-center justify-content-center text-dark px-1" style="top: -5px; left: 15px; height: 20px; min-width: 20px;">3</span>
-                            </a>
-                            <a href="#" class="my-auto">
-                                <i class="fas fa-user fa-2x"></i>
-                            </a>
-                        </div>
-                    </div>
-                </nav>
-            </div>
-        </div>
-        <!-- Navbar End -->
+        @await Html.PartialAsync("_Header")
 
 
         <!-- Hero Start -->
         <div class="container-fluid p-0 pt-1 px-5 pb-0 mb-5 hero-header">
             <div class="container p-0">
-                <div class="mx-auto w-50 position-relative">
-                    <input type="text" class="form-control border-2 border-secondary py-3 px-4 rounded-pill" placeholder="Search">
-                    <button type="submit" class="btn btn-primary border-2 border-secondary py-3 px-4 position-absolute rounded-pill text-white h-100" style="top: 0; right: 0%;">
-                        <i class="bi bi-search"></i>
-                    </button>
-                </div>
-
-
                 <div class="row g-5 py-3 px-0">
                     <!-- Sidebar Start -->
                     <div class="col-lg-4">
@@ -121,31 +55,11 @@
                         <div class="hero__categories position-relative">
                             <div class="hero__categories__all d-flex align-items-center gap-2" id="categoriesToggle" aria-expanded="false" role="button" tabindex="0">
                                 <i class="fa fa-bars text-primary"></i>
-                                <span>All departments</span>
+                                <span>Danh mục</span>
                                 <i class="fa fa-angle-down ms-auto text-muted toggle-caret"></i>
                             </div>
 
                             <ul class="hero__categories__list list-unstyled m-0 p-0 mt-2 shadow-sm" id="categoriesList" aria-labelledby="categoriesToggle">
-                            <li>
-                                <div class="dropdown category-dropdown">
-                                    <a href="#" class="h6 px-5 py-3 rounded bg-white mb-2 dropdown-toggle d-flex align-items-center justify-content-between js-has-sub" aria-expanded="false">
-                                        <span><i class="fas fa-carrot text-primary me-2"></i>Vegetables</span>
-                                        <i class="fas fa-angle-right text-primary toggle-submenu"></i>
-                                    </a>
-
-                                    <div class="dropdown-menu m-0 bg-secondary rounded-0 category-submenu">
-                                        <a class="dropdown-item" href="#">Leafy Greens</a>
-                                        <a class="dropdown-item" href="#">Root Vegetables</a>
-                                        <a class="dropdown-item" href="#">Herbs</a>
-                                        <a class="dropdown-item" href="#">Exotic</a>
-                                    </div>
-                                </div>
-                            </li>
-                            <li><a href="#" class="h6 px-5 py-3 rounded bg-white mb-2"><i class="fas fa-drumstick-bite text-primary me-2"></i>Meat</a></li>
-                            <li><a href="#" class="h6 px-5 py-3 rounded bg-white mb-2"><i class="fas fa-apple-alt text-primary me-2"></i>Fruit &amp; Nut Gifts</a></li>
-                            <li><a href="#" class="h6 px-5 py-3 rounded bg-white mb-2"><i class="fas fa-fish text-primary me-2"></i>Ocean Foods</a></li>
-                            <li><a href="#" class="h6 px-5 py-3 rounded bg-white mb-2"><i class="fas fa-egg text-primary me-2"></i>Butter &amp; Eggs</a></li>
-                            <li><a href="#" class="h6 px-5 py-3 rounded bg-white mb-2"><i class="fas fa-hamburger text-primary me-2"></i>Fastfood</a></li>
                             </ul>
                         </div>
                     <!-- </div> -->
@@ -622,73 +536,7 @@
 
 
 
-        <!-- Footer Start -->
-        <div class="container-fluid bg-dark text-white-50 footer pt-5 mt-5">
-            <div class="container py-5">
-                <div class="pb-4 mb-4" style="border-bottom: 1px solid rgba(226, 175, 24, 0.5) ;">
-                    <div class="row g-4">
-                        <div class="col-lg-3">
-                            <a href="#">
-                                <h1 class="text-primary mb-0">TenTech</h1>
-                                <p class="text-secondary mb-0">Laptop chính hãng - Dịch vụ tận tâm</p>
-                            </a>
-                        </div>
-                        <div class="col-lg-6">
-                            <div>
-                                <h4 class="text-light mb-3">Đăng ký nhận tin khuyến mãi</h4>
-                            </div>
-                            <div class="position-relative mx-auto">
-                                <input class="form-control border-0 w-100 py-3 px-4 rounded-pill" type="number" placeholder="Nhập số điện thoại của bạn">
-                                <button type="submit" class="btn btn-primary border-0 border-secondary py-3 px-4 position-absolute rounded-pill text-white" style="top: 0; right: 0;">Đăng ký ngay</button>
-                            </div>
-                        </div>
-                        <div class="col-lg-3">
-                            <div>
-                                <h4 class="text-light mb-3" style="margin-left: 2vh;">Theo dõi chúng tôi</h4>
-                            </div>
-                            <div class="d-flex justify-content-center pt-3">
-                                <a class="btn  btn-outline-secondary me-2 btn-md-square rounded-circle" href=""><i class="fab fa-twitter"></i></a>
-                                <a class="btn btn-outline-secondary me-2 btn-md-square rounded-circle" href=""><i class="fab fa-facebook-f"></i></a>
-                                <a class="btn btn-outline-secondary me-2 btn-md-square rounded-circle" href=""><i class="fab fa-youtube"></i></a>
-                                <a class="btn btn-outline-secondary btn-md-square rounded-circle" href=""><i class="fab fa-linkedin-in"></i></a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="row g-5">
-                    <div class="col-lg-3 col-md-6">
-                        <div class="d-flex flex-column text-start footer-item">
-                            <h4 class="text-light mb-3">Truy cập nhanh</h4>
-                            <a class="btn-link" href="warranty.html">Chính sách bảo hành</a>
-                            <a class="btn-link" href="privacy.html">Chính sách bảo mật thông tin</a>
-                            <a class="btn-link" href="payment.html">Hướng dẫn thanh toán</a>
-                            <a class="btn-link" href="contact.html">Liên hệ</a>
-                        </div>
-                    </div>
-                    <div class="col-lg-3 col-md-6">
-                        <div class="footer-item">
-                            <h4 class="text-light mb-3">Liên hệ</h4>
-                            <p>Địa chỉ: số 3 Đ. Cầu Giấy, Ngọc Khánh, Đống Đa, Hà Nội</p>
-                            <p>Email: TenTech@gmail.com</p>
-                            <p>Điện thoại: +0123 4567 8910</p>
-                        </div>
-                    </div>
-                    <div class="col-lg-3 col-md-6">
-                        <div class="d-flex flex-column text-start footer-item">
-                            <h4 class="text-light mb-3">Phương thức thanh toán</h4>
-                            <img src="LaptopFe/img/payment-2.png" class="img-fluid" alt="">
-                        </div>
-                    </div>
-                    <div class="col-lg-3 col-md-6">
-                        <div class="footer-item">
-                            <h4 class="text-light mb-3">Cửa hàng TenTech</h4>               
-                            <iframe class="ng-tns-c0-0" allowfullscreen="" height="125" loading="lazy" src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3724.1228608575834!2d105.80064111432421!3d21.02776948599887!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3135ab424a50fff9%3A0xbe3a7f3670c0a45f!2zVHLGsOG7nW5nIMSQ4bqhaSBo4buNYyBHaWFvIHRow7RuZyBW4bqtbiB04bqjaQ!5e0!3m2!1svi!2s!4v1539544397383" style="border-radius:25px;border:0;width:100%"></iframe>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- Footer End -->
+        @await Html.PartialAsync("_Footer")
 
         <!-- Back to Top -->
         <a href="#" class="btn btn-primary border-3 border-primary rounded-circle back-to-top"><i class="fa fa-arrow-up"></i></a>   
@@ -704,6 +552,80 @@
 
     <!-- Template Javascript -->
     <script src="../LaptopFe/js/main.js"></script>
+    <script>
+        (function () {
+            var apiBase = "http://localhost:5068/";
+            var $list = $('#categoriesList');
+            if ($list.length === 0) return;
+
+            // Toggle dropdown behavior
+            $('#categoriesToggle').on('click keypress', function (e) {
+                if (e.type === 'click' || (e.type === 'keypress' && (e.which === 13 || e.which === 32))) {
+                    $('#categoriesList').toggleClass('show');
+                    var expanded = $(this).attr('aria-expanded') === 'true';
+                    $(this).attr('aria-expanded', (!expanded).toString());
+                    $(this).find('.toggle-caret').toggleClass('fa-angle-down fa-angle-up');
+                }
+            });
+
+            // Load brands and product names from products list (client grouping)
+            $.ajax({
+                type: 'GET',
+                url: apiBase + "api/ListProductAPI/all",
+                dataType: 'json',
+                success: function (data) {
+                    // Group by brandId
+                    var brandMap = {};
+                    (data || []).forEach(function (p) {
+                        var bId = (p.brandId || '').trim();
+                        var bName = (p.brand && p.brand.brandName) ? p.brand.brandName : (bId || 'Khác');
+                        if (!brandMap[bId]) {
+                            brandMap[bId] = { brandId: bId, brandName: bName, productNames: new Set() };
+                        }
+                        if (p.productName) {
+                            brandMap[bId].productNames.add(p.productName);
+                        }
+                    });
+
+                    var brands = Object.values(brandMap).filter(function (b) { return (b.brandId || '').length > 0; });
+                    // Build list
+                    var html = '';
+                    brands.forEach(function (b) {
+                        var productNames = Array.from(b.productNames).sort();
+                        if (productNames.length > 0) {
+                            html += '<li>';
+                            html += '  <div class="dropdown category-dropdown">';
+                            html += '    <a href="/Home/Index?brandId=' + encodeURIComponent(b.brandId) + '" class="h6 px-5 py-3 rounded bg-white mb-2 dropdown-toggle d-flex align-items-center justify-content-between js-has-sub" aria-expanded="false">';
+                            html += '      <span><i class="fas fa-laptop text-primary me-2"></i>' + (b.brandName || b.brandId) + '</span>';
+                            html += '      <i class="fas fa-angle-right text-primary toggle-submenu"></i>';
+                            html += '    </a>';
+                            html += '    <div class="dropdown-menu m-0 bg-secondary rounded-0 category-submenu">';
+                            productNames.forEach(function (pn) {
+                                html += '      <a class="dropdown-item" href="/Home/Index?brandId=' + encodeURIComponent(b.brandId) + '&productName=' + encodeURIComponent(pn) + '">' + pn + '</a>';
+                            });
+                            html += '    </div>';
+                            html += '  </div>';
+                            html += '</li>';
+                        } else {
+                            html += '<li><a href="/Home/Index?brandId=' + encodeURIComponent(b.brandId) + '" class="h6 px-5 py-3 rounded bg-white mb-2"><i class="fas fa-laptop text-primary me-2"></i>' + (b.brandName || b.brandId) + '</a></li>';
+                        }
+                    });
+                    $list.html(html);
+
+                    // Handle submenu toggle hover
+                    $list.on('mouseenter', '.category-dropdown', function () {
+                        $(this).find('.category-submenu').addClass('show').css('display', 'block');
+                    }).on('mouseleave', '.category-dropdown', function () {
+                        $(this).find('.category-submenu').removeClass('show').css('display', 'none');
+                    });
+                },
+                error: function () {
+                    // Fallback content
+                    $list.html('<li><span class="d-block px-5 py-3 text-muted">Không thể tải danh mục</span></li>');
+                }
+            });
+        })();
+    </script>
     
     @RenderSection("Scripts", required: false)
     </body>
