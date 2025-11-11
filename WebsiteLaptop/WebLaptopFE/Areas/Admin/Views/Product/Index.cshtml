@@ -3,58 +3,7 @@
     Layout = "~/Areas/Admin/Views/Shared/_LayoutTableProduct.cshtml";
 }
 
-<style>
-    .product-image {
-        width: 60px;
-        height: 60px;
-        object-fit: cover;
-        border-radius: 8px;
-    }
-    .action-btn {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.75rem;
-        margin: 0 0.125rem;
-    }
-    .modal-lg {
-        max-width: 800px;
-    }
-    .preview-image {
-        max-width: 200px;
-        max-height: 200px;
-        margin-top: 10px;
-        border-radius: 8px;
-    }
-    .table-actions {
-        white-space: nowrap;
-    }
-    .badge-price {
-        font-size: 0.875rem;
-        padding: 0.5rem 0.75rem;
-    }
-    /* Ẩn nút xóa khi ở chế độ xem */
-    .view-mode .configuration-item button,
-    .view-mode .existing-image button {
-        display: none !important;
-        pointer-events: none !important;
-    }
-    .view-mode #btnAddConfiguration {
-        display: none !important;
-    }
-    /* Fix cho input trong configurations */
-    .configuration-item .form-control {
-        height: auto;
-        min-height: 38px;
-        line-height: 1.5;
-    }
-    .configuration-item .form-label {
-        display: block;
-        margin-bottom: 0.25rem;
-        font-weight: 400;
-    }
-    .configuration-item .mb-3 {
-        margin-bottom: 1rem !important;
-    }
-</style>
+
 
 <div class="container-fluid py-4">
     <div class="row">
@@ -70,41 +19,29 @@
                 </div>
                 <div class="card-body px-3 pb-2">
                     <!-- Bộ lọc và tìm kiếm -->
-                    <div class="row mb-3">
-                        <div class="col-md-4">
+                    <div class="row mb-3 g-2 align-items-end">
+                        <div class="col-lg-4 col-md-5">
                             <div class="input-group input-group-outline">
                                 <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm sản phẩm...">
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-lg-3 col-md-4">
                             <select id="brandFilter" class="form-select">
                                 <option value="">Tất cả thương hiệu</option>
                             </select>
-                        </div>
-                        <div class="col-md-2">
-                            <select id="pageSizeSelect" class="form-select">
-                                <option value="10">10 / trang</option>
-                                <option value="20">20 / trang</option>
-                                <option value="50">50 / trang</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3 text-end">
-                            <button class="btn btn-primary" onclick="loadProducts()">
-                                <i class="material-icons text-sm">search</i> Tìm kiếm
-                            </button>
                         </div>
                     </div>
 
                     <!-- Bảng sản phẩm -->
                     <div class="table-responsive p-0">
-                        <table class="table align-items-center mb-0">
+                        <table class="table align-items-center mb-0" style="table-layout: fixed; width: 100%;">
                             <thead>
                                 <tr>
-                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Sản phẩm</th>
-                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Thông tin</th>
-                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Giá</th>
-                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Thương hiệu</th>
-                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Thao tác</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 30%;">Sản phẩm</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 20%;">Thông tin</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Giá</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Thương hiệu</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 20%;">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody id="productTableBody">
@@ -324,25 +261,33 @@
         let currentPage = 1;
         let pageSize = 10;
         let deleteProductId = '';
+        let searchDebounceTimer = null;
+        const SEARCH_DEBOUNCE_DELAY = 300;
 
         $(document).ready(function() {
             loadBrands();
             loadProducts();
 
-            // Xử lý tìm kiếm khi nhấn Enter
-            $('#searchInput').on('keypress', function(e) {
-                if (e.which === 13) {
-                    loadProducts();
-                }
+            // Tìm kiếm tự động theo tên
+            $('#searchInput').on('input', function() {
+                triggerAutoSearch();
             });
 
-            // Xử lý thay đổi số lượng hiển thị
-            $('#pageSizeSelect').on('change', function() {
-                pageSize = parseInt($(this).val());
-                currentPage = 1;
-                loadProducts();
+            // Tìm kiếm tự động theo thương hiệu
+            $('#brandFilter').on('change', function() {
+                triggerAutoSearch();
             });
         });
+
+        function triggerAutoSearch() {
+            currentPage = 1;
+            if (searchDebounceTimer) {
+                clearTimeout(searchDebounceTimer);
+            }
+            searchDebounceTimer = setTimeout(() => {
+                loadProducts();
+            }, SEARCH_DEBOUNCE_DELAY);
+        }
 
         // Load danh sách thương hiệu
         function loadBrands() {
@@ -370,7 +315,7 @@
         // Load danh sách sản phẩm
         function loadProducts(page = currentPage) {
             currentPage = page;
-            const searchTerm = $('#searchInput').val();
+            const searchTerm = $('#searchInput').val().trim();
             const brandId = $('#brandFilter').val();
 
             $.ajax({
@@ -419,31 +364,31 @@
                 const brandName = product.brandName || '-';
 
                 tbody.append(`
-                    <tr>
-                        <td>
+                    <tr style="height: 80px;">
+                        <td style="vertical-align: middle;">
                             <div class="d-flex px-2 py-1">
                                 <div>
-                                    <img src="${avatar}" class="product-image me-3" alt="${product.productName}">
+                                    <img src="${avatar}" class="product-image me-3" alt="${product.productName}" onerror="this.src='${IMAGE_BASE_URL}/default-laptop.jpg'">
                                 </div>
-                                <div class="d-flex flex-column justify-content-center">
-                                    <h6 class="mb-0 text-sm">${product.productName}</h6>
+                                <div class="d-flex flex-column justify-content-center" style="min-width: 0; flex: 1;">
+                                    <h6 class="mb-0 text-sm" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${product.productName}</h6>
                                     <p class="text-xs text-secondary mb-0">${product.productId}</p>
                                 </div>
                             </div>
                         </td>
-                        <td>
-                            <p class="text-xs font-weight-bold mb-0">${product.productModel || '-'}</p>
-                            <p class="text-xs text-secondary mb-0">${product.screen || '-'}</p>
+                        <td style="vertical-align: middle;">
+                            <p class="text-xs font-weight-bold mb-0" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${product.productModel || '-'}</p>
+                            <p class="text-xs text-secondary mb-0" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${product.screen || '-'}</p>
                         </td>
-                        <td class="align-middle text-center">
+                        <td style="vertical-align: middle; text-align: center;">
                             <span class="badge badge-price bg-gradient-success">${sellingPrice}</span>
                             ${product.originalSellingPrice && product.originalSellingPrice > product.sellingPrice ? 
                                 `<br><small class="text-muted text-decoration-line-through">${originalPrice}</small>` : ''}
                         </td>
-                        <td class="align-middle text-center">
-                            <span class="text-xs font-weight-bold">${brandName}</span>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; max-width: 100%;">${brandName}</span>
                         </td>
-                        <td class="align-middle text-center table-actions">
+                        <td style="vertical-align: middle; text-align: center;" class="table-actions">
                             <button class="btn btn-info action-btn" onclick='viewProduct("${product.productId}")' title="Xem">
                                 <i class="material-icons text-sm">visibility</i>
                             </button>
@@ -1500,4 +1445,97 @@
     </script>
 }
 
+<style>
+    .product-image {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 8px;
+    }
 
+    .action-btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        margin: 0 0.125rem;
+    }
+
+    .modal-lg {
+        max-width: 800px;
+    }
+
+    .preview-image {
+        max-width: 200px;
+        max-height: 200px;
+        margin-top: 10px;
+        border-radius: 8px;
+    }
+
+    .table-actions {
+        white-space: nowrap;
+    }
+
+    .badge-price {
+        font-size: 0.875rem;
+        padding: 0.5rem 0.75rem;
+    }
+    /* Fix lỗi cột bị lệch khi đổi trang */
+    #productTableBody tr {
+        height: 80px;
+    }
+
+        #productTableBody tr td {
+            vertical-align: middle !important;
+            padding: 0.75rem 0.5rem !important;
+        }
+
+            #productTableBody tr td:first-child {
+                width: 30%;
+                min-width: 250px;
+            }
+
+            #productTableBody tr td:nth-child(2) {
+                width: 20%;
+                min-width: 150px;
+            }
+
+            #productTableBody tr td:nth-child(3) {
+                width: 15%;
+                min-width: 120px;
+            }
+
+            #productTableBody tr td:nth-child(4) {
+                width: 15%;
+                min-width: 100px;
+            }
+
+            #productTableBody tr td:nth-child(5) {
+                width: 20%;
+                min-width: 150px;
+            }
+    /* Ẩn nút xóa khi ở chế độ xem */
+    .view-mode .configuration-item button,
+    .view-mode .existing-image button {
+        display: none !important;
+        pointer-events: none !important;
+    }
+
+    .view-mode #btnAddConfiguration {
+        display: none !important;
+    }
+    /* Fix cho input trong configurations */
+    .configuration-item .form-control {
+        height: auto;
+        min-height: 38px;
+        line-height: 1.5;
+    }
+
+    .configuration-item .form-label {
+        display: block;
+        margin-bottom: 0.25rem;
+        font-weight: 400;
+    }
+
+    .configuration-item .mb-3 {
+        margin-bottom: 1rem !important;
+    }
+</style>

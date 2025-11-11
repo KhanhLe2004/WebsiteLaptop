@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
 using System.Text.Json;
 using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
@@ -629,13 +630,23 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     return NotFound(new { message = "Không tìm thấy sản phẩm" });
                 }
 
-                // Kiểm tra ràng buộc với các bảng khác
+                // Kiểm tra ràng buộc với các bảng quan trọng (không thể xóa nếu có)
                 var hasCartDetails = await _context.CartDetails.AnyAsync(cd => cd.ProductId == id);
                 var hasSaleInvoiceDetails = await _context.SaleInvoiceDetails.AnyAsync(sid => sid.ProductId == id);
+                var hasProductSerials = await _context.ProductSerials.AnyAsync(ps => ps.ProductId == id);
+                var hasStockExportDetails = await _context.StockExportDetails.AnyAsync(sed => sed.ProductId == id);
+                var hasStockImportDetails = await _context.StockImportDetails.AnyAsync(sid => sid.ProductId == id);
                 
-                if (hasCartDetails || hasSaleInvoiceDetails)
+                if (hasCartDetails || hasSaleInvoiceDetails || hasProductSerials || hasStockExportDetails || hasStockImportDetails)
                 {
-                    return BadRequest(new { message = "Không thể xóa sản phẩm vì đã có trong giỏ hàng hoặc hóa đơn" });
+                    var reasons = new List<string>();
+                    if (hasCartDetails) reasons.Add("giỏ hàng");
+                    if (hasSaleInvoiceDetails) reasons.Add("hóa đơn bán hàng");
+                    if (hasProductSerials) reasons.Add("sản phẩm serial");
+                    if (hasStockExportDetails) reasons.Add("phiếu xuất kho");
+                    if (hasStockImportDetails) reasons.Add("phiếu nhập kho");
+                    
+                    return BadRequest(new { message = $"Không thể xóa sản phẩm vì đã có trong {string.Join(", ", reasons)}" });
                 }
 
                 // Xóa ảnh avatar nếu có
@@ -661,6 +672,19 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     .ToListAsync();
                 _context.ProductConfigurations.RemoveRange(productConfigs);
 
+                // Xóa Product Reviews
+                var productReviews = await _context.ProductReviews
+                    .Where(pr => pr.ProductId == id)
+                    .ToListAsync();
+                _context.ProductReviews.RemoveRange(productReviews);
+
+                // Xóa Promotions
+                var promotions = await _context.Promotions
+                    .Where(p => p.ProductId == id)
+                    .ToListAsync();
+                _context.Promotions.RemoveRange(promotions);
+
+                // Xóa Product
                 _context.Products.Remove(product);
                 await _context.SaveChangesAsync();
 
@@ -668,7 +692,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Lỗi khi xóa sản phẩm", error = ex.Message });
+                Console.WriteLine($"Error deleting product: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
+                return StatusCode(500, new { message = "Lỗi khi xóa sản phẩm", error = ex.Message, details = ex.ToString() });
             }
         }
 
