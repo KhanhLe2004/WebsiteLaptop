@@ -39,6 +39,20 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Đảm bảo thư mục wwwroot/image tồn tại
+var wwwrootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+var imagePath = Path.Combine(wwwrootPath, "image");
+if (!Directory.Exists(wwwrootPath))
+{
+    Directory.CreateDirectory(wwwrootPath);
+    Console.WriteLine($"Created directory: {wwwrootPath}");
+}
+if (!Directory.Exists(imagePath))
+{
+    Directory.CreateDirectory(imagePath);
+    Console.WriteLine($"Created directory: {imagePath}");
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -46,10 +60,18 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// Use CORS - must be before UseStaticFiles và UseAuthorization
+app.UseCors("AllowAll");
+
 app.UseHttpsRedirection();
 
-// Use CORS - must be before UseAuthorization
-app.UseCors("AllowAll");
+// Enable static files để serve ảnh từ wwwroot/image
+// UseStaticFiles() mặc định serve từ wwwroot, nên /image/... sẽ tìm file trong wwwroot/image/...
+app.UseStaticFiles();
+
+Console.WriteLine($"Static files serving from: {wwwrootPath}");
+Console.WriteLine($"Image files serving from: {imagePath}");
+Console.WriteLine($"Image URL pattern: http://localhost:5068/image/{{filename}}");
 
 app.UseAuthorization();
 

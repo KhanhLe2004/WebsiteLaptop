@@ -10,6 +10,7 @@
 @section Scripts {
     <script>
         let url = "http://localhost:5068/";
+        const IMAGE_BASE_URL = url + "image";
         
         function showProductByCategory() {
             var str = '';
@@ -45,7 +46,7 @@
                                 }
                             }
                             
-                            var avatar = (val.avatar && typeof val.avatar === 'string' && val.avatar.trim() !== '') ? `/image/${val.avatar}` : '/image/default-laptop.jpg';
+                            var avatar = (val.avatar && typeof val.avatar === 'string' && val.avatar.trim() !== '') ? `${IMAGE_BASE_URL}/${val.avatar}` : `${IMAGE_BASE_URL}/default-laptop.jpg`;
                             str += `
                                 <div class="col-lg-3 col-md-6 col-sm-6 col-12">
                                     <div class="rounded position-relative fruite-item">

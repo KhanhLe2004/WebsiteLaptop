@@ -31,6 +31,29 @@
         font-size: 0.875rem;
         padding: 0.5rem 0.75rem;
     }
+    /* Ẩn nút xóa khi ở chế độ xem */
+    .view-mode .configuration-item button,
+    .view-mode .existing-image button {
+        display: none !important;
+        pointer-events: none !important;
+    }
+    .view-mode #btnAddConfiguration {
+        display: none !important;
+    }
+    /* Fix cho input trong configurations */
+    .configuration-item .form-control {
+        height: auto;
+        min-height: 38px;
+        line-height: 1.5;
+    }
+    .configuration-item .form-label {
+        display: block;
+        margin-bottom: 0.25rem;
+        font-weight: 400;
+    }
+    .configuration-item .mb-3 {
+        margin-bottom: 1rem !important;
+    }
 </style>
 
 <div class="container-fluid py-4">
@@ -124,7 +147,7 @@
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
                                 <label class="form-label">Mã sản phẩm *</label>
-                                <input type="text" class="form-control" id="productId" required>
+                                <input type="text" class="form-control" id="productId" required readonly>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -211,9 +234,48 @@
                     <div class="row">
                         <div class="col-md-12">
                             <div class="mb-3">
-                                <label for="avatarFile" class="form-label">Ảnh sản phẩm</label>
+                                <label for="avatarFile" class="form-label">Ảnh đại diện sản phẩm</label>
                                 <input type="file" class="form-control" id="avatarFile" accept="image/*" onchange="previewImage(this)">
                                 <img id="imagePreview" class="preview-image" style="display:none;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quản lý Cấu hình sản phẩm -->
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header bg-gradient-info">
+                                    <h6 class="text-white mb-0">Cấu hình sản phẩm</h6>
+                                    <button type="button" class="btn btn-sm btn-light float-end" id="btnAddConfiguration" onclick="addConfiguration()">
+                                        <i class="material-icons text-sm">add</i> Thêm cấu hình
+                                    </button>
+                                </div>
+                                <div class="card-body">
+                                    <div id="configurationsContainer">
+                                        <!-- Configurations sẽ được thêm động ở đây -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quản lý Ảnh sản phẩm -->
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header bg-gradient-success">
+                                    <h6 class="text-white mb-0">Ảnh sản phẩm</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="productImageFiles" class="form-label">Chọn nhiều ảnh</label>
+                                        <input type="file" class="form-control" id="productImageFiles" accept="image/*" multiple onchange="previewProductImages(this)">
+                                    </div>
+                                    <div id="productImagesPreview" class="row g-2">
+                                        <!-- Ảnh hiện tại và preview sẽ hiển thị ở đây -->
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -257,6 +319,8 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         const API_URL = 'http://localhost:5068/api/admin/products';
+        const API_BASE_URL = API_URL.replace(/\/api\/admin\/products$/, '');
+        const IMAGE_BASE_URL = `${API_BASE_URL}/image`;
         let currentPage = 1;
         let pageSize = 10;
         let deleteProductId = '';
@@ -347,7 +411,7 @@
             }
 
             $.each(products, function(index, product) {
-                const avatar = product.avatar ? `/image/${product.avatar}` : '/image/default-laptop.jpg';
+                const avatar = product.avatar ? `${IMAGE_BASE_URL}/${product.avatar}` : `${IMAGE_BASE_URL}/default-laptop.jpg`;
                 const originalPrice = product.originalSellingPrice ? 
                     new Intl.NumberFormat('vi-VN').format(product.originalSellingPrice) + ' đ' : '-';
                 const sellingPrice = product.sellingPrice ? 
@@ -454,20 +518,145 @@
             $('#pageInfo').text(`Hiển thị ${start} - ${end} trong tổng số ${response.totalItems} sản phẩm`);
         }
 
+        // Biến lưu trữ configurations và images
+        let configurations = [];
+        let existingImages = [];
+        let imagesToDelete = [];
+        let newImageFiles = []; // Lưu trữ các file ảnh mới được chọn
+
         // Mở modal thêm sản phẩm
         function openAddModal() {
             $('#isEditMode').val('false');
             $('#productModalLabel').text('Thêm sản phẩm mới');
+            
+            // Reset form
             $('#productForm')[0].reset();
-            $('#productId').prop('disabled', false);
+            $('#productId').val('');
+            $('#productName').val('');
+            $('#productModel').val('');
+            $('#brandId').val('');
+            $('#originalSellingPrice').val('');
+            $('#sellingPrice').val('');
+            $('#warrantyPeriod').val('');
+            $('#screen').val('');
+            $('#camera').val('');
+            $('#connect').val('');
+            $('#weight').val('');
+            $('#pin').val('');
+            
+            // Reset file inputs
+            $('#avatarFile').val('');
+            $('#productImageFiles').val('');
+            
+            // Reset preview
             $('#imagePreview').hide();
+            $('#productImagesPreview').empty();
             $('#errorMessage').hide();
+            
+            // Reset configurations và images
+            configurations = [];
+            existingImages = [];
+            imagesToDelete = [];
+            newImageFiles = [];
+            renderConfigurations();
+            renderProductImages();
             
             // Remove is-filled class from all input groups
             $('.input-group-outline').removeClass('is-filled');
             
+            // Enable all controls
+            setViewMode(false);
+            $('#productId').prop('disabled', false).prop('readonly', true); // Readonly khi thêm mới
+            $('.modal-footer .btn-primary').show();
+            
+            // Lấy ProductId tự động
+            $.ajax({
+                url: `${API_URL}/next-id`,
+                type: 'GET',
+                success: function(response) {
+                    if (response && response.productId) {
+                        $('#productId').val(response.productId);
+                        // Trigger change để update is-filled class
+                        $('#productId').trigger('change');
+                        // Add is-filled class
+                        $('#productId').closest('.input-group-outline').addClass('is-filled');
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Error getting next product ID:', xhr);
+                    // Nếu API lỗi, vẫn có thể tự nhập (remove readonly)
+                    $('#productId').prop('readonly', false);
+                }
+            });
+            
             const modal = new bootstrap.Modal(document.getElementById('productModal'));
             modal.show();
+        }
+        
+        // Thiết lập chế độ xem/chỉnh sửa
+        function setViewMode(isViewMode) {
+            const modalContent = $('#productModal .modal-content');
+            
+            if (isViewMode) {
+                // Thêm class view-mode để áp dụng CSS
+                modalContent.addClass('view-mode');
+                
+                // Disable tất cả inputs và selects trong form chính
+                $('#productForm input:not([type="hidden"]):not([type="file"]), #productForm select').prop('disabled', true);
+                $('#productForm input[type="file"]').prop('disabled', true).css('pointer-events', 'none');
+                
+                // Ẩn nút thêm cấu hình
+                $('#btnAddConfiguration').hide().css('display', 'none');
+                
+                // Ẩn TẤT CẢ nút xóa trong configurations (nhiều lớp bảo vệ)
+                $('.configuration-item button').hide().css({
+                    'display': 'none !important',
+                    'visibility': 'hidden',
+                    'pointer-events': 'none',
+                    'opacity': '0'
+                });
+                
+                // Ẩn TẤT CẢ nút xóa trong images (nhiều lớp bảo vệ)
+                $('.existing-image button').hide().css({
+                    'display': 'none !important',
+                    'visibility': 'hidden',
+                    'pointer-events': 'none',
+                    'opacity': '0'
+                });
+                
+                // Disable file input cho product images
+                $('#productImageFiles').prop('disabled', true).css('pointer-events', 'none');
+                
+                // Ẩn nút lưu
+                $('.modal-footer .btn-primary').hide();
+            } else {
+                // Xóa class view-mode
+                modalContent.removeClass('view-mode');
+                
+                // Enable tất cả inputs và selects trong form chính (trừ productId nếu đang edit)
+                $('#productForm input:not([type="hidden"]):not([type="file"]), #productForm select').each(function() {
+                    // Giữ nguyên trạng thái disabled của productId nếu đang edit
+                    if ($(this).attr('id') === 'productId' && $('#isEditMode').val() === 'true') {
+                        return; // Không enable productId khi edit
+                    }
+                    $(this).prop('disabled', false);
+                });
+                
+                $('#productForm input[type="file"]').prop('disabled', false).css('pointer-events', 'auto');
+                
+                // Hiện nút thêm cấu hình (quan trọng!)
+                $('#btnAddConfiguration').show().prop('disabled', false);
+                
+                // Enable file input cho product images
+                $('#productImageFiles').prop('disabled', false).css('pointer-events', 'auto');
+                
+                // Re-render configurations và images để enable controls và hiện nút xóa
+                renderConfigurations();
+                renderProductImages();
+                
+                // Hiện nút lưu
+                $('.modal-footer .btn-primary').show();
+            }
         }
 
         // Xem chi tiết sản phẩm
@@ -476,15 +665,29 @@
                 url: `${API_URL}/${productId}`,
                 type: 'GET',
                 success: function(product) {
-                    fillFormWithProduct(product, true);
+                    console.log('View product data:', product);
                     $('#productModalLabel').text('Chi tiết sản phẩm');
-                    $('#productForm input, #productForm select').prop('disabled', true);
-                    $('.modal-footer .btn-primary').hide();
+                    
+                    // Đảm bảo modal được reset trước
+                    $('#productForm')[0].reset();
+                    $('#btnAddConfiguration').show(); // Sẽ bị ẩn trong fillFormWithProduct
+                    
+                    // Load dữ liệu với viewOnly = true
+                    fillFormWithProduct(product, true);
                     
                     const modal = new bootstrap.Modal(document.getElementById('productModal'));
                     modal.show();
+                    
+                    // Đảm bảo setViewMode được gọi sau khi modal hiển thị
+                    setTimeout(function() {
+                        setViewMode(true);
+                        // Force hide các nút xóa một lần nữa để chắc chắn
+                        $('.configuration-item button').hide();
+                        $('.existing-image button').hide();
+                    }, 300);
                 },
                 error: function(xhr) {
+                    console.error('Error loading product for view:', xhr);
                     showNotification('Lỗi khi tải thông tin sản phẩm', 'error');
                 }
             });
@@ -496,17 +699,46 @@
                 url: `${API_URL}/${productId}`,
                 type: 'GET',
                 success: function(product) {
+                    console.log('Product data loaded:', product);
+                    console.log('Configurations:', product.configurations);
+                    console.log('Images:', product.images);
+                    
                     $('#isEditMode').val('true');
                     $('#productModalLabel').text('Cập nhật sản phẩm');
+                    
+                    // Reset form và data trước
+                    $('#productForm')[0].reset();
+                    configurations = [];
+                    existingImages = [];
+                    imagesToDelete = [];
+                    newImageFiles = [];
+                    
+                    // Fill form với dữ liệu
                     fillFormWithProduct(product, false);
-                    $('#productId').prop('disabled', true);
-                    $('#productForm input, #productForm select').prop('disabled', false);
-                    $('.modal-footer .btn-primary').show();
+                    
+                    // Disable productId (không cho sửa mã) - set readonly
+                    $('#productId').prop('disabled', false).prop('readonly', true);
+                    
+                    // Enable edit mode (không phải view mode) - gọi sau khi fill form
+                    setTimeout(function() {
+                        setViewMode(false);
+                        
+                        // Đảm bảo nút "Thêm cấu hình" hiển thị
+                        $('#btnAddConfiguration').show().prop('disabled', false);
+                        
+                        // Đảm bảo file input enabled
+                        $('#productImageFiles').prop('disabled', false).css('pointer-events', 'auto');
+                        
+                        // Re-render để đảm bảo controls hiển thị đúng
+                        renderConfigurations();
+                        renderProductImages();
+                    }, 150);
                     
                     const modal = new bootstrap.Modal(document.getElementById('productModal'));
                     modal.show();
                 },
                 error: function(xhr) {
+                    console.error('Error loading product:', xhr);
                     showNotification('Lỗi khi tải thông tin sản phẩm', 'error');
                 }
             });
@@ -514,8 +746,12 @@
 
         // Điền dữ liệu vào form
         function fillFormWithProduct(product, viewOnly) {
-            $('#productId').val(product.productId);
-            $('#productName').val(product.productName);
+            // Reset form trước
+            $('#productForm')[0].reset();
+            
+            // Fill basic info
+            $('#productId').val(product.productId || '');
+            $('#productName').val(product.productName || '');
             $('#productModel').val(product.productModel || '');
             $('#brandId').val(product.brandId || '');
             $('#originalSellingPrice').val(product.originalSellingPrice || '');
@@ -526,19 +762,64 @@
             $('#connect').val(product.connect || '');
             $('#weight').val(product.weight || '');
             $('#pin').val(product.pin || '');
+            
+            // Trigger change để update is-filled class
+            $('#brandId').trigger('change');
 
             // Add is-filled class to input groups with values
-            $('.input-group-outline input').each(function() {
-                if ($(this).val()) {
-                    $(this).closest('.input-group-outline').addClass('is-filled');
-                }
-            });
+            setTimeout(function() {
+                $('.input-group-outline input, .input-group-outline select').each(function() {
+                    if ($(this).val()) {
+                        $(this).closest('.input-group-outline').addClass('is-filled');
+                    } else {
+                        $(this).closest('.input-group-outline').removeClass('is-filled');
+                    }
+                });
+            }, 100);
 
+            // Load avatar
             if (product.avatar) {
-                $('#imagePreview').attr('src', `/image/${product.avatar}`).show();
+                const avatarUrl = `${IMAGE_BASE_URL}/${product.avatar}`;
+                $('#imagePreview').attr('src', avatarUrl).show();
             } else {
                 $('#imagePreview').hide();
             }
+
+            // Load configurations TRƯỚC KHI set view mode
+            configurations = product.configurations || [];
+            console.log('Loaded configurations:', configurations);
+            console.log('Configurations count:', configurations.length);
+
+            // Load existing images
+            existingImages = product.images || [];
+            console.log('Loaded images:', existingImages);
+            console.log('Images count:', existingImages.length);
+            imagesToDelete = [];
+            
+            // Chỉ reset newImageFiles khi viewOnly (không reset khi edit)
+            if (viewOnly) {
+                newImageFiles = [];
+            }
+            
+            // Render configurations và images
+            renderConfigurations();
+            renderProductImages();
+            
+            // Set view mode SAU KHI render (chỉ set nếu viewOnly, không set khi edit)
+            if (viewOnly) {
+                // Disable form inputs
+                $('#productForm input:not([type="hidden"]):not([type="file"]), #productForm select').prop('disabled', true);
+                $('#productForm input[type="file"]').prop('disabled', true).css('pointer-events', 'none');
+                $('#btnAddConfiguration').hide();
+                $('.modal-footer .btn-primary').hide();
+                // Clear file inputs khi view
+                $('#productImageFiles').val('');
+            }
+            // Nếu không phải viewOnly (edit mode), không set gì ở đây
+            // Sẽ được set trong editProduct function
+            
+            // Clear avatar file input (luôn clear)
+            $('#avatarFile').val('');
 
             $('#errorMessage').hide();
         }
@@ -556,18 +837,40 @@
 
         // Lưu sản phẩm
         function saveProduct() {
+            // Clear error message
+            $('#errorMessage').hide();
+            
             const isEdit = $('#isEditMode').val() === 'true';
             const productId = $('#productId').val().trim();
 
-            if (!productId) {
+            if (!isEdit && !productId) {
                 showError('Vui lòng nhập mã sản phẩm');
+                $('#productId').focus();
                 return;
             }
 
             const productName = $('#productName').val().trim();
             if (!productName) {
                 showError('Vui lòng nhập tên sản phẩm');
+                $('#productName').focus();
                 return;
+            }
+            
+            // Validate configurations (chỉ validate nếu có configurations và có ít nhất một field được điền)
+            if (configurations && configurations.length > 0) {
+                for (let i = 0; i < configurations.length; i++) {
+                    const config = configurations[i];
+                    // Kiểm tra xem config có ít nhất một field được điền không
+                    const hasAnyField = (config.specifications && config.specifications.trim() !== '') ||
+                                       (config.price && parseFloat(config.price) > 0) ||
+                                       (config.quantity && parseInt(config.quantity) > 0);
+                    
+                    // Nếu có ít nhất một field nhưng thiếu specifications, báo lỗi
+                    if (hasAnyField && (!config.specifications || config.specifications.trim() === '')) {
+                        showError(`Vui lòng nhập thông số kỹ thuật cho cấu hình thứ ${i + 1}`);
+                        return;
+                    }
+                }
             }
 
             const formData = new FormData();
@@ -592,6 +895,68 @@
                 formData.append('AvatarFile', avatarFile);
             }
 
+            // Thêm configurations (chỉ gửi nếu có)
+            if (configurations && configurations.length > 0) {
+                if (isEdit) {
+                    const configsToSend = configurations
+                        .filter(c => c.specifications && c.specifications.trim() !== '') // Lọc bỏ config rỗng
+                        .map(c => ({
+                            configurationId: c.configurationId || null,
+                            specifications: (c.specifications || '').trim(),
+                            price: parseFloat(c.price) || 0,
+                            quantity: parseInt(c.quantity) || 0
+                        }));
+                    if (configsToSend.length > 0) {
+                        formData.append('ConfigurationsJson', JSON.stringify(configsToSend));
+                    }
+
+                    // Thêm images to delete
+                    if (imagesToDelete.length > 0) {
+                        formData.append('ImagesToDeleteJson', JSON.stringify(imagesToDelete));
+                    }
+                } else {
+                    const configsToSend = configurations
+                        .filter(c => c.specifications && c.specifications.trim() !== '') // Lọc bỏ config rỗng
+                        .map(c => ({
+                            specifications: (c.specifications || '').trim(),
+                            price: parseFloat(c.price) || 0,
+                            quantity: parseInt(c.quantity) || 0
+                        }));
+                    if (configsToSend.length > 0) {
+                        formData.append('ConfigurationsJson', JSON.stringify(configsToSend));
+                    }
+                }
+            }
+
+            // Thêm product images từ newImageFiles array
+            if (newImageFiles && newImageFiles.length > 0) {
+                newImageFiles.forEach(function(imageObj) {
+                    if (imageObj && imageObj.file) {
+                        // Validate file type
+                        if (!imageObj.file.type || !imageObj.file.type.startsWith('image/')) {
+                            console.warn('Skipping non-image file:', imageObj.name);
+                            return;
+                        }
+                        // Validate file size (max 5MB)
+                        if (imageObj.file.size > 5 * 1024 * 1024) {
+                            console.warn('Skipping large file:', imageObj.name, 'Size:', imageObj.file.size);
+                            return;
+                        }
+                        formData.append('ImageFiles', imageObj.file);
+                    }
+                });
+            }
+            
+            // Debug: Log form data
+            console.log('FormData contents:');
+            for (let pair of formData.entries()) {
+                if (pair[1] instanceof File) {
+                    console.log(pair[0] + ': [File] ' + pair[1].name + ' (' + pair[1].size + ' bytes)');
+                } else {
+                    console.log(pair[0] + ': ' + (typeof pair[1] === 'string' && pair[1].length > 100 ? pair[1].substring(0, 100) + '...' : pair[1]));
+                }
+            }
+
             const url = isEdit ? `${API_URL}/${productId}` : API_URL;
             const method = isEdit ? 'PUT' : 'POST';
 
@@ -602,19 +967,63 @@
                 processData: false,
                 contentType: false,
                 success: function(response) {
+                    console.log('Save product success:', response);
                     showNotification(isEdit ? 'Cập nhật sản phẩm thành công' : 'Thêm sản phẩm thành công', 'success');
-                    bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('productModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
                     loadProducts();
                 },
                 error: function(xhr) {
-                    let message = 'Có lỗi xảy ra';
-                    if (xhr.responseJSON && xhr.responseJSON.message) {
-                        message = xhr.responseJSON.message;
-                    } else if (xhr.responseJSON && xhr.responseJSON.errors) {
-                        const errors = xhr.responseJSON.errors;
-                        message = Object.values(errors).flat().join('<br>');
+                    console.error('Error saving product:', xhr);
+                    console.error('Status:', xhr.status);
+                    console.error('Status Text:', xhr.statusText);
+                    console.error('Response Text:', xhr.responseText);
+                    console.error('Response JSON:', xhr.responseJSON);
+                    
+                    let message = 'Có lỗi xảy ra khi lưu sản phẩm';
+                    let errorDetails = '';
+                    
+                    if (xhr.responseJSON) {
+                        if (xhr.responseJSON.message) {
+                            message = xhr.responseJSON.message;
+                        }
+                        if (xhr.responseJSON.error) {
+                            errorDetails += '<br><small style="color: #dc3545;">' + xhr.responseJSON.error + '</small>';
+                        }
+                        if (xhr.responseJSON.details) {
+                            errorDetails += '<br><small style="color: #6c757d; font-size: 0.8em;">' + 
+                                xhr.responseJSON.details.substring(0, 500).replace(/\n/g, '<br>') + '</small>';
+                        }
+                        if (xhr.responseJSON.errors) {
+                            const errors = xhr.responseJSON.errors;
+                            const errorMessages = Object.values(errors).flat();
+                            errorDetails += '<br>' + errorMessages.join('<br>');
+                        }
+                    } else if (xhr.responseText) {
+                        try {
+                            const errorObj = JSON.parse(xhr.responseText);
+                            message = errorObj.message || errorObj.error || message;
+                            if (errorObj.details) {
+                                errorDetails += '<br><small style="color: #6c757d;">' + 
+                                    errorObj.details.substring(0, 300) + '</small>';
+                            }
+                        } catch (e) {
+                            errorDetails = '<br><small>' + xhr.responseText.substring(0, 200) + '</small>';
+                        }
                     }
-                    showError(message);
+                    
+                    if (xhr.status) {
+                        errorDetails += '<br><small style="color: #6c757d;">HTTP Status: ' + xhr.status + 
+                            (xhr.statusText ? ' ' + xhr.statusText : '') + '</small>';
+                    }
+                    
+                    showError(message + errorDetails);
+                    // Scroll to error message
+                    if ($('#errorMessage').length > 0) {
+                        $('#errorMessage')[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
                 }
             });
         }
@@ -665,6 +1074,430 @@
         function showError(message) {
             $('#errorMessage').html(message).show();
         }
+
+        // ========== Xử lý Configurations ==========
+        
+        // Thêm cấu hình mới
+        function addConfiguration() {
+            configurations.push({
+                configurationId: null,
+                specifications: '',
+                price: 0,
+                quantity: 0
+            });
+            renderConfigurations();
+        }
+
+        // Xóa cấu hình
+        function removeConfiguration(index) {
+            // Kiểm tra view mode - ngăn chặn xóa khi đang xem
+            const firstInput = $('#productForm input:not([type="hidden"])').first();
+            const isViewMode = firstInput.length > 0 ? firstInput.prop('disabled') || false : false;
+            if (isViewMode) {
+                console.warn('Cannot remove configuration in view mode');
+                return;
+            }
+            
+            const config = configurations[index];
+            // Nếu là configuration đã tồn tại, đánh dấu để xóa khi update
+            if (config.configurationId) {
+                // Trong trường hợp update, configuration sẽ bị xóa vì không có trong list gửi lên
+            }
+            configurations.splice(index, 1);
+            renderConfigurations();
+        }
+
+        // Cập nhật cấu hình
+        function updateConfiguration(index, field, value) {
+            if (configurations[index]) {
+                configurations[index][field] = value;
+            }
+        }
+
+        // Render danh sách configurations
+        function renderConfigurations() {
+            const container = $('#configurationsContainer');
+            container.empty();
+
+            // Kiểm tra view mode - nếu không có input nào trong form thì chưa load
+            const firstInput = $('#productForm input:not([type="hidden"])').first();
+            const isViewMode = firstInput.length > 0 ? firstInput.prop('disabled') || false : false;
+
+            if (configurations.length === 0) {
+                if (isViewMode) {
+                    container.append(`
+                        <p class="text-muted text-sm mb-0">Không có cấu hình nào.</p>
+                    `);
+                } else {
+                    container.append(`
+                        <p class="text-muted text-sm mb-0">Chưa có cấu hình nào. Nhấn "Thêm cấu hình" để thêm mới.</p>
+                    `);
+                }
+                return;
+            }
+            
+            configurations.forEach((config, index) => {
+                const specifications = (config.specifications || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                const price = config.price || 0;
+                const quantity = config.quantity || 0;
+                const disabledAttr = isViewMode ? 'disabled' : '';
+                
+                const configHtml = `
+                    <div class="card mb-3 configuration-item" data-index="${index}">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-5">
+                                    <div class="mb-3">
+                                        <label for="config-spec-${index}" class="form-label" style="font-size: 0.875rem; color: #7b809a; font-weight: 400; margin-bottom: 0.25rem;">Thông số kỹ thuật</label>
+                                        <input type="text" 
+                                               id="config-spec-${index}"
+                                               class="form-control config-specifications" 
+                                               value="${specifications}" 
+                                               onchange="updateConfiguration(${index}, 'specifications', this.value)"
+                                               oninput="updateConfiguration(${index}, 'specifications', this.value)"
+                                               placeholder="VD: RAM 8GB, SSD 256GB"
+                                               ${disabledAttr}>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="config-price-${index}" class="form-label" style="font-size: 0.875rem; color: #7b809a; font-weight: 400; margin-bottom: 0.25rem;">Giá (VNĐ)</label>
+                                        <input type="number" 
+                                               id="config-price-${index}"
+                                               class="form-control config-price" 
+                                               value="${price}" 
+                                               onchange="updateConfiguration(${index}, 'price', parseFloat(this.value) || 0)"
+                                               oninput="updateConfiguration(${index}, 'price', parseFloat(this.value) || 0)"
+                                               step="1000"
+                                               ${disabledAttr}>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="config-qty-${index}" class="form-label" style="font-size: 0.875rem; color: #7b809a; font-weight: 400; margin-bottom: 0.25rem;">Số lượng</label>
+                                        <input type="number" 
+                                               id="config-qty-${index}"
+                                               class="form-control config-quantity" 
+                                               value="${quantity}" 
+                                               onchange="updateConfiguration(${index}, 'quantity', parseInt(this.value) || 0)"
+                                               oninput="updateConfiguration(${index}, 'quantity', parseInt(this.value) || 0)"
+                                               min="0"
+                                               ${disabledAttr}>
+                                    </div>
+                                </div>
+                                <div class="col-md-1">
+                                    ${!isViewMode ? `
+                                    <button type="button" class="btn btn-danger btn-sm mt-3" 
+                                            onclick="removeConfiguration(${index})" 
+                                            title="Xóa">
+                                        <i class="material-icons text-sm">delete</i>
+                                    </button>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.append(configHtml);
+            });
+        }
+
+        // ========== Xử lý Product Images ==========
+        
+        // Preview product images
+        function previewProductImages(input) {
+            const previewContainer = $('#productImagesPreview');
+            
+            // Kiểm tra view mode
+            const firstInput = $('#productForm input:not([type="hidden"])').first();
+            const isViewMode = firstInput.length > 0 ? firstInput.prop('disabled') || false : false;
+            
+            // Nếu ở view mode, không cho phép thêm ảnh
+            if (isViewMode) {
+                $(input).val('');
+                return;
+            }
+            
+            // Xóa message "chưa có ảnh" nếu có
+            previewContainer.find('.col-12 p.text-muted').remove();
+            
+            if (input.files && input.files.length > 0) {
+                const files = Array.from(input.files);
+                
+                files.forEach((file, fileIndex) => {
+                    // Validate file type
+                    if (!file.type.startsWith('image/')) {
+                        showNotification('File không phải là ảnh: ' + file.name, 'error');
+                        return;
+                    }
+                    
+                    // Validate file size (max 5MB)
+                    if (file.size > 5 * 1024 * 1024) {
+                        showNotification('Ảnh quá lớn (tối đa 5MB): ' + file.name, 'error');
+                        return;
+                    }
+                    
+                    // Tạo unique ID cho file (dùng timestamp + random để đảm bảo unique)
+                    const fileId = 'new_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + fileIndex;
+                    
+                    // Kiểm tra xem file đã được thêm chưa (tránh trùng lặp)
+                    const isDuplicate = newImageFiles.some(img => 
+                        img.name === file.name && 
+                        img.file.size === file.size && 
+                        img.file.lastModified === file.lastModified
+                    );
+                    
+                    if (isDuplicate) {
+                        showNotification('Ảnh đã được thêm: ' + file.name, 'error');
+                        return;
+                    }
+                    
+                    // Thêm file vào mảng newImageFiles
+                    newImageFiles.push({
+                        id: fileId,
+                        file: file,
+                        name: file.name
+                    });
+                    
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        // Kiểm tra xem element đã tồn tại chưa (tránh duplicate)
+                        if ($(`.new-image-preview[data-file-id="${fileId}"]`).length > 0) {
+                            return;
+                        }
+                        
+                        const imageHtml = `
+                            <div class="col-md-3 mb-2 new-image-preview" data-file-id="${fileId}">
+                                <div class="card position-relative">
+                                    <img src="${e.target.result}" class="card-img-top" style="height: 150px; object-fit: cover;">
+                                    <button type="button" 
+                                            class="btn btn-danger btn-sm position-absolute top-0 end-0 m-1" 
+                                            onclick="removeNewImage('${fileId}')"
+                                            title="Xóa ảnh">
+                                        <i class="material-icons text-sm">close</i>
+                                    </button>
+                                    <div class="card-body p-2">
+                                        <small class="text-muted d-block" style="font-size: 0.75rem; word-break: break-word; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${file.name}">${file.name}</small>
+                                        <small class="text-info">Ảnh mới</small>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        previewContainer.append(imageHtml);
+                    };
+                    reader.onerror = function() {
+                        showNotification('Lỗi khi đọc file: ' + file.name, 'error');
+                        // Xóa file khỏi mảng nếu có lỗi
+                        newImageFiles = newImageFiles.filter(img => img.id !== fileId);
+                    };
+                    reader.readAsDataURL(file);
+                });
+                
+                // Reset file input để có thể chọn lại file cùng tên
+                $(input).val('');
+            }
+        }
+        
+        // Xóa ảnh mới được chọn
+        function removeNewImage(fileId) {
+            // Kiểm tra view mode
+            const firstInput = $('#productForm input:not([type="hidden"])').first();
+            const isViewMode = firstInput.length > 0 ? firstInput.prop('disabled') || false : false;
+            if (isViewMode) {
+                return;
+            }
+            
+            // Xóa khỏi mảng newImageFiles
+            newImageFiles = newImageFiles.filter(img => img.id !== fileId);
+            
+            // Xóa khỏi DOM
+            $(`.new-image-preview[data-file-id="${fileId}"]`).remove();
+            
+            // Nếu không còn ảnh nào, hiển thị message
+            const previewContainer = $('#productImagesPreview');
+            if (newImageFiles.length === 0 && 
+                (!existingImages || existingImages.length === 0 || 
+                 existingImages.every(img => imagesToDelete.includes(img.imageId)))) {
+                if (previewContainer.find('.existing-image').length === 0 && 
+                    previewContainer.find('.new-image-preview').length === 0) {
+                    previewContainer.append(`
+                        <div class="col-12">
+                            <p class="text-muted text-sm mb-0">Chưa có ảnh nào. Chọn ảnh để thêm.</p>
+                        </div>
+                    `);
+                }
+            }
+        }
+        
+        // Render lại các ảnh mới đã chọn (dùng khi edit sản phẩm)
+        function renderNewImages() {
+            const previewContainer = $('#productImagesPreview');
+            
+            // Kiểm tra view mode
+            const firstInput = $('#productForm input:not([type="hidden"])').first();
+            const isViewMode = firstInput.length > 0 ? firstInput.prop('disabled') || false : false;
+            
+            // Xóa các new-image-preview cũ
+            previewContainer.find('.new-image-preview').remove();
+            
+            // Render lại từ mảng newImageFiles
+            newImageFiles.forEach(function(imageObj) {
+                if (imageObj && imageObj.file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const imageHtml = `
+                            <div class="col-md-3 mb-2 new-image-preview" data-file-id="${imageObj.id}">
+                                <div class="card position-relative">
+                                    <img src="${e.target.result}" class="card-img-top" style="height: 150px; object-fit: cover;">
+                                    ${!isViewMode ? `
+                                    <button type="button" 
+                                            class="btn btn-danger btn-sm position-absolute top-0 end-0 m-1" 
+                                            onclick="removeNewImage('${imageObj.id}')"
+                                            title="Xóa ảnh">
+                                        <i class="material-icons text-sm">close</i>
+                                    </button>
+                                    ` : ''}
+                                    <div class="card-body p-2">
+                                        <small class="text-muted d-block" style="font-size: 0.75rem; word-break: break-word; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${imageObj.name}">${imageObj.name}</small>
+                                        <small class="text-info">Ảnh mới</small>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        previewContainer.append(imageHtml);
+                    };
+                    reader.readAsDataURL(imageObj.file);
+                }
+            });
+        }
+
+        // Render existing product images
+        function renderProductImages() {
+            const previewContainer = $('#productImagesPreview');
+            
+            // Kiểm tra view mode - nếu không có input nào trong form thì chưa load
+            const firstInput = $('#productForm input:not([type="hidden"])').first();
+            const isViewMode = firstInput.length > 0 ? firstInput.prop('disabled') || false : false;
+            
+            // Xóa các existing images cũ để render lại (KHÔNG xóa new-image-preview)
+            previewContainer.find('.existing-image').remove();
+            
+            // Xóa message "không có ảnh" nếu có
+            previewContainer.find('.col-12 p.text-muted').remove();
+            
+            // Hiển thị ảnh hiện có
+            if (existingImages && existingImages.length > 0) {
+                const visibleImages = existingImages.filter(img => !imagesToDelete.includes(img.imageId));
+                if (visibleImages.length > 0) {
+                    visibleImages.forEach((image, index) => {
+                        const imgSrc = `${IMAGE_BASE_URL}/${image.imageUrl || image.imageId}`;
+                        const fallbackSrc = `${IMAGE_BASE_URL}/default-laptop.jpg`;
+                        const imageHtml = `
+                            <div class="col-md-3 mb-2 existing-image" data-image-id="${image.imageId}">
+                                <div class="card position-relative">
+                                    <img src="${imgSrc}" 
+                                         class="card-img-top" 
+                                         style="height: 150px; object-fit: cover;"
+                                         onerror="this.src='${fallbackSrc}'">
+                                    ${!isViewMode ? `
+                                    <button type="button" 
+                                            class="btn btn-danger btn-sm position-absolute top-0 end-0 m-1" 
+                                            onclick="removeExistingImage('${image.imageId}')"
+                                            title="Xóa ảnh">
+                                        <i class="material-icons text-sm">close</i>
+                                    </button>
+                                    ` : ''}
+                                    <div class="card-body p-2">
+                                        <small class="text-muted">Ảnh hiện có</small>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        previewContainer.append(imageHtml);
+                    });
+                }
+            }
+            
+            // Hiển thị message nếu không có ảnh nào (chỉ khi view mode hoặc không có ảnh mới)
+            if ((!existingImages || existingImages.length === 0 || 
+                 existingImages.every(img => imagesToDelete.includes(img.imageId))) &&
+                (!newImageFiles || newImageFiles.length === 0)) {
+                if (previewContainer.find('.existing-image').length === 0 && 
+                    previewContainer.find('.new-image-preview').length === 0) {
+                    if (isViewMode) {
+                        previewContainer.append(`
+                            <div class="col-12">
+                                <p class="text-muted text-sm mb-0">Không có ảnh nào.</p>
+                            </div>
+                        `);
+                    } else {
+                        previewContainer.append(`
+                            <div class="col-12">
+                                <p class="text-muted text-sm mb-0">Chưa có ảnh nào. Chọn ảnh để thêm.</p>
+                            </div>
+                        `);
+                    }
+                }
+            }
+        }
+
+        // Xóa ảnh hiện có
+        function removeExistingImage(imageId) {
+            // Kiểm tra view mode - ngăn chặn xóa khi đang xem
+            const firstInput = $('#productForm input:not([type="hidden"])').first();
+            const isViewMode = firstInput.length > 0 ? firstInput.prop('disabled') || false : false;
+            if (isViewMode) {
+                console.warn('Cannot remove image in view mode');
+                return;
+            }
+            
+            if (!imagesToDelete.includes(imageId)) {
+                imagesToDelete.push(imageId);
+            }
+            $(`.existing-image[data-image-id="${imageId}"]`).remove();
+        }
+
+        // Reset khi đóng modal
+        $(document).on('hidden.bs.modal', '#productModal', function() {
+            // Xóa class view-mode
+            $('#productModal .modal-content').removeClass('view-mode');
+            
+            // Reset file inputs
+            $('#productImageFiles').val('');
+            $('#avatarFile').val('');
+            
+            // Clear previews
+            $('#imagePreview').hide();
+            $('#productImagesPreview').empty();
+            
+            // Reset data
+            configurations = [];
+            existingImages = [];
+            imagesToDelete = [];
+            newImageFiles = [];
+            
+            // Reset form
+            $('#productForm')[0].reset();
+            $('#errorMessage').hide();
+            
+            // Remove is-filled classes
+            $('.input-group-outline').removeClass('is-filled');
+            
+            // Enable all controls để sẵn sàng cho lần mở tiếp theo
+            $('#productForm input:not([type="hidden"]), #productForm select').prop('disabled', false);
+            $('#productForm input[type="file"]').prop('disabled', false).css('pointer-events', 'auto');
+            $('.modal-footer .btn-primary').show();
+            $('#btnAddConfiguration').show();
+            
+            // Reset các nút xóa
+            $('.configuration-item button, .existing-image button').css({
+                'display': '',
+                'visibility': '',
+                'pointer-events': '',
+                'opacity': ''
+            });
+        });
     </script>
 }
+
 

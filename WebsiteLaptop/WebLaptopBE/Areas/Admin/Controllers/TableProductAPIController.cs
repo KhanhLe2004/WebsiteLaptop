@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
@@ -98,6 +99,57 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
         }
 
+        // GET: api/admin/products/next-id
+        // Lấy ProductId tiếp theo (tự động generate)
+        [HttpGet("next-id")]
+        public async Task<ActionResult> GetNextProductId()
+        {
+            try
+            {
+                // Lấy tất cả productId hiện có, sắp xếp theo thứ tự giảm dần
+                var lastProduct = await _context.Products
+                    .Where(p => p.ProductId.StartsWith("P") && p.ProductId.Length >= 2)
+                    .OrderByDescending(p => p.ProductId)
+                    .FirstOrDefaultAsync();
+
+                string nextId;
+                if (lastProduct == null)
+                {
+                    // Nếu chưa có sản phẩm nào, bắt đầu từ P001
+                    nextId = "P001";
+                }
+                else
+                {
+                    // Lấy số từ productId (ví dụ: P040 -> 40)
+                    var lastId = lastProduct.ProductId;
+                    if (lastId.StartsWith("P") && lastId.Length > 1)
+                    {
+                        var numberPart = lastId.Substring(1);
+                        if (int.TryParse(numberPart, out int lastNumber))
+                        {
+                            var nextNumber = lastNumber + 1;
+                            nextId = $"P{nextNumber:D3}"; // Format với 3 chữ số (P001, P002, ...)
+                        }
+                        else
+                        {
+                            // Nếu không parse được, bắt đầu từ P001
+                            nextId = "P001";
+                        }
+                    }
+                    else
+                    {
+                        nextId = "P001";
+                    }
+                }
+
+                return Ok(new { productId = nextId });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi tạo ProductId", error = ex.Message });
+            }
+        }
+
         // GET: api/admin/products/{id}
         // Lấy chi tiết một sản phẩm
         [HttpGet("{id}")]
@@ -105,34 +157,61 @@ namespace WebLaptopBE.Areas.Admin.Controllers
         {
             try
             {
+                // Load product với các navigation properties
                 var product = await _context.Products
                     .Include(p => p.Brand)
-                    .Where(p => p.ProductId == id)
-                    .Select(p => new ProductDTO
-                    {
-                        ProductId = p.ProductId,
-                        ProductName = p.ProductName,
-                        ProductModel = p.ProductModel,
-                        WarrantyPeriod = p.WarrantyPeriod,
-                        OriginalSellingPrice = p.OriginalSellingPrice,
-                        SellingPrice = p.SellingPrice,
-                        Screen = p.Screen,
-                        Camera = p.Camera,
-                        Connect = p.Connect,
-                        Weight = p.Weight,
-                        Pin = p.Pin,
-                        BrandId = p.BrandId,
-                        BrandName = p.Brand != null ? p.Brand.BrandName : null,
-                        Avatar = p.Avatar
-                    })
-                    .FirstOrDefaultAsync();
+                    .Include(p => p.ProductConfigurations)
+                    .Include(p => p.ProductImages)
+                    .FirstOrDefaultAsync(p => p.ProductId == id);
 
                 if (product == null)
                 {
                     return NotFound(new { message = "Không tìm thấy sản phẩm" });
                 }
 
-                return Ok(product);
+                // Load configurations trực tiếp từ database
+                var configurations = await _context.ProductConfigurations
+                    .Where(c => c.ProductId == id)
+                    .ToListAsync();
+
+                // Load images trực tiếp từ database
+                var images = await _context.ProductImages
+                    .Where(img => img.ProductId == id)
+                    .ToListAsync();
+
+                var productDTO = new ProductDTO
+                {
+                    ProductId = product.ProductId,
+                    ProductName = product.ProductName,
+                    ProductModel = product.ProductModel,
+                    WarrantyPeriod = product.WarrantyPeriod,
+                    OriginalSellingPrice = product.OriginalSellingPrice,
+                    SellingPrice = product.SellingPrice,
+                    Screen = product.Screen,
+                    Camera = product.Camera,
+                    Connect = product.Connect,
+                    Weight = product.Weight,
+                    Pin = product.Pin,
+                    BrandId = product.BrandId,
+                    BrandName = product.Brand != null ? product.Brand.BrandName : null,
+                    Avatar = product.Avatar,
+                    Configurations = configurations.Select(c => new ProductConfigurationDTO
+                    {
+                        ConfigurationId = c.ConfigurationId,
+                        Specifications = c.Specifications,
+                        Price = c.Price,
+                        Quantity = c.Quantity,
+                        ProductId = c.ProductId
+                    }).ToList(),
+                    Images = images.Select(img => new ProductImageDTO
+                    {
+                        ImageId = img.ImageId,
+                        ProductId = img.ProductId,
+                        ImageUrl = img.ImageId // Sử dụng ImageId làm tên file
+                    }).ToList()
+                };
+
+                return Ok(productDTO);
             }
             catch (Exception ex)
             {
@@ -150,6 +229,41 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 if (!ModelState.IsValid)
                 {
                     return BadRequest(ModelState);
+                }
+
+                // Nếu không có ProductId hoặc rỗng, tự động generate
+                if (string.IsNullOrWhiteSpace(dto.ProductId))
+                {
+                    var lastProduct = await _context.Products
+                        .Where(p => p.ProductId.StartsWith("P") && p.ProductId.Length >= 2)
+                        .OrderByDescending(p => p.ProductId)
+                        .FirstOrDefaultAsync();
+
+                    if (lastProduct == null)
+                    {
+                        dto.ProductId = "P001";
+                    }
+                    else
+                    {
+                        var lastId = lastProduct.ProductId;
+                        if (lastId.StartsWith("P") && lastId.Length > 1)
+                        {
+                            var numberPart = lastId.Substring(1);
+                            if (int.TryParse(numberPart, out int lastNumber))
+                            {
+                                var nextNumber = lastNumber + 1;
+                                dto.ProductId = $"P{nextNumber:D3}";
+                            }
+                            else
+                            {
+                                dto.ProductId = "P001";
+                            }
+                        }
+                        else
+                        {
+                            dto.ProductId = "P001";
+                        }
+                    }
                 }
 
                 // Kiểm tra sản phẩm đã tồn tại
@@ -172,7 +286,17 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 string? avatarFileName = null;
                 if (dto.AvatarFile != null && dto.AvatarFile.Length > 0)
                 {
-                    avatarFileName = await SaveImageAsync(dto.AvatarFile);
+                    try
+                    {
+                        avatarFileName = await SaveImageAsync(dto.AvatarFile);
+                        Console.WriteLine($"Avatar saved: {avatarFileName}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error saving avatar: {ex.Message}");
+                        Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                        return StatusCode(500, new { message = "Lỗi khi upload ảnh đại diện", error = ex.Message, details = ex.ToString() });
+                    }
                 }
 
                 var product = new Product
@@ -195,33 +319,119 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 _context.Products.Add(product);
                 await _context.SaveChangesAsync();
 
-                var result = await _context.Products
-                    .Include(p => p.Brand)
-                    .Where(p => p.ProductId == product.ProductId)
-                    .Select(p => new ProductDTO
+                // Xử lý Configurations
+                if (!string.IsNullOrEmpty(dto.ConfigurationsJson))
+                {
+                    try
                     {
-                        ProductId = p.ProductId,
-                        ProductName = p.ProductName,
-                        ProductModel = p.ProductModel,
-                        WarrantyPeriod = p.WarrantyPeriod,
-                        OriginalSellingPrice = p.OriginalSellingPrice,
-                        SellingPrice = p.SellingPrice,
-                        Screen = p.Screen,
-                        Camera = p.Camera,
-                        Connect = p.Connect,
-                        Weight = p.Weight,
-                        Pin = p.Pin,
-                        BrandId = p.BrandId,
-                        BrandName = p.Brand != null ? p.Brand.BrandName : null,
-                        Avatar = p.Avatar
-                    })
-                    .FirstAsync();
+                        var configurations = JsonSerializer.Deserialize<List<ProductConfigurationCreateDTO>>(dto.ConfigurationsJson);
+                        if (configurations != null && configurations.Count > 0)
+                        {
+                            foreach (var configDto in configurations)
+                            {
+                                // Validate configuration
+                                if (string.IsNullOrWhiteSpace(configDto.Specifications))
+                                {
+                                    Console.WriteLine("Warning: Configuration with empty specifications skipped");
+                                    continue;
+                                }
 
+                                var configId = $"CFG{DateTime.Now:yyyyMMddHHmmss}{Guid.NewGuid().ToString().Substring(0, 8)}";
+                                if (configId.Length > 20) configId = configId.Substring(0, 20);
+
+                                var configuration = new ProductConfiguration
+                                {
+                                    ConfigurationId = configId,
+                                    ProductId = product.ProductId,
+                                    Specifications = configDto.Specifications?.Trim() ?? string.Empty,
+                                    Price = configDto.Price ?? 0,
+                                    Quantity = configDto.Quantity ?? 0
+                                };
+                                _context.ProductConfigurations.Add(configuration);
+                            }
+                            if (_context.ChangeTracker.HasChanges())
+                            {
+                                await _context.SaveChangesAsync();
+                            }
+                        }
+                    }
+                    catch (JsonException ex)
+                    {
+                        // Log error nhưng không fail request
+                        Console.WriteLine($"Error parsing configurations: {ex.Message}");
+                        Console.WriteLine($"ConfigurationsJson: {dto.ConfigurationsJson}");
+                        // Không throw exception để không fail toàn bộ request
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error saving configurations: {ex.Message}");
+                        Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                        // Không throw để không fail toàn bộ request
+                    }
+                }
+                // Nếu không có ConfigurationsJson hoặc rỗng, không làm gì (sản phẩm có thể không có cấu hình)
+
+                // Xử lý Product Images
+                try
+                {
+                    var imageFiles = Request.Form.Files.Where(f => f.Name == "ImageFiles").ToList();
+                    if (imageFiles != null && imageFiles.Count > 0)
+                    {
+                        foreach (var imageFile in imageFiles)
+                        {
+                            if (imageFile != null && imageFile.Length > 0)
+                            {
+                                try
+                                {
+                                    // Validate file type
+                                    if (!imageFile.ContentType.StartsWith("image/"))
+                                    {
+                                        Console.WriteLine($"Warning: Skipping non-image file: {imageFile.FileName}");
+                                        continue;
+                                    }
+
+                                    var imageFileName = await SaveImageAsync(imageFile);
+                                    
+                                    var productImage = new ProductImage
+                                    {
+                                        ImageId = imageFileName, // Lưu tên file vào ImageId
+                                        ProductId = product.ProductId
+                                    };
+                                    _context.ProductImages.Add(productImage);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"Error processing image file {imageFile.FileName}: {ex.Message}");
+                                    // Tiếp tục xử lý các file khác
+                                }
+                            }
+                        }
+                        if (_context.ChangeTracker.HasChanges())
+                        {
+                            await _context.SaveChangesAsync();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error saving product images: {ex.Message}");
+                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                    // Không throw để không fail toàn bộ request
+                }
+
+                // Load lại product với đầy đủ thông tin
+                var result = await GetProductByIdAsync(product.ProductId);
                 return CreatedAtAction(nameof(GetProduct), new { id = product.ProductId }, result);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Lỗi khi tạo sản phẩm", error = ex.Message });
+                Console.WriteLine($"Error creating product: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
+                return StatusCode(500, new { message = "Lỗi khi tạo sản phẩm", error = ex.Message, details = ex.ToString() });
             }
         }
 
@@ -280,6 +490,124 @@ namespace WebLaptopBE.Areas.Admin.Controllers
 
                 await _context.SaveChangesAsync();
 
+                // Xử lý Configurations
+                if (!string.IsNullOrEmpty(dto.ConfigurationsJson))
+                {
+                    try
+                    {
+                        var configurations = JsonSerializer.Deserialize<List<ProductConfigurationUpdateDTO>>(dto.ConfigurationsJson);
+                        if (configurations != null)
+                        {
+                            // Load configurations hiện tại
+                            var existingConfigs = await _context.ProductConfigurations
+                                .Where(c => c.ProductId == id)
+                                .ToListAsync();
+
+                            // Xử lý từng configuration
+                            foreach (var configDto in configurations)
+                            {
+                                if (!string.IsNullOrEmpty(configDto.ConfigurationId))
+                                {
+                                    // Update existing
+                                    var existingConfig = existingConfigs.FirstOrDefault(c => c.ConfigurationId == configDto.ConfigurationId);
+                                    if (existingConfig != null)
+                                    {
+                                        existingConfig.Specifications = configDto.Specifications;
+                                        existingConfig.Price = configDto.Price;
+                                        existingConfig.Quantity = configDto.Quantity;
+                                        _context.ProductConfigurations.Update(existingConfig);
+                                    }
+                                }
+                                else
+                                {
+                                    // Create new
+                                    var configId = $"CFG{DateTime.Now:yyyyMMddHHmmss}{Guid.NewGuid().ToString().Substring(0, 8)}";
+                                    if (configId.Length > 20) configId = configId.Substring(0, 20);
+
+                                    var newConfig = new ProductConfiguration
+                                    {
+                                        ConfigurationId = configId,
+                                        ProductId = id,
+                                        Specifications = configDto.Specifications,
+                                        Price = configDto.Price,
+                                        Quantity = configDto.Quantity
+                                    };
+                                    _context.ProductConfigurations.Add(newConfig);
+                                }
+                            }
+
+                            // Xóa các configuration không còn trong list
+                            var configIdsToKeep = configurations
+                                .Where(c => !string.IsNullOrEmpty(c.ConfigurationId))
+                                .Select(c => c.ConfigurationId)
+                                .ToList();
+
+                            var configsToDelete = existingConfigs
+                                .Where(c => !configIdsToKeep.Contains(c.ConfigurationId))
+                                .ToList();
+
+                            if (configsToDelete.Any())
+                            {
+                                _context.ProductConfigurations.RemoveRange(configsToDelete);
+                            }
+
+                            await _context.SaveChangesAsync();
+                        }
+                    }
+                    catch (JsonException ex)
+                    {
+                        Console.WriteLine($"Error parsing configurations: {ex.Message}");
+                    }
+                }
+
+                // Xử lý xóa Images
+                if (!string.IsNullOrEmpty(dto.ImagesToDeleteJson))
+                {
+                    try
+                    {
+                        var imageIdsToDelete = JsonSerializer.Deserialize<List<string>>(dto.ImagesToDeleteJson);
+                        if (imageIdsToDelete != null && imageIdsToDelete.Count > 0)
+                        {
+                            var imagesToDelete = await _context.ProductImages
+                                .Where(img => img.ProductId == id && imageIdsToDelete.Contains(img.ImageId))
+                                .ToListAsync();
+
+                            foreach (var img in imagesToDelete)
+                            {
+                                DeleteImage(img.ImageId); // Xóa file ảnh
+                            }
+
+                            _context.ProductImages.RemoveRange(imagesToDelete);
+                            await _context.SaveChangesAsync();
+                        }
+                    }
+                    catch (JsonException ex)
+                    {
+                        Console.WriteLine($"Error parsing images to delete: {ex.Message}");
+                    }
+                }
+
+                // Xử lý thêm Images mới
+                var imageFiles = Request.Form.Files.Where(f => f.Name == "ImageFiles").ToList();
+                if (imageFiles != null && imageFiles.Count > 0)
+                {
+                    foreach (var imageFile in imageFiles)
+                    {
+                        if (imageFile.Length > 0)
+                        {
+                            var imageFileName = await SaveImageAsync(imageFile);
+
+                            var productImage = new ProductImage
+                            {
+                                ImageId = imageFileName, // Lưu tên file vào ImageId
+                                ProductId = id
+                            };
+                            _context.ProductImages.Add(productImage);
+                        }
+                    }
+                    await _context.SaveChangesAsync();
+                }
+
                 return Ok(new { message = "Cập nhật sản phẩm thành công" });
             }
             catch (Exception ex)
@@ -310,11 +638,28 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     return BadRequest(new { message = "Không thể xóa sản phẩm vì đã có trong giỏ hàng hoặc hóa đơn" });
                 }
 
-                // Xóa ảnh nếu có
+                // Xóa ảnh avatar nếu có
                 if (!string.IsNullOrEmpty(product.Avatar))
                 {
                     DeleteImage(product.Avatar);
                 }
+
+                // Xóa Product Images
+                var productImages = await _context.ProductImages
+                    .Where(img => img.ProductId == id)
+                    .ToListAsync();
+                
+                foreach (var img in productImages)
+                {
+                    DeleteImage(img.ImageId); // Xóa file ảnh
+                }
+                _context.ProductImages.RemoveRange(productImages);
+
+                // Xóa Product Configurations
+                var productConfigs = await _context.ProductConfigurations
+                    .Where(c => c.ProductId == id)
+                    .ToListAsync();
+                _context.ProductConfigurations.RemoveRange(productConfigs);
 
                 _context.Products.Remove(product);
                 await _context.SaveChangesAsync();
@@ -345,22 +690,135 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
         }
 
+        // Helper method để load product với đầy đủ thông tin
+        private async Task<ProductDTO> GetProductByIdAsync(string productId)
+        {
+            var product = await _context.Products
+                .Include(p => p.Brand)
+                .FirstOrDefaultAsync(p => p.ProductId == productId);
+
+            if (product == null)
+            {
+                return null!;
+            }
+
+            // Load configurations trực tiếp từ database
+            var configurations = await _context.ProductConfigurations
+                .Where(c => c.ProductId == productId)
+                .ToListAsync();
+
+            // Load images trực tiếp từ database
+            var images = await _context.ProductImages
+                .Where(img => img.ProductId == productId)
+                .ToListAsync();
+
+            return new ProductDTO
+            {
+                ProductId = product.ProductId,
+                ProductName = product.ProductName,
+                ProductModel = product.ProductModel,
+                WarrantyPeriod = product.WarrantyPeriod,
+                OriginalSellingPrice = product.OriginalSellingPrice,
+                SellingPrice = product.SellingPrice,
+                Screen = product.Screen,
+                Camera = product.Camera,
+                Connect = product.Connect,
+                Weight = product.Weight,
+                Pin = product.Pin,
+                BrandId = product.BrandId,
+                BrandName = product.Brand != null ? product.Brand.BrandName : null,
+                Avatar = product.Avatar,
+                Configurations = configurations.Select(c => new ProductConfigurationDTO
+                {
+                    ConfigurationId = c.ConfigurationId,
+                    Specifications = c.Specifications,
+                    Price = c.Price,
+                    Quantity = c.Quantity,
+                    ProductId = c.ProductId
+                }).ToList(),
+                Images = images.Select(img => new ProductImageDTO
+                {
+                    ImageId = img.ImageId,
+                    ProductId = img.ProductId,
+                    ImageUrl = img.ImageId // Sử dụng ImageId làm tên file
+                }).ToList()
+            };
+        }
+
         // Hàm hỗ trợ lưu ảnh
         private async Task<string> SaveImageAsync(IFormFile file)
         {
             try
             {
-                // Tạo tên file unique
+                if (file == null || file.Length == 0)
+                {
+                    throw new ArgumentException("File is null or empty");
+                }
+
+                // Validate file type
+                if (string.IsNullOrEmpty(file.ContentType) || !file.ContentType.StartsWith("image/"))
+                {
+                    throw new ArgumentException($"Invalid file type: {file.ContentType}. Only image files are allowed.");
+                }
+
+                // Validate file size (max 10MB)
+                const long maxFileSize = 10 * 1024 * 1024; // 10MB
+                if (file.Length > maxFileSize)
+                {
+                    throw new ArgumentException($"File size ({file.Length} bytes) exceeds maximum allowed size ({maxFileSize} bytes)");
+                }
+
+                // Tạo tên file unique nhưng TUÂN THỦ GIỚI HẠN cột DB:
+                // - ProductImage.ImageId tối đa 20 ký tự (xem cấu hình model)
+                // => Luôn tạo tên file với tổng độ dài <= 20 để tránh lỗi khi lưu ảnh sản phẩm
                 var fileExtension = Path.GetExtension(file.FileName);
-                var fileName = $"{Guid.NewGuid()}{fileExtension}";
+                if (string.IsNullOrEmpty(fileExtension))
+                {
+                    // Nếu không có extension, thử lấy từ content type
+                    fileExtension = file.ContentType switch
+                    {
+                        "image/jpeg" => ".jpg",
+                        "image/png" => ".png",
+                        "image/gif" => ".gif",
+                        "image/webp" => ".webp",
+                        _ => ".jpg" // Default
+                    };
+                }
+
+                // Tính toán độ dài tối đa cho phần baseName để tổng độ dài (base + ext) <= 20
+                const int maxTotalLength = 20;
+                var extLength = fileExtension.Length;
+                var baseNameMaxLength = Math.Max(1, maxTotalLength - extLength);
+
+                // Tạo baseName ngẫu nhiên có độ dài phù hợp
+                string GenerateRandomBaseName(int length)
+                {
+                    const string chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+                    var rnd = new Random();
+                    var buffer = new char[length];
+                    for (int i = 0; i < length; i++)
+                    {
+                        buffer[i] = chars[rnd.Next(chars.Length)];
+                    }
+                    return new string(buffer);
+                }
+
+                var baseName = GenerateRandomBaseName(baseNameMaxLength);
+                var fileName = $"{baseName}{fileExtension}";
                 
                 // Đường dẫn thư mục lưu ảnh
-                var uploadsFolder = Path.Combine(_environment.WebRootPath ?? "wwwroot", "image");
+                var webRootPath = _environment.WebRootPath;
+                if (string.IsNullOrEmpty(webRootPath))
+                {
+                    webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+                }
+                var uploadsFolder = Path.Combine(webRootPath, "image");
                 
                 // Tạo thư mục nếu chưa tồn tại
                 if (!Directory.Exists(uploadsFolder))
                 {
                     Directory.CreateDirectory(uploadsFolder);
+                    Console.WriteLine($"Created directory: {uploadsFolder}");
                 }
                 
                 var filePath = Path.Combine(uploadsFolder, fileName);
@@ -371,11 +829,14 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     await file.CopyToAsync(fileStream);
                 }
                 
+                Console.WriteLine($"Image saved successfully: {fileName} at {filePath}");
                 return fileName;
             }
             catch (Exception ex)
             {
-                throw new Exception($"Lỗi khi lưu ảnh: {ex.Message}");
+                Console.WriteLine($"Error in SaveImageAsync: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                throw new Exception($"Lỗi khi lưu ảnh: {ex.Message}", ex);
             }
         }
 

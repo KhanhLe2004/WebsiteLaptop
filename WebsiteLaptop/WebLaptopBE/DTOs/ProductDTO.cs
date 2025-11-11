@@ -2,6 +2,24 @@ using System.ComponentModel.DataAnnotations;
 
 namespace WebLaptopBE.DTOs
 {
+    // DTO cho ProductConfiguration
+    public class ProductConfigurationDTO
+    {
+        public string ConfigurationId { get; set; } = null!;
+        public string? Specifications { get; set; }
+        public decimal? Price { get; set; }
+        public int? Quantity { get; set; }
+        public string? ProductId { get; set; }
+    }
+
+    // DTO cho ProductImage
+    public class ProductImageDTO
+    {
+        public string ImageId { get; set; } = null!;
+        public string? ProductId { get; set; }
+        public string? ImageUrl { get; set; } // Đường dẫn ảnh (sử dụng ImageId làm tên file)
+    }
+
     // DTO cho hiển thị sản phẩm
     public class ProductDTO
     {
@@ -19,6 +37,8 @@ namespace WebLaptopBE.DTOs
         public string? BrandId { get; set; }
         public string? BrandName { get; set; }
         public string? Avatar { get; set; }
+        public List<ProductConfigurationDTO> Configurations { get; set; } = new List<ProductConfigurationDTO>();
+        public List<ProductImageDTO> Images { get; set; } = new List<ProductImageDTO>();
     }
 
     // DTO cho tạo mới sản phẩm
@@ -63,6 +83,20 @@ namespace WebLaptopBE.DTOs
         public string? BrandId { get; set; }
 
         public IFormFile? AvatarFile { get; set; }
+
+        // Danh sách cấu hình sản phẩm (gửi dưới dạng JSON string)
+        public string? ConfigurationsJson { get; set; }
+
+        // Danh sách ảnh sản phẩm (sẽ được xử lý từ form files)
+        // Note: Sẽ lấy từ Request.Form.Files với name "ImageFiles"
+    }
+
+    // DTO cho tạo ProductConfiguration
+    public class ProductConfigurationCreateDTO
+    {
+        public string? Specifications { get; set; }
+        public decimal? Price { get; set; }
+        public int? Quantity { get; set; }
     }
 
     // DTO cho cập nhật sản phẩm
@@ -103,6 +137,27 @@ namespace WebLaptopBE.DTOs
         public string? BrandId { get; set; }
 
         public IFormFile? AvatarFile { get; set; }
+
+        // Danh sách cấu hình sản phẩm (gửi dưới dạng JSON string)
+        public string? ConfigurationsJson { get; set; }
+
+        // Danh sách ảnh cần xóa (gửi dưới dạng JSON string - array of ImageId)
+        public string? ImagesToDeleteJson { get; set; }
+
+        // Flag để xóa avatar (true nếu muốn xóa avatar hiện có)
+        public bool? AvatarToDelete { get; set; }
+
+        // Danh sách ảnh sản phẩm mới (sẽ được xử lý từ form files)
+        // Note: Sẽ lấy từ Request.Form.Files với name "ImageFiles"
+    }
+
+    // DTO cho cập nhật ProductConfiguration
+    public class ProductConfigurationUpdateDTO
+    {
+        public string? ConfigurationId { get; set; } // Nếu có thì update, nếu null thì tạo mới
+        public string? Specifications { get; set; }
+        public decimal? Price { get; set; }
+        public int? Quantity { get; set; }
     }
 
     // DTO cho phân trang
