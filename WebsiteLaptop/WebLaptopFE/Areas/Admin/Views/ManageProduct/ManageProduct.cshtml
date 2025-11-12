@@ -1,6 +1,6 @@
 @{
     ViewData["Title"] = "Quản lý sản phẩm";
-    Layout = "~/Areas/Admin/Views/Shared/_LayoutTableProduct.cshtml";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutManageProduct.cshtml";
 }
 
 
@@ -251,7 +251,6 @@
         </div>
     </div>
 </div>
-
 @section Scripts {
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
@@ -465,6 +464,7 @@
 
         // Biến lưu trữ configurations và images
         let configurations = [];
+        let configurationsToDelete = []; // Lưu trữ các configurationId cần xóa (tương tự imagesToDelete)
         let existingImages = [];
         let imagesToDelete = [];
         let newImageFiles = []; // Lưu trữ các file ảnh mới được chọn
@@ -500,6 +500,7 @@
             
             // Reset configurations và images
             configurations = [];
+            configurationsToDelete = [];
             existingImages = [];
             imagesToDelete = [];
             newImageFiles = [];
@@ -654,6 +655,7 @@
                     // Reset form và data trước
                     $('#productForm')[0].reset();
                     configurations = [];
+                    configurationsToDelete = [];
                     existingImages = [];
                     imagesToDelete = [];
                     newImageFiles = [];
@@ -731,15 +733,37 @@
             }
 
             // Load configurations TRƯỚC KHI set view mode
-            configurations = product.configurations || [];
+            const productConfigurations = Array.isArray(product.configurations) ? product.configurations : [];
+            console.log('Raw product.configurations:', product.configurations);
+            console.log('productConfigurations array:', productConfigurations);
+            console.log('productConfigurations length:', productConfigurations.length);
+            
+            configurations = productConfigurations.map((config, idx) => {
+                const mappedConfig = {
+                    configurationId: config.configurationId || null,
+                    specifications: config.specifications || '',
+                    price: typeof config.price === 'number'
+                        ? config.price
+                        : (config.price ? parseFloat(config.price) || 0 : 0),
+                    quantity: typeof config.quantity === 'number'
+                        ? config.quantity
+                        : (config.quantity ? parseInt(config.quantity) || 0 : 0)
+                };
+                console.log(`Config ${idx}:`, mappedConfig);
+                return mappedConfig;
+            });
+            
             console.log('Loaded configurations:', configurations);
             console.log('Configurations count:', configurations.length);
+            console.log('Configurations type:', typeof configurations);
+            console.log('Is array:', Array.isArray(configurations));
 
             // Load existing images
             existingImages = product.images || [];
             console.log('Loaded images:', existingImages);
             console.log('Images count:', existingImages.length);
             imagesToDelete = [];
+            configurationsToDelete = []; // Reset configurationsToDelete khi load product
             
             // Chỉ reset newImageFiles khi viewOnly (không reset khi edit)
             if (viewOnly) {
@@ -801,17 +825,19 @@
                 return;
             }
             
-            // Validate configurations (chỉ validate nếu có configurations và có ít nhất một field được điền)
+            // Validate configurations
             if (configurations && configurations.length > 0) {
                 for (let i = 0; i < configurations.length; i++) {
                     const config = configurations[i];
-                    // Kiểm tra xem config có ít nhất một field được điền không
-                    const hasAnyField = (config.specifications && config.specifications.trim() !== '') ||
-                                       (config.price && parseFloat(config.price) > 0) ||
-                                       (config.quantity && parseInt(config.quantity) > 0);
                     
-                    // Nếu có ít nhất một field nhưng thiếu specifications, báo lỗi
-                    if (hasAnyField && (!config.specifications || config.specifications.trim() === '')) {
+                    // Kiểm tra xem config có ít nhất một field được điền không
+                    const hasSpecifications = config.specifications && config.specifications.trim() !== '';
+                    const hasPrice = config.price && parseFloat(config.price) > 0;
+                    const hasQuantity = config.quantity && parseInt(config.quantity) > 0;
+                    const hasAnyField = hasSpecifications || hasPrice || hasQuantity;
+                    
+                    // Nếu có field được điền nhưng thiếu specifications, báo lỗi
+                    if (hasAnyField && !hasSpecifications) {
                         showError(`Vui lòng nhập thông số kỹ thuật cho cấu hình thứ ${i + 1}`);
                         return;
                     }
@@ -840,13 +866,26 @@
                 formData.append('AvatarFile', avatarFile);
             }
 
-            // Thêm configurations
-            console.log('Original configurations array:', configurations);
-            
+            // Thêm configurations (tương tự như images)
             if (isEdit) {
-                // Khi update, luôn gửi ConfigurationsJson (có thể là array rỗng để xóa tất cả)
-                const configsToSend = (configurations || [])
-                    .filter(c => c.specifications && c.specifications.trim() !== '') // Lọc bỏ config rỗng
+                // Xử lý xóa Configurations (tương tự như xóa Images)
+                if (configurationsToDelete.length > 0) {
+                    console.log('Configurations to delete:', configurationsToDelete);
+                    formData.append('ConfigurationsToDeleteJson', JSON.stringify(configurationsToDelete));
+                }
+
+                // Xử lý thêm/Update Configurations (tương tự như thêm Images)
+                // Chỉ gửi configurations có specifications (required)
+                const configsToSend = configurations
+                    .filter(c => {
+                        // Chỉ giữ lại configurations có specifications không rỗng
+                        const hasSpecifications = c.specifications && c.specifications.trim() !== '';
+                        if (!hasSpecifications) {
+                            console.log('Skipping configuration without specifications:', c);
+                            return false;
+                        }
+                        return true;
+                    })
                     .map(c => ({
                         configurationId: c.configurationId || null,
                         specifications: (c.specifications || '').trim(),
@@ -854,12 +893,15 @@
                         quantity: parseInt(c.quantity) || 0
                     }));
                 
-                console.log('Configs to send (update):', configsToSend);
-                const configsJson = JSON.stringify(configsToSend);
-                console.log('ConfigurationsJson (update):', configsJson);
-                
-                // Luôn gửi ConfigurationsJson, kể cả khi rỗng (để backend biết cần xóa tất cả configs cũ)
-                formData.append('ConfigurationsJson', configsJson);
+                // Chỉ gửi ConfigurationsJson nếu có configurations hợp lệ
+                if (configsToSend.length > 0) {
+                    console.log('All configurations before filter:', configurations);
+                    console.log('Configs to send (with specifications):', configsToSend);
+                    console.log('Configs to send count:', configsToSend.length);
+                    const configsJson = JSON.stringify(configsToSend);
+                    console.log('ConfigurationsJson (update):', configsJson);
+                    formData.append('ConfigurationsJson', configsJson);
+                }
 
                 // Thêm images to delete
                 if (imagesToDelete.length > 0) {
@@ -875,18 +917,11 @@
                             price: parseFloat(c.price) || 0,
                             quantity: parseInt(c.quantity) || 0
                         }));
-                    
-                    console.log('Configs to send (create):', configsToSend);
-                    
                     if (configsToSend.length > 0) {
                         const configsJson = JSON.stringify(configsToSend);
                         console.log('ConfigurationsJson (create):', configsJson);
                         formData.append('ConfigurationsJson', configsJson);
-                    } else {
-                        console.warn('No valid configurations to send after filtering');
                     }
-                } else {
-                    console.warn('No configurations array or empty array');
                 }
             }
 
@@ -1050,7 +1085,7 @@
             renderConfigurations();
         }
 
-        // Xóa cấu hình
+        // Xóa cấu hình (tương tự như removeExistingImage)
         function removeConfiguration(index) {
             // Kiểm tra view mode - ngăn chặn xóa khi đang xem
             const firstInput = $('#productForm input:not([type="hidden"])').first();
@@ -1061,10 +1096,14 @@
             }
             
             const config = configurations[index];
-            // Nếu là configuration đã tồn tại, đánh dấu để xóa khi update
-            if (config.configurationId) {
-                // Trong trường hợp update, configuration sẽ bị xóa vì không có trong list gửi lên
+            // Nếu là configuration đã tồn tại (có configurationId), thêm vào configurationsToDelete
+            if (config && config.configurationId) {
+                if (!configurationsToDelete.includes(config.configurationId)) {
+                    configurationsToDelete.push(config.configurationId);
+                    console.log('Added configuration to delete:', config.configurationId);
+                }
             }
+            // Xóa khỏi array configurations
             configurations.splice(index, 1);
             renderConfigurations();
         }
@@ -1072,16 +1111,7 @@
         // Cập nhật cấu hình
         function updateConfiguration(index, field, value) {
             if (configurations[index]) {
-                // Xử lý giá trị dựa trên field type
-                if (field === 'price') {
-                    const numValue = parseFloat(value);
-                    configurations[index][field] = isNaN(numValue) ? 0 : numValue;
-                } else if (field === 'quantity') {
-                    const intValue = parseInt(value);
-                    configurations[index][field] = isNaN(intValue) ? 0 : intValue;
-                } else {
-                    configurations[index][field] = value || '';
-                }
+                configurations[index][field] = value;
             }
         }
 
@@ -1090,11 +1120,18 @@
             const container = $('#configurationsContainer');
             container.empty();
 
+            // Debug: Log configurations state
+            console.log('renderConfigurations called');
+            console.log('configurations:', configurations);
+            console.log('configurations.length:', configurations.length);
+            console.log('configurations type:', typeof configurations);
+            console.log('Is array:', Array.isArray(configurations));
+
             // Kiểm tra view mode - nếu không có input nào trong form thì chưa load
             const firstInput = $('#productForm input:not([type="hidden"])').first();
             const isViewMode = firstInput.length > 0 ? firstInput.prop('disabled') || false : false;
 
-            if (configurations.length === 0) {
+            if (!configurations || configurations.length === 0) {
                 if (isViewMode) {
                     container.append(`
                         <p class="text-muted text-sm mb-0">Không có cấu hình nào.</p>
@@ -1443,6 +1480,7 @@
             
             // Reset data
             configurations = [];
+            configurationsToDelete = [];
             existingImages = [];
             imagesToDelete = [];
             newImageFiles = [];

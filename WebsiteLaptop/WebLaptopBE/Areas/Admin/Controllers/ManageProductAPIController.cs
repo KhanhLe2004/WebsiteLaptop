@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
@@ -11,12 +12,12 @@ namespace WebLaptopBE.Areas.Admin.Controllers
 {
     [Route("api/admin/products")]
     [ApiController]
-    public class TableProductAPIController : ControllerBase
+    public class ManageProductAPIController : ControllerBase
     {
         private readonly Testlaptop20Context _context;
         private readonly IWebHostEnvironment _environment;
 
-        public TableProductAPIController(Testlaptop20Context context, IWebHostEnvironment environment)
+        public ManageProductAPIController(Testlaptop20Context context, IWebHostEnvironment environment)
         {
             _context = context;
             _environment = environment;
@@ -321,6 +322,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 await _context.SaveChangesAsync();
 
                 // Xử lý Configurations
+                // Nếu ConfigurationsJson được gửi, xử lý configurations
                 if (!string.IsNullOrEmpty(dto.ConfigurationsJson))
                 {
                     try
@@ -328,38 +330,47 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         var configurations = JsonSerializer.Deserialize<List<ProductConfigurationCreateDTO>>(dto.ConfigurationsJson);
                         if (configurations != null && configurations.Count > 0)
                         {
-                            foreach (var configDto in configurations)
+                            // Lọc bỏ configurations có Specifications rỗng
+                            var validConfigurations = configurations
+                                .Where(c => !string.IsNullOrWhiteSpace(c.Specifications))
+                                .ToList();
+
+                            if (validConfigurations.Count > 0)
                             {
-                                // Validate configuration
-                                if (string.IsNullOrWhiteSpace(configDto.Specifications))
+                                var configIdGenerator = await CreateConfigurationIdGeneratorAsync();
+                                foreach (var configDto in validConfigurations)
                                 {
-                                    Console.WriteLine("Warning: Configuration with empty specifications skipped");
-                                    continue;
+                                    var configuration = new ProductConfiguration
+                                    {
+                                        ConfigurationId = configIdGenerator.Next(),
+                                        ProductId = product.ProductId,
+                                        Specifications = configDto.Specifications?.Trim() ?? string.Empty,
+                                        Price = configDto.Price ?? 0,
+                                        Quantity = configDto.Quantity ?? 0
+                                    };
+                                    _context.ProductConfigurations.Add(configuration);
                                 }
-
-                                var configId = $"CFG{DateTime.Now:yyyyMMddHHmmss}{Guid.NewGuid().ToString().Substring(0, 8)}";
-                                if (configId.Length > 20) configId = configId.Substring(0, 20);
-
-                                var configuration = new ProductConfiguration
+                                
+                                if (_context.ChangeTracker.HasChanges())
                                 {
-                                    ConfigurationId = configId,
-                                    ProductId = product.ProductId,
-                                    Specifications = configDto.Specifications?.Trim() ?? string.Empty,
-                                    Price = configDto.Price ?? 0,
-                                    Quantity = configDto.Quantity ?? 0
-                                };
-                                _context.ProductConfigurations.Add(configuration);
+                                    await _context.SaveChangesAsync();
+                                    Console.WriteLine($"Successfully created {validConfigurations.Count} configurations for product {product.ProductId}");
+                                }
                             }
-                            if (_context.ChangeTracker.HasChanges())
+                            else
                             {
-                                await _context.SaveChangesAsync();
+                                Console.WriteLine("No valid configurations to create (all have empty specifications)");
                             }
+                        }
+                        else
+                        {
+                            Console.WriteLine("ConfigurationsJson is empty or null, no configurations created");
                         }
                     }
                     catch (JsonException ex)
                     {
                         // Log error nhưng không fail request
-                        Console.WriteLine($"Error parsing configurations: {ex.Message}");
+                        Console.WriteLine($"Error parsing configurations JSON: {ex.Message}");
                         Console.WriteLine($"ConfigurationsJson: {dto.ConfigurationsJson}");
                         // Không throw exception để không fail toàn bộ request
                     }
@@ -370,7 +381,11 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         // Không throw để không fail toàn bộ request
                     }
                 }
-                // Nếu không có ConfigurationsJson hoặc rỗng, không làm gì (sản phẩm có thể không có cấu hình)
+                else
+                {
+                    // Nếu không có ConfigurationsJson, không tạo configurations (sản phẩm có thể không có cấu hình)
+                    Console.WriteLine("ConfigurationsJson not provided, no configurations created");
+                }
 
                 // Xử lý Product Images
                 try
@@ -443,14 +458,63 @@ namespace WebLaptopBE.Areas.Admin.Controllers
         {
             try
             {
+                // Log dữ liệu nhận được
+                Console.WriteLine($"=== UpdateProduct called for product ID: {id} ===");
+                Console.WriteLine($"ProductName: {dto.ProductName}");
+                Console.WriteLine($"ConfigurationsJson from DTO: {dto.ConfigurationsJson ?? "NULL"}");
+                Console.WriteLine($"ConfigurationsToDeleteJson from DTO: {dto.ConfigurationsToDeleteJson ?? "NULL"}");
+                
+                // Kiểm tra Request.Form trực tiếp và override DTO nếu cần
+                if (Request.Form.ContainsKey("ConfigurationsJson"))
+                {
+                    var configJsonFromForm = Request.Form["ConfigurationsJson"].ToString();
+                    Console.WriteLine($"ConfigurationsJson from Request.Form: {configJsonFromForm}");
+                    // Override DTO nếu Request.Form có giá trị nhưng DTO không có
+                    if (string.IsNullOrEmpty(dto.ConfigurationsJson) && !string.IsNullOrEmpty(configJsonFromForm))
+                    {
+                        dto.ConfigurationsJson = configJsonFromForm;
+                        Console.WriteLine("Overrode DTO.ConfigurationsJson from Request.Form");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("ConfigurationsJson NOT found in Request.Form");
+                }
+                
+                if (Request.Form.ContainsKey("ConfigurationsToDeleteJson"))
+                {
+                    var configsToDeleteFromForm = Request.Form["ConfigurationsToDeleteJson"].ToString();
+                    Console.WriteLine($"ConfigurationsToDeleteJson from Request.Form: {configsToDeleteFromForm}");
+                    // Override DTO nếu Request.Form có giá trị nhưng DTO không có
+                    if (string.IsNullOrEmpty(dto.ConfigurationsToDeleteJson) && !string.IsNullOrEmpty(configsToDeleteFromForm))
+                    {
+                        dto.ConfigurationsToDeleteJson = configsToDeleteFromForm;
+                        Console.WriteLine("Overrode DTO.ConfigurationsToDeleteJson from Request.Form");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("ConfigurationsToDeleteJson NOT found in Request.Form");
+                }
+                
+                // Log lại sau khi override
+                Console.WriteLine($"After override - ConfigurationsJson: {dto.ConfigurationsJson ?? "NULL"}");
+                Console.WriteLine($"After override - ConfigurationsToDeleteJson: {dto.ConfigurationsToDeleteJson ?? "NULL"}");
+                
                 if (!ModelState.IsValid)
                 {
+                    Console.WriteLine("ModelState is invalid:");
+                    foreach (var error in ModelState)
+                    {
+                        Console.WriteLine($"  {error.Key}: {string.Join(", ", error.Value.Errors.Select(e => e.ErrorMessage))}");
+                    }
                     return BadRequest(ModelState);
                 }
 
                 var product = await _context.Products.FindAsync(id);
                 if (product == null)
                 {
+                    Console.WriteLine($"Product with ID {id} not found");
                     return NotFound(new { message = "Không tìm thấy sản phẩm" });
                 }
 
@@ -491,74 +555,181 @@ namespace WebLaptopBE.Areas.Admin.Controllers
 
                 await _context.SaveChangesAsync();
 
-                // Xử lý Configurations
-                if (!string.IsNullOrEmpty(dto.ConfigurationsJson))
+                // Xử lý xóa Configurations (tương tự như xóa Images)
+                if (!string.IsNullOrEmpty(dto.ConfigurationsToDeleteJson))
                 {
                     try
                     {
-                        var configurations = JsonSerializer.Deserialize<List<ProductConfigurationUpdateDTO>>(dto.ConfigurationsJson);
-                        if (configurations != null)
+                        var configurationIdsToDelete = JsonSerializer.Deserialize<List<string>>(dto.ConfigurationsToDeleteJson);
+                        if (configurationIdsToDelete != null && configurationIdsToDelete.Count > 0)
                         {
-                            // Load configurations hiện tại
-                            var existingConfigs = await _context.ProductConfigurations
-                                .Where(c => c.ProductId == id)
+                            var configsToDelete = await _context.ProductConfigurations
+                                .Where(c => c.ProductId == id && configurationIdsToDelete.Contains(c.ConfigurationId))
                                 .ToListAsync();
-
-                            // Xử lý từng configuration
-                            foreach (var configDto in configurations)
-                            {
-                                if (!string.IsNullOrEmpty(configDto.ConfigurationId))
-                                {
-                                    // Update existing
-                                    var existingConfig = existingConfigs.FirstOrDefault(c => c.ConfigurationId == configDto.ConfigurationId);
-                                    if (existingConfig != null)
-                                    {
-                                        existingConfig.Specifications = configDto.Specifications;
-                                        existingConfig.Price = configDto.Price;
-                                        existingConfig.Quantity = configDto.Quantity;
-                                        _context.ProductConfigurations.Update(existingConfig);
-                                    }
-                                }
-                                else
-                                {
-                                    // Create new
-                                    var configId = $"CFG{DateTime.Now:yyyyMMddHHmmss}{Guid.NewGuid().ToString().Substring(0, 8)}";
-                                    if (configId.Length > 20) configId = configId.Substring(0, 20);
-
-                                    var newConfig = new ProductConfiguration
-                                    {
-                                        ConfigurationId = configId,
-                                        ProductId = id,
-                                        Specifications = configDto.Specifications,
-                                        Price = configDto.Price,
-                                        Quantity = configDto.Quantity
-                                    };
-                                    _context.ProductConfigurations.Add(newConfig);
-                                }
-                            }
-
-                            // Xóa các configuration không còn trong list
-                            var configIdsToKeep = configurations
-                                .Where(c => !string.IsNullOrEmpty(c.ConfigurationId))
-                                .Select(c => c.ConfigurationId)
-                                .ToList();
-
-                            var configsToDelete = existingConfigs
-                                .Where(c => !configIdsToKeep.Contains(c.ConfigurationId))
-                                .ToList();
 
                             if (configsToDelete.Any())
                             {
+                                Console.WriteLine($"Deleting {configsToDelete.Count} configurations");
                                 _context.ProductConfigurations.RemoveRange(configsToDelete);
+                                await _context.SaveChangesAsync();
                             }
-
-                            await _context.SaveChangesAsync();
                         }
                     }
                     catch (JsonException ex)
                     {
-                        Console.WriteLine($"Error parsing configurations: {ex.Message}");
+                        Console.WriteLine($"Error parsing configurations to delete JSON: {ex.Message}");
                     }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error deleting configurations: {ex.Message}");
+                    }
+                }
+
+                // Xử lý thêm/Update Configurations (tương tự như thêm Images)
+                if (!string.IsNullOrEmpty(dto.ConfigurationsJson))
+                {
+                    try
+                    {
+                        Console.WriteLine($"Received ConfigurationsJson: {dto.ConfigurationsJson}");
+                        
+                        // Sử dụng JsonSerializerOptions với PropertyNameCaseInsensitive để match camelCase từ frontend
+                        var jsonOptions = new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        };
+                        
+                        var configurations = JsonSerializer.Deserialize<List<ProductConfigurationUpdateDTO>>(dto.ConfigurationsJson, jsonOptions);
+                        Console.WriteLine($"Deserialized configurations count: {configurations?.Count ?? 0}");
+                        
+                        if (configurations != null && configurations.Count > 0)
+                        {
+                            // Lọc bỏ configurations có Specifications rỗng
+                            var validConfigurations = configurations
+                                .Where(c => !string.IsNullOrWhiteSpace(c.Specifications))
+                                .ToList();
+                            
+                            Console.WriteLine($"Valid configurations count: {validConfigurations.Count}");
+
+                            if (validConfigurations.Count > 0)
+                            {
+                                ConfigurationIdGenerator? configIdGenerator = null;
+                                if (validConfigurations.Any(c => string.IsNullOrWhiteSpace(c.ConfigurationId)))
+                                {
+                                    configIdGenerator = await CreateConfigurationIdGeneratorAsync();
+                                    Console.WriteLine("Created ConfigurationIdGenerator for new configurations");
+                                }
+
+                                int addedCount = 0;
+                                int updatedCount = 0;
+                                
+                                // Xử lý từng configuration
+                                foreach (var configDto in validConfigurations)
+                                {
+                                    try
+                                    {
+                                        if (!string.IsNullOrWhiteSpace(configDto.ConfigurationId))
+                                        {
+                                            // Update existing
+                                            var existingConfig = await _context.ProductConfigurations
+                                                .FirstOrDefaultAsync(c => c.ProductId == id && c.ConfigurationId == configDto.ConfigurationId);
+                                            
+                                            if (existingConfig != null)
+                                            {
+                                                existingConfig.Specifications = configDto.Specifications?.Trim() ?? string.Empty;
+                                                existingConfig.Price = configDto.Price ?? 0;
+                                                existingConfig.Quantity = configDto.Quantity ?? 0;
+                                                _context.ProductConfigurations.Update(existingConfig);
+                                                updatedCount++;
+                                                Console.WriteLine($"Updated configuration: {configDto.ConfigurationId}, Specs: {configDto.Specifications}, Price: {configDto.Price}, Qty: {configDto.Quantity}");
+                                            }
+                                            else
+                                            {
+                                                Console.WriteLine($"Warning: Configuration with ID {configDto.ConfigurationId} not found for product {id}, creating new");
+                                                // Nếu không tìm thấy, tạo mới
+                                                configIdGenerator ??= await CreateConfigurationIdGeneratorAsync();
+                                                var newConfig = new ProductConfiguration
+                                                {
+                                                    ConfigurationId = configIdGenerator.Next(),
+                                                    ProductId = id,
+                                                    Specifications = configDto.Specifications?.Trim() ?? string.Empty,
+                                                    Price = configDto.Price ?? 0,
+                                                    Quantity = configDto.Quantity ?? 0
+                                                };
+                                                _context.ProductConfigurations.Add(newConfig);
+                                                addedCount++;
+                                                Console.WriteLine($"Created new configuration: {newConfig.ConfigurationId}, Specs: {newConfig.Specifications}, Price: {newConfig.Price}, Qty: {newConfig.Quantity}");
+                                            }
+                                        }
+                                        else
+                                        {
+                                            // Create new
+                                            configIdGenerator ??= await CreateConfigurationIdGeneratorAsync();
+
+                                            var newConfig = new ProductConfiguration
+                                            {
+                                                ConfigurationId = configIdGenerator.Next(),
+                                                ProductId = id,
+                                                Specifications = configDto.Specifications?.Trim() ?? string.Empty,
+                                                Price = configDto.Price ?? 0,
+                                                Quantity = configDto.Quantity ?? 0
+                                            };
+                                            _context.ProductConfigurations.Add(newConfig);
+                                            addedCount++;
+                                            Console.WriteLine($"Created new configuration: {newConfig.ConfigurationId}, Specs: {newConfig.Specifications}, Price: {newConfig.Price}, Qty: {newConfig.Quantity}");
+                                        }
+                                    }
+                                    catch (Exception configEx)
+                                    {
+                                        Console.WriteLine($"Error processing individual configuration: {configEx.Message}");
+                                        Console.WriteLine($"Stack trace: {configEx.StackTrace}");
+                                        // Tiếp tục xử lý các configuration khác
+                                    }
+                                }
+
+                                // Kiểm tra xem có changes không
+                                if (_context.ChangeTracker.HasChanges())
+                                {
+                                    Console.WriteLine($"Saving changes for configurations. Added: {addedCount}, Updated: {updatedCount}");
+                                    var savedCount = await _context.SaveChangesAsync();
+                                    Console.WriteLine($"SaveChangesAsync returned: {savedCount} entities saved");
+                                    Console.WriteLine($"Successfully processed {validConfigurations.Count} configurations (Added: {addedCount}, Updated: {updatedCount})");
+                                }
+                                else
+                                {
+                                    Console.WriteLine("No changes detected in ChangeTracker");
+                                }
+                            }
+                            else
+                            {
+                                Console.WriteLine("No valid configurations to process (all have empty specifications)");
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("Configurations list is null or empty after deserialization");
+                        }
+                    }
+                    catch (JsonException ex)
+                    {
+                        Console.WriteLine($"Error parsing configurations JSON: {ex.Message}");
+                        Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                        Console.WriteLine($"ConfigurationsJson: {dto.ConfigurationsJson}");
+                        // Không throw để không fail toàn bộ request
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error processing configurations: {ex.Message}");
+                        Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                        if (ex.InnerException != null)
+                        {
+                            Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                        }
+                        // Không throw để không fail toàn bộ request
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("ConfigurationsJson is null or empty");
                 }
 
                 // Xử lý xóa Images
@@ -773,6 +944,63 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     ImageUrl = img.ImageId // Sử dụng ImageId làm tên file
                 }).ToList()
             };
+        }
+
+        private async Task<ConfigurationIdGenerator> CreateConfigurationIdGeneratorAsync()
+        {
+            var existingIds = await _context.ProductConfigurations
+                .AsNoTracking()
+                .Select(c => c.ConfigurationId)
+                .ToListAsync();
+
+            var normalizedIds = existingIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id.Trim().ToUpperInvariant())
+                .ToList();
+
+            var maxSequence = 0;
+            foreach (var id in normalizedIds)
+            {
+                if (id.StartsWith("CF") && id.Length > 2)
+                {
+                    var numberPart = id.Substring(2);
+                    if (int.TryParse(numberPart, out var number) && number > maxSequence)
+                    {
+                        maxSequence = number;
+                    }
+                }
+            }
+
+            return new ConfigurationIdGenerator(normalizedIds, maxSequence + 1);
+        }
+
+        private sealed class ConfigurationIdGenerator
+        {
+            private readonly HashSet<string> _allocatedIds;
+            private int _nextSequence;
+
+            public ConfigurationIdGenerator(IEnumerable<string> existingIds, int startSequence)
+            {
+                _allocatedIds = new HashSet<string>(
+                    existingIds.Where(id => !string.IsNullOrWhiteSpace(id))
+                               .Select(id => id.Trim().ToUpperInvariant()),
+                    StringComparer.OrdinalIgnoreCase);
+
+                _nextSequence = startSequence < 1 ? 1 : startSequence;
+            }
+
+            public string Next()
+            {
+                string candidate;
+                do
+                {
+                    candidate = $"CF{_nextSequence:D3}";
+                    _nextSequence++;
+                } while (_allocatedIds.Contains(candidate));
+
+                _allocatedIds.Add(candidate);
+                return candidate;
+            }
         }
 
         // Hàm hỗ trợ lưu ảnh

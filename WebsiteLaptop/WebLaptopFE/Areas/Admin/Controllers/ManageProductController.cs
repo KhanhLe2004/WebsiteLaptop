@@ -3,10 +3,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace WebLaptopFE.Areas.Admin.Controllers
 {
     [Area("Admin")]
-    public class ProductController : Controller
+    public class ManageProductController : Controller
     {
         // GET: Admin/Product
-        public IActionResult Index()
+        public IActionResult ManageProduct()
         {
             return View();
         }

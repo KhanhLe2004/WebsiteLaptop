@@ -23,7 +23,7 @@ app.UseAuthorization();
 // Route cho Area Admin
 app.MapControllerRoute(
     name: "admin",
-    pattern: "{area:exists}/{controller=Product}/{action=Index}/{id?}");
+    pattern: "{area:exists}/{controller=ManageProduct}/{action=ManageProduct}/{id?}");
 
 app.MapControllerRoute(
     name: "default",

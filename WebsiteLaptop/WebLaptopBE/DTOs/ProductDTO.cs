@@ -141,6 +141,9 @@ namespace WebLaptopBE.DTOs
         // Danh sách cấu hình sản phẩm (gửi dưới dạng JSON string)
         public string? ConfigurationsJson { get; set; }
 
+        // Danh sách cấu hình cần xóa (gửi dưới dạng JSON string - array of ConfigurationId)
+        public string? ConfigurationsToDeleteJson { get; set; }
+
         // Danh sách ảnh cần xóa (gửi dưới dạng JSON string - array of ImageId)
         public string? ImagesToDeleteJson { get; set; }
 
