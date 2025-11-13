@@ -28,9 +28,11 @@
         <!-- Template Stylesheet -->
         <link href="../LaptopFe/css/style.css" rel="stylesheet">
 
-        @* insert icon *@
-        <link rel="shortcut icon" href="~/LaptopFe/img/TenTech-icon.ico" type="image/x-icon" />
+    @* Trang con có th? chèn CSS riêng b?ng section "Styles" *@
+    @RenderSection("Styles", required: false)
 
+    @* insert icon *@
+        <link rel="shortcut icon" href="~/LaptopFe/img/TenTech-icon.ico" type="image/x-icon" />
     </head>
 
     <body>
@@ -40,7 +42,7 @@
         </div>
         <!-- Spinner End -->
 
-        @await Html.PartialAsync("_Header")
+    @await Html.PartialAsync("_Header")
 
         <!-- Modal Search Start -->
         <div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
@@ -61,9 +63,9 @@
         </div>
         <!-- Modal Search End -->
 
-        @RenderBody()
+    @RenderBody()
 
-        @await Html.PartialAsync("_Footer")
+    @await Html.PartialAsync("_Footer")
 
         <!-- JavaScript Libraries -->
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
@@ -75,8 +77,7 @@
 
         <!-- Template Javascript -->
         <script src="../LaptopFe/js/main.js"></script>
-        
-        @RenderSection("Scripts", required: false)
+
+    @RenderSection("Scripts", required: false)
     </body>
 </html>
-
