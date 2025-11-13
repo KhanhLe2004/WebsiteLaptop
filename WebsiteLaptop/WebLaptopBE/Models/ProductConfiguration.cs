@@ -7,7 +7,13 @@ public partial class ProductConfiguration
 {
     public string ConfigurationId { get; set; } = null!;
 
-    public string? Specifications { get; set; }
+    public string? Cpu { get; set; }
+
+    public string? Ram { get; set; }
+
+    public string? Rom { get; set; }
+
+    public string? Card { get; set; }
 
     public decimal? Price { get; set; }
 

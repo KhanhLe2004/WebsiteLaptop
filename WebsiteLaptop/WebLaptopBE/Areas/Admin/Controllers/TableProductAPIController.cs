@@ -1,6 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using WebLaptopBE.Data;
+﻿using Microsoft.AspNetCore.Mvc;
+using WebLaptopBE.Models;
 
 namespace WebLaptopBE.Areas.Admin.Controllers
 {
@@ -8,7 +7,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class TableProductAPIController : ControllerBase
     {
-        private Testlaptop20Context db = new Testlaptop20Context();
+        private readonly Testlaptop27Context _db = new();
 
     }
 }

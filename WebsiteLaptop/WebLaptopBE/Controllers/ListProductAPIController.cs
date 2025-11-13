@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Linq;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using WebLaptopBE.Data;
+using WebLaptopBE.Models;
 
 namespace WebLaptopBE.Controllers
 {
@@ -11,12 +10,12 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class ListProductAPIController : ControllerBase
     {
-        private Testlaptop20Context db = new Testlaptop20Context();
+        private readonly Testlaptop27Context _db = new();
         
         [HttpGet("all")]
         public IActionResult GetAllProducts()
         {
-            var lstSanPham = db.Products
+            var lstSanPham = _db.Products
                 .AsNoTracking()
                 .Include(p => p.Brand)
                 .Select(p => new
@@ -49,7 +48,7 @@ namespace WebLaptopBE.Controllers
         {
             try
             {
-                var product = db.Products
+                var product = _db.Products
                     .AsNoTracking()
                     .Include(p => p.Brand)
                     .Where(p => p.ProductId == id)
@@ -81,7 +80,7 @@ namespace WebLaptopBE.Controllers
                     return NotFound(new { message = "Không tìm thấy sản phẩm" });
                 }
 
-                var images = db.ProductImages
+                var images = _db.ProductImages
                     .AsNoTracking()
                     .Where(pi => pi.ProductId == id)
                     .Select(pi => new
@@ -91,30 +90,40 @@ namespace WebLaptopBE.Controllers
                     })
                     .ToList();
 
-                var configurations = db.ProductConfigurations
+                var configurations = _db.ProductConfigurations
                     .AsNoTracking()
                     .Where(pc => pc.ProductId == id)
                     .Select(pc => new
                     {
                         pc.ConfigurationId,
-                        pc.Specifications,
+                        pc.Cpu,
+                        pc.Ram,
+                        pc.Rom,
+                        pc.Card,
                         pc.Price,
                         pc.ProductId,
                         pc.Quantity
                     })
                     .ToList();
 
-                var reviews = db.ProductReviews
+                var reviews = _db.ProductReviews
                     .AsNoTracking()
+                    .Include(pr => pr.Customer)
                     .Where(pr => pr.ProductId == id)
                     .OrderByDescending(pr => pr.Time)
                     .Select(pr => new
                     {
-                        pr.Username,
+                        pr.ProductReviewId,
                         pr.Rate,
                         pr.ContentDetail,
                         pr.Time,
-                        pr.ProductId
+                        pr.CustomerId,
+                        Customer = pr.Customer != null ? new
+                        {
+                            pr.Customer.CustomerId,
+                            pr.Customer.CustomerName,
+                            pr.Customer.Avatar
+                        } : null
                     })
                     .ToList();
 
@@ -122,10 +131,10 @@ namespace WebLaptopBE.Controllers
 
                 var result = new
                 {
-                    product = product,
-                    images = images,
-                    configurations = configurations,
-                    reviews = reviews,
+                    product,
+                    images,
+                    configurations,
+                    reviews,
                     averageRating = Math.Round(averageRating, 1),
                     totalReviews = reviews.Count
                 };

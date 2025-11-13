@@ -15,5 +15,7 @@ public partial class Supplier
 
     public string? Email { get; set; }
 
+    public bool? Active { get; set; }
+
     public virtual ICollection<StockImport> StockImports { get; set; } = new List<StockImport>();
 }

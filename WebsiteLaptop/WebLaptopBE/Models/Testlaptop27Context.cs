@@ -1,22 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
-using WebLaptopBE.Models;
 
-namespace WebLaptopBE.Data;
+namespace WebLaptopBE.Models;
 
-public partial class Testlaptop20Context : DbContext
+public partial class Testlaptop27Context : DbContext
 {
-    public Testlaptop20Context()
+    public Testlaptop27Context()
     {
     }
 
-    public Testlaptop20Context(DbContextOptions<Testlaptop20Context> options)
+    public Testlaptop27Context(DbContextOptions<Testlaptop27Context> options)
         : base(options)
     {
     }
-
-    public virtual DbSet<Account> Accounts { get; set; }
 
     public virtual DbSet<Branch> Branches { get; set; }
 
@@ -66,27 +63,10 @@ public partial class Testlaptop20Context : DbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseSqlServer("Data Source=DESKTOP-4SKINCH\\SQLEXPRESS;Initial Catalog=testlaptop20;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False");
+        => optionsBuilder.UseSqlServer("Data Source=DESKTOP-4SKINCH\\SQLEXPRESS;Initial Catalog=testlaptop27;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Account>(entity =>
-        {
-            entity.HasKey(e => e.Username);
-
-            entity.ToTable("Account");
-
-            entity.Property(e => e.Username)
-                .HasMaxLength(20)
-                .HasColumnName("username");
-            entity.Property(e => e.AccountType)
-                .HasMaxLength(50)
-                .HasColumnName("account_type");
-            entity.Property(e => e.Password)
-                .HasMaxLength(20)
-                .HasColumnName("password");
-        });
-
         modelBuilder.Entity<Branch>(entity =>
         {
             entity.HasKey(e => e.BranchesId);
@@ -122,16 +102,16 @@ public partial class Testlaptop20Context : DbContext
             entity.Property(e => e.CartId)
                 .HasMaxLength(20)
                 .HasColumnName("cart_id");
+            entity.Property(e => e.CustomerId)
+                .HasMaxLength(20)
+                .HasColumnName("customer_id");
             entity.Property(e => e.TotalAmount)
                 .HasColumnType("decimal(18, 2)")
                 .HasColumnName("total_amount");
-            entity.Property(e => e.Username)
-                .HasMaxLength(20)
-                .HasColumnName("username");
 
-            entity.HasOne(d => d.UsernameNavigation).WithMany(p => p.Carts)
-                .HasForeignKey(d => d.Username)
-                .HasConstraintName("FK_Cart_Account");
+            entity.HasOne(d => d.Customer).WithMany(p => p.Carts)
+                .HasForeignKey(d => d.CustomerId)
+                .HasConstraintName("FK_Cart_Customer");
         });
 
         modelBuilder.Entity<CartDetail>(entity =>
@@ -212,16 +192,15 @@ public partial class Testlaptop20Context : DbContext
             entity.Property(e => e.Email)
                 .HasMaxLength(100)
                 .HasColumnName("email");
+            entity.Property(e => e.Password)
+                .HasMaxLength(20)
+                .HasColumnName("password");
             entity.Property(e => e.PhoneNumber)
                 .HasMaxLength(20)
                 .HasColumnName("phone_number");
             entity.Property(e => e.Username)
                 .HasMaxLength(20)
                 .HasColumnName("username");
-
-            entity.HasOne(d => d.UsernameNavigation).WithMany(p => p.Customers)
-                .HasForeignKey(d => d.Username)
-                .HasConstraintName("FK_Customer_Account");
         });
 
         modelBuilder.Entity<Employee>(entity =>
@@ -248,6 +227,9 @@ public partial class Testlaptop20Context : DbContext
             entity.Property(e => e.EmployeeName)
                 .HasMaxLength(50)
                 .HasColumnName("employee_name");
+            entity.Property(e => e.Password)
+                .HasMaxLength(20)
+                .HasColumnName("password");
             entity.Property(e => e.PhoneNumber)
                 .HasMaxLength(20)
                 .HasColumnName("phone_number");
@@ -265,10 +247,6 @@ public partial class Testlaptop20Context : DbContext
             entity.HasOne(d => d.Role).WithMany(p => p.Employees)
                 .HasForeignKey(d => d.RoleId)
                 .HasConstraintName("FK_Employee_Role");
-
-            entity.HasOne(d => d.UsernameNavigation).WithMany(p => p.Employees)
-                .HasForeignKey(d => d.Username)
-                .HasConstraintName("FK_Employee_Account");
         });
 
         modelBuilder.Entity<History>(entity =>
@@ -281,16 +259,16 @@ public partial class Testlaptop20Context : DbContext
             entity.Property(e => e.ActivityType)
                 .HasMaxLength(20)
                 .HasColumnName("activity_type");
+            entity.Property(e => e.EmployeeId)
+                .HasMaxLength(20)
+                .HasColumnName("employee_id");
             entity.Property(e => e.Time)
                 .HasColumnType("datetime")
                 .HasColumnName("time");
-            entity.Property(e => e.Username)
-                .HasMaxLength(20)
-                .HasColumnName("username");
 
-            entity.HasOne(d => d.UsernameNavigation).WithMany(p => p.Histories)
-                .HasForeignKey(d => d.Username)
-                .HasConstraintName("FK_History_Account");
+            entity.HasOne(d => d.Employee).WithMany(p => p.Histories)
+                .HasForeignKey(d => d.EmployeeId)
+                .HasConstraintName("FK_History_Employee");
         });
 
         modelBuilder.Entity<Product>(entity =>
@@ -300,6 +278,7 @@ public partial class Testlaptop20Context : DbContext
             entity.Property(e => e.ProductId)
                 .HasMaxLength(20)
                 .HasColumnName("product_id");
+            entity.Property(e => e.Active).HasColumnName("active");
             entity.Property(e => e.Avatar)
                 .HasMaxLength(100)
                 .HasColumnName("avatar");
@@ -349,6 +328,12 @@ public partial class Testlaptop20Context : DbContext
             entity.Property(e => e.ConfigurationId)
                 .HasMaxLength(20)
                 .HasColumnName("configuration_id");
+            entity.Property(e => e.Card)
+                .HasMaxLength(50)
+                .HasColumnName("card");
+            entity.Property(e => e.Cpu)
+                .HasMaxLength(50)
+                .HasColumnName("cpu");
             entity.Property(e => e.Price)
                 .HasColumnType("decimal(18, 2)")
                 .HasColumnName("price");
@@ -356,9 +341,12 @@ public partial class Testlaptop20Context : DbContext
                 .HasMaxLength(20)
                 .HasColumnName("product_id");
             entity.Property(e => e.Quantity).HasColumnName("quantity");
-            entity.Property(e => e.Specifications)
-                .HasMaxLength(100)
-                .HasColumnName("specifications");
+            entity.Property(e => e.Ram)
+                .HasMaxLength(50)
+                .HasColumnName("ram");
+            entity.Property(e => e.Rom)
+                .HasMaxLength(50)
+                .HasColumnName("rom");
 
             entity.HasOne(d => d.Product).WithMany(p => p.ProductConfigurations)
                 .HasForeignKey(d => d.ProductId)
@@ -385,31 +373,30 @@ public partial class Testlaptop20Context : DbContext
 
         modelBuilder.Entity<ProductReview>(entity =>
         {
-            entity.HasKey(e => new { e.ProductId, e.Username });
-
             entity.ToTable("ProductReview");
 
+            entity.Property(e => e.ProductReviewId)
+                .HasMaxLength(20)
+                .HasColumnName("productReview_id");
+            entity.Property(e => e.ContentDetail).HasColumnName("content_detail");
+            entity.Property(e => e.CustomerId)
+                .HasMaxLength(20)
+                .HasColumnName("customer_id");
             entity.Property(e => e.ProductId)
                 .HasMaxLength(20)
                 .HasColumnName("product_id");
-            entity.Property(e => e.Username)
-                .HasMaxLength(20)
-                .HasColumnName("username");
-            entity.Property(e => e.ContentDetail).HasColumnName("content_detail");
             entity.Property(e => e.Rate).HasColumnName("rate");
             entity.Property(e => e.Time)
                 .HasColumnType("datetime")
                 .HasColumnName("time");
 
+            entity.HasOne(d => d.Customer).WithMany(p => p.ProductReviews)
+                .HasForeignKey(d => d.CustomerId)
+                .HasConstraintName("FK_ProductReview_Customer");
+
             entity.HasOne(d => d.Product).WithMany(p => p.ProductReviews)
                 .HasForeignKey(d => d.ProductId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_ProductReview_Product");
-
-            entity.HasOne(d => d.UsernameNavigation).WithMany(p => p.ProductReviews)
-                .HasForeignKey(d => d.Username)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_ProductReview_Account");
         });
 
         modelBuilder.Entity<ProductSerial>(entity =>
@@ -682,6 +669,7 @@ public partial class Testlaptop20Context : DbContext
             entity.Property(e => e.SupplierId)
                 .HasMaxLength(20)
                 .HasColumnName("supplier_id");
+            entity.Property(e => e.Active).HasColumnName("active");
             entity.Property(e => e.Address)
                 .HasMaxLength(100)
                 .HasColumnName("address");

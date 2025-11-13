@@ -31,6 +31,8 @@ public partial class Product
 
     public string? Avatar { get; set; }
 
+    public bool? Active { get; set; }
+
     public virtual Brand? Brand { get; set; }
 
     public virtual ICollection<CartDetail> CartDetails { get; set; } = new List<CartDetail>();

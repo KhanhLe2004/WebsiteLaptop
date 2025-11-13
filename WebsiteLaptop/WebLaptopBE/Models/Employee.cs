@@ -25,11 +25,15 @@ public partial class Employee
 
     public string? Username { get; set; }
 
+    public string? Password { get; set; }
+
     public bool? Active { get; set; }
 
     public virtual Branch? Branches { get; set; }
 
     public virtual ICollection<Chat> Chats { get; set; } = new List<Chat>();
+
+    public virtual ICollection<History> Histories { get; set; } = new List<History>();
 
     public virtual Role? Role { get; set; }
 
@@ -38,8 +42,6 @@ public partial class Employee
     public virtual ICollection<StockExport> StockExports { get; set; } = new List<StockExport>();
 
     public virtual ICollection<StockImport> StockImports { get; set; } = new List<StockImport>();
-
-    public virtual Account? UsernameNavigation { get; set; }
 
     public virtual ICollection<Warranty> Warranties { get; set; } = new List<Warranty>();
 }

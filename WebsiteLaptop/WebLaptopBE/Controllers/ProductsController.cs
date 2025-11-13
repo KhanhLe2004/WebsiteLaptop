@@ -1,10 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
-using System.Collections.Generic;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using WebLaptopBE.Data;
+using WebLaptopBE.Models;
 
 namespace WebLaptopBE.Controllers
 {
@@ -12,12 +12,7 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class ProductsController : ControllerBase
     {
-        private readonly Testlaptop20Context _db;
-
-        public ProductsController()
-        {
-            _db = new Testlaptop20Context();
-        }
+        private readonly Testlaptop27Context _db = new();
 
         // GET /api/products/category/{brandId}?productName={productName}
         [HttpGet("category/{brandId}")]
@@ -100,87 +95,31 @@ namespace WebLaptopBE.Controllers
                 var priceRange = _db.ProductConfigurations
                     .AsNoTracking()
                     .Where(pc => pc.Price != null && pc.Price > 0)
-                    .Select(pc => pc.Price)
+                    .Select(pc => pc.Price!.Value)
                     .ToList();
 
-                var minPrice = priceRange.Any() ? (decimal)priceRange.Min() : 0;
-                var maxPrice = priceRange.Any() ? (decimal)priceRange.Max() : 0;
+                var minPrice = priceRange.Any() ? priceRange.Min() : 0;
+                var maxPrice = priceRange.Any() ? priceRange.Max() : 0;
 
-                // Lấy tất cả specifications để parse RAM và Storage
-                var allSpecs = _db.ProductConfigurations
+                var ramList = _db.ProductConfigurations
                     .AsNoTracking()
-                    .Where(pc => pc.Specifications != null && pc.Specifications.Trim() != "")
-                    .Select(pc => pc.Specifications)
+                    .Where(pc => pc.Ram != null && pc.Ram.Trim() != string.Empty)
+                    .Select(pc => pc.Ram!.Trim())
+                    .Distinct()
+                    .ToList()
+                    .OrderBy(r => ParseCapacityToGb(r))
+                    .ThenBy(r => r, StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
-                var ramSet = new HashSet<string>();
-                var storageSet = new HashSet<string>();
-
-                foreach (var spec in allSpecs)
-                {
-                    if (string.IsNullOrWhiteSpace(spec)) continue;
-
-                    // Parse RAM - tìm pattern như "8GB", "16GB", "32GB" (chỉ lấy RAM, không lấy storage GB)
-                    // Tránh match với storage như "512GB SSD" - chỉ lấy khi không có SSD/HDD sau đó
-                    var ramMatches = Regex.Matches(spec, @"\b(\d+)\s*GB\b(?!\s*(?:SSD|HDD|NVMe|M\.2))", RegexOptions.IgnoreCase);
-                    foreach (Match ramMatch in ramMatches)
-                    {
-                        if (ramMatch.Success)
-                        {
-                            var ramValue = ramMatch.Groups[1].Value + "GB";
-                            // Chỉ thêm nếu không phải là storage (thường RAM < 128GB)
-                            if (int.TryParse(ramMatch.Groups[1].Value, out var ramSize) && ramSize <= 128)
-                            {
-                                ramSet.Add(ramValue);
-                            }
-                        }
-                    }
-
-                    // Parse Storage - tìm pattern như "256GB SSD", "512GB SSD", "1TB HDD", etc.
-                    var storageMatches = Regex.Matches(spec, @"\b(\d+)\s*(GB|TB)\s*(SSD|HDD|NVMe|M\.2|M2)\b", RegexOptions.IgnoreCase);
-                    foreach (Match storageMatch in storageMatches)
-                    {
-                        if (storageMatch.Success)
-                        {
-                            var storageValue = storageMatch.Groups[1].Value + storageMatch.Groups[2].Value;
-                            var storageType = storageMatch.Groups[3].Value.ToUpper();
-                            if (storageType == "M2" || storageType == "M.2")
-                            {
-                                storageType = "M.2";
-                            }
-                            storageSet.Add(storageValue + " " + storageType);
-                        }
-                    }
-                    
-                    // Cũng tìm storage không có type (chỉ GB/TB lớn hơn 128GB)
-                    var storageWithoutTypeMatches = Regex.Matches(spec, @"\b(1[3-9]\d|[2-9]\d{2}|\d{4,})\s*(GB|TB)\b(?!\s*(?:SSD|HDD|NVMe|M\.2|M2))", RegexOptions.IgnoreCase);
-                    foreach (Match storageMatch in storageWithoutTypeMatches)
-                    {
-                        if (storageMatch.Success)
-                        {
-                            var storageValue = storageMatch.Groups[1].Value + storageMatch.Groups[2].Value;
-                            storageSet.Add(storageValue);
-                        }
-                    }
-                }
-
-                var ramList = ramSet.OrderBy(r =>
-                {
-                    var num = Regex.Match(r, @"\d+").Value;
-                    return int.TryParse(num, out var n) ? n : 0;
-                }).ToList();
-
-                var storageList = storageSet.OrderBy(s =>
-                {
-                    var match = Regex.Match(s, @"(\d+)\s*(GB|TB)");
-                    if (match.Success)
-                    {
-                        var num = int.Parse(match.Groups[1].Value);
-                        var unit = match.Groups[2].Value.ToUpper();
-                        return unit == "TB" ? num * 1024 : num; // Convert TB to GB for sorting
-                    }
-                    return 0;
-                }).ToList();
+                var storageList = _db.ProductConfigurations
+                    .AsNoTracking()
+                    .Where(pc => pc.Rom != null && pc.Rom.Trim() != string.Empty)
+                    .Select(pc => pc.Rom!.Trim())
+                    .Distinct()
+                    .ToList()
+                    .OrderBy(s => ParseCapacityToGb(s))
+                    .ThenBy(s => s, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
 
                 return Ok(new
                 {
@@ -223,7 +162,6 @@ namespace WebLaptopBE.Controllers
                 var configQuery = _db.ProductConfigurations
                     .AsNoTracking()
                     .Include(pc => pc.Product)
-                        .ThenInclude(p => p.Brand)
                     .Where(pc => pc.Product != null);
 
                 // Filter by brand
@@ -232,7 +170,9 @@ namespace WebLaptopBE.Controllers
                     var brandIdList = brandIds.Split(',', StringSplitOptions.RemoveEmptyEntries)
                         .Select(b => b.Trim())
                         .ToList();
-                    configQuery = configQuery.Where(pc => pc.Product != null && 
+                    configQuery = configQuery.Where(pc =>
+                        pc.Product != null &&
+                        pc.Product.BrandId != null &&
                         brandIdList.Contains(pc.Product.BrandId));
                 }
 
@@ -250,26 +190,31 @@ namespace WebLaptopBE.Controllers
                 if (!string.IsNullOrWhiteSpace(ramOptions))
                 {
                     var ramList = ramOptions.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                        .Select(r => r.Trim())
+                        .Select(r => r.Trim().ToUpperInvariant())
                         .ToList();
-                    
-                    configQuery = configQuery.Where(pc => 
-                        pc.Specifications != null &&
-                        ramList.Any(ram => pc.Specifications.Contains(ram, StringComparison.OrdinalIgnoreCase)));
+
+                    if (ramList.Any())
+                    {
+                        configQuery = configQuery.Where(pc =>
+                            pc.Ram != null &&
+                            ramList.Contains(pc.Ram!.ToUpper()));
+                    }
                 }
 
                 // Filter by Storage
                 if (!string.IsNullOrWhiteSpace(storageOptions))
                 {
                     var storageList = storageOptions.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                        .Select(s => s.Trim())
+                        .Select(s => s.Trim().ToUpperInvariant())
                         .ToList();
-                    
-                    configQuery = configQuery.Where(pc => 
-                        pc.Specifications != null &&
-                        storageList.Any(storage => 
-                            pc.Specifications.Contains(storage, StringComparison.OrdinalIgnoreCase) ||
-                            pc.Specifications.Contains(storage.Replace(" ", ""), StringComparison.OrdinalIgnoreCase)));
+
+                    if (storageList.Any())
+                    {
+                        configQuery = configQuery.Where(pc =>
+                            pc.Rom != null &&
+                            storageList.Any(storage =>
+                                EF.Functions.Like(pc.Rom!.ToUpper(), $"%{storage}%")));
+                    }
                 }
 
                 // Get distinct products from configurations
@@ -349,6 +294,24 @@ namespace WebLaptopBE.Controllers
                 });
             }
         }
+
+        private static int ParseCapacityToGb(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return int.MaxValue;
+            }
+
+            var match = Regex.Match(value, @"(\d+)");
+            if (!match.Success || !int.TryParse(match.Groups[1].Value, out var number))
+            {
+                return int.MaxValue;
+            }
+
+            var upper = value.ToUpperInvariant();
+            return upper.Contains("TB") ? number * 1024 : number;
+        }
     }
 }
+
 
