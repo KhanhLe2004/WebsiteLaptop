@@ -1,0 +1,546 @@
+@{
+    ViewData["Title"] = "Shop";
+    Layout = "~/Views/Shared/_LayoutShop.cshtml";
+}
+
+<!-- Fruits Shop Start-->
+<div class="container-fluid fruite py-5">
+    <div class="container py-5">
+        <h1 class="mb-4">Cửa hàng Laptop</h1>
+        <div class="row g-4">
+            <div class="col-lg-12">
+                <div class="row g-4">
+                    <div class="col-6"></div>
+                    <div class="col-xl-3">
+                        <div class="bg-light ps-3 py-3 rounded d-flex justify-content-between mb-4">
+                            <label for="sortSelect">Sắp xếp theo:</label>
+                            <select id="sortSelect" name="sortSelect" class="border-0 form-select-sm bg-light me-3">
+                                <option value="price">Giá tăng dần</option>
+                                <option value="price_desc">Giá giảm dần</option>
+                                <option value="name">Tên A-Z</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-4">
+                    <div class="col-lg-3">
+                        <div class="row g-4">
+                            <!-- Brand Filter -->
+                            <div class="col-lg-12">
+                                <div class="mb-3">
+                                    <h4>Hãng</h4>
+                                    <ul class="list-unstyled fruite-categorie" id="brandFilter">
+                                        <!-- Brands will be loaded here -->
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- Price Filter -->
+                            <div class="col-lg-12">
+                                <div class="mb-3">
+                                    <h4 class="mb-2">Mức giá</h4>
+                                    <ul class="list-unstyled fruite-categorie" id="priceFilter">
+                                        <li>
+                                            <div class="d-flex align-items-center mb-2">
+                                                <input type="checkbox" class="form-check-input me-2 price-checkbox" id="price-all" value="all" checked>
+                                                <label for="price-all" class="mb-0">Tất cả</label>
+                                            </div>
+                                        </li>
+                                        <li>
+                                            <div class="d-flex align-items-center mb-2">
+                                                <input type="checkbox" class="form-check-input me-2 price-checkbox" id="price-under-10" value="under-10">
+                                                <label for="price-under-10" class="mb-0">Dưới 10 triệu</label>
+                                            </div>
+                                        </li>
+                                        <li>
+                                            <div class="d-flex align-items-center mb-2">
+                                                <input type="checkbox" class="form-check-input me-2 price-checkbox" id="price-10-15" value="10-15">
+                                                <label for="price-10-15" class="mb-0">Từ 10 - 15 triệu</label>
+                                            </div>
+                                        </li>
+                                        <li>
+                                            <div class="d-flex align-items-center mb-2">
+                                                <input type="checkbox" class="form-check-input me-2 price-checkbox" id="price-15-20" value="15-20">
+                                                <label for="price-15-20" class="mb-0">Từ 15 - 20 triệu</label>
+                                            </div>
+                                        </li>
+                                        <li>
+                                            <div class="d-flex align-items-center mb-2">
+                                                <input type="checkbox" class="form-check-input me-2 price-checkbox" id="price-20-25" value="20-25">
+                                                <label for="price-20-25" class="mb-0">Từ 20 - 25 triệu</label>
+                                            </div>
+                                        </li>
+                                        <li>
+                                            <div class="d-flex align-items-center mb-2">
+                                                <input type="checkbox" class="form-check-input me-2 price-checkbox" id="price-25-30" value="25-30">
+                                                <label for="price-25-30" class="mb-0">Từ 25 - 30 triệu</label>
+                                            </div>
+                                        </li>
+                                        <li>
+                                            <div class="d-flex align-items-center mb-2">
+                                                <input type="checkbox" class="form-check-input me-2 price-checkbox" id="price-over-30" value="over-30">
+                                                <label for="price-over-30" class="mb-0">Trên 30 triệu</label>
+                                            </div>
+                                        </li>
+                                    </ul>
+                                    <p class="text-muted small mb-2">Hoặc nhập khoảng giá:</p>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <input type="number" class="form-control form-control-sm" id="minPriceInput" placeholder="Min" style="width: 100px;">
+                                        <span class="mx-2">~</span>
+                                        <input type="number" class="form-control form-control-sm" id="maxPriceInput" placeholder="Max" style="width: 100px;">
+                                    </div>
+                                    <div class="mb-3">
+                                        <input type="range" class="form-range w-100" id="priceRange" min="0" max="100" value="0">
+                                        <div class="d-flex justify-content-between">
+                                            <small id="priceRangeMin">0</small>
+                                            <small id="priceRangeMax">0</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- RAM Filter -->
+                            <div class="col-lg-12">
+                                <div class="mb-3">
+                                    <h4>RAM</h4>
+                                    <ul class="list-unstyled fruite-categorie" id="ramFilter">
+                                        <!-- RAM options will be loaded here -->
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- Storage Filter -->
+                            <div class="col-lg-12">
+                                <div class="mb-3">
+                                    <h4>Ổ cứng</h4>
+                                    <ul class="list-unstyled fruite-categorie" id="storageFilter">
+                                        <!-- Storage options will be loaded here -->
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Products Display -->
+                    <div class="col-lg-9">
+                        <div class="row g-4 justify-content-center" id="productsContainer">
+                            <!-- Products will be loaded here -->
+                        </div>
+                        <!-- Pagination -->
+                        <div class="pagination d-flex justify-content-center mt-5" id="paginationContainer">
+                            <!-- Pagination will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Fruits Shop End-->
+
+@section Scripts {
+    <script>
+        let apiBase = "http://localhost:5068/";
+        let filters = {
+            brands: [],
+            minPrice: null,
+            maxPrice: null,
+            ram: [],
+            storage: [],
+            sortBy: 'price',
+            page: 1,
+            pageSize: 12
+        };
+        let priceRange = { min: 0, max: 0 };
+        let allBrands = [];
+        let allRamOptions = [];
+        let allStorageOptions = [];
+
+        // Load filters on page load
+        $(document).ready(function() {
+            loadFilters();
+        });
+
+        // Load filters from API
+        function loadFilters() {
+            $.ajax({
+                type: 'GET',
+                url: apiBase + "api/products/shop/filters",
+                dataType: 'json',
+                success: function(data) {
+                    allBrands = data.brands || [];
+                    priceRange = data.priceRange || { min: 0, max: 0 };
+                    allRamOptions = data.ramOptions || [];
+                    allStorageOptions = data.storageOptions || [];
+
+                    // Initialize price range slider
+                    $('#priceRange').attr('min', Math.floor(priceRange.min / 1000000));
+                    $('#priceRange').attr('max', Math.ceil(priceRange.max / 1000000));
+                    $('#priceRangeMin').text(formatPrice(priceRange.min));
+                    $('#priceRangeMax').text(formatPrice(priceRange.max));
+                    $('#minPriceInput').attr('placeholder', Math.floor(priceRange.min / 1000) + 'k');
+                    $('#maxPriceInput').attr('placeholder', Math.ceil(priceRange.max / 1000) + 'k');
+
+                    // Render brand filters
+                    renderBrandFilters();
+                    // Render RAM filters
+                    renderRamFilters();
+                    // Render Storage filters
+                    renderStorageFilters();
+                    // Load products
+                    loadProducts();
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading filters:', error);
+                }
+            });
+        }
+
+        // Render brand filters
+        function renderBrandFilters() {
+            let html = '';
+            allBrands.forEach(function(brand) {
+                html += '<li>';
+                html += '  <div class="d-flex align-items-center mb-2">';
+                html += '    <input type="checkbox" class="form-check-input me-2 brand-checkbox" id="brand-' + brand.brandId + '" value="' + brand.brandId + '">';
+                html += '    <label for="brand-' + brand.brandId + '" class="mb-0">' + (brand.brandName || brand.brandId) + '</label>';
+                html += '  </div>';
+                html += '</li>';
+            });
+            $('#brandFilter').html(html);
+
+            // Attach change event
+            $('.brand-checkbox').on('change', function() {
+                updateBrandFilters();
+            });
+        }
+
+        // Render RAM filters
+        function renderRamFilters() {
+            let html = '';
+            allRamOptions.forEach(function(ram) {
+                html += '<li>';
+                html += '  <div class="d-flex align-items-center mb-2">';
+                html += '    <input type="checkbox" class="form-check-input me-2 ram-checkbox" id="ram-' + ram.replace(/\s/g, '-') + '" value="' + ram + '">';
+                html += '    <label for="ram-' + ram.replace(/\s/g, '-') + '" class="mb-0">' + ram + '</label>';
+                html += '  </div>';
+                html += '</li>';
+            });
+            $('#ramFilter').html(html);
+
+            // Attach change event
+            $('.ram-checkbox').on('change', function() {
+                updateRamFilters();
+            });
+        }
+
+        // Render Storage filters
+        function renderStorageFilters() {
+            let html = '';
+            allStorageOptions.forEach(function(storage) {
+                html += '<li>';
+                html += '  <div class="d-flex align-items-center mb-2">';
+                html += '    <input type="checkbox" class="form-check-input me-2 storage-checkbox" id="storage-' + storage.replace(/\s/g, '-').replace(/\//g, '-') + '" value="' + storage + '">';
+                html += '    <label for="storage-' + storage.replace(/\s/g, '-').replace(/\//g, '-') + '" class="mb-0">' + storage + '</label>';
+                html += '  </div>';
+                html += '</li>';
+            });
+            $('#storageFilter').html(html);
+
+            // Attach change event
+            $('.storage-checkbox').on('change', function() {
+                updateStorageFilters();
+            });
+        }
+
+        // Update brand filters
+        function updateBrandFilters() {
+            filters.brands = [];
+            $('.brand-checkbox:checked').each(function() {
+                filters.brands.push($(this).val());
+            });
+            filters.page = 1;
+            loadProducts();
+        }
+
+        // Update RAM filters
+        function updateRamFilters() {
+            filters.ram = [];
+            $('.ram-checkbox:checked').each(function() {
+                filters.ram.push($(this).val());
+            });
+            filters.page = 1;
+            loadProducts();
+        }
+
+        // Update Storage filters
+        function updateStorageFilters() {
+            filters.storage = [];
+            $('.storage-checkbox:checked').each(function() {
+                filters.storage.push($(this).val());
+            });
+            filters.page = 1;
+            loadProducts();
+        }
+
+        // Price filter handlers
+        $('.price-checkbox').on('change', function() {
+            if ($(this).val() === 'all') {
+                if ($(this).is(':checked')) {
+                    $('.price-checkbox').not(this).prop('checked', false);
+                    filters.minPrice = null;
+                    filters.maxPrice = null;
+                }
+            } else {
+                $('#price-all').prop('checked', false);
+                updatePriceFromCheckboxes();
+            }
+            filters.page = 1;
+            loadProducts();
+        });
+
+        function updatePriceFromCheckboxes() {
+            filters.minPrice = null;
+            filters.maxPrice = null;
+            let hasCustomRange = false;
+
+            $('.price-checkbox:checked').each(function() {
+                let value = $(this).val();
+                if (value === 'under-10') {
+                    if (!filters.maxPrice || filters.maxPrice > 10000000) {
+                        filters.maxPrice = 10000000;
+                    }
+                } else if (value === '10-15') {
+                    if (!filters.minPrice || filters.minPrice > 10000000) {
+                        filters.minPrice = 10000000;
+                    }
+                    if (!filters.maxPrice || filters.maxPrice > 15000000) {
+                        filters.maxPrice = 15000000;
+                    }
+                } else if (value === '15-20') {
+                    if (!filters.minPrice || filters.minPrice > 15000000) {
+                        filters.minPrice = 15000000;
+                    }
+                    if (!filters.maxPrice || filters.maxPrice > 20000000) {
+                        filters.maxPrice = 20000000;
+                    }
+                } else if (value === '20-25') {
+                    if (!filters.minPrice || filters.minPrice > 20000000) {
+                        filters.minPrice = 20000000;
+                    }
+                    if (!filters.maxPrice || filters.maxPrice > 25000000) {
+                        filters.maxPrice = 25000000;
+                    }
+                } else if (value === '25-30') {
+                    if (!filters.minPrice || filters.minPrice > 25000000) {
+                        filters.minPrice = 25000000;
+                    }
+                    if (!filters.maxPrice || filters.maxPrice > 30000000) {
+                        filters.maxPrice = 30000000;
+                    }
+                } else if (value === 'over-30') {
+                    if (!filters.minPrice || filters.minPrice > 30000000) {
+                        filters.minPrice = 30000000;
+                    }
+                }
+            });
+
+            // Check custom price inputs
+            let minInput = parseInt($('#minPriceInput').val()) * 1000;
+            let maxInput = parseInt($('#maxPriceInput').val()) * 1000;
+            if (!isNaN(minInput) && minInput > 0) {
+                filters.minPrice = minInput;
+                hasCustomRange = true;
+            }
+            if (!isNaN(maxInput) && maxInput > 0) {
+                filters.maxPrice = maxInput;
+                hasCustomRange = true;
+            }
+        }
+
+        $('#minPriceInput, #maxPriceInput').on('change', function() {
+            updatePriceFromCheckboxes();
+            filters.page = 1;
+            loadProducts();
+        });
+
+        // Price range slider
+        $('#priceRange').on('input', function() {
+            let maxVal = $(this).val();
+            $(this).css('background', 'linear-gradient(to right, #198754 0%, #198754 ' + maxVal + '%, #ddd ' + maxVal + '%, #ddd 100%)');
+        });
+
+        $('#priceRange').on('change', function() {
+            let maxVal = parseInt($(this).val()) * 1000000;
+            filters.maxPrice = maxVal;
+            $('#maxPriceInput').val(Math.floor(maxVal / 1000));
+            filters.page = 1;
+            loadProducts();
+        });
+
+        // Sort handler
+        $('#sortSelect').on('change', function() {
+            filters.sortBy = $(this).val();
+            filters.page = 1;
+            loadProducts();
+        });
+
+        // Load products
+        function loadProducts() {
+            let params = {
+                page: filters.page,
+                pageSize: filters.pageSize,
+                sortBy: filters.sortBy
+            };
+
+            if (filters.brands.length > 0) {
+                params.brandIds = filters.brands.join(',');
+            }
+            if (filters.minPrice) {
+                params.minPrice = filters.minPrice;
+            }
+            if (filters.maxPrice) {
+                params.maxPrice = filters.maxPrice;
+            }
+            if (filters.ram.length > 0) {
+                params.ramOptions = filters.ram.join(',');
+            }
+            if (filters.storage.length > 0) {
+                params.storageOptions = filters.storage.join(',');
+            }
+
+            $.ajax({
+                type: 'GET',
+                url: apiBase + "api/products/shop/search",
+                data: params,
+                dataType: 'json',
+                success: function(data) {
+                    renderProducts(data.products || []);
+                    renderPagination(data.page || 1, data.totalPages || 1);
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading products:', error);
+                    $('#productsContainer').html('<div class="col-12"><p class="text-center text-danger">Không thể tải sản phẩm. Vui lòng thử lại sau.</p></div>');
+                }
+            });
+        }
+
+        // Render products
+        function renderProducts(products) {
+            if (products.length === 0) {
+                $('#productsContainer').html('<div class="col-12"><p class="text-center">Không có sản phẩm nào.</p></div>');
+                return;
+            }
+
+            let html = '';
+            products.forEach(function(product) {
+                let price = 'Liên hệ';
+                let originalPrice = '';
+                let displayPrice = product.minConfigPrice || product.sellingPrice || 0;
+
+                if (displayPrice > 0) {
+                    try {
+                        price = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(displayPrice);
+                    } catch (e) {
+                        price = displayPrice.toString() + ' VND';
+                    }
+                }
+
+                if (product.originalSellingPrice && product.originalSellingPrice > displayPrice) {
+                    try {
+                        var formattedOriginalPrice = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(product.originalSellingPrice);
+                        originalPrice = `<span class="text-muted text-decoration-line-through me-2" style="font-size: 0.9em;">${formattedOriginalPrice}</span>`;
+                    } catch (e) {
+                        originalPrice = `<span class="text-muted text-decoration-line-through me-2" style="font-size: 0.9em;">${product.originalSellingPrice.toString()} VND</span>`;
+                    }
+                }
+
+                let avatar = (product.avatar && typeof product.avatar === 'string' && product.avatar.trim() !== '') ? `/image/${product.avatar}` : '/image/default-laptop.jpg';
+                let brandName = (product.brand && product.brand.brandName) ? product.brand.brandName : 'Laptop';
+                let productDetailUrl = '/Home/ProductDetail?id=' + encodeURIComponent(product.productId || '');
+
+                html += '<div class="col-md-6 col-lg-6 col-xl-4">';
+                html += '  <div class="rounded position-relative fruite-item">';
+                html += '    <div class="fruite-img" style="cursor: pointer;" onclick="window.location.href=\'' + productDetailUrl + '\'">';
+                html += '      <img src="' + avatar + '" class="img-fluid w-100 rounded-top" alt="' + (product.productName || '') + '" style="height: 200px; object-fit: cover;">';
+                html += '    </div>';
+                html += '    <div class="text-white bg-secondary px-3 py-1 rounded position-absolute" style="top: 10px; left: 10px;">' + brandName + '</div>';
+                html += '    <div class="p-4 border border-secondary border-top-0 rounded-bottom">';
+                html += '      <h4><a href="' + productDetailUrl + '" class="text-dark text-decoration-none">' + (product.productName || 'Chưa có tên') + '</a></h4>';
+                html += '      <p>' + (product.productModel || '') + '</p>';
+                html += '      <div class="d-flex align-items-center flex-wrap gap-2 mb-3">';
+                html += '        ' + originalPrice;
+                html += '        <span class="text-dark fs-5 fw-bold mb-0">' + price + '</span>';
+                html += '      </div>';
+                html += '      <div class="d-flex gap-2">';
+                html += '        <a href="' + productDetailUrl + '" class="btn border border-secondary rounded-pill px-3 text-primary">';
+                html += '          <i class="fa fa-eye me-2 text-primary"></i> Xem chi tiết';
+                html += '        </a>';
+                html += '        <a href="#" class="btn border border-secondary rounded-pill px-3 text-primary" onclick="event.preventDefault(); toggleFavorite(\'' + (product.productId || '') + '\'); return false;" title="Thêm vào yêu thích">';
+                html += '          <i class="far fa-heart" id="heart-' + (product.productId || '') + '"></i>';
+                html += '        </a>';
+                html += '      </div>';
+                html += '    </div>';
+                html += '  </div>';
+                html += '</div>';
+            });
+
+            $('#productsContainer').html(html);
+        }
+
+        // Render pagination
+        function renderPagination(currentPage, totalPages) {
+            if (totalPages <= 1) {
+                $('#paginationContainer').html('');
+                return;
+            }
+
+            let html = '';
+            html += '<a href="#" class="rounded" onclick="event.preventDefault(); changePage(' + (currentPage > 1 ? currentPage - 1 : 1) + '); return false;">&laquo;</a>';
+
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === currentPage) {
+                    html += '<a href="#" class="active rounded">' + i + '</a>';
+                } else {
+                    html += '<a href="#" class="rounded" onclick="event.preventDefault(); changePage(' + i + '); return false;">' + i + '</a>';
+                }
+            }
+
+            html += '<a href="#" class="rounded" onclick="event.preventDefault(); changePage(' + (currentPage < totalPages ? currentPage + 1 : totalPages) + '); return false;">&raquo;</a>';
+
+            $('#paginationContainer').html(html);
+        }
+
+        // Change page
+        function changePage(page) {
+            filters.page = page;
+            loadProducts();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Format price
+        function formatPrice(price) {
+            if (!price) return '0 đ';
+            try {
+                return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
+            } catch (e) {
+                return price.toString() + ' đ';
+            }
+        }
+
+        // Toggle favorite
+        function toggleFavorite(productId) {
+            if (!productId) return;
+            
+            let heartIcon = $('#heart-' + productId);
+            if (heartIcon.hasClass('fas')) {
+                heartIcon.removeClass('fas text-danger').addClass('far');
+                console.log('Bỏ yêu thích sản phẩm:', productId);
+            } else {
+                heartIcon.removeClass('far').addClass('fas text-danger');
+                console.log('Thêm yêu thích sản phẩm:', productId);
+            }
+        }
+    </script>
+}
+
