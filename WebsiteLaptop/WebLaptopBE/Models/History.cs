@@ -9,9 +9,9 @@ public partial class History
 
     public string? ActivityType { get; set; }
 
-    public string? Username { get; set; }
+    public string? EmployeeId { get; set; }
 
     public DateTime? Time { get; set; }
 
-    public virtual Account? UsernameNavigation { get; set; }
+    public virtual Employee? Employee { get; set; }
 }

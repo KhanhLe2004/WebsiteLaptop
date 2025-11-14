@@ -20,14 +20,21 @@
                 <div class="card-body px-3 pb-2">
                     <!-- Bộ lọc và tìm kiếm -->
                     <div class="row mb-3 g-2 align-items-end">
-                        <div class="col-lg-4 col-md-5">
+                        <div class="col-lg-3 col-md-4">
                             <div class="input-group input-group-outline">
                                 <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm sản phẩm...">
                             </div>
                         </div>
-                        <div class="col-lg-3 col-md-4">
+                        <div class="col-lg-2 col-md-3">
                             <select id="brandFilter" class="form-select">
                                 <option value="">Tất cả thương hiệu</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-2 col-md-3">
+                            <select id="activeFilter" class="form-select">
+                                <option value="true" selected>Đang bán</option>
+                                <option value="false">Ngừng bán</option>
+                                <option value="">Tất cả trạng thái</option>
                             </select>
                         </div>
                     </div>
@@ -230,22 +237,22 @@
     </div>
 </div>
 
-<!-- Modal Xác nhận xóa -->
+<!-- Modal Xác nhận ngừng bán -->
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-gradient-danger">
-                <h5 class="modal-title text-white" id="deleteModalLabel">Xác nhận xóa</h5>
+                <h5 class="modal-title text-white" id="deleteModalLabel">Xác nhận ngừng bán</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p>Bạn có chắc chắn muốn xóa sản phẩm <strong id="deleteProductName"></strong>?</p>
-                <p class="text-danger text-sm mb-0">Hành động này không thể hoàn tác!</p>
+                <p id="deleteModalMessage">Bạn có chắc chắn muốn ngừng bán sản phẩm <strong id="deleteProductName"></strong>?</p>
+                <p class="text-warning text-sm mb-0">Sản phẩm sẽ bị ẩn khỏi danh sách đang bán nhưng có thể khôi phục sau.</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
                 <button type="button" class="btn btn-danger" onclick="confirmDelete()">
-                    <i class="material-icons text-sm">delete</i> Xóa
+                    <i class="material-icons text-sm">delete</i> Ngừng bán
                 </button>
             </div>
         </div>
@@ -274,6 +281,11 @@
 
             // Tìm kiếm tự động theo thương hiệu
             $('#brandFilter').on('change', function() {
+                triggerAutoSearch();
+            });
+
+            // Tìm kiếm tự động theo trạng thái active
+            $('#activeFilter').on('change', function() {
                 triggerAutoSearch();
             });
         });
@@ -316,16 +328,24 @@
             currentPage = page;
             const searchTerm = $('#searchInput').val().trim();
             const brandId = $('#brandFilter').val();
+            const activeFilter = $('#activeFilter').val();
+
+            const dataParams = {
+                pageNumber: currentPage,
+                pageSize: pageSize,
+                searchTerm: searchTerm,
+                brandId: brandId
+            };
+
+            // Chỉ thêm active vào params nếu có giá trị
+            if (activeFilter !== '') {
+                dataParams.active = activeFilter === 'true';
+            }
 
             $.ajax({
                 url: API_URL,
                 type: 'GET',
-                data: {
-                    pageNumber: currentPage,
-                    pageSize: pageSize,
-                    searchTerm: searchTerm,
-                    brandId: brandId
-                },
+                data: dataParams,
                 success: function(response) {
                     displayProducts(response.items);
                     displayPagination(response);
@@ -361,9 +381,41 @@
                 const sellingPrice = product.sellingPrice ? 
                     new Intl.NumberFormat('vi-VN').format(product.sellingPrice) + ' đ' : '-';
                 const brandName = product.brandName || '-';
+                const isActive = product.active !== false; // Mặc định true nếu không có giá trị
+                const activeBadge = isActive 
+                    ? '<span class="badge bg-gradient-success">Đang bán</span>' 
+                    : '<span class="badge bg-gradient-danger">Ngừng bán</span>';
+                const productNameEscaped = (product.productName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+                // Nút thao tác khác nhau tùy theo active
+                let actionButtons = '';
+                if (isActive) {
+                    // Sản phẩm đang bán: có nút Xem, Sửa, Xóa
+                    actionButtons = `
+                        <button class="btn btn-info action-btn" onclick='viewProduct("${product.productId}")' title="Xem">
+                            <i class="material-icons text-sm">visibility</i>
+                        </button>
+                        <button class="btn btn-warning action-btn" onclick='editProduct("${product.productId}")' title="Sửa">
+                            <i class="material-icons text-sm">edit</i>
+                        </button>
+                        <button class="btn btn-danger action-btn" onclick='deleteProduct("${product.productId}", "${productNameEscaped}")' title="Ngừng bán">
+                            <i class="material-icons text-sm">delete</i>
+                        </button>
+                    `;
+                } else {
+                    // Sản phẩm ngừng bán: có nút Xem, Khôi phục
+                    actionButtons = `
+                        <button class="btn btn-info action-btn" onclick='viewProduct("${product.productId}")' title="Xem">
+                            <i class="material-icons text-sm">visibility</i>
+                        </button>
+                        <button class="btn btn-success action-btn" onclick='restoreProduct("${product.productId}", "${productNameEscaped}")' title="Khôi phục">
+                            <i class="material-icons text-sm">restore</i>
+                        </button>
+                    `;
+                }
 
                 tbody.append(`
-                    <tr style="height: 80px;">
+                    <tr style="height: 80px;" class="${!isActive ? 'table-secondary' : ''}">
                         <td style="vertical-align: middle;">
                             <div class="d-flex px-2 py-1">
                                 <div>
@@ -378,6 +430,7 @@
                         <td style="vertical-align: middle;">
                             <p class="text-xs font-weight-bold mb-0" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${product.productModel || '-'}</p>
                             <p class="text-xs text-secondary mb-0" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${product.screen || '-'}</p>
+                            ${activeBadge}
                         </td>
                         <td style="vertical-align: middle; text-align: center;">
                             <span class="badge badge-price bg-gradient-success">${sellingPrice}</span>
@@ -388,15 +441,7 @@
                             <span class="text-xs font-weight-bold" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; max-width: 100%;">${brandName}</span>
                         </td>
                         <td style="vertical-align: middle; text-align: center;" class="table-actions">
-                            <button class="btn btn-info action-btn" onclick='viewProduct("${product.productId}")' title="Xem">
-                                <i class="material-icons text-sm">visibility</i>
-                            </button>
-                            <button class="btn btn-warning action-btn" onclick='editProduct("${product.productId}")' title="Sửa">
-                                <i class="material-icons text-sm">edit</i>
-                            </button>
-                            <button class="btn btn-danger action-btn" onclick='deleteProduct("${product.productId}", "${product.productName}")' title="Xóa">
-                                <i class="material-icons text-sm">delete</i>
-                            </button>
+                            ${actionButtons}
                         </td>
                     </tr>
                 `);
@@ -732,7 +777,10 @@
             
             configurations = productConfigurations.map((config) => ({
                 configurationId: config.configurationId || null,
-                specifications: config.specifications || '',
+                cpu: config.cpu || '',
+                ram: config.ram || '',
+                rom: config.rom || '',
+                card: config.card || '',
                 price: typeof config.price === 'number'
                     ? config.price
                     : (config.price ? parseFloat(config.price) || 0 : 0),
@@ -806,24 +854,8 @@
                 return;
             }
             
-            // Validate configurations
-            if (configurations && configurations.length > 0) {
-                for (let i = 0; i < configurations.length; i++) {
-                    const config = configurations[i];
-                    
-                    // Kiểm tra xem config có ít nhất một field được điền không
-                    const hasSpecifications = config.specifications && config.specifications.trim() !== '';
-                    const hasPrice = config.price && parseFloat(config.price) > 0;
-                    const hasQuantity = config.quantity && parseInt(config.quantity) > 0;
-                    const hasAnyField = hasSpecifications || hasPrice || hasQuantity;
-                    
-                    // Nếu có field được điền nhưng thiếu specifications, báo lỗi
-                    if (hasAnyField && !hasSpecifications) {
-                        showError(`Vui lòng nhập thông số kỹ thuật cho cấu hình thứ ${i + 1}`);
-                        return;
-                    }
-                }
-            }
+            // Validate configurations - không cần validation nghiêm ngặt vì các trường đều optional
+            // Chỉ kiểm tra nếu có điền thì phải hợp lệ (đã được xử lý trong filter khi gửi)
 
             const formData = new FormData();
             formData.append('ProductName', productName);
@@ -855,12 +887,23 @@
                 }
 
                 // Xử lý thêm/Update Configurations (tương tự như thêm Images)
-                // Chỉ gửi configurations có specifications (required)
+                // Lọc bỏ configurations có tất cả các trường đều rỗng
                 const configsToSend = configurations
-                    .filter(c => c.specifications && c.specifications.trim() !== '')
+                    .filter(c => {
+                        const hasCpu = c.cpu && c.cpu.trim() !== '';
+                        const hasRam = c.ram && c.ram.trim() !== '';
+                        const hasRom = c.rom && c.rom.trim() !== '';
+                        const hasCard = c.card && c.card.trim() !== '';
+                        const hasPrice = c.price && parseFloat(c.price) > 0;
+                        const hasQuantity = c.quantity && parseInt(c.quantity) > 0;
+                        return hasCpu || hasRam || hasRom || hasCard || hasPrice || hasQuantity;
+                    })
                     .map(c => ({
                         configurationId: c.configurationId || null,
-                        specifications: (c.specifications || '').trim(),
+                        cpu: (c.cpu || '').trim(),
+                        ram: (c.ram || '').trim(),
+                        rom: (c.rom || '').trim(),
+                        card: (c.card || '').trim(),
                         price: parseFloat(c.price) || 0,
                         quantity: parseInt(c.quantity) || 0
                     }));
@@ -878,9 +921,20 @@
                 // Khi tạo mới, chỉ gửi nếu có configurations hợp lệ
                 if (configurations && configurations.length > 0) {
                     const configsToSend = configurations
-                        .filter(c => c.specifications && c.specifications.trim() !== '') // Lọc bỏ config rỗng
+                        .filter(c => {
+                            const hasCpu = c.cpu && c.cpu.trim() !== '';
+                            const hasRam = c.ram && c.ram.trim() !== '';
+                            const hasRom = c.rom && c.rom.trim() !== '';
+                            const hasCard = c.card && c.card.trim() !== '';
+                            const hasPrice = c.price && parseFloat(c.price) > 0;
+                            const hasQuantity = c.quantity && parseInt(c.quantity) > 0;
+                            return hasCpu || hasRam || hasRom || hasCard || hasPrice || hasQuantity;
+                        })
                         .map(c => ({
-                            specifications: (c.specifications || '').trim(),
+                            cpu: (c.cpu || '').trim(),
+                            ram: (c.ram || '').trim(),
+                            rom: (c.rom || '').trim(),
+                            card: (c.card || '').trim(),
                             price: parseFloat(c.price) || 0,
                             quantity: parseInt(c.quantity) || 0
                         }));
@@ -979,26 +1033,52 @@
             });
         }
 
-        // Xóa sản phẩm
+        // Xóa sản phẩm (ẩn sản phẩm - set active = 0)
         function deleteProduct(productId, productName) {
             deleteProductId = productId;
-            $('#deleteProductName').text(productName);
+            const productNameEscaped = productName.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            $('#deleteProductName').html(productNameEscaped);
+            $('#deleteModalLabel').text('Xác nhận ngừng bán');
+            $('#deleteModalMessage').html(`Bạn có chắc chắn muốn ngừng bán sản phẩm <strong>${productNameEscaped}</strong>?`);
             const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
             modal.show();
         }
 
-        // Xác nhận xóa
+        // Xác nhận xóa (ẩn sản phẩm)
         function confirmDelete() {
             $.ajax({
                 url: `${API_URL}/${deleteProductId}`,
                 type: 'DELETE',
                 success: function(response) {
-                    showNotification('Xóa sản phẩm thành công', 'success');
+                    showNotification('Đã ngừng bán sản phẩm thành công', 'success');
                     bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
                     loadProducts();
                 },
                 error: function(xhr) {
-                    let message = 'Có lỗi xảy ra khi xóa sản phẩm';
+                    let message = 'Có lỗi xảy ra khi ngừng bán sản phẩm';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showNotification(message, 'error');
+                }
+            });
+        }
+
+        // Khôi phục sản phẩm (set active = 1)
+        function restoreProduct(productId, productName) {
+            if (!confirm(`Bạn có chắc chắn muốn khôi phục sản phẩm "${productName}"?\nSản phẩm sẽ được hiển thị lại trong danh sách đang bán.`)) {
+                return;
+            }
+
+            $.ajax({
+                url: `${API_URL}/${productId}/restore`,
+                type: 'POST',
+                success: function(response) {
+                    showNotification('Khôi phục sản phẩm thành công', 'success');
+                    loadProducts();
+                },
+                error: function(xhr) {
+                    let message = 'Có lỗi xảy ra khi khôi phục sản phẩm';
                     if (xhr.responseJSON && xhr.responseJSON.message) {
                         message = xhr.responseJSON.message;
                     }
@@ -1032,7 +1112,10 @@
         function addConfiguration() {
             configurations.push({
                 configurationId: null,
-                specifications: '',
+                cpu: '',
+                ram: '',
+                rom: '',
+                card: '',
                 price: 0,
                 quantity: 0
             });
@@ -1088,7 +1171,10 @@
             }
             
             configurations.forEach((config, index) => {
-                const specifications = (config.specifications || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                const cpu = (config.cpu || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                const ram = (config.ram || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                const rom = (config.rom || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                const card = (config.card || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                 const price = config.price || 0;
                 const quantity = config.quantity || 0;
                 const disabledAttr = isViewMode ? 'disabled' : '';
@@ -1097,20 +1183,61 @@
                     <div class="card mb-3 configuration-item" data-index="${index}">
                         <div class="card-body">
                             <div class="row">
-                                <div class="col-md-5">
+                                <div class="col-md-3">
                                     <div class="mb-3">
-                                        <label for="config-spec-${index}" class="form-label" style="font-size: 0.875rem; color: #7b809a; font-weight: 400; margin-bottom: 0.25rem;">Thông số kỹ thuật</label>
+                                        <label for="config-cpu-${index}" class="form-label" style="font-size: 0.875rem; color: #7b809a; font-weight: 400; margin-bottom: 0.25rem;">CPU</label>
                                         <input type="text" 
-                                               id="config-spec-${index}"
-                                               class="form-control config-specifications" 
-                                               value="${specifications}" 
-                                               onchange="updateConfiguration(${index}, 'specifications', this.value)"
-                                               oninput="updateConfiguration(${index}, 'specifications', this.value)"
-                                               placeholder="VD: RAM 8GB, SSD 256GB"
+                                               id="config-cpu-${index}"
+                                               class="form-control config-cpu" 
+                                               value="${cpu}" 
+                                               onchange="updateConfiguration(${index}, 'cpu', this.value)"
+                                               oninput="updateConfiguration(${index}, 'cpu', this.value)"
+                                               placeholder="VD: Intel Core i5"
                                                ${disabledAttr}>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="config-ram-${index}" class="form-label" style="font-size: 0.875rem; color: #7b809a; font-weight: 400; margin-bottom: 0.25rem;">RAM</label>
+                                        <input type="text" 
+                                               id="config-ram-${index}"
+                                               class="form-control config-ram" 
+                                               value="${ram}" 
+                                               onchange="updateConfiguration(${index}, 'ram', this.value)"
+                                               oninput="updateConfiguration(${index}, 'ram', this.value)"
+                                               placeholder="VD: 8GB"
+                                               ${disabledAttr}>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="config-rom-${index}" class="form-label" style="font-size: 0.875rem; color: #7b809a; font-weight: 400; margin-bottom: 0.25rem;">ROM</label>
+                                        <input type="text" 
+                                               id="config-rom-${index}"
+                                               class="form-control config-rom" 
+                                               value="${rom}" 
+                                               onchange="updateConfiguration(${index}, 'rom', this.value)"
+                                               oninput="updateConfiguration(${index}, 'rom', this.value)"
+                                               placeholder="VD: 256GB SSD"
+                                               ${disabledAttr}>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="config-card-${index}" class="form-label" style="font-size: 0.875rem; color: #7b809a; font-weight: 400; margin-bottom: 0.25rem;">Card</label>
+                                        <input type="text" 
+                                               id="config-card-${index}"
+                                               class="form-control config-card" 
+                                               value="${card}" 
+                                               onchange="updateConfiguration(${index}, 'card', this.value)"
+                                               oninput="updateConfiguration(${index}, 'card', this.value)"
+                                               placeholder="VD: NVIDIA RTX 3050"
+                                               ${disabledAttr}>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4">
                                     <div class="mb-3">
                                         <label for="config-price-${index}" class="form-label" style="font-size: 0.875rem; color: #7b809a; font-weight: 400; margin-bottom: 0.25rem;">Giá (VNĐ)</label>
                                         <input type="number" 
@@ -1123,7 +1250,7 @@
                                                ${disabledAttr}>
                                     </div>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <div class="mb-3">
                                         <label for="config-qty-${index}" class="form-label" style="font-size: 0.875rem; color: #7b809a; font-weight: 400; margin-bottom: 0.25rem;">Số lượng</label>
                                         <input type="number" 
@@ -1136,13 +1263,16 @@
                                                ${disabledAttr}>
                                     </div>
                                 </div>
-                                <div class="col-md-1">
+                                <div class="col-md-4">
                                     ${!isViewMode ? `
-                                    <button type="button" class="btn btn-danger btn-sm mt-3" 
-                                            onclick="removeConfiguration(${index})" 
-                                            title="Xóa">
-                                        <i class="material-icons text-sm">delete</i>
-                                    </button>
+                                    <div class="mb-3">
+                                        <label class="form-label" style="font-size: 0.875rem; color: #7b809a; font-weight: 400; margin-bottom: 0.25rem;">Thao tác</label>
+                                        <button type="button" class="btn btn-danger btn-sm d-block" 
+                                                onclick="removeConfiguration(${index})" 
+                                                title="Xóa">
+                                            <i class="material-icons text-sm">delete</i> Xóa
+                                        </button>
+                                    </div>
                                     ` : ''}
                                 </div>
                             </div>

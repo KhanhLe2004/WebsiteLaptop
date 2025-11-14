@@ -14,10 +14,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageProductAPIController : ControllerBase
     {
-        private readonly Testlaptop20Context _context;
+        private readonly Testlaptop27Context _context;
         private readonly IWebHostEnvironment _environment;
 
-        public ManageProductAPIController(Testlaptop20Context context, IWebHostEnvironment environment)
+        public ManageProductAPIController(Testlaptop27Context context, IWebHostEnvironment environment)
         {
             _context = context;
             _environment = environment;
@@ -30,7 +30,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
             [FromQuery] string? searchTerm = null,
-            [FromQuery] string? brandId = null)
+            [FromQuery] string? brandId = null,
+            [FromQuery] bool? active = null)
         {
             try
             {
@@ -58,6 +59,12 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     query = query.Where(p => p.BrandId == brandId);
                 }
 
+                // Lọc theo trạng thái active
+                if (active.HasValue)
+                {
+                    query = query.Where(p => p.Active == active.Value);
+                }
+
                 // Đếm tổng số
                 var totalItems = await query.CountAsync();
 
@@ -81,7 +88,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         Pin = p.Pin,
                         BrandId = p.BrandId,
                         BrandName = p.Brand != null ? p.Brand.BrandName : null,
-                        Avatar = p.Avatar
+                        Avatar = p.Avatar,
+                        Active = p.Active
                     })
                     .ToListAsync();
 
@@ -188,10 +196,14 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     BrandId = product.BrandId,
                     BrandName = product.Brand != null ? product.Brand.BrandName : null,
                     Avatar = product.Avatar,
+                    Active = product.Active,
                     Configurations = configurations.Select(c => new ProductConfigurationDTO
                     {
                         ConfigurationId = c.ConfigurationId,
-                        Specifications = c.Specifications,
+                        Cpu = c.Cpu,
+                        Ram = c.Ram,
+                        Rom = c.Rom,
+                        Card = c.Card,
                         Price = c.Price,
                         Quantity = c.Quantity,
                         ProductId = c.ProductId
@@ -285,7 +297,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     Weight = dto.Weight,
                     Pin = dto.Pin,
                     BrandId = dto.BrandId,
-                    Avatar = avatarFileName
+                    Avatar = avatarFileName,
+                    Active = true // Mặc định sản phẩm mới tạo sẽ active
                 };
 
                 _context.Products.Add(product);
@@ -303,9 +316,14 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         
                         if (configurations != null && configurations.Count > 0)
                         {
-                            // Lọc bỏ configurations có Specifications rỗng
+                            // Lọc bỏ configurations có tất cả các trường đều rỗng
                             var validConfigurations = configurations
-                                .Where(c => !string.IsNullOrWhiteSpace(c.Specifications))
+                                .Where(c => !string.IsNullOrWhiteSpace(c.Cpu) || 
+                                           !string.IsNullOrWhiteSpace(c.Ram) || 
+                                           !string.IsNullOrWhiteSpace(c.Rom) || 
+                                           !string.IsNullOrWhiteSpace(c.Card) ||
+                                           (c.Price.HasValue && c.Price.Value > 0) ||
+                                           (c.Quantity.HasValue && c.Quantity.Value > 0))
                                 .ToList();
 
                             if (validConfigurations.Count > 0)
@@ -317,7 +335,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                                     {
                                         ConfigurationId = configIdGenerator.Next(),
                                         ProductId = product.ProductId,
-                                        Specifications = configDto.Specifications?.Trim() ?? string.Empty,
+                                        Cpu = configDto.Cpu?.Trim() ?? string.Empty,
+                                        Ram = configDto.Ram?.Trim() ?? string.Empty,
+                                        Rom = configDto.Rom?.Trim() ?? string.Empty,
+                                        Card = configDto.Card?.Trim() ?? string.Empty,
                                         Price = configDto.Price ?? 0,
                                         Quantity = configDto.Quantity ?? 0
                                     });
@@ -505,9 +526,14 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         
                         if (configurations != null && configurations.Count > 0)
                         {
-                            // Lọc bỏ configurations có Specifications rỗng
+                            // Lọc bỏ configurations có tất cả các trường đều rỗng
                             var validConfigurations = configurations
-                                .Where(c => !string.IsNullOrWhiteSpace(c.Specifications))
+                                .Where(c => !string.IsNullOrWhiteSpace(c.Cpu) || 
+                                           !string.IsNullOrWhiteSpace(c.Ram) || 
+                                           !string.IsNullOrWhiteSpace(c.Rom) || 
+                                           !string.IsNullOrWhiteSpace(c.Card) ||
+                                           (c.Price.HasValue && c.Price.Value > 0) ||
+                                           (c.Quantity.HasValue && c.Quantity.Value > 0))
                                 .ToList();
 
                             if (validConfigurations.Count > 0)
@@ -529,7 +555,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                                         
                                         if (existingConfig != null)
                                         {
-                                            existingConfig.Specifications = configDto.Specifications?.Trim() ?? string.Empty;
+                                            existingConfig.Cpu = configDto.Cpu?.Trim() ?? string.Empty;
+                                            existingConfig.Ram = configDto.Ram?.Trim() ?? string.Empty;
+                                            existingConfig.Rom = configDto.Rom?.Trim() ?? string.Empty;
+                                            existingConfig.Card = configDto.Card?.Trim() ?? string.Empty;
                                             existingConfig.Price = configDto.Price ?? 0;
                                             existingConfig.Quantity = configDto.Quantity ?? 0;
                                             _context.ProductConfigurations.Update(existingConfig);
@@ -542,7 +571,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                                             {
                                                 ConfigurationId = configIdGenerator.Next(),
                                                 ProductId = id,
-                                                Specifications = configDto.Specifications?.Trim() ?? string.Empty,
+                                                Cpu = configDto.Cpu?.Trim() ?? string.Empty,
+                                                Ram = configDto.Ram?.Trim() ?? string.Empty,
+                                                Rom = configDto.Rom?.Trim() ?? string.Empty,
+                                                Card = configDto.Card?.Trim() ?? string.Empty,
                                                 Price = configDto.Price ?? 0,
                                                 Quantity = configDto.Quantity ?? 0
                                             });
@@ -556,7 +588,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                                         {
                                             ConfigurationId = configIdGenerator.Next(),
                                             ProductId = id,
-                                            Specifications = configDto.Specifications?.Trim() ?? string.Empty,
+                                            Cpu = configDto.Cpu?.Trim() ?? string.Empty,
+                                            Ram = configDto.Ram?.Trim() ?? string.Empty,
+                                            Rom = configDto.Rom?.Trim() ?? string.Empty,
+                                            Card = configDto.Card?.Trim() ?? string.Empty,
                                             Price = configDto.Price ?? 0,
                                             Quantity = configDto.Quantity ?? 0
                                         });
@@ -643,7 +678,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
         }
 
         // DELETE: api/admin/products/{id}
-        // Xóa sản phẩm
+        // Ẩn sản phẩm (set active = 0) thay vì xóa thực sự
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProduct(string id)
         {
@@ -655,70 +690,42 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     return NotFound(new { message = "Không tìm thấy sản phẩm" });
                 }
 
-                // Kiểm tra ràng buộc với các bảng quan trọng (không thể xóa nếu có)
-                var hasCartDetails = await _context.CartDetails.AnyAsync(cd => cd.ProductId == id);
-                var hasSaleInvoiceDetails = await _context.SaleInvoiceDetails.AnyAsync(sid => sid.ProductId == id);
-                var hasProductSerials = await _context.ProductSerials.AnyAsync(ps => ps.ProductId == id);
-                var hasStockExportDetails = await _context.StockExportDetails.AnyAsync(sed => sed.ProductId == id);
-                var hasStockImportDetails = await _context.StockImportDetails.AnyAsync(sid => sid.ProductId == id);
-                
-                if (hasCartDetails || hasSaleInvoiceDetails || hasProductSerials || hasStockExportDetails || hasStockImportDetails)
-                {
-                    var reasons = new List<string>();
-                    if (hasCartDetails) reasons.Add("giỏ hàng");
-                    if (hasSaleInvoiceDetails) reasons.Add("hóa đơn bán hàng");
-                    if (hasProductSerials) reasons.Add("sản phẩm serial");
-                    if (hasStockExportDetails) reasons.Add("phiếu xuất kho");
-                    if (hasStockImportDetails) reasons.Add("phiếu nhập kho");
-                    
-                    return BadRequest(new { message = $"Không thể xóa sản phẩm vì đã có trong {string.Join(", ", reasons)}" });
-                }
-
-                // Xóa ảnh avatar nếu có
-                if (!string.IsNullOrEmpty(product.Avatar))
-                {
-                    DeleteImage(product.Avatar);
-                }
-
-                // Xóa Product Images
-                var productImages = await _context.ProductImages
-                    .Where(img => img.ProductId == id)
-                    .ToListAsync();
-                
-                foreach (var img in productImages)
-                {
-                    DeleteImage(img.ImageId); // Xóa file ảnh
-                }
-                _context.ProductImages.RemoveRange(productImages);
-
-                // Xóa Product Configurations
-                var productConfigs = await _context.ProductConfigurations
-                    .Where(c => c.ProductId == id)
-                    .ToListAsync();
-                _context.ProductConfigurations.RemoveRange(productConfigs);
-
-                // Xóa Product Reviews
-                var productReviews = await _context.ProductReviews
-                    .Where(pr => pr.ProductId == id)
-                    .ToListAsync();
-                _context.ProductReviews.RemoveRange(productReviews);
-
-                // Xóa Promotions
-                var promotions = await _context.Promotions
-                    .Where(p => p.ProductId == id)
-                    .ToListAsync();
-                _context.Promotions.RemoveRange(promotions);
-
-                // Xóa Product
-                _context.Products.Remove(product);
+                // Set active = 0 thay vì xóa
+                product.Active = false;
                 await _context.SaveChangesAsync();
 
-                return Ok(new { message = "Xóa sản phẩm thành công" });
+                return Ok(new { message = "Đã ẩn sản phẩm thành công" });
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error deleting product: {ex.Message}");
-                return StatusCode(500, new { message = "Lỗi khi xóa sản phẩm", error = ex.Message });
+                Console.WriteLine($"Error hiding product: {ex.Message}");
+                return StatusCode(500, new { message = "Lỗi khi ẩn sản phẩm", error = ex.Message });
+            }
+        }
+
+        // POST: api/admin/products/{id}/restore
+        // Khôi phục sản phẩm (set active = 1)
+        [HttpPost("{id}/restore")]
+        public async Task<IActionResult> RestoreProduct(string id)
+        {
+            try
+            {
+                var product = await _context.Products.FindAsync(id);
+                if (product == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy sản phẩm" });
+                }
+
+                // Set active = 1
+                product.Active = true;
+                await _context.SaveChangesAsync();
+
+                return Ok(new { message = "Khôi phục sản phẩm thành công" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error restoring product: {ex.Message}");
+                return StatusCode(500, new { message = "Lỗi khi khôi phục sản phẩm", error = ex.Message });
             }
         }
 
@@ -778,10 +785,14 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 BrandId = product.BrandId,
                 BrandName = product.Brand != null ? product.Brand.BrandName : null,
                 Avatar = product.Avatar,
+                Active = product.Active,
                 Configurations = configurations.Select(c => new ProductConfigurationDTO
                 {
                     ConfigurationId = c.ConfigurationId,
-                    Specifications = c.Specifications,
+                    Cpu = c.Cpu,
+                    Ram = c.Ram,
+                    Rom = c.Rom,
+                    Card = c.Card,
                     Price = c.Price,
                     Quantity = c.Quantity,
                     ProductId = c.ProductId

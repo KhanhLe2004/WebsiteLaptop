@@ -9,9 +9,9 @@ public partial class Cart
 
     public decimal? TotalAmount { get; set; }
 
-    public string? Username { get; set; }
+    public string? CustomerId { get; set; }
 
     public virtual ICollection<CartDetail> CartDetails { get; set; } = new List<CartDetail>();
 
-    public virtual Account? UsernameNavigation { get; set; }
+    public virtual Customer? Customer { get; set; }
 }

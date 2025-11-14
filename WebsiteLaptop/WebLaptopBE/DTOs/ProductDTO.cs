@@ -6,7 +6,10 @@ namespace WebLaptopBE.DTOs
     public class ProductConfigurationDTO
     {
         public string ConfigurationId { get; set; } = null!;
-        public string? Specifications { get; set; }
+        public string? Cpu { get; set; }
+        public string? Ram { get; set; }
+        public string? Rom { get; set; }
+        public string? Card { get; set; }
         public decimal? Price { get; set; }
         public int? Quantity { get; set; }
         public string? ProductId { get; set; }
@@ -37,6 +40,7 @@ namespace WebLaptopBE.DTOs
         public string? BrandId { get; set; }
         public string? BrandName { get; set; }
         public string? Avatar { get; set; }
+        public bool? Active { get; set; }
         public List<ProductConfigurationDTO> Configurations { get; set; } = new List<ProductConfigurationDTO>();
         public List<ProductImageDTO> Images { get; set; } = new List<ProductImageDTO>();
     }
@@ -94,7 +98,10 @@ namespace WebLaptopBE.DTOs
     // DTO cho tạo ProductConfiguration
     public class ProductConfigurationCreateDTO
     {
-        public string? Specifications { get; set; }
+        public string? Cpu { get; set; }
+        public string? Ram { get; set; }
+        public string? Rom { get; set; }
+        public string? Card { get; set; }
         public decimal? Price { get; set; }
         public int? Quantity { get; set; }
     }
@@ -158,7 +165,10 @@ namespace WebLaptopBE.DTOs
     public class ProductConfigurationUpdateDTO
     {
         public string? ConfigurationId { get; set; } // Nếu có thì update, nếu null thì tạo mới
-        public string? Specifications { get; set; }
+        public string? Cpu { get; set; }
+        public string? Ram { get; set; }
+        public string? Rom { get; set; }
+        public string? Card { get; set; }
         public decimal? Price { get; set; }
         public int? Quantity { get; set; }
     }
