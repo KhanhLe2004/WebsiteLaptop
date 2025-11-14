@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebLaptopBE.Data;
 
@@ -9,13 +8,18 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class ListProductAPIController : ControllerBase
     {
-        private Testlaptop20Context db = new Testlaptop20Context();
+        private readonly Testlaptop20Context _context;
+
+        public ListProductAPIController(Testlaptop20Context context)
+        {
+            _context = context;
+        }
         
         [HttpGet("all")]
-        public IActionResult GetAllProducts()
+        public async Task<IActionResult> GetAllProducts()
         {
-            var lstSanPham = db.Products.AsNoTracking().ToList();
-            return Ok(lstSanPham);
+            var products = await _context.Products.AsNoTracking().ToListAsync();
+            return Ok(products);
         }
     }
 }

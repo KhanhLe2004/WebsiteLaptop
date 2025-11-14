@@ -611,7 +611,6 @@
                 url: `${API_URL}/${productId}`,
                 type: 'GET',
                 success: function(product) {
-                    console.log('View product data:', product);
                     $('#productModalLabel').text('Chi tiết sản phẩm');
                     
                     // Đảm bảo modal được reset trước
@@ -645,10 +644,6 @@
                 url: `${API_URL}/${productId}`,
                 type: 'GET',
                 success: function(product) {
-                    console.log('Product data loaded:', product);
-                    console.log('Configurations:', product.configurations);
-                    console.log('Images:', product.images);
-                    
                     $('#isEditMode').val('true');
                     $('#productModalLabel').text('Cập nhật sản phẩm');
                     
@@ -734,34 +729,20 @@
 
             // Load configurations TRƯỚC KHI set view mode
             const productConfigurations = Array.isArray(product.configurations) ? product.configurations : [];
-            console.log('Raw product.configurations:', product.configurations);
-            console.log('productConfigurations array:', productConfigurations);
-            console.log('productConfigurations length:', productConfigurations.length);
             
-            configurations = productConfigurations.map((config, idx) => {
-                const mappedConfig = {
-                    configurationId: config.configurationId || null,
-                    specifications: config.specifications || '',
-                    price: typeof config.price === 'number'
-                        ? config.price
-                        : (config.price ? parseFloat(config.price) || 0 : 0),
-                    quantity: typeof config.quantity === 'number'
-                        ? config.quantity
-                        : (config.quantity ? parseInt(config.quantity) || 0 : 0)
-                };
-                console.log(`Config ${idx}:`, mappedConfig);
-                return mappedConfig;
-            });
-            
-            console.log('Loaded configurations:', configurations);
-            console.log('Configurations count:', configurations.length);
-            console.log('Configurations type:', typeof configurations);
-            console.log('Is array:', Array.isArray(configurations));
+            configurations = productConfigurations.map((config) => ({
+                configurationId: config.configurationId || null,
+                specifications: config.specifications || '',
+                price: typeof config.price === 'number'
+                    ? config.price
+                    : (config.price ? parseFloat(config.price) || 0 : 0),
+                quantity: typeof config.quantity === 'number'
+                    ? config.quantity
+                    : (config.quantity ? parseInt(config.quantity) || 0 : 0)
+            }));
 
             // Load existing images
             existingImages = product.images || [];
-            console.log('Loaded images:', existingImages);
-            console.log('Images count:', existingImages.length);
             imagesToDelete = [];
             configurationsToDelete = []; // Reset configurationsToDelete khi load product
             
@@ -870,22 +851,13 @@
             if (isEdit) {
                 // Xử lý xóa Configurations (tương tự như xóa Images)
                 if (configurationsToDelete.length > 0) {
-                    console.log('Configurations to delete:', configurationsToDelete);
                     formData.append('ConfigurationsToDeleteJson', JSON.stringify(configurationsToDelete));
                 }
 
                 // Xử lý thêm/Update Configurations (tương tự như thêm Images)
                 // Chỉ gửi configurations có specifications (required)
                 const configsToSend = configurations
-                    .filter(c => {
-                        // Chỉ giữ lại configurations có specifications không rỗng
-                        const hasSpecifications = c.specifications && c.specifications.trim() !== '';
-                        if (!hasSpecifications) {
-                            console.log('Skipping configuration without specifications:', c);
-                            return false;
-                        }
-                        return true;
-                    })
+                    .filter(c => c.specifications && c.specifications.trim() !== '')
                     .map(c => ({
                         configurationId: c.configurationId || null,
                         specifications: (c.specifications || '').trim(),
@@ -895,12 +867,7 @@
                 
                 // Chỉ gửi ConfigurationsJson nếu có configurations hợp lệ
                 if (configsToSend.length > 0) {
-                    console.log('All configurations before filter:', configurations);
-                    console.log('Configs to send (with specifications):', configsToSend);
-                    console.log('Configs to send count:', configsToSend.length);
-                    const configsJson = JSON.stringify(configsToSend);
-                    console.log('ConfigurationsJson (update):', configsJson);
-                    formData.append('ConfigurationsJson', configsJson);
+                    formData.append('ConfigurationsJson', JSON.stringify(configsToSend));
                 }
 
                 // Thêm images to delete
@@ -919,8 +886,8 @@
                         }));
                     if (configsToSend.length > 0) {
                         const configsJson = JSON.stringify(configsToSend);
-                        console.log('ConfigurationsJson (create):', configsJson);
                         formData.append('ConfigurationsJson', configsJson);
+                        console.log('Create - ConfigurationsJson:', configsJson);
                     }
                 }
             }
@@ -931,27 +898,15 @@
                     if (imageObj && imageObj.file) {
                         // Validate file type
                         if (!imageObj.file.type || !imageObj.file.type.startsWith('image/')) {
-                            console.warn('Skipping non-image file:', imageObj.name);
                             return;
                         }
                         // Validate file size (max 5MB)
                         if (imageObj.file.size > 5 * 1024 * 1024) {
-                            console.warn('Skipping large file:', imageObj.name, 'Size:', imageObj.file.size);
                             return;
                         }
                         formData.append('ImageFiles', imageObj.file);
                     }
                 });
-            }
-            
-            // Debug: Log form data
-            console.log('FormData contents:');
-            for (let pair of formData.entries()) {
-                if (pair[1] instanceof File) {
-                    console.log(pair[0] + ': [File] ' + pair[1].name + ' (' + pair[1].size + ' bytes)');
-                } else {
-                    console.log(pair[0] + ': ' + (typeof pair[1] === 'string' && pair[1].length > 100 ? pair[1].substring(0, 100) + '...' : pair[1]));
-                }
             }
 
             const url = isEdit ? `${API_URL}/${productId}` : API_URL;
@@ -964,7 +919,6 @@
                 processData: false,
                 contentType: false,
                 success: function(response) {
-                    console.log('Save product success:', response);
                     showNotification(isEdit ? 'Cập nhật sản phẩm thành công' : 'Thêm sản phẩm thành công', 'success');
                     const modalInstance = bootstrap.Modal.getInstance(document.getElementById('productModal'));
                     if (modalInstance) {
@@ -1091,17 +1045,13 @@
             const firstInput = $('#productForm input:not([type="hidden"])').first();
             const isViewMode = firstInput.length > 0 ? firstInput.prop('disabled') || false : false;
             if (isViewMode) {
-                console.warn('Cannot remove configuration in view mode');
                 return;
             }
             
             const config = configurations[index];
             // Nếu là configuration đã tồn tại (có configurationId), thêm vào configurationsToDelete
-            if (config && config.configurationId) {
-                if (!configurationsToDelete.includes(config.configurationId)) {
-                    configurationsToDelete.push(config.configurationId);
-                    console.log('Added configuration to delete:', config.configurationId);
-                }
+            if (config && config.configurationId && !configurationsToDelete.includes(config.configurationId)) {
+                configurationsToDelete.push(config.configurationId);
             }
             // Xóa khỏi array configurations
             configurations.splice(index, 1);
@@ -1119,13 +1069,6 @@
         function renderConfigurations() {
             const container = $('#configurationsContainer');
             container.empty();
-
-            // Debug: Log configurations state
-            console.log('renderConfigurations called');
-            console.log('configurations:', configurations);
-            console.log('configurations.length:', configurations.length);
-            console.log('configurations type:', typeof configurations);
-            console.log('Is array:', Array.isArray(configurations));
 
             // Kiểm tra view mode - nếu không có input nào trong form thì chưa load
             const firstInput = $('#productForm input:not([type="hidden"])').first();
@@ -1455,7 +1398,6 @@
             const firstInput = $('#productForm input:not([type="hidden"])').first();
             const isViewMode = firstInput.length > 0 ? firstInput.prop('disabled') || false : false;
             if (isViewMode) {
-                console.warn('Cannot remove image in view mode');
                 return;
             }
             
