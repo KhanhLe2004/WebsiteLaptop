@@ -130,7 +130,7 @@
 
 <!-- Inline CSS: do NOT create a Styles section (layout doesn't render it). -->
 <style>
-    /* Keep Bootstrap grid untouched. Only style the sidebar to be sticky and scrollable internally */
+    /* Keep Bootstrap grid untouched. Only style the sidebar to be sticky and scrollable internally. */
 
     /* Make sidebar sticky and scrollable without changing grid widths */
     .shop-sidebar {
@@ -186,335 +186,339 @@
 </style>
 
 @section Scripts {
-        <script>
-            // API base
-            let apiBase = "http://localhost:5068/";
-            // filter state
-            let filters = {
-                brands: [],
-                minPrice: null,
-                maxPrice: null,
-                ram: [],
-                storage: [],
-                sortBy: 'price',
-                page: 1,
-                pageSize: 12
-            };
+            <script>
+                // API base
+                const apiBase = "http://localhost:5068/";
+                const defaultProductImage = "/image/default-laptop.jpg";
+                const backendImageBase = apiBase + "image/";
 
-            let priceRange = { min: 0, max: 0 };
-            let allBrands = [];
-            let allRamOptions = [];
-            let allStorageOptions = [];
-
-            // normalize helper (remove spaces, uppercase)
-            function normalizeForApi(s) {
-                if (!s) return '';
-                return s.toString().trim().replace(/\s+/g, '').replace(/\//g, '').toUpperCase();
-            }
-
-            // Initialize
-            $(document).ready(function() {
-                loadFilters();
-
-                // price checkbox handler (delegated)
-                $(document).on('change', '.price-checkbox', function() {
-                    if ($(this).val() === 'all') {
-                        if ($(this).is(':checked')) {
-                            $('.price-checkbox').not(this).prop('checked', false);
-                            filters.minPrice = null;
-                            filters.maxPrice = null;
-                        }
-                    } else {
-                        $('#price-all').prop('checked', false);
-                        updatePriceFromCheckboxes();
+                function buildImageUrl(fileName) {
+                    if (!fileName || typeof fileName !== "string" || !fileName.trim()) {
+                        return defaultProductImage;
                     }
-                    filters.page = 1;
-                    loadProducts();
-                });
+                    return backendImageBase + encodeURIComponent(fileName.trim());
+                }
 
-                // sort change
-                $('#sortSelect').on('change', function() {
-                    filters.sortBy = $(this).val();
-                    filters.page = 1;
-                    loadProducts();
-                });
+                function normalizeForApi(value) {
+                    if (!value) return '';
+                    return value.toString().trim().replace(/\s+/g, '').replace(/\//g, '').toUpperCase();
+                }
 
-                // Delegated handlers for brand/ram/storage
-                $(document).on('change', '.brand-checkbox', function() {
-                    updateBrandFilters();
-                });
-                $(document).on('change', '.ram-checkbox', function() {
-                    updateRamFilters();
-                });
-                $(document).on('change', '.storage-checkbox', function() {
-                    updateStorageFilters();
-                });
-            });
-
-            // Load filter options from API
-            function loadFilters() {
-                $.ajax({
-                    type: 'GET',
-                    url: apiBase + "api/products/shop/filters",
-                    dataType: 'json',
-                    success: function(data) {
-                        allBrands = data.brands || [];
-                        priceRange = data.priceRange || { min: 0, max: 0 };
-                        allRamOptions = data.ramOptions || [];
-                        allStorageOptions = data.storageOptions || [];
-
-                        renderBrandFilters();
-                        renderRamFilters();
-                        renderStorageFilters();
-
-                        // load initial products (no filters)
-                        loadProducts();
-                    },
-                    error: function(xhr, status, error) {
-                        console.error('Error loading filters:', error);
-                        // fallback: still try loadProducts (will request all)
-                        loadProducts();
-                    }
-                });
-            }
-
-            // Render brand list
-            function renderBrandFilters() {
-                let html = '';
-                allBrands.forEach(function(brand) {
-                    html += '<li>';
-                    html += '  <div class="d-flex align-items-center mb-2">';
-                    html += '    <input type="checkbox" class="form-check-input me-2 brand-checkbox" id="brand-' + brand.brandId + '" value="' + brand.brandId + '">';
-                    html += '    <label for="brand-' + brand.brandId + '" class="mb-0">' + (brand.brandName || brand.brandId) + '</label>';
-                    html += '  </div>';
-                    html += '</li>';
-                });
-                $('#brandFilter').html(html);
-            }
-
-            // Render ram list
-            function renderRamFilters() {
-                let html = '';
-                allRamOptions.forEach(function(ram) {
-                    let id = 'ram-' + ram.replace(/\s/g, '-');
-                    html += '<li>';
-                    html += '  <div class="d-flex align-items-center mb-2">';
-                    html += '    <input type="checkbox" class="form-check-input me-2 ram-checkbox" id="' + id + '" value="' + ram + '">';
-                    html += '    <label for="' + id + '" class="mb-0">' + ram + '</label>';
-                    html += '  </div>';
-                    html += '</li>';
-                });
-                $('#ramFilter').html(html);
-            }
-
-            // Render storage list
-            function renderStorageFilters() {
-                let html = '';
-                allStorageOptions.forEach(function(storage) {
-                    let id = 'storage-' + storage.replace(/\s/g, '-').replace(/\//g, '-');
-                    html += '<li>';
-                    html += '  <div class="d-flex align-items-center mb-2">';
-                    html += '    <input type="checkbox" class="form-check-input me-2 storage-checkbox" id="' + id + '" value="' + storage + '">';
-                    html += '    <label for="' + id + '" class="mb-0">' + storage + '</label>';
-                    html += '  </div>';
-                    html += '</li>';
-                });
-                $('#storageFilter').html(html);
-            }
-
-            // Update brand filters
-            function updateBrandFilters() {
-                filters.brands = [];
-                $('.brand-checkbox:checked').each(function() {
-                    filters.brands.push($(this).val());
-                });
-                filters.page = 1;
-                loadProducts();
-            }
-
-            // Update ram filters
-            function updateRamFilters() {
-                filters.ram = [];
-                $('.ram-checkbox:checked').each(function() {
-                    filters.ram.push($(this).val());
-                });
-                filters.page = 1;
-                loadProducts();
-            }
-
-            // Update storage filters
-            function updateStorageFilters() {
-                filters.storage = [];
-                $('.storage-checkbox:checked').each(function() {
-                    filters.storage.push($(this).val());
-                });
-                filters.page = 1;
-                loadProducts();
-            }
-
-            // Update min/max price from checked boxes
-            function updatePriceFromCheckboxes() {
-                filters.minPrice = null;
-                filters.maxPrice = null;
-
-                $('.price-checkbox:checked').each(function() {
-                    let v = $(this).val();
-                    if (v === 'under-10') {
-                        filters.maxPrice = Math.min(filters.maxPrice || 10000000, 10000000);
-                    } else if (v === '10-15') {
-                        filters.minPrice = 10000000;
-                        filters.maxPrice = 15000000;
-                    } else if (v === '15-20') {
-                        filters.minPrice = 15000000;
-                        filters.maxPrice = 20000000;
-                    } else if (v === '20-25') {
-                        filters.minPrice = 20000000;
-                        filters.maxPrice = 25000000;
-                    } else if (v === '25-30') {
-                        filters.minPrice = 25000000;
-                        filters.maxPrice = 30000000;
-                    } else if (v === 'over-30') {
-                        filters.minPrice = 30000000;
-                    }
-                });
-            }
-
-            // Build params and call API to load products
-            function loadProducts() {
-                let params = {
-                    page: filters.page,
-                    pageSize: filters.pageSize,
-                    sortBy: filters.sortBy
+                // filter state
+                let filters = {
+                    brands: [],
+                    minPrice: null,
+                    maxPrice: null,
+                    ram: [],
+                    storage: [],
+                    sortBy: 'price',
+                    page: 1,
+                    // Set large pageSize so server returns all matched items (no client-side pagination)
+                    pageSize: 100000
                 };
 
-                if (filters.brands.length > 0) params.brandIds = filters.brands.join(',');
+                let priceRange = { min: 0, max: 0 };
+                let allBrands = [];
+                let allRamOptions = [];
+                let allStorageOptions = [];
 
-                if (filters.minPrice) params.minPrice = filters.minPrice;
-                if (filters.maxPrice) params.maxPrice = filters.maxPrice;
-
-                // IMPORTANT: normalize ram and storage values to match server normalization
-                if (filters.ram.length > 0) {
-                    let normalizedRam = filters.ram.map(r => normalizeForApi(r)).filter(Boolean);
-                    if (normalizedRam.length > 0) params.ramOptions = normalizedRam.join(',');
-                }
-                if (filters.storage.length > 0) {
-                    let normalizedStorage = filters.storage.map(s => normalizeForApi(s)).filter(Boolean);
-                    if (normalizedStorage.length > 0) params.storageOptions = normalizedStorage.join(',');
-                }
-
-                $.ajax({
-                    type: 'GET',
-                    url: apiBase + "api/products/shop/search",
-                    data: params,
-                    dataType: 'json',
-                    success: function(data) {
-                        if (data && data.products) {
-                            renderProducts(data.products || []);
-                        } else {
-                            console.error('Invalid response format:', data);
-                            $('#productsContainer').html('<div class="col-12"><p class="text-center">Không có sản phẩm nào.</p></div>');
-                        }
-                    },
-                    error: function(xhr, status, error) {
-                        console.error('Error loading products:', error);
-                        console.error('Status:', status);
-                        console.error('Response:', xhr.responseText);
-                        // Show a friendly message inside products area (keeps sidebar visible)
-                        let errText = 'Không thể tải sản phẩm. Vui lòng thử lại sau.';
-                        try {
-                            if (xhr.responseJSON && xhr.responseJSON.message) {
-                                errText += ' — ' + xhr.responseJSON.message;
+                // Initialize
+                $(document).ready(function() {
+                    loadFilters();
+                    // Attach price checkbox handler (delegated to handle dynamic inputs)
+                    $(document).on('change', '.price-checkbox', function() {
+                        if ($(this).val() === 'all') {
+                            if ($(this).is(':checked')) {
+                                $('.price-checkbox').not(this).prop('checked', false);
+                                filters.minPrice = null;
+                                filters.maxPrice = null;
                             }
-                        } catch (e) {}
-                        $('#productsContainer').html('<div class="col-12"><p class="text-center text-danger">' + errText + '</p></div>');
-                    }
-                });
-            }
-
-            // Render product cards (robust to PascalCase/camelCase names)
-            function renderProducts(products) {
-                if (!products || products.length === 0) {
-                    $('#productsContainer').html('<div class="col-12"><p class="text-center">Không có sản phẩm nào.</p></div>');
-                    return;
-                }
-
-                let html = '';
-                products.forEach(function(product) {
-                    // resolve fields (handle both PascalCase and camelCase)
-                    const pid = product.productId || product.ProductId || '';
-                    const pname = product.productName || product.ProductName || 'Chưa có tên';
-                    const pmodel = product.productModel || product.ProductModel || '';
-                    const avatar = (product.avatar || product.Avatar) ? '/image/' + (product.avatar || product.Avatar) : '/image/default-laptop.jpg';
-                    const brandObj = product.brand || product.Brand || {};
-                    const brandName = brandObj.brandName || brandObj.BrandName || 'Laptop';
-
-                    // price resolution: prefer SellingPrice as the primary filter value (per your request)
-                    const sellingPriceVal = (product.sellingPrice ?? product.SellingPrice);
-                    const minConfigVal = (product.minConfigPrice ?? product.MinConfigPrice ?? product.minConfigPrice);
-                    // displayPrice: prefer sellingPrice if present (>0), otherwise minConfigVal, otherwise 0
-                    let displayPriceVal = 0;
-                    if (sellingPriceVal != null && sellingPriceVal > 0) displayPriceVal = sellingPriceVal;
-                    else if (minConfigVal != null && minConfigVal > 0) displayPriceVal = minConfigVal;
-                    else displayPriceVal = 0;
-
-                    const originalPriceVal = (product.originalSellingPrice ?? product.OriginalSellingPrice ?? 0);
-
-                    // format
-                    function fmt(amount) {
-                        if (!amount || amount <= 0) return 'Liên hệ';
-                        try {
-                            return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
-                        } catch (e) {
-                            return amount.toString() + ' ₫';
+                        } else {
+                            $('#price-all').prop('checked', false);
+                            updatePriceFromCheckboxes();
                         }
-                    }
+                        filters.page = 1;
+                        loadProducts();
+                    });
 
-                    let priceHtml = fmt(displayPriceVal);
-                    let originalPriceHtml = '';
-                    if (originalPriceVal && originalPriceVal > displayPriceVal) {
-                        originalPriceHtml = `<span class="text-muted text-decoration-line-through me-2" style="font-size: 0.9em;">${fmt(originalPriceVal)}</span>`;
-                    }
+                    // sort change
+                    $('#sortSelect').on('change', function() {
+                        filters.sortBy = $(this).val();
+                        filters.page = 1;
+                        loadProducts();
+                    });
 
-                    const productDetailUrl = '/Home/ProductDetail?id=' + encodeURIComponent(pid);
-
-                    html += '<div class="col-md-6 col-lg-6 col-xl-4">';
-                    html += '  <div class="rounded position-relative fruite-item">';
-                    html += '    <div class="fruite-img" style="cursor: pointer;" onclick="window.location.href=\'' + productDetailUrl + '\'">';
-                    html += '      <img src="' + avatar + '" class="img-fluid w-100 rounded-top" alt="' + pname + '">';
-                    html += '    </div>';
-                    html += '    <div class="text-white bg-secondary px-3 py-1 rounded position-absolute" style="top: 10px; left: 10px;">' + brandName + '</div>';
-                    html += '    <div class="p-4 border border-secondary border-top-0 rounded-bottom">';
-                    html += '      <h4><a href="' + productDetailUrl + '" class="text-dark text-decoration-none">' + pname + '</a></h4>';
-                    html += '      <p>' + pmodel + '</p>';
-                    html += '      <div class="d-flex align-items-center flex-wrap gap-2 mb-3">';
-                    html += '        ' + originalPriceHtml;
-                    html += '        <span class="text-dark fs-5 fw-bold mb-0">' + priceHtml + '</span>';
-                    html += '      </div>';
-                    html += '      <div class="d-flex gap-2">';
-                    html += '        <a href="' + productDetailUrl + '" class="btn border border-secondary rounded-pill px-3 text-primary">';
-                    html += '          <i class="fa fa-eye me-2 text-primary"></i> Xem chi tiết';
-                    html += '        </a>';
-                    html += '        <a href="#" class="btn border border-secondary rounded-pill px-3 text-primary" onclick="event.preventDefault(); toggleFavorite(\'' + pid + '\'); return false;" title="Thêm vào yêu thích">';
-                    html += '          <i class="far fa-heart" id="heart-' + pid + '"></i>';
-                    html += '        </a>';
-                    html += '      </div>';
-                    html += '    </div>';
-                    html += '  </div>';
-                    html += '</div>';
+                    // Delegated handlers for brand/ram/storage -- filter change triggers loadProducts
+                    $(document).on('change', '.brand-checkbox', function() {
+                        updateBrandFilters();
+                    });
+                    $(document).on('change', '.ram-checkbox', function() {
+                        updateRamFilters();
+                    });
+                    $(document).on('change', '.storage-checkbox', function() {
+                        updateStorageFilters();
+                    });
                 });
 
-                $('#productsContainer').html(html);
-            }
+                // Load filter options from API
+                function loadFilters() {
+                    $.ajax({
+                        type: 'GET',
+                        url: apiBase + "api/products/shop/filters",
+                        dataType: 'json',
+                        success: function(data) {
+                            allBrands = data.brands || [];
+                            priceRange = data.priceRange || { min: 0, max: 0 };
+                            allRamOptions = data.ramOptions || [];
+                            allStorageOptions = data.storageOptions || [];
 
-            // Optional toggle favorite
-            function toggleFavorite(productId) {
-                if (!productId) return;
-                let heartIcon = $('#heart-' + productId);
-                if (heartIcon.hasClass('fas')) {
-                    heartIcon.removeClass('fas text-danger').addClass('far');
-                } else {
-                    heartIcon.removeClass('far').addClass('fas text-danger');
+                            renderBrandFilters();
+                            renderRamFilters();
+                            renderStorageFilters();
+
+                            // load initial products (no filters)
+                            loadProducts();
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('Error loading filters:', error);
+                            // fallback: still try loadProducts (will request all)
+                            loadProducts();
+                        }
+                    });
                 }
-            }
-        </script>
+
+                // Render brand list
+                function renderBrandFilters() {
+                    let html = '';
+                    allBrands.forEach(function(brand) {
+                        html += '<li>';
+                        html += '  <div class="d-flex align-items-center mb-2">';
+                        html += '    <input type="checkbox" class="form-check-input me-2 brand-checkbox" id="brand-' + brand.brandId + '" value="' + brand.brandId + '">';
+                        html += '    <label for="brand-' + brand.brandId + '" class="mb-0">' + (brand.brandName || brand.brandId) + '</label>';
+                        html += '  </div>';
+                        html += '</li>';
+                    });
+                    $('#brandFilter').html(html);
+                }
+
+                // Render ram list
+                function renderRamFilters() {
+                    let html = '';
+                    allRamOptions.forEach(function(ram) {
+                        let id = 'ram-' + ram.replace(/\s/g, '-');
+                        html += '<li>';
+                        html += '  <div class="d-flex align-items-center mb-2">';
+                        html += '    <input type="checkbox" class="form-check-input me-2 ram-checkbox" id="' + id + '" value="' + ram + '">';
+                        html += '    <label for="' + id + '" class="mb-0">' + ram + '</label>';
+                        html += '  </div>';
+                        html += '</li>';
+                    });
+                    $('#ramFilter').html(html);
+                }
+
+                // Render storage list
+                function renderStorageFilters() {
+                    let html = '';
+                    allStorageOptions.forEach(function(storage) {
+                        let id = 'storage-' + storage.replace(/\s/g, '-').replace(/\//g, '-');
+                        html += '<li>';
+                        html += '  <div class="d-flex align-items-center mb-2">';
+                        html += '    <input type="checkbox" class="form-check-input me-2 storage-checkbox" id="' + id + '" value="' + storage + '">';
+                        html += '    <label for="' + id + '" class="mb-0">' + storage + '</label>';
+                        html += '  </div>';
+                        html += '</li>';
+                    });
+                    $('#storageFilter').html(html);
+                }
+
+                // Update brand filters
+                function updateBrandFilters() {
+                    filters.brands = [];
+                    $('.brand-checkbox:checked').each(function() {
+                        filters.brands.push($(this).val());
+                    });
+                    filters.page = 1;
+                    loadProducts();
+                }
+
+                // Update ram filters
+                function updateRamFilters() {
+                    filters.ram = [];
+                    $('.ram-checkbox:checked').each(function() {
+                        filters.ram.push($(this).val());
+                    });
+                    filters.page = 1;
+                    loadProducts();
+                }
+
+                // Update storage filters
+                function updateStorageFilters() {
+                    filters.storage = [];
+                    $('.storage-checkbox:checked').each(function() {
+                        filters.storage.push($(this).val());
+                    });
+                    filters.page = 1;
+                    loadProducts();
+                }
+
+                // Update min/max price from checked boxes
+                function updatePriceFromCheckboxes() {
+                    filters.minPrice = null;
+                    filters.maxPrice = null;
+
+                    $('.price-checkbox:checked').each(function() {
+                        let v = $(this).val();
+                        if (v === 'under-10') {
+                            filters.maxPrice = Math.min(filters.maxPrice || 10000000, 10000000);
+                        } else if (v === '10-15') {
+                            filters.minPrice = 10000000;
+                            filters.maxPrice = 15000000;
+                        } else if (v === '15-20') {
+                            filters.minPrice = 15000000;
+                            filters.maxPrice = 20000000;
+                        } else if (v === '20-25') {
+                            filters.minPrice = 20000000;
+                            filters.maxPrice = 25000000;
+                        } else if (v === '25-30') {
+                            filters.minPrice = 25000000;
+                            filters.maxPrice = 30000000;
+                        } else if (v === 'over-30') {
+                            filters.minPrice = 30000000;
+                        }
+                    });
+                }
+
+                // Build params and call API to load products
+                function loadProducts() {
+                    let params = {
+                        page: filters.page || 1,
+                        pageSize: filters.pageSize || 100000,
+                        sortBy: filters.sortBy || 'price'
+                    };
+
+                    if (filters.brands.length > 0) params.brandIds = filters.brands.join(',');
+                    if (filters.minPrice) params.minPrice = filters.minPrice;
+                    if (filters.maxPrice) params.maxPrice = filters.maxPrice;
+
+                    if (filters.ram.length > 0) {
+                        const normalizedRam = filters.ram.map(normalizeForApi).filter(Boolean);
+                        if (normalizedRam.length > 0) params.ramOptions = normalizedRam.join(',');
+                    }
+
+                    if (filters.storage.length > 0) {
+                        const normalizedStorage = filters.storage.map(normalizeForApi).filter(Boolean);
+                        if (normalizedStorage.length > 0) params.storageOptions = normalizedStorage.join(',');
+                    }
+
+                    $.ajax({
+                        type: 'GET',
+                        url: apiBase + "api/products/shop/search",
+                        data: params,
+                        dataType: 'json',
+                        success: function(data) {
+                            if (data && data.products) {
+                                renderProducts(data.products || []);
+                            } else {
+                                console.error('Invalid response format:', data);
+                                $('#productsContainer').html('<div class="col-12"><p class="text-center">Không có sản phẩm nào.</p></div>');
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('Error loading products:', error);
+                            console.error('Status:', status);
+                            console.error('Response:', xhr.responseText);
+                            // Show a friendly message inside products area (keeps sidebar visible)
+                            let errText = 'Không thể tải sản phẩm. Vui lòng thử lại sau.';
+                            try {
+                                if (xhr.responseJSON && xhr.responseJSON.message) {
+                                    errText += ' — ' + xhr.responseJSON.message;
+                                }
+                            } catch (e) {}
+                            $('#productsContainer').html('<div class="col-12"><p class="text-center text-danger">' + errText + '</p></div>');
+                        }
+                    });
+                }
+
+                // Render product cards
+                function renderProducts(products) {
+                    if (!products || products.length === 0) {
+                        $('#productsContainer').html('<div class="col-12"><p class="text-center">Không có sản phẩm nào.</p></div>');
+                        return;
+                    }
+
+                    let html = '';
+                    products.forEach(function(product) {
+                        const pid = product.productId || product.ProductId || '';
+                        const pname = product.productName || product.ProductName || 'Chưa có tên';
+                        const pmodel = product.productModel || product.ProductModel || '';
+                        const avatar = buildImageUrl(product.avatar || product.Avatar);
+                        const brandObj = product.brand || product.Brand || {};
+                        const brandName = brandObj.brandName || brandObj.BrandName || 'Laptop';
+
+                        // Prefer MinConfigPrice when available, otherwise use SellingPrice
+                        let displayPrice = product.sellingPrice || product.SellingPrice || 0;
+
+                        let price = 'Liên hệ';
+                        let originalPrice = '';
+
+                        if (displayPrice > 0) {
+                            try {
+                                price = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(displayPrice);
+                            } catch (e) {
+                                price = displayPrice.toString() + ' VND';
+                            }
+                        }
+
+                        const originalVal = product.originalSellingPrice ?? product.OriginalSellingPrice;
+                        if (originalVal && originalVal > displayPrice) {
+                            try {
+                                originalPrice = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(originalVal);
+                                originalPrice = '<span class="text-muted text-decoration-line-through me-2" style="font-size: 0.9em;">' + originalPrice + '</span>';
+                            } catch (e) {
+                                originalPrice = '<span class="text-muted text-decoration-line-through me-2" style="font-size: 0.9em;">' + originalVal + ' VND</span>';
+                            }
+                        }
+
+                        const productDetailUrl = '/Home/ProductDetail?id=' + encodeURIComponent(pid);
+
+                        html += '<div class="col-md-6 col-lg-6 col-xl-4">';
+                        html += '  <div class="rounded position-relative fruite-item">';
+                        html += '    <div class="fruite-img" style="cursor: pointer;" onclick="window.location.href=\'' + productDetailUrl + '\'">';
+                        html += '      <img src="' + avatar + '" class="img-fluid w-100 rounded-top" alt="' + pname + '">';
+                        html += '    </div>';
+                        html += '    <div class="text-white bg-secondary px-3 py-1 rounded position-absolute" style="top: 10px; left: 10px;">' + brandName + '</div>';
+                        html += '    <div class="p-4 border border-secondary border-top-0 rounded-bottom">';
+                        html += '      <h4><a href="' + productDetailUrl + '" class="text-dark text-decoration-none">' + pname + '</a></h4>';
+                        html += '      <p>' + pmodel + '</p>';
+                        html += '      <div class="d-flex align-items-center flex-wrap gap-2 mb-3">';
+                        html += '        ' + originalPrice;
+                        html += '        <span class="text-dark fs-5 fw-bold mb-0">' + price + '</span>';
+                        html += '      </div>';
+                        html += '      <div class="d-flex gap-2">';
+                        html += '        <a href="' + productDetailUrl + '" class="btn border border-secondary rounded-pill px-3 text-primary">';
+                        html += '          <i class="fa fa-eye me-2 text-primary"></i> Xem chi tiết';
+                        html += '        </a>';
+                        html += '        <a href="#" class="btn border border-secondary rounded-pill px-3 text-primary" onclick="event.preventDefault(); toggleFavorite(\'' + pid + '\'); return false;" title="Thêm vào yêu thích">';
+                        html += '          <i class="far fa-heart" id="heart-' + pid + '"></i>';
+                        html += '        </a>';
+                        html += '      </div>';
+                        html += '    </div>';
+                        html += '  </div>';
+                        html += '</div>';
+                    });
+
+                    $('#productsContainer').html(html);
+                }
+
+                // Optional toggle favorite
+                function toggleFavorite(productId) {
+                    if (!productId) return;
+                    let heartIcon = $('#heart-' + productId);
+                    if (heartIcon.hasClass('fas')) {
+                        heartIcon.removeClass('fas text-danger').addClass('far');
+                    } else {
+                        heartIcon.removeClass('far').addClass('fas text-danger');
+                    }
+                }
+            </script>
 }

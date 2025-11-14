@@ -22,7 +22,17 @@
 @section Scripts {
         <script>
             // Base API URL (chỉnh nếu cần)
-            const url = "http://localhost:5068/";
+            const apiBase = "http://localhost:5068/";
+            const backendImageBase = apiBase + "image/";
+            const defaultProductImage = "/image/default-laptop.jpg";
+
+            function buildImageUrl(fileName) {
+                if (!fileName || typeof fileName !== "string" || !fileName.trim()) {
+                    return defaultProductImage;
+                }
+                return backendImageBase + encodeURIComponent(fileName.trim());
+            }
+
             let allProducts = []; // store fetched products
             let currentPage = 1;
             const productsPerPage = 8; // số sản phẩm hiển thị mỗi trang
@@ -78,7 +88,7 @@
                             }
                         }
 
-                        const avatar = (val.avatar && typeof val.avatar === 'string' && val.avatar.trim() !== '') ? `/image/${val.avatar}` : '/image/default-laptop.jpg';
+                        const avatar = buildImageUrl(val.avatar || val.Avatar);
                         const brandName = (val.brand && val.brand.brandName) ? val.brand.brandName : 'Laptop';
                         const productDetailUrl = '/Home/ProductDetail?id=' + encodeURIComponent(val.productId || '');
 
@@ -278,9 +288,9 @@
                 currentPage = page;
                 let requestUrl;
                 if (brandId) {
-                    requestUrl = url + "api/products/category/" + encodeURIComponent(brandId) + (productName ? ("?productName=" + encodeURIComponent(productName)) : "");
+                    requestUrl = apiBase + "api/products/category/" + encodeURIComponent(brandId) + (productName ? ("?productName=" + encodeURIComponent(productName)) : "");
                 } else {
-                    requestUrl = url + "api/ListProductAPI/all";
+                    requestUrl = apiBase + "api/ListProductAPI/all";
                 }
 
                 $.ajax({

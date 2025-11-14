@@ -311,6 +311,16 @@
 
         <script>
             let url = "http://localhost:5068/";
+            const backendImageBase = url + "image/";
+            const defaultProductImage = "/image/default-laptop.jpg";
+
+            function getBackendImageUrl(fileName) {
+                if (!fileName || typeof fileName !== "string" || !fileName.trim()) {
+                    return defaultProductImage;
+                }
+                return backendImageBase + encodeURIComponent(fileName.trim());
+            }
+
             let productId = '@ViewBag.ProductId';
             let currentImageIndex = 0;
             let productImages = [];
@@ -431,7 +441,7 @@
                         }
 
                         // Main image handling + sizing
-                        let mainImage = (product.avatar && product.avatar.trim() !== '') ? `/image/${product.avatar}` : '/image/default-laptop.jpg';
+                        let mainImage = getBackendImageUrl(product.avatar);
                         $('#mainProductImage').attr('src', mainImage).attr('alt', product.productName || '');
 
                         let img = new Image();
@@ -449,9 +459,9 @@
 
                         // Collect product images and thumbnails
                         productImages = [];
-                        if (product.avatar) productImages.push(`/image/${product.avatar}`);
+                        if (product.avatar) productImages.push(getBackendImageUrl(product.avatar));
                         if (data.images && data.images.length > 0) {
-                            data.images.forEach(function(image) { productImages.push(`/image/${image.imageId}`); });
+                            data.images.forEach(function(image) { productImages.push(getBackendImageUrl(image.imageId)); });
                         }
                         if (productImages.length === 0) productImages.push(mainImage);
                         currentImageIndex = 0;
@@ -723,7 +733,7 @@
                             let featuredHtml = '';
                             let featuredProducts = data.slice(0, 6);
                             featuredProducts.forEach(function(product) {
-                                let image = (product.avatar && typeof product.avatar === 'string' && product.avatar.trim() !== '') ? `/image/${product.avatar}` : '/image/default-laptop.jpg';
+                                let image = getBackendImageUrl(product.avatar);
                                 let price = product.sellingPrice ? formatCurrency(product.sellingPrice) : 'Liên hệ';
                                 let productDetailUrl = '/Home/ProductDetail?id=' + encodeURIComponent(product.productId || '');
                                 featuredHtml += `

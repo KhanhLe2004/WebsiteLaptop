@@ -37,6 +37,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Serve static files (e.g., product images from wwwroot/image)
+app.UseStaticFiles();
+
 // Use CORS - must be before UseAuthorization
 app.UseCors("AllowAll");
 

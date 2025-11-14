@@ -154,7 +154,7 @@ namespace WebLaptopBE.Controllers
             [FromQuery] string? storageOptions, // Comma-separated storage values
             [FromQuery] string? sortBy = "price", // price, price_desc, name
             [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 12)
+            [FromQuery] int pageSize = 100)
         {
             try
             {
@@ -383,7 +383,21 @@ namespace WebLaptopBE.Controllers
                         break;
                 }
 
-                // 8) Paging in-memory
+                // If user didn't apply ANY filters, return the FULL list (no paging) as requested.
+                if (noFiltersAtAll)
+                {
+                    var total = finalProducts.Count;
+                    return Ok(new
+                    {
+                        products = finalProducts,
+                        totalCount = total,
+                        page = 1,
+                        pageSize = total,
+                        totalPages = 1
+                    });
+                }
+
+                // 8) Paging in-memory (only when some filters were applied)
                 var totalCount = finalProducts.Count;
                 var paged = finalProducts
                     .Skip((page - 1) * pageSize)
