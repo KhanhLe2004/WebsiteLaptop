@@ -23,7 +23,7 @@ app.UseAuthorization();
 // Route cho Area Admin (phải đặt trước default route)
 app.MapControllerRoute(
     name: "areas",
-    pattern: "{area:exists}/{controller=Dashboard}/{action=Dashboard}/{id?}");
+     pattern: "{area:exists}/{controller=Dashboard}/{action=Dashboard}/{id?}");
 
 app.MapControllerRoute(
     name: "default",

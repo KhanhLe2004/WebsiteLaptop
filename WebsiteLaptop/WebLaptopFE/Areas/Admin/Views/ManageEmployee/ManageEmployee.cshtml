@@ -1,0 +1,1005 @@
+﻿@{
+    ViewData["Title"] = "Quản lý nhân viên";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutManageEmployee.cshtml";
+}
+
+
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card my-4">
+                <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                    <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="text-white text-capitalize ps-3 mb-0">Quản lý nhân viên</h6>
+                            <button type="button" class="btn btn-white btn-sm me-3" onclick="addEmployee()">
+                                <i class="material-icons text-sm">add</i> Thêm nhân viên
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body px-3 pb-2">
+                    <!-- Bộ lọc và tìm kiếm -->
+                    <div class="row mb-3 g-2 align-items-end">
+                        <div class="col-lg-4 col-md-6">
+                            <div class="input-group input-group-outline">
+                                <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm nhân viên...">
+                            </div>
+                        </div>
+                        <div class="col-lg-2 col-md-3">
+                            <select id="activeFilter" class="form-select">
+                                <option value="true" selected>Đang hoạt động</option>
+                                <option value="false">Đã khóa</option>
+                                <option value="">Tất cả trạng thái</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Bảng nhân viên -->
+                    <div class="table-responsive p-0">
+                        <table class="table align-items-center mb-0" style="table-layout: fixed; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 25%;">Nhân viên</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 20%;">Thông tin liên hệ</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Ngày sinh</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Tài khoản</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 25%;">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="employeeTableBody">
+                                <!-- Dữ liệu sẽ được load bằng AJAX -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Phân trang -->
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <p class="text-sm mb-0" id="pageInfo">Đang tải...</p>
+                        </div>
+                        <div class="col-md-6">
+                            <nav aria-label="Page navigation">
+                                <ul class="pagination justify-content-end mb-0" id="pagination">
+                                    <!-- Phân trang sẽ được tạo bằng JavaScript -->
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Thêm/Sửa Nhân viên -->
+<div class="modal fade" id="employeeModal" tabindex="-1" aria-labelledby="employeeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-primary">
+                <h5 class="modal-title text-white" id="employeeModalLabel">Thêm nhân viên</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="employeeForm">
+                    <input type="hidden" id="isEditMode" value="false">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Mã nhân viên</label>
+                                <input type="text" class="form-control" id="employeeId" readonly disabled>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Tên nhân viên *</label>
+                                <input type="text" class="form-control" id="employeeName" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Ngày sinh</label>
+                                <input type="date" class="form-control" id="dateOfBirth">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Số điện thoại</label>
+                                <input type="text" class="form-control" id="phoneNumber">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" id="email">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Địa chỉ</label>
+                                <input type="text" class="form-control" id="address">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Tên đăng nhập</label>
+                                <input type="text" class="form-control" id="username">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Mật khẩu</label>
+                                <input type="password" class="form-control" id="password" data-password-length="0" placeholder="">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Mã chi nhánh</label>
+                                <input type="text" class="form-control" id="branchesId">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Mã vai trò</label>
+                                <input type="text" class="form-control" id="roleId">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <label for="avatarFile" class="form-label">Ảnh đại diện</label>
+                                <input type="file" class="form-control" id="avatarFile" accept="image/*" onchange="previewImage(this)">
+                                <img id="imagePreview" class="preview-image" style="display:none;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-danger mb-3" id="errorMessage" style="display:none;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" onclick="saveEmployee()">
+                    <i class="material-icons text-sm">save</i> Lưu
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xác nhận khóa -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-danger">
+                <h5 class="modal-title text-white" id="deleteModalLabel">Xác nhận khóa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteModalMessage">Bạn có chắc chắn muốn khóa nhân viên <strong id="deleteEmployeeName"></strong>?</p>
+                <p class="text-warning text-sm mb-0">Nhân viên sẽ bị ẩn khỏi danh sách đang hoạt động nhưng có thể khôi phục sau.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDelete()">
+                    <i class="material-icons text-sm">delete</i> Khóa
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts {
+    <script>
+        const API_URL = 'http://localhost:5068/api/admin/employees';
+        const API_BASE_URL = API_URL.replace(/\/api\/admin\/employees$/, '');
+        const IMAGE_BASE_URL = `${API_BASE_URL}/imageEmployees`;
+        let currentPage = 1;
+        let pageSize = 10;
+        let deleteEmployeeId = '';
+        let searchDebounceTimer = null;
+        const SEARCH_DEBOUNCE_DELAY = 300;
+
+        $(document).ready(function() {
+            loadEmployees();
+
+            // Tìm kiếm tự động theo tên
+            $('#searchInput').on('input', function() {
+                triggerAutoSearch();
+            });
+
+            // Tìm kiếm tự động theo trạng thái active
+            $('#activeFilter').on('change', function() {
+                triggerAutoSearch();
+            });
+
+            // Lưu độ dài mật khẩu khi người dùng nhập
+            $('#password').on('input', function() {
+                const length = $(this).val().length;
+                $(this).data('password-length', length);
+                // Nếu đang edit và người dùng bắt đầu nhập, đổi về type="password"
+                const isEditMode = $('#isEditMode').val() === 'true';
+                if (isEditMode && $(this).attr('type') === 'text' && length > 0) {
+                    // Kiểm tra xem có phải toàn dấu * không
+                    const value = $(this).val();
+                    if (value && value.length > 0 && !value.match(/^\*+$/)) {
+                        // Người dùng đang nhập mật khẩu mới, đổi về type="password"
+                        $(this).attr('type', 'password');
+                    }
+                }
+            });
+            
+            // Khi focus vào password field trong chế độ edit, nếu đang hiển thị dấu *, clear và đổi về password
+            $('#password').on('focus', function() {
+                const isEditMode = $('#isEditMode').val() === 'true';
+                if (isEditMode && $(this).attr('type') === 'text') {
+                    const value = $(this).val();
+                    if (value && value.match(/^\*+$/)) {
+                        // Đang hiển thị dấu *, clear và đổi về password để người dùng nhập mới
+                        const savedLength = value.length; // Lưu độ dài dấu * hiện tại
+                        $(this).attr('type', 'password').val('').data('password-length', 0).data('saved-star-length', savedLength);
+                    }
+                }
+            });
+            
+            // Khi blur khỏi password field trong chế độ edit, nếu không có giá trị mới, hiển thị lại dấu *
+            $('#password').on('blur', function() {
+                const isEditMode = $('#isEditMode').val() === 'true';
+                if (isEditMode && $(this).attr('type') === 'password') {
+                    const value = $(this).val();
+                    if (!value || value.trim() === '') {
+                        // Không có giá trị mới, hiển thị lại dấu *
+                        const savedLength = parseInt($(this).data('saved-star-length')) || 8;
+                        $(this).attr('type', 'text').val('*'.repeat(savedLength)).data('password-length', savedLength);
+                    }
+                }
+            });
+        });
+
+        function triggerAutoSearch() {
+            currentPage = 1;
+            if (searchDebounceTimer) {
+                clearTimeout(searchDebounceTimer);
+            }
+            searchDebounceTimer = setTimeout(() => {
+                loadEmployees();
+            }, SEARCH_DEBOUNCE_DELAY);
+        }
+
+        // Load danh sách nhân viên
+        function loadEmployees(page = currentPage) {
+            currentPage = page;
+            const searchTerm = $('#searchInput').val().trim();
+            const activeFilter = $('#activeFilter').val();
+
+            const dataParams = {
+                pageNumber: currentPage,
+                pageSize: pageSize,
+                searchTerm: searchTerm
+            };
+
+            // Chỉ thêm active vào params nếu có giá trị
+            if (activeFilter !== '') {
+                dataParams.active = activeFilter === 'true';
+            }
+
+            $.ajax({
+                url: API_URL,
+                type: 'GET',
+                data: dataParams,
+                success: function(response) {
+                    displayEmployees(response.items);
+                    displayPagination(response);
+                    updatePageInfo(response);
+                },
+                error: function(xhr) {
+                    console.error('Lỗi khi tải nhân viên:', xhr);
+                    showNotification('Lỗi khi tải dữ liệu nhân viên', 'error');
+                }
+            });
+        }
+
+        // Hiển thị nhân viên
+        function displayEmployees(employees) {
+            const tbody = $('#employeeTableBody');
+            tbody.empty();
+
+            if (employees.length === 0) {
+                tbody.append(`
+                    <tr>
+                        <td colspan="5" class="text-center text-secondary py-4">
+                            Không có nhân viên nào
+                        </td>
+                    </tr>
+                `);
+                return;
+            }
+
+            $.each(employees, function(index, employee) {
+                const avatar = employee.avatar ? `${IMAGE_BASE_URL}/${employee.avatar}` : `${IMAGE_BASE_URL}/default-avatar.jpg`;
+                const dateOfBirth = employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString('vi-VN') : '-';
+                const phoneNumber = employee.phoneNumber || '-';
+                const email = employee.email || '-';
+                const username = employee.username || '-';
+                const isActive = employee.active !== false; // Mặc định true nếu không có giá trị
+                const activeBadge = isActive 
+                    ? '<span class="badge bg-gradient-success">Đang hoạt động</span>' 
+                    : '<span class="badge bg-gradient-danger">Đã khóa</span>';
+                const employeeNameEscaped = (employee.employeeName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+                // Nút thao tác khác nhau tùy theo active
+                let actionButtons = '';
+                if (isActive) {
+                    // Nhân viên đang hoạt động: có nút Xem, Sửa, Xóa
+                    actionButtons = `
+                        <button class="btn btn-info action-btn" onclick='viewEmployee("${employee.employeeId}")' title="Xem">
+                            <i class="material-icons text-sm">visibility</i>
+                        </button>
+                        <button class="btn btn-warning action-btn" onclick='editEmployee("${employee.employeeId}")' title="Sửa">
+                            <i class="material-icons text-sm">edit</i>
+                        </button>
+                        <button class="btn btn-danger action-btn" onclick='deleteEmployee("${employee.employeeId}", "${employeeNameEscaped}")' title="Khóa">
+                            <i class="material-icons text-sm">delete</i>
+                        </button>
+                    `;
+                } else {
+                    // Nhân viên đã khóa: có nút Xem, Khôi phục
+                    actionButtons = `
+                        <button class="btn btn-info action-btn" onclick='viewEmployee("${employee.employeeId}")' title="Xem">
+                            <i class="material-icons text-sm">visibility</i>
+                        </button>
+                        <button class="btn btn-success action-btn" onclick='restoreEmployee("${employee.employeeId}", "${employeeNameEscaped}")' title="Khôi phục">
+                            <i class="material-icons text-sm">restore</i>
+                        </button>
+                    `;
+                }
+
+                tbody.append(`
+                    <tr style="height: 80px;" class="${!isActive ? 'table-secondary' : ''}">
+                        <td style="vertical-align: middle;">
+                            <div class="d-flex px-2 py-1">
+                                <div>
+                                    <img src="${avatar}" class="employee-image me-3" alt="${employee.employeeName}" onerror="this.src='${IMAGE_BASE_URL}/default-avatar.jpg'">
+                                </div>
+                                <div class="d-flex flex-column justify-content-center" style="min-width: 0; flex: 1;">
+                                    <h6 class="mb-0 text-sm" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${employee.employeeName}</h6>
+                                    <p class="text-xs text-secondary mb-0">${employee.employeeId}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td style="vertical-align: middle;">
+                            <p class="text-xs font-weight-bold mb-0" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${phoneNumber}</p>
+                            <p class="text-xs text-secondary mb-0" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${email}</p>
+                            ${activeBadge}
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold">${dateOfBirth}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; max-width: 100%;">${username}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;" class="table-actions">
+                            ${actionButtons}
+                        </td>
+                    </tr>
+                `);
+            });
+        }
+
+        // Hiển thị phân trang
+        function displayPagination(response) {
+            const pagination = $('#pagination');
+            pagination.empty();
+
+            if (response.totalPages <= 1) return;
+
+            // Nút Previous
+            pagination.append(`
+                <li class="page-item ${response.hasPreviousPage ? '' : 'disabled'}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadEmployees(${currentPage - 1})">
+                        <i class="material-icons text-sm">chevron_left</i>
+                    </a>
+                </li>
+            `);
+
+            // Các trang
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(response.totalPages, currentPage + 2);
+
+            if (startPage > 1) {
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadEmployees(1)">1</a></li>`);
+                if (startPage > 2) {
+                    pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                pagination.append(`
+                    <li class="page-item ${i === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="javascript:void(0)" onclick="loadEmployees(${i})">${i}</a>
+                    </li>
+                `);
+            }
+
+            if (endPage < response.totalPages) {
+                if (endPage < response.totalPages - 1) {
+                    pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadEmployees(${response.totalPages})">${response.totalPages}</a></li>`);
+            }
+
+            // Nút Next
+            pagination.append(`
+                <li class="page-item ${response.hasNextPage ? '' : 'disabled'}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadEmployees(${currentPage + 1})">
+                        <i class="material-icons text-sm">chevron_right</i>
+                    </a>
+                </li>
+            `);
+        }
+
+        // Cập nhật thông tin trang
+        function updatePageInfo(response) {
+            const start = (response.pageNumber - 1) * response.pageSize + 1;
+            const end = Math.min(response.pageNumber * response.pageSize, response.totalItems);
+            $('#pageInfo').text(`Hiển thị ${start} - ${end} trong tổng số ${response.totalItems} nhân viên`);
+        }
+
+        // Thiết lập chế độ xem/chỉnh sửa
+        function setViewMode(isViewMode) {
+            const modalContent = $('#employeeModal .modal-content');
+            const passwordInput = $('#password');
+            
+            if (isViewMode) {
+                // Thêm class view-mode để áp dụng CSS
+                modalContent.addClass('view-mode');
+                
+                // Disable tất cả inputs và selects trong form
+                $('#employeeForm input:not([type="hidden"]):not([type="file"]), #employeeForm select').prop('disabled', true);
+                $('#employeeForm input[type="file"]').prop('disabled', true).css('pointer-events', 'none');
+                
+                // Xử lý password: đổi sang text và hiển thị dấu * với độ dài thực
+                const passwordLength = parseInt(passwordInput.data('password-length')) || 8; // Mặc định 8 ký tự nếu không có
+                if (passwordLength > 0) {
+                    passwordInput.attr('type', 'text').val('*'.repeat(passwordLength));
+                } else {
+                    passwordInput.attr('type', 'text').val('');
+                }
+                
+                // Ẩn nút lưu
+                $('.modal-footer .btn-primary').hide();
+            } else {
+                // Xóa class view-mode
+                modalContent.removeClass('view-mode');
+                
+                // Enable tất cả inputs và selects trong form (trừ employeeId nếu đang edit)
+                $('#employeeForm input:not([type="hidden"]):not([type="file"]), #employeeForm select').each(function() {
+                    // Giữ nguyên trạng thái disabled của employeeId nếu đang edit
+                    if ($(this).attr('id') === 'employeeId' && $('#isEditMode').val() === 'true') {
+                        return; // Không enable employeeId khi edit
+                    }
+                    $(this).prop('disabled', false);
+                });
+                
+                // Đổi password về type="password" và clear giá trị
+                // Nhưng nếu đang edit và có mật khẩu (có username), hiển thị dấu * ban đầu
+                const isEditMode = $('#isEditMode').val() === 'true';
+                const hasUsername = $('#username').val() && $('#username').val().trim() !== '';
+                if (isEditMode && hasUsername) {
+                    // Hiển thị dấu * khi đang edit (người dùng có thể focus để nhập mới)
+                    const passwordLength = parseInt(passwordInput.data('password-length')) || 8;
+                    passwordInput.attr('type', 'text').val('*'.repeat(passwordLength));
+                } else {
+                    passwordInput.attr('type', 'password').val('');
+                }
+                
+                $('#employeeForm input[type="file"]').prop('disabled', false).css('pointer-events', 'auto');
+                
+                // Hiện nút lưu
+                $('.modal-footer .btn-primary').show();
+            }
+        }
+
+        // Thêm nhân viên mới
+        function addEmployee() {
+            $('#isEditMode').val('false');
+            $('#employeeModalLabel').text('Thêm nhân viên');
+            
+            // Reset form
+            $('#employeeForm')[0].reset();
+            $('#employeeId').val(''); // Mã sẽ được tạo tự động
+            $('#imagePreview').hide();
+            $('#errorMessage').hide();
+            
+            // Enable tất cả inputs
+            setViewMode(false);
+            
+            const modal = new bootstrap.Modal(document.getElementById('employeeModal'));
+            modal.show();
+        }
+
+        // Xem chi tiết nhân viên
+        function viewEmployee(employeeId) {
+            $.ajax({
+                url: `${API_URL}/${employeeId}`,
+                type: 'GET',
+                success: function(employee) {
+                    $('#employeeModalLabel').text('Chi tiết nhân viên');
+                    
+                    // Đảm bảo modal được reset trước
+                    $('#employeeForm')[0].reset();
+                    
+                    // Load dữ liệu với viewOnly = true
+                    fillFormWithEmployee(employee, true);
+                    
+                    const modal = new bootstrap.Modal(document.getElementById('employeeModal'));
+                    modal.show();
+                    
+                    // Đảm bảo setViewMode được gọi sau khi modal hiển thị
+                    setTimeout(function() {
+                        setViewMode(true);
+                    }, 300);
+                },
+                error: function(xhr) {
+                    console.error('Error loading employee for view:', xhr);
+                    showNotification('Lỗi khi tải thông tin nhân viên', 'error');
+                }
+            });
+        }
+
+        // Sửa nhân viên
+        function editEmployee(employeeId) {
+            $.ajax({
+                url: `${API_URL}/${employeeId}`,
+                type: 'GET',
+                success: function(employee) {
+                    $('#isEditMode').val('true');
+                    $('#employeeModalLabel').text('Cập nhật nhân viên');
+                    
+                    // Reset form trước
+                    $('#employeeForm')[0].reset();
+                    
+                    // Fill form với dữ liệu
+                    fillFormWithEmployee(employee, false);
+                    
+                    // Disable employeeId (không cho sửa mã) - set readonly
+                    $('#employeeId').prop('disabled', false).prop('readonly', true);
+                    
+                    // Enable edit mode (không phải view mode) - gọi sau khi fill form
+                    setTimeout(function() {
+                        setViewMode(false);
+                        // Nếu nhân viên có username và có độ dài mật khẩu, hiển thị dấu * với độ dài thực
+                        if (employee.username && employee.passwordLength && employee.passwordLength > 0) {
+                            const passwordInput = $('#password');
+                            passwordInput.attr('type', 'text').val('*'.repeat(employee.passwordLength));
+                        }
+                    }, 150);
+                    
+                    const modal = new bootstrap.Modal(document.getElementById('employeeModal'));
+                    modal.show();
+                },
+                error: function(xhr) {
+                    console.error('Error loading employee:', xhr);
+                    showNotification('Lỗi khi tải thông tin nhân viên', 'error');
+                }
+            });
+        }
+
+        // Điền dữ liệu vào form
+        function fillFormWithEmployee(employee, viewOnly) {
+            // Reset form trước
+            $('#employeeForm')[0].reset();
+            
+            // Fill basic info
+            $('#employeeId').val(employee.employeeId || '');
+            $('#employeeName').val(employee.employeeName || '');
+            
+            // Format date for input[type="date"]
+            if (employee.dateOfBirth) {
+                const date = new Date(employee.dateOfBirth);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                $('#dateOfBirth').val(`${year}-${month}-${day}`);
+            } else {
+                $('#dateOfBirth').val('');
+            }
+            
+            $('#phoneNumber').val(employee.phoneNumber || '');
+            $('#email').val(employee.email || '');
+            $('#address').val(employee.address || '');
+            $('#username').val(employee.username || '');
+            $('#branchesId').val(employee.branchesId || '');
+            $('#roleId').val(employee.roleId || '');
+            // Không fill password vì lý do bảo mật
+            // Sử dụng độ dài mật khẩu từ API (passwordLength) hoặc mặc định 8
+            const passwordLength = employee.passwordLength || 8;
+            $('#password').val('').data('password-length', passwordLength);
+            
+            // Nếu đang ở chế độ xem hoặc sửa và nhân viên có username (có mật khẩu)
+            // thì hiển thị dấu * ngay lập tức với độ dài thực
+            if (viewOnly || $('#isEditMode').val() === 'true') {
+                if (employee.username && passwordLength > 0) {
+                    // Có username và có độ dài mật khẩu, hiển thị dấu * với độ dài thực
+                    setTimeout(function() {
+                        const passwordInput = $('#password');
+                        passwordInput.attr('type', 'text').val('*'.repeat(passwordLength));
+                    }, 100);
+                }
+            }
+            
+            // Trigger change để update is-filled class
+            $('#email').trigger('change');
+
+            // Add is-filled class to input groups with values
+            setTimeout(function() {
+                $('.input-group-outline input, .input-group-outline select').each(function() {
+                    if ($(this).val()) {
+                        $(this).closest('.input-group-outline').addClass('is-filled');
+                    } else {
+                        $(this).closest('.input-group-outline').removeClass('is-filled');
+                    }
+                });
+            }, 100);
+
+            // Load avatar
+            if (employee.avatar) {
+                const avatarUrl = `${IMAGE_BASE_URL}/${employee.avatar}`;
+                $('#imagePreview').attr('src', avatarUrl).show();
+            } else {
+                $('#imagePreview').hide();
+            }
+            
+            // Set view mode SAU KHI render (chỉ set nếu viewOnly, không set khi edit)
+            if (viewOnly) {
+                // Disable form inputs
+                $('#employeeForm input:not([type="hidden"]):not([type="file"]), #employeeForm select').prop('disabled', true);
+                $('#employeeForm input[type="file"]').prop('disabled', true).css('pointer-events', 'none');
+                $('.modal-footer .btn-primary').hide();
+                // Clear file inputs khi view
+                $('#avatarFile').val('');
+            }
+            
+            // Clear avatar file input (luôn clear)
+            $('#avatarFile').val('');
+
+            $('#errorMessage').hide();
+        }
+
+        // Preview ảnh
+        function previewImage(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    $('#imagePreview').attr('src', e.target.result).show();
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // Lưu nhân viên (thêm mới hoặc cập nhật)
+        function saveEmployee() {
+            // Clear error message
+            $('#errorMessage').hide();
+            
+            const isEdit = $('#isEditMode').val() === 'true';
+            const employeeId = $('#employeeId').val().trim();
+
+            const employeeName = $('#employeeName').val().trim();
+            if (!employeeName) {
+                showError('Vui lòng nhập tên nhân viên');
+                $('#employeeName').focus();
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('EmployeeName', employeeName);
+            formData.append('DateOfBirth', $('#dateOfBirth').val() || '');
+            formData.append('PhoneNumber', $('#phoneNumber').val() || '');
+            formData.append('Email', $('#email').val() || '');
+            formData.append('Address', $('#address').val() || '');
+            formData.append('Username', $('#username').val() || '');
+            formData.append('BranchesId', $('#branchesId').val() || '');
+            formData.append('RoleId', $('#roleId').val() || '');
+            
+            // Chỉ gửi password nếu có giá trị
+            const password = $('#password').val();
+            if (password) {
+                formData.append('Password', password);
+            }
+
+            const avatarFile = $('#avatarFile')[0].files[0];
+            if (avatarFile) {
+                formData.append('AvatarFile', avatarFile);
+            }
+
+            let url, method;
+            if (isEdit) {
+                if (!employeeId) {
+                    showError('Không tìm thấy mã nhân viên');
+                    return;
+                }
+                url = `${API_URL}/${employeeId}`;
+                method = 'PUT';
+            } else {
+                url = API_URL;
+                method = 'POST';
+            }
+
+            $.ajax({
+                url: url,
+                type: method,
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    const message = isEdit ? 'Cập nhật nhân viên thành công' : 'Thêm nhân viên thành công';
+                    showNotification(message, 'success');
+                    
+                    // Cập nhật passwordLength nếu có trong response
+                    if (response && response.passwordLength !== undefined) {
+                        $('#password').data('password-length', response.passwordLength);
+                    } else if (password && password.length > 0) {
+                        // Nếu không có trong response, sử dụng độ dài password vừa nhập
+                        $('#password').data('password-length', password.length);
+                    }
+                    
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('employeeModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                    loadEmployees();
+                },
+                error: function(xhr) {
+                    console.error('Error saving employee:', xhr);
+                    console.error('Status:', xhr.status);
+                    console.error('Status Text:', xhr.statusText);
+                    console.error('Response Text:', xhr.responseText);
+                    console.error('Response JSON:', xhr.responseJSON);
+                    
+                    let message = isEdit ? 'Có lỗi xảy ra khi cập nhật nhân viên' : 'Có lỗi xảy ra khi thêm nhân viên';
+                    let errorDetails = '';
+                    
+                    if (xhr.responseJSON) {
+                        if (xhr.responseJSON.message) {
+                            message = xhr.responseJSON.message;
+                        }
+                        if (xhr.responseJSON.error) {
+                            errorDetails += '<br><small style="color: #dc3545;">' + xhr.responseJSON.error + '</small>';
+                        }
+                        if (xhr.responseJSON.details) {
+                            errorDetails += '<br><small style="color: #6c757d; font-size: 0.8em;">' + 
+                                xhr.responseJSON.details.substring(0, 500).replace(/\n/g, '<br>') + '</small>';
+                        }
+                        if (xhr.responseJSON.errors) {
+                            const errors = xhr.responseJSON.errors;
+                            const errorMessages = Object.values(errors).flat();
+                            errorDetails += '<br>' + errorMessages.join('<br>');
+                        }
+                    } else if (xhr.responseText) {
+                        try {
+                            const errorObj = JSON.parse(xhr.responseText);
+                            message = errorObj.message || errorObj.error || message;
+                            if (errorObj.details) {
+                                errorDetails += '<br><small style="color: #6c757d;">' + 
+                                    errorObj.details.substring(0, 300) + '</small>';
+                            }
+                        } catch (e) {
+                            errorDetails = '<br><small>' + xhr.responseText.substring(0, 200) + '</small>';
+                        }
+                    }
+                    
+                    if (xhr.status) {
+                        errorDetails += '<br><small style="color: #6c757d;">HTTP Status: ' + xhr.status + 
+                            (xhr.statusText ? ' ' + xhr.statusText : '') + '</small>';
+                    }
+                    
+                    showError(message + errorDetails);
+                    // Scroll to error message
+                    if ($('#errorMessage').length > 0) {
+                        $('#errorMessage')[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                }
+            });
+        }
+
+        // Xóa nhân viên (khóa nhân viên - set active = false)
+        function deleteEmployee(employeeId, employeeName) {
+            deleteEmployeeId = employeeId;
+            const employeeNameEscaped = employeeName.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            $('#deleteEmployeeName').html(employeeNameEscaped);
+            $('#deleteModalLabel').text('Xác nhận khóa');
+            $('#deleteModalMessage').html(`Bạn có chắc chắn muốn khóa nhân viên <strong>${employeeNameEscaped}</strong>?`);
+            const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+            modal.show();
+        }
+
+        // Xác nhận xóa (khóa nhân viên)
+        function confirmDelete() {
+            $.ajax({
+                url: `${API_URL}/${deleteEmployeeId}`,
+                type: 'DELETE',
+                success: function(response) {
+                    showNotification('Đã khóa nhân viên thành công', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+                    loadEmployees();
+                },
+                error: function(xhr) {
+                    let message = 'Có lỗi xảy ra khi khóa nhân viên';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showNotification(message, 'error');
+                }
+            });
+        }
+
+        // Khôi phục nhân viên (set active = true)
+        function restoreEmployee(employeeId, employeeName) {
+            if (!confirm(`Bạn có chắc chắn muốn khôi phục nhân viên "${employeeName}"?\nNhân viên sẽ được hiển thị lại trong danh sách đang hoạt động.`)) {
+                return;
+            }
+
+            $.ajax({
+                url: `${API_URL}/${employeeId}/restore`,
+                type: 'POST',
+                success: function(response) {
+                    showNotification('Khôi phục nhân viên thành công', 'success');
+                    loadEmployees();
+                },
+                error: function(xhr) {
+                    let message = 'Có lỗi xảy ra khi khôi phục nhân viên';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showNotification(message, 'error');
+                }
+            });
+        }
+
+        // Hiển thị thông báo
+        function showNotification(message, type) {
+            const bgColor = type === 'success' ? 'bg-gradient-success' : 'bg-gradient-danger';
+            const notification = $(`
+                <div class="alert ${bgColor} text-white alert-dismissible fade show position-fixed" 
+                     style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `);
+            $('body').append(notification);
+            setTimeout(() => notification.alert('close'), 3000);
+        }
+
+        // Hiển thị lỗi trong modal
+        function showError(message) {
+            $('#errorMessage').html(message).show();
+        }
+
+        // Reset khi đóng modal
+        $(document).on('hidden.bs.modal', '#employeeModal', function() {
+            // Xóa class view-mode
+            $('#employeeModal .modal-content').removeClass('view-mode');
+            
+            // Reset file inputs
+            $('#avatarFile').val('');
+            
+            // Clear previews
+            $('#imagePreview').hide();
+            
+            // Reset form
+            $('#employeeForm')[0].reset();
+            // Reset password về type="password" và clear data
+            $('#password').attr('type', 'password').val('').data('password-length', 0);
+            $('#errorMessage').hide();
+            
+            // Remove is-filled classes
+            $('.input-group-outline').removeClass('is-filled');
+            
+            // Enable all controls để sẵn sàng cho lần mở tiếp theo
+            $('#employeeForm input:not([type="hidden"]), #employeeForm select').prop('disabled', false);
+            $('#employeeForm input[type="file"]').prop('disabled', false).css('pointer-events', 'auto');
+            $('.modal-footer .btn-primary').show();
+        });
+    </script>
+}
+
+<style>
+    .employee-image {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 50%;
+    }
+
+    .action-btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        margin: 0 0.125rem;
+    }
+
+    .modal-lg {
+        max-width: 800px;
+    }
+
+    .preview-image {
+        max-width: 200px;
+        max-height: 200px;
+        margin-top: 10px;
+        border-radius: 8px;
+    }
+
+    .table-actions {
+        white-space: nowrap;
+    }
+
+    /* Fix lỗi cột bị lệch khi đổi trang */
+    #employeeTableBody tr {
+        height: 80px;
+    }
+
+    #employeeTableBody tr td {
+        vertical-align: middle !important;
+        padding: 0.75rem 0.5rem !important;
+    }
+
+    #employeeTableBody tr td:first-child {
+        width: 25%;
+        min-width: 200px;
+    }
+
+    #employeeTableBody tr td:nth-child(2) {
+        width: 20%;
+        min-width: 150px;
+    }
+
+    #employeeTableBody tr td:nth-child(3) {
+        width: 15%;
+        min-width: 100px;
+    }
+
+    #employeeTableBody tr td:nth-child(4) {
+        width: 15%;
+        min-width: 100px;
+    }
+
+    #employeeTableBody tr td:nth-child(5) {
+        width: 25%;
+        min-width: 150px;
+    }
+
+    /* Ẩn placeholder mờ trong input password */
+    #password::placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    #password::-webkit-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    #password::-moz-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    #password:-ms-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+</style>
