@@ -1,0 +1,962 @@
+﻿@{
+    ViewData["Title"] = "Quản lý khách hàng";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutManageCustomer.cshtml";
+}
+
+
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card my-4">
+                <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                    <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
+                        <h6 class="text-white text-capitalize ps-3">Quản lý khách hàng</h6>
+                    </div>
+                </div>
+                <div class="card-body px-3 pb-2">
+                    <!-- Bộ lọc và tìm kiếm -->
+                    <div class="row mb-3 g-2 align-items-end">
+                        <div class="col-lg-4 col-md-6">
+                            <div class="input-group input-group-outline">
+                                <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm khách hàng...">
+                            </div>
+                        </div>
+                        <div class="col-lg-2 col-md-3">
+                            <select id="activeFilter" class="form-select">
+                                <option value="true" selected>Đang hoạt động</option>
+                                <option value="false">Đã khóa</option>
+                                <option value="">Tất cả trạng thái</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Bảng khách hàng -->
+                    <div class="table-responsive p-0">
+                        <table class="table align-items-center mb-0" style="table-layout: fixed; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 25%;">Khách hàng</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 20%;">Thông tin liên hệ</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Ngày sinh</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Tài khoản</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 25%;">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="customerTableBody">
+                                <!-- Dữ liệu sẽ được load bằng AJAX -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Phân trang -->
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <p class="text-sm mb-0" id="pageInfo">Đang tải...</p>
+                        </div>
+                        <div class="col-md-6">
+                            <nav aria-label="Page navigation">
+                                <ul class="pagination justify-content-end mb-0" id="pagination">
+                                    <!-- Phân trang sẽ được tạo bằng JavaScript -->
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Sửa Khách hàng -->
+<div class="modal fade" id="customerModal" tabindex="-1" aria-labelledby="customerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-primary">
+                <h5 class="modal-title text-white" id="customerModalLabel">Cập nhật khách hàng</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="customerForm">
+                    <input type="hidden" id="isEditMode" value="true">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Mã khách hàng</label>
+                                <input type="text" class="form-control" id="customerId" readonly disabled>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Tên khách hàng *</label>
+                                <input type="text" class="form-control" id="customerName" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Ngày sinh</label>
+                                <input type="date" class="form-control" id="dateOfBirth">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Số điện thoại</label>
+                                <input type="text" class="form-control" id="phoneNumber">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" id="email">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Địa chỉ</label>
+                                <input type="text" class="form-control" id="address">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Tên đăng nhập</label>
+                                <input type="text" class="form-control" id="username">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Mật khẩu</label>
+                                <input type="password" class="form-control" id="password" data-password-length="0" placeholder="">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <label for="avatarFile" class="form-label">Ảnh đại diện</label>
+                                <input type="file" class="form-control" id="avatarFile" accept="image/*" onchange="previewImage(this)">
+                                <img id="imagePreview" class="preview-image" style="display:none;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-danger mb-3" id="errorMessage" style="display:none;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" onclick="saveCustomer()">
+                    <i class="material-icons text-sm">save</i> Lưu
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xác nhận khóa -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-danger">
+                <h5 class="modal-title text-white" id="deleteModalLabel">Xác nhận khóa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteModalMessage">Bạn có chắc chắn muốn khóa khách hàng <strong id="deleteCustomerName"></strong>?</p>
+                <p class="text-warning text-sm mb-0">Khách hàng sẽ bị ẩn khỏi danh sách đang hoạt động nhưng có thể khôi phục sau.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDelete()">
+                    <i class="material-icons text-sm">delete</i> Khóa
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts {
+    <script>
+        const API_URL = 'http://localhost:5068/api/admin/customers';
+        const API_BASE_URL = API_URL.replace(/\/api\/admin\/customers$/, '');
+        const IMAGE_BASE_URL = `${API_BASE_URL}/imageCustomers`;
+        let currentPage = 1;
+        let pageSize = 10;
+        let deleteCustomerId = '';
+        let searchDebounceTimer = null;
+        const SEARCH_DEBOUNCE_DELAY = 300;
+
+        $(document).ready(function() {
+            loadCustomers();
+
+            // Tìm kiếm tự động theo tên
+            $('#searchInput').on('input', function() {
+                triggerAutoSearch();
+            });
+
+            // Tìm kiếm tự động theo trạng thái active
+            $('#activeFilter').on('change', function() {
+                triggerAutoSearch();
+            });
+
+            // Lưu độ dài mật khẩu khi người dùng nhập
+            $('#password').on('input', function() {
+                const length = $(this).val().length;
+                $(this).data('password-length', length);
+                // Nếu đang edit và người dùng bắt đầu nhập, đổi về type="password"
+                const isEditMode = $('#isEditMode').val() === 'true';
+                if (isEditMode && $(this).attr('type') === 'text' && length > 0) {
+                    // Kiểm tra xem có phải toàn dấu * không
+                    const value = $(this).val();
+                    if (value && value.length > 0 && !value.match(/^\*+$/)) {
+                        // Người dùng đang nhập mật khẩu mới, đổi về type="password"
+                        $(this).attr('type', 'password');
+                    }
+                }
+            });
+            
+            // Khi focus vào password field trong chế độ edit, nếu đang hiển thị dấu *, clear và đổi về password
+            $('#password').on('focus', function() {
+                const isEditMode = $('#isEditMode').val() === 'true';
+                if (isEditMode && $(this).attr('type') === 'text') {
+                    const value = $(this).val();
+                    if (value && value.match(/^\*+$/)) {
+                        // Đang hiển thị dấu *, clear và đổi về password để người dùng nhập mới
+                        const savedLength = value.length; // Lưu độ dài dấu * hiện tại
+                        $(this).attr('type', 'password').val('').data('password-length', 0).data('saved-star-length', savedLength);
+                    }
+                }
+            });
+            
+            // Khi blur khỏi password field trong chế độ edit, nếu không có giá trị mới, hiển thị lại dấu *
+            $('#password').on('blur', function() {
+                const isEditMode = $('#isEditMode').val() === 'true';
+                if (isEditMode && $(this).attr('type') === 'password') {
+                    const value = $(this).val();
+                    if (!value || value.trim() === '') {
+                        // Không có giá trị mới, hiển thị lại dấu *
+                        const savedLength = parseInt($(this).data('saved-star-length')) || 8;
+                        $(this).attr('type', 'text').val('*'.repeat(savedLength)).data('password-length', savedLength);
+                    }
+                }
+            });
+        });
+
+        function triggerAutoSearch() {
+            currentPage = 1;
+            if (searchDebounceTimer) {
+                clearTimeout(searchDebounceTimer);
+            }
+            searchDebounceTimer = setTimeout(() => {
+                loadCustomers();
+            }, SEARCH_DEBOUNCE_DELAY);
+        }
+
+        // Load danh sách khách hàng
+        function loadCustomers(page = currentPage) {
+            currentPage = page;
+            const searchTerm = $('#searchInput').val().trim();
+            const activeFilter = $('#activeFilter').val();
+
+            const dataParams = {
+                pageNumber: currentPage,
+                pageSize: pageSize,
+                searchTerm: searchTerm
+            };
+
+            // Chỉ thêm active vào params nếu có giá trị
+            if (activeFilter !== '') {
+                dataParams.active = activeFilter === 'true';
+            }
+
+            $.ajax({
+                url: API_URL,
+                type: 'GET',
+                data: dataParams,
+                success: function(response) {
+                    displayCustomers(response.items);
+                    displayPagination(response);
+                    updatePageInfo(response);
+                },
+                error: function(xhr) {
+                    console.error('Lỗi khi tải khách hàng:', xhr);
+                    showNotification('Lỗi khi tải dữ liệu khách hàng', 'error');
+                }
+            });
+        }
+
+        // Hiển thị khách hàng
+        function displayCustomers(customers) {
+            const tbody = $('#customerTableBody');
+            tbody.empty();
+
+            if (customers.length === 0) {
+                tbody.append(`
+                    <tr>
+                        <td colspan="5" class="text-center text-secondary py-4">
+                            Không có khách hàng nào
+                        </td>
+                    </tr>
+                `);
+                return;
+            }
+
+            $.each(customers, function(index, customer) {
+                const avatar = customer.avatar ? `${IMAGE_BASE_URL}/${customer.avatar}` : `${IMAGE_BASE_URL}/default-avatar.jpg`;
+                const dateOfBirth = customer.dateOfBirth ? new Date(customer.dateOfBirth).toLocaleDateString('vi-VN') : '-';
+                const phoneNumber = customer.phoneNumber || '-';
+                const email = customer.email || '-';
+                const username = customer.username || '-';
+                const isActive = customer.active !== false; // Mặc định true nếu không có giá trị
+                const activeBadge = isActive 
+                    ? '<span class="badge bg-gradient-success">Đang hoạt động</span>' 
+                    : '<span class="badge bg-gradient-danger">Đã khóa</span>';
+                const customerNameEscaped = (customer.customerName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+                // Nút thao tác khác nhau tùy theo active
+                let actionButtons = '';
+                if (isActive) {
+                    // Khách hàng đang hoạt động: có nút Xem, Sửa, Xóa
+                    actionButtons = `
+                        <button class="btn btn-info action-btn" onclick='viewCustomer("${customer.customerId}")' title="Xem">
+                            <i class="material-icons text-sm">visibility</i>
+                        </button>
+                        <button class="btn btn-warning action-btn" onclick='editCustomer("${customer.customerId}")' title="Sửa">
+                            <i class="material-icons text-sm">edit</i>
+                        </button>
+                        <button class="btn btn-danger action-btn" onclick='deleteCustomer("${customer.customerId}", "${customerNameEscaped}")' title="Khóa">
+                            <i class="material-icons text-sm">delete</i>
+                        </button>
+                    `;
+                } else {
+                    // Khách hàng đã khóa: có nút Xem, Khôi phục
+                    actionButtons = `
+                        <button class="btn btn-info action-btn" onclick='viewCustomer("${customer.customerId}")' title="Xem">
+                            <i class="material-icons text-sm">visibility</i>
+                        </button>
+                        <button class="btn btn-success action-btn" onclick='restoreCustomer("${customer.customerId}", "${customerNameEscaped}")' title="Khôi phục">
+                            <i class="material-icons text-sm">restore</i>
+                        </button>
+                    `;
+                }
+
+                tbody.append(`
+                    <tr style="height: 80px;" class="${!isActive ? 'table-secondary' : ''}">
+                        <td style="vertical-align: middle;">
+                            <div class="d-flex px-2 py-1">
+                                <div>
+                                    <img src="${avatar}" class="customer-image me-3" alt="${customer.customerName}" onerror="this.src='${IMAGE_BASE_URL}/default-avatar.jpg'">
+                                </div>
+                                <div class="d-flex flex-column justify-content-center" style="min-width: 0; flex: 1;">
+                                    <h6 class="mb-0 text-sm" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${customer.customerName}</h6>
+                                    <p class="text-xs text-secondary mb-0">${customer.customerId}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td style="vertical-align: middle;">
+                            <p class="text-xs font-weight-bold mb-0" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${phoneNumber}</p>
+                            <p class="text-xs text-secondary mb-0" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${email}</p>
+                            ${activeBadge}
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold">${dateOfBirth}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; max-width: 100%;">${username}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;" class="table-actions">
+                            ${actionButtons}
+                        </td>
+                    </tr>
+                `);
+            });
+        }
+
+        // Hiển thị phân trang
+        function displayPagination(response) {
+            const pagination = $('#pagination');
+            pagination.empty();
+
+            if (response.totalPages <= 1) return;
+
+            // Nút Previous
+            pagination.append(`
+                <li class="page-item ${response.hasPreviousPage ? '' : 'disabled'}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadCustomers(${currentPage - 1})">
+                        <i class="material-icons text-sm">chevron_left</i>
+                    </a>
+                </li>
+            `);
+
+            // Các trang
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(response.totalPages, currentPage + 2);
+
+            if (startPage > 1) {
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadCustomers(1)">1</a></li>`);
+                if (startPage > 2) {
+                    pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                pagination.append(`
+                    <li class="page-item ${i === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="javascript:void(0)" onclick="loadCustomers(${i})">${i}</a>
+                    </li>
+                `);
+            }
+
+            if (endPage < response.totalPages) {
+                if (endPage < response.totalPages - 1) {
+                    pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadCustomers(${response.totalPages})">${response.totalPages}</a></li>`);
+            }
+
+            // Nút Next
+            pagination.append(`
+                <li class="page-item ${response.hasNextPage ? '' : 'disabled'}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadCustomers(${currentPage + 1})">
+                        <i class="material-icons text-sm">chevron_right</i>
+                    </a>
+                </li>
+            `);
+        }
+
+        // Cập nhật thông tin trang
+        function updatePageInfo(response) {
+            const start = (response.pageNumber - 1) * response.pageSize + 1;
+            const end = Math.min(response.pageNumber * response.pageSize, response.totalItems);
+            $('#pageInfo').text(`Hiển thị ${start} - ${end} trong tổng số ${response.totalItems} khách hàng`);
+        }
+
+        // Thiết lập chế độ xem/chỉnh sửa
+        function setViewMode(isViewMode) {
+            const modalContent = $('#customerModal .modal-content');
+            const passwordInput = $('#password');
+            
+            if (isViewMode) {
+                // Thêm class view-mode để áp dụng CSS
+                modalContent.addClass('view-mode');
+                
+                // Disable tất cả inputs và selects trong form
+                $('#customerForm input:not([type="hidden"]):not([type="file"]), #customerForm select').prop('disabled', true);
+                $('#customerForm input[type="file"]').prop('disabled', true).css('pointer-events', 'none');
+                
+                // Xử lý password: đổi sang text và hiển thị dấu * với độ dài thực
+                const passwordLength = parseInt(passwordInput.data('password-length')) || 8; // Mặc định 8 ký tự nếu không có
+                if (passwordLength > 0) {
+                    passwordInput.attr('type', 'text').val('*'.repeat(passwordLength));
+                } else {
+                    passwordInput.attr('type', 'text').val('');
+                }
+                
+                // Ẩn nút lưu
+                $('.modal-footer .btn-primary').hide();
+            } else {
+                // Xóa class view-mode
+                modalContent.removeClass('view-mode');
+                
+                // Enable tất cả inputs và selects trong form (trừ customerId nếu đang edit)
+                $('#customerForm input:not([type="hidden"]):not([type="file"]), #customerForm select').each(function() {
+                    // Giữ nguyên trạng thái disabled của customerId nếu đang edit
+                    if ($(this).attr('id') === 'customerId' && $('#isEditMode').val() === 'true') {
+                        return; // Không enable customerId khi edit
+                    }
+                    $(this).prop('disabled', false);
+                });
+                
+                // Đổi password về type="password" và clear giá trị
+                // Nhưng nếu đang edit và có mật khẩu (có username), hiển thị dấu * ban đầu
+                const isEditMode = $('#isEditMode').val() === 'true';
+                const hasUsername = $('#username').val() && $('#username').val().trim() !== '';
+                if (isEditMode && hasUsername) {
+                    // Hiển thị dấu * khi đang edit (người dùng có thể focus để nhập mới)
+                    const passwordLength = parseInt(passwordInput.data('password-length')) || 8;
+                    passwordInput.attr('type', 'text').val('*'.repeat(passwordLength));
+                } else {
+                    passwordInput.attr('type', 'password').val('');
+                }
+                
+                $('#customerForm input[type="file"]').prop('disabled', false).css('pointer-events', 'auto');
+                
+                // Hiện nút lưu
+                $('.modal-footer .btn-primary').show();
+            }
+        }
+
+        // Xem chi tiết khách hàng
+        function viewCustomer(customerId) {
+            $.ajax({
+                url: `${API_URL}/${customerId}`,
+                type: 'GET',
+                success: function(customer) {
+                    $('#customerModalLabel').text('Chi tiết khách hàng');
+                    
+                    // Đảm bảo modal được reset trước
+                    $('#customerForm')[0].reset();
+                    
+                    // Load dữ liệu với viewOnly = true
+                    fillFormWithCustomer(customer, true);
+                    
+                    const modal = new bootstrap.Modal(document.getElementById('customerModal'));
+                    modal.show();
+                    
+                    // Đảm bảo setViewMode được gọi sau khi modal hiển thị
+                    setTimeout(function() {
+                        setViewMode(true);
+                    }, 300);
+                },
+                error: function(xhr) {
+                    console.error('Error loading customer for view:', xhr);
+                    showNotification('Lỗi khi tải thông tin khách hàng', 'error');
+                }
+            });
+        }
+
+        // Sửa khách hàng
+        function editCustomer(customerId) {
+            $.ajax({
+                url: `${API_URL}/${customerId}`,
+                type: 'GET',
+                success: function(customer) {
+                    $('#isEditMode').val('true');
+                    $('#customerModalLabel').text('Cập nhật khách hàng');
+                    
+                    // Reset form trước
+                    $('#customerForm')[0].reset();
+                    
+                    // Fill form với dữ liệu
+                    fillFormWithCustomer(customer, false);
+                    
+                    // Disable customerId (không cho sửa mã) - set readonly
+                    $('#customerId').prop('disabled', false).prop('readonly', true);
+                    
+                    // Enable edit mode (không phải view mode) - gọi sau khi fill form
+                    setTimeout(function() {
+                        setViewMode(false);
+                        // Nếu khách hàng có username và có độ dài mật khẩu, hiển thị dấu * với độ dài thực
+                        if (customer.username && customer.passwordLength && customer.passwordLength > 0) {
+                            const passwordInput = $('#password');
+                            passwordInput.attr('type', 'text').val('*'.repeat(customer.passwordLength));
+                        }
+                    }, 150);
+                    
+                    const modal = new bootstrap.Modal(document.getElementById('customerModal'));
+                    modal.show();
+                },
+                error: function(xhr) {
+                    console.error('Error loading customer:', xhr);
+                    showNotification('Lỗi khi tải thông tin khách hàng', 'error');
+                }
+            });
+        }
+
+        // Điền dữ liệu vào form
+        function fillFormWithCustomer(customer, viewOnly) {
+            // Reset form trước
+            $('#customerForm')[0].reset();
+            
+            // Fill basic info
+            $('#customerId').val(customer.customerId || '');
+            $('#customerName').val(customer.customerName || '');
+            
+            // Format date for input[type="date"]
+            if (customer.dateOfBirth) {
+                const date = new Date(customer.dateOfBirth);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                $('#dateOfBirth').val(`${year}-${month}-${day}`);
+            } else {
+                $('#dateOfBirth').val('');
+            }
+            
+            $('#phoneNumber').val(customer.phoneNumber || '');
+            $('#email').val(customer.email || '');
+            $('#address').val(customer.address || '');
+            $('#username').val(customer.username || '');
+            // Không fill password vì lý do bảo mật
+            // Sử dụng độ dài mật khẩu từ API (passwordLength) hoặc mặc định 8
+            const passwordLength = customer.passwordLength || 8;
+            $('#password').val('').data('password-length', passwordLength);
+            
+            // Nếu đang ở chế độ xem hoặc sửa và khách hàng có username (có mật khẩu)
+            // thì hiển thị dấu * ngay lập tức với độ dài thực
+            if (viewOnly || $('#isEditMode').val() === 'true') {
+                if (customer.username && passwordLength > 0) {
+                    // Có username và có độ dài mật khẩu, hiển thị dấu * với độ dài thực
+                    setTimeout(function() {
+                        const passwordInput = $('#password');
+                        passwordInput.attr('type', 'text').val('*'.repeat(passwordLength));
+                    }, 100);
+                }
+            }
+            
+            // Trigger change để update is-filled class
+            $('#email').trigger('change');
+
+            // Add is-filled class to input groups with values
+            setTimeout(function() {
+                $('.input-group-outline input, .input-group-outline select').each(function() {
+                    if ($(this).val()) {
+                        $(this).closest('.input-group-outline').addClass('is-filled');
+                    } else {
+                        $(this).closest('.input-group-outline').removeClass('is-filled');
+                    }
+                });
+            }, 100);
+
+            // Load avatar
+            if (customer.avatar) {
+                const avatarUrl = `${IMAGE_BASE_URL}/${customer.avatar}`;
+                $('#imagePreview').attr('src', avatarUrl).show();
+            } else {
+                $('#imagePreview').hide();
+            }
+            
+            // Set view mode SAU KHI render (chỉ set nếu viewOnly, không set khi edit)
+            if (viewOnly) {
+                // Disable form inputs
+                $('#customerForm input:not([type="hidden"]):not([type="file"]), #customerForm select').prop('disabled', true);
+                $('#customerForm input[type="file"]').prop('disabled', true).css('pointer-events', 'none');
+                $('.modal-footer .btn-primary').hide();
+                // Clear file inputs khi view
+                $('#avatarFile').val('');
+            }
+            
+            // Clear avatar file input (luôn clear)
+            $('#avatarFile').val('');
+
+            $('#errorMessage').hide();
+        }
+
+        // Preview ảnh
+        function previewImage(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    $('#imagePreview').attr('src', e.target.result).show();
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // Lưu khách hàng (chỉ cập nhật, không tạo mới)
+        function saveCustomer() {
+            // Clear error message
+            $('#errorMessage').hide();
+            
+            const isEdit = $('#isEditMode').val() === 'true';
+            const customerId = $('#customerId').val().trim();
+
+            if (!isEdit) {
+                showError('Chức năng thêm khách hàng đã bị vô hiệu hóa');
+                return;
+            }
+
+            if (!customerId) {
+                showError('Không tìm thấy mã khách hàng');
+                return;
+            }
+
+            const customerName = $('#customerName').val().trim();
+            if (!customerName) {
+                showError('Vui lòng nhập tên khách hàng');
+                $('#customerName').focus();
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('CustomerName', customerName);
+            formData.append('DateOfBirth', $('#dateOfBirth').val() || '');
+            formData.append('PhoneNumber', $('#phoneNumber').val() || '');
+            formData.append('Email', $('#email').val() || '');
+            formData.append('Address', $('#address').val() || '');
+            formData.append('Username', $('#username').val() || '');
+            
+            // Chỉ gửi password nếu có giá trị (khi muốn đổi mật khẩu)
+            const password = $('#password').val();
+            if (password) {
+                formData.append('Password', password);
+            }
+
+            const avatarFile = $('#avatarFile')[0].files[0];
+            if (avatarFile) {
+                formData.append('AvatarFile', avatarFile);
+            }
+
+            const url = `${API_URL}/${customerId}`;
+            const method = 'PUT';
+
+            $.ajax({
+                url: url,
+                type: method,
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    showNotification('Cập nhật khách hàng thành công', 'success');
+                    
+                    // Cập nhật passwordLength nếu có trong response
+                    if (response && response.passwordLength !== undefined) {
+                        $('#password').data('password-length', response.passwordLength);
+                    } else if (password && password.length > 0) {
+                        // Nếu không có trong response, sử dụng độ dài password vừa nhập
+                        $('#password').data('password-length', password.length);
+                    }
+                    
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('customerModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                    loadCustomers();
+                },
+                error: function(xhr) {
+                    console.error('Error saving customer:', xhr);
+                    console.error('Status:', xhr.status);
+                    console.error('Status Text:', xhr.statusText);
+                    console.error('Response Text:', xhr.responseText);
+                    console.error('Response JSON:', xhr.responseJSON);
+                    
+                    let message = 'Có lỗi xảy ra khi lưu khách hàng';
+                    let errorDetails = '';
+                    
+                    if (xhr.responseJSON) {
+                        if (xhr.responseJSON.message) {
+                            message = xhr.responseJSON.message;
+                        }
+                        if (xhr.responseJSON.error) {
+                            errorDetails += '<br><small style="color: #dc3545;">' + xhr.responseJSON.error + '</small>';
+                        }
+                        if (xhr.responseJSON.details) {
+                            errorDetails += '<br><small style="color: #6c757d; font-size: 0.8em;">' + 
+                                xhr.responseJSON.details.substring(0, 500).replace(/\n/g, '<br>') + '</small>';
+                        }
+                        if (xhr.responseJSON.errors) {
+                            const errors = xhr.responseJSON.errors;
+                            const errorMessages = Object.values(errors).flat();
+                            errorDetails += '<br>' + errorMessages.join('<br>');
+                        }
+                    } else if (xhr.responseText) {
+                        try {
+                            const errorObj = JSON.parse(xhr.responseText);
+                            message = errorObj.message || errorObj.error || message;
+                            if (errorObj.details) {
+                                errorDetails += '<br><small style="color: #6c757d;">' + 
+                                    errorObj.details.substring(0, 300) + '</small>';
+                            }
+                        } catch (e) {
+                            errorDetails = '<br><small>' + xhr.responseText.substring(0, 200) + '</small>';
+                        }
+                    }
+                    
+                    if (xhr.status) {
+                        errorDetails += '<br><small style="color: #6c757d;">HTTP Status: ' + xhr.status + 
+                            (xhr.statusText ? ' ' + xhr.statusText : '') + '</small>';
+                    }
+                    
+                    showError(message + errorDetails);
+                    // Scroll to error message
+                    if ($('#errorMessage').length > 0) {
+                        $('#errorMessage')[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                }
+            });
+        }
+
+        // Xóa khách hàng (khóa khách hàng - set active = false)
+        function deleteCustomer(customerId, customerName) {
+            deleteCustomerId = customerId;
+            const customerNameEscaped = customerName.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            $('#deleteCustomerName').html(customerNameEscaped);
+            $('#deleteModalLabel').text('Xác nhận khóa');
+            $('#deleteModalMessage').html(`Bạn có chắc chắn muốn khóa khách hàng <strong>${customerNameEscaped}</strong>?`);
+            const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+            modal.show();
+        }
+
+        // Xác nhận xóa (khóa khách hàng)
+        function confirmDelete() {
+            $.ajax({
+                url: `${API_URL}/${deleteCustomerId}`,
+                type: 'DELETE',
+                success: function(response) {
+                    showNotification('Đã khóa khách hàng thành công', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+                    loadCustomers();
+                },
+                error: function(xhr) {
+                    let message = 'Có lỗi xảy ra khi khóa khách hàng';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showNotification(message, 'error');
+                }
+            });
+        }
+
+        // Khôi phục khách hàng (set active = true)
+        function restoreCustomer(customerId, customerName) {
+            if (!confirm(`Bạn có chắc chắn muốn khôi phục khách hàng "${customerName}"?\nKhách hàng sẽ được hiển thị lại trong danh sách đang hoạt động.`)) {
+                return;
+            }
+
+            $.ajax({
+                url: `${API_URL}/${customerId}/restore`,
+                type: 'POST',
+                success: function(response) {
+                    showNotification('Khôi phục khách hàng thành công', 'success');
+                    loadCustomers();
+                },
+                error: function(xhr) {
+                    let message = 'Có lỗi xảy ra khi khôi phục khách hàng';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showNotification(message, 'error');
+                }
+            });
+        }
+
+        // Hiển thị thông báo
+        function showNotification(message, type) {
+            const bgColor = type === 'success' ? 'bg-gradient-success' : 'bg-gradient-danger';
+            const notification = $(`
+                <div class="alert ${bgColor} text-white alert-dismissible fade show position-fixed" 
+                     style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `);
+            $('body').append(notification);
+            setTimeout(() => notification.alert('close'), 3000);
+        }
+
+        // Hiển thị lỗi trong modal
+        function showError(message) {
+            $('#errorMessage').html(message).show();
+        }
+
+        // Reset khi đóng modal
+        $(document).on('hidden.bs.modal', '#customerModal', function() {
+            // Xóa class view-mode
+            $('#customerModal .modal-content').removeClass('view-mode');
+            
+            // Reset file inputs
+            $('#avatarFile').val('');
+            
+            // Clear previews
+            $('#imagePreview').hide();
+            
+            // Reset form
+            $('#customerForm')[0].reset();
+            // Reset password về type="password" và clear data
+            $('#password').attr('type', 'password').val('').data('password-length', 0);
+            $('#errorMessage').hide();
+            
+            // Remove is-filled classes
+            $('.input-group-outline').removeClass('is-filled');
+            
+            // Enable all controls để sẵn sàng cho lần mở tiếp theo
+            $('#customerForm input:not([type="hidden"]), #customerForm select').prop('disabled', false);
+            $('#customerForm input[type="file"]').prop('disabled', false).css('pointer-events', 'auto');
+            $('.modal-footer .btn-primary').show();
+        });
+    </script>
+}
+
+<style>
+    .customer-image {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 50%;
+    }
+
+    .action-btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        margin: 0 0.125rem;
+    }
+
+    .modal-lg {
+        max-width: 800px;
+    }
+
+    .preview-image {
+        max-width: 200px;
+        max-height: 200px;
+        margin-top: 10px;
+        border-radius: 8px;
+    }
+
+    .table-actions {
+        white-space: nowrap;
+    }
+
+    /* Fix lỗi cột bị lệch khi đổi trang */
+    #customerTableBody tr {
+        height: 80px;
+    }
+
+    #customerTableBody tr td {
+        vertical-align: middle !important;
+        padding: 0.75rem 0.5rem !important;
+    }
+
+    #customerTableBody tr td:first-child {
+        width: 25%;
+        min-width: 200px;
+    }
+
+    #customerTableBody tr td:nth-child(2) {
+        width: 20%;
+        min-width: 150px;
+    }
+
+    #customerTableBody tr td:nth-child(3) {
+        width: 15%;
+        min-width: 100px;
+    }
+
+    #customerTableBody tr td:nth-child(4) {
+        width: 15%;
+        min-width: 100px;
+    }
+
+    #customerTableBody tr td:nth-child(5) {
+        width: 25%;
+        min-width: 150px;
+    }
+
+    /* Ẩn placeholder mờ trong input password */
+    #password::placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    #password::-webkit-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    #password::-moz-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    #password:-ms-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+</style>
