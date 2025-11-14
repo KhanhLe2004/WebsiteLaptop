@@ -45,12 +45,6 @@
                                 <ul class="list-unstyled fruite-categorie" id="priceFilter">
                                     <li>
                                         <div class="d-flex align-items-center mb-2">
-                                            <input type="checkbox" class="form-check-input me-2 price-checkbox" id="price-all" value="all" checked>
-                                            <label for="price-all" class="mb-0">Tất cả</label>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div class="d-flex align-items-center mb-2">
                                             <input type="checkbox" class="form-check-input me-2 price-checkbox" id="price-under-10" value="under-10">
                                             <label for="price-under-10" class="mb-0">Dưới 10 triệu</label>
                                         </div>
@@ -223,32 +217,39 @@
 
                     // Initialize
                     $(document).ready(function() {
-                        // Restore filters from URL parameters
-                        restoreFiltersFromURL();
+                        // Always prioritize sessionStorage (has most recent filters)
+                        // Only use URL if sessionStorage is empty
+                        restoreFiltersFromSessionStorage();
+                        if (filters.brands.length === 0 && filters.priceRanges.length === 0 && 
+                            filters.ram.length === 0 && filters.storage.length === 0) {
+                            restoreFiltersFromURL();
+                        }
                         
                         loadFilters();
                         
                         // Handle browser back/forward navigation
                         window.addEventListener('popstate', function(event) {
-                            // Restore filters from URL when navigating back/forward
-                            restoreFiltersFromURL();
+                            // Always prioritize sessionStorage (has most recent filters)
+                            restoreFiltersFromSessionStorage();
+                            if (filters.brands.length === 0 && filters.priceRanges.length === 0 && 
+                                filters.ram.length === 0 && filters.storage.length === 0) {
+                                restoreFiltersFromURL();
+                            }
+                            
                             restoreCheckboxStates();
                             loadProducts();
                         });
                         
+                        // Save filters to sessionStorage before navigating away
+                        window.addEventListener('beforeunload', function() {
+                            saveFiltersToSessionStorage();
+                        });
+                        
                         // Attach price checkbox handler (delegated to handle dynamic inputs)
                         $(document).on('change', '.price-checkbox', function() {
-                            if ($(this).val() === 'all') {
-                                if ($(this).is(':checked')) {
-                                    $('.price-checkbox').not(this).prop('checked', false);
-                                    filters.priceRanges = [];
-                                }
-                            } else {
-                                $('#price-all').prop('checked', false);
-                                updatePriceFromCheckboxes();
-                            }
+                            updatePriceFromCheckboxes();
                             filters.page = 1;
-                            saveFiltersToURL();
+                            saveFiltersToSessionStorage(); // Save filters when changed
                             loadProducts();
                         });
 
@@ -256,7 +257,7 @@
                         $('#sortSelect').on('change', function() {
                             filters.sortBy = $(this).val();
                             filters.page = 1;
-                            saveFiltersToURL();
+                            saveFiltersToSessionStorage(); // Save filters when changed
                             loadProducts();
                         });
 
@@ -355,7 +356,7 @@
                             filters.brands.push($(this).val());
                         });
                         filters.page = 1;
-                        saveFiltersToURL();
+                        saveFiltersToSessionStorage(); // Save filters when changed
                         loadProducts();
                     }
 
@@ -366,7 +367,7 @@
                             filters.ram.push($(this).val());
                         });
                         filters.page = 1;
-                        saveFiltersToURL();
+                        saveFiltersToSessionStorage(); // Save filters when changed
                         loadProducts();
                     }
 
@@ -378,7 +379,7 @@
                             filters.storage.push(normalizeForApi($(this).val()));
                         });
                         filters.page = 1;
-                        saveFiltersToURL();
+                        saveFiltersToSessionStorage(); // Save filters when changed
                         loadProducts();
                     }
 
@@ -399,12 +400,48 @@
                             } else if (v === '25-30') {
                                 filters.priceRanges.push({ min: 25000000, max: 30000000 });
                             } else if (v === 'over-30') {
-                                filters.priceRanges.push({ min: 30000000, max: null }); // No upper limit
+                                filters.priceRanges.push({ min: 30000000, max: 1000000000 }); // Use large number for max
                             }
                         });
                     }
 
-                    // Save filters to URL parameters
+                    // Save filters to sessionStorage
+                    function saveFiltersToSessionStorage() {
+                        try {
+                            sessionStorage.setItem('shopFilters', JSON.stringify(filters));
+                        } catch (e) {
+                            console.error('Error saving filters to sessionStorage:', e);
+                        }
+                    }
+
+                    // Restore filters from sessionStorage
+                    function restoreFiltersFromSessionStorage() {
+                        try {
+                            const savedFilters = sessionStorage.getItem('shopFilters');
+                            if (savedFilters) {
+                                const parsed = JSON.parse(savedFilters);
+                                if (parsed) {
+                                    // Reset filters first
+                                    filters.brands = [];
+                                    filters.priceRanges = [];
+                                    filters.ram = [];
+                                    filters.storage = [];
+                                    filters.sortBy = 'price';
+                                    
+                                    // Restore from sessionStorage
+                                    filters.brands = parsed.brands || [];
+                                    filters.priceRanges = parsed.priceRanges || [];
+                                    filters.ram = parsed.ram || [];
+                                    filters.storage = parsed.storage || [];
+                                    filters.sortBy = parsed.sortBy || 'price';
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Error restoring filters from sessionStorage:', e);
+                        }
+                    }
+
+                    // Save filters to URL parameters (not used for filter changes, only for ProductDetail links)
                     function saveFiltersToURL() {
                         const urlParams = new URLSearchParams();
                         
@@ -414,10 +451,9 @@
                         
                         if (filters.priceRanges.length > 0) {
                             const priceRangesStr = filters.priceRanges.map(r => {
-                                if (r.max === null) {
-                                    return r.min + '-';
-                                }
-                                return r.min + '-' + r.max;
+                                const min = r.min || 0;
+                                const max = (r.max === null || r.max === undefined) ? 1000000000 : r.max;
+                                return min + '-' + max;
                             }).join(',');
                             urlParams.set('priceRanges', priceRangesStr);
                         }
@@ -435,12 +471,19 @@
                         }
                         
                         const newUrl = window.location.pathname + (urlParams.toString() ? ('?' + urlParams.toString()) : '');
-                        window.history.pushState({ filters: filters }, '', newUrl);
+                        window.history.replaceState({ filters: filters }, '', newUrl);
                     }
 
                     // Restore filters from URL parameters
                     function restoreFiltersFromURL() {
                         const urlParams = new URLSearchParams(window.location.search);
+                        
+                        // Reset filters first
+                        filters.brands = [];
+                        filters.priceRanges = [];
+                        filters.ram = [];
+                        filters.storage = [];
+                        filters.sortBy = 'price';
                         
                         // Restore brands
                         const brandsParam = urlParams.get('brands');
@@ -456,7 +499,8 @@
                                 const parts = rangeStr.split('-');
                                 if (parts.length === 2) {
                                     const min = parseInt(parts[0]);
-                                    const max = parts[1] === '' ? null : parseInt(parts[1]);
+                                    let max = parts[1] === '' ? 1000000000 : parseInt(parts[1]);
+                                    if (isNaN(max)) max = 1000000000; // Default to large number if max is invalid
                                     if (!isNaN(min)) {
                                         filters.priceRanges.push({ min: min, max: max });
                                     }
@@ -485,39 +529,42 @@
 
                     // Restore checkbox states from filters
                     function restoreCheckboxStates() {
+                        // Uncheck all brand checkboxes first
+                        $('.brand-checkbox').prop('checked', false);
                         // Restore brand checkboxes
                         filters.brands.forEach(brandId => {
                             $('#brand-' + brandId).prop('checked', true);
                         });
                         
+                        // Uncheck all price checkboxes first
+                        $('.price-checkbox').prop('checked', false);
                         // Restore price checkboxes
-                        if (filters.priceRanges.length === 0) {
-                            $('#price-all').prop('checked', true);
-                        } else {
-                            $('#price-all').prop('checked', false);
-                            filters.priceRanges.forEach(range => {
-                                if (range.min === 0 && range.max === 10000000) {
-                                    $('#price-under-10').prop('checked', true);
-                                } else if (range.min === 10000000 && range.max === 15000000) {
-                                    $('#price-10-15').prop('checked', true);
-                                } else if (range.min === 15000000 && range.max === 20000000) {
-                                    $('#price-15-20').prop('checked', true);
-                                } else if (range.min === 20000000 && range.max === 25000000) {
-                                    $('#price-20-25').prop('checked', true);
-                                } else if (range.min === 25000000 && range.max === 30000000) {
-                                    $('#price-25-30').prop('checked', true);
-                                } else if (range.min === 30000000 && range.max === null) {
-                                    $('#price-over-30').prop('checked', true);
-                                }
-                            });
-                        }
+                        filters.priceRanges.forEach(range => {
+                            if (range.min === 0 && range.max === 10000000) {
+                                $('#price-under-10').prop('checked', true);
+                            } else if (range.min === 10000000 && range.max === 15000000) {
+                                $('#price-10-15').prop('checked', true);
+                            } else if (range.min === 15000000 && range.max === 20000000) {
+                                $('#price-15-20').prop('checked', true);
+                            } else if (range.min === 20000000 && range.max === 25000000) {
+                                $('#price-20-25').prop('checked', true);
+                            } else if (range.min === 25000000 && range.max === 30000000) {
+                                $('#price-25-30').prop('checked', true);
+                            } else if (range.min === 30000000 && (range.max === null || range.max === 1000000000 || range.max >= 1000000000)) {
+                                $('#price-over-30').prop('checked', true);
+                            }
+                        });
                         
+                        // Uncheck all RAM checkboxes first
+                        $('.ram-checkbox').prop('checked', false);
                         // Restore RAM checkboxes
                         filters.ram.forEach(ram => {
                             const ramId = 'ram-' + ram.replace(/\s/g, '-');
                             $('#' + ramId).prop('checked', true);
                         });
                         
+                        // Uncheck all storage checkboxes first
+                        $('.storage-checkbox').prop('checked', false);
                         // Restore storage checkboxes
                         filters.storage.forEach(storage => {
                             // Need to find matching checkbox by comparing normalized values
@@ -547,11 +594,10 @@
                         // Build priceRanges parameter
                         if (filters.priceRanges.length > 0) {
                             const priceRangesStr = filters.priceRanges.map(r => {
-                                if (r.max === null || r.max === undefined) {
-                                    // For "over-30", use a very large number as max (1 billion VND)
-                                    return r.min + '-' + 1000000000;
-                                }
-                                return r.min + '-' + r.max;
+                                // Ensure both min and max are valid numbers
+                                const min = r.min || 0;
+                                const max = (r.max === null || r.max === undefined) ? 1000000000 : r.max;
+                                return min + '-' + max;
                             }).join(',');
                             params.priceRanges = priceRangesStr;
                         }
@@ -635,6 +681,9 @@
                                 }
                             }
 
+                            // Save current filters to sessionStorage before navigating
+                            saveFiltersToSessionStorage();
+                            
                             // Build product detail URL with filter parameters
                             const urlParams = new URLSearchParams();
                             urlParams.set('id', pid);
@@ -645,10 +694,9 @@
                             }
                             if (filters.priceRanges.length > 0) {
                                 const priceRangesStr = filters.priceRanges.map(r => {
-                                    if (r.max === null) {
-                                        return r.min + '-';
-                                    }
-                                    return r.min + '-' + r.max;
+                                    const min = r.min || 0;
+                                    const max = (r.max === null || r.max === undefined) ? 1000000000 : r.max;
+                                    return min + '-' + max;
                                 }).join(',');
                                 urlParams.set('priceRanges', priceRangesStr);
                             }

@@ -198,14 +198,42 @@ namespace WebLaptopBE.Controllers
                         .Where(x => x != null)
                         .ToList();
 
+                    // [trang] - price
                     if (ranges.Any())
                     {
-                        // OR logic: thỏa ít nhất 1 khoảng giá
-                        productsBaseQuery = productsBaseQuery.Where(p =>
-                            p.SellingPrice != null &&
-                            ranges.Any(r => p.SellingPrice >= r!.Min && p.SellingPrice <= r!.Max));
+                        // Tạo list sản phẩm thỏa ít nhất một khoảng giá
+                        var productIdsMatchingPrice = new List<string>();
+
+                        foreach (var range in ranges)
+                        {
+                            var matchedIds = _db.Products
+                                .AsNoTracking()
+                                .Where(p => p.SellingPrice != null && p.SellingPrice >= range!.Min && p.SellingPrice <= range!.Max)
+                                .Select(p => p.ProductId!)
+                                .ToList();
+
+                            productIdsMatchingPrice.AddRange(matchedIds);
+                        }
+
+                        productIdsMatchingPrice = productIdsMatchingPrice.Distinct().ToList();
+
+                        if (!productIdsMatchingPrice.Any())
+                        {
+                            return Ok(new
+                            {
+                                products = new List<object>(),
+                                totalCount = 0,
+                                page = page,
+                                pageSize = pageSize,
+                                totalPages = 0
+                            });
+                        }
+
+                        // Chỉ giữ các productId trong filter price
+                        productsBaseQuery = productsBaseQuery.Where(p => productIdsMatchingPrice.Contains(p.ProductId!));
                     }
                 }
+
 
                 // materialize product ids from the base (brand+price) filters
                 var productIdsFromProducts = productsBaseQuery

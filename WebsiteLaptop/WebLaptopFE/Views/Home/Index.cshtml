@@ -252,35 +252,20 @@
             }
 
             /**
-             * goToPage: transition to page WITHOUT reload
-             * - updates history (pushState)
-             * - renders products client-side
+             * goToPage: transition to page WITHOUT reload and WITHOUT changing URL
+             * - renders products client-side only
              */
             function goToPage(page) {
                 page = parseInt(page) || 1;
                 if (page < 1) page = 1;
                 currentPage = page;
 
-                // update URL params (preserve brandId & productName)
-                const urlParams = new URLSearchParams(window.location.search);
-                urlParams.set('page', page);
-                const newUrl = window.location.pathname + (urlParams.toString() ? ('?' + urlParams.toString()) : '');
-                window.history.pushState({ page: page }, '', newUrl);
-
-                // re-render products
+                // re-render products (no URL change)
                 buildProductsHtml(allProducts, page);
 
                 // scroll to products
                 document.querySelector('#displayProducts')?.scrollIntoView({ behavior: 'smooth' });
             }
-
-            // handle back/forward navigation
-            window.addEventListener('popstate', function (event) {
-                const params = new URLSearchParams(window.location.search);
-                const p = parseInt(params.get('page')) || 1;
-                currentPage = p;
-                buildProductsHtml(allProducts, currentPage);
-            });
 
             // Fetch products (all or by category)
             function showProductByCategory() {
