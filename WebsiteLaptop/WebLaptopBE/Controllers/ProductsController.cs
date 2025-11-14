@@ -148,8 +148,7 @@ namespace WebLaptopBE.Controllers
         [HttpGet("shop/search")]
         public IActionResult SearchProducts(
             [FromQuery] string? brandIds, // Comma-separated brand IDs
-            [FromQuery] decimal? minPrice,
-            [FromQuery] decimal? maxPrice,
+            [FromQuery] string? priceRanges, // Comma-separated price ranges like "500-1000,1500-2000"
             [FromQuery] string? ramOptions, // Comma-separated RAM values like "8GB,16GB"
             [FromQuery] string? storageOptions, // Comma-separated storage values
             [FromQuery] string? sortBy = "price", // price, price_desc, name
@@ -160,11 +159,11 @@ namespace WebLaptopBE.Controllers
             {
                 // Normalize input presence
                 bool hasBrandFilter = !string.IsNullOrWhiteSpace(brandIds);
-                bool hasPriceFilter = (minPrice.HasValue && minPrice.Value > 0) || (maxPrice.HasValue && maxPrice.Value > 0);
+                bool hasPriceFilter = !string.IsNullOrWhiteSpace(priceRanges);
                 bool hasRamFilter = !string.IsNullOrWhiteSpace(ramOptions);
                 bool hasStorageFilter = !string.IsNullOrWhiteSpace(storageOptions);
 
-                // 1) Build base product set applying brand and sellingPrice filters (since price filter uses SellingPrice)
+                // 1) Build base product set applying brand and sellingPrice filters
                 var productsBaseQuery = _db.Products.AsNoTracking();
 
                 if (hasBrandFilter)
@@ -183,13 +182,28 @@ namespace WebLaptopBE.Controllers
 
                 if (hasPriceFilter)
                 {
-                    if (minPrice.HasValue && minPrice.Value > 0)
+                    var ranges = priceRanges!
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(r =>
+                        {
+                            var parts = r.Split('-', StringSplitOptions.RemoveEmptyEntries);
+                            if (parts.Length == 2 &&
+                                decimal.TryParse(parts[0], out var min) &&
+                                decimal.TryParse(parts[1], out var max))
+                            {
+                                return new { Min = min, Max = max };
+                            }
+                            return null;
+                        })
+                        .Where(x => x != null)
+                        .ToList();
+
+                    if (ranges.Any())
                     {
-                        productsBaseQuery = productsBaseQuery.Where(p => p.SellingPrice != null && p.SellingPrice >= minPrice.Value);
-                    }
-                    if (maxPrice.HasValue && maxPrice.Value > 0)
-                    {
-                        productsBaseQuery = productsBaseQuery.Where(p => p.SellingPrice != null && p.SellingPrice <= maxPrice.Value);
+                        // OR logic: thỏa ít nhất 1 khoảng giá
+                        productsBaseQuery = productsBaseQuery.Where(p =>
+                            p.SellingPrice != null &&
+                            ranges.Any(r => p.SellingPrice >= r!.Min && p.SellingPrice <= r!.Max));
                     }
                 }
 
@@ -217,7 +231,6 @@ namespace WebLaptopBE.Controllers
 
                         if (ramList.Any())
                         {
-                            // Use normalized comparison using ToUpper().Replace(" ", "")
                             configQuery = configQuery.Where(pc =>
                                 pc.Ram != null &&
                                 ramList.Contains(pc.Ram!.ToUpper().Replace(" ", "")));
@@ -227,32 +240,74 @@ namespace WebLaptopBE.Controllers
                     // Storage filter
                     if (hasStorageFilter)
                     {
-                        var storageList = storageOptions!
+                        var requestedStorage = storageOptions!
                             .Split(',', StringSplitOptions.RemoveEmptyEntries)
-                            .Select(s => s.Trim().ToUpper().Replace(" ", "").Replace("-", "").Replace("/", ""))
+                            .Select(s => s.Trim())
                             .Where(s => !string.IsNullOrEmpty(s))
                             .ToList();
 
-                        if (storageList.Any())
+                        if (requestedStorage.Any())
                         {
-                            configQuery = configQuery.Where(pc =>
-                                pc.Rom != null &&
-                                storageList.Any(st =>
-                                    EF.Functions.Like(pc.Rom!.ToUpper().Replace(" ", "").Replace("-", "").Replace("/", ""), $"%{st}%")
-                                ));
+                            var candidateConfigs = configQuery
+                                .Select(pc => new { pc.ProductId, pc.Rom })
+                                .ToList();
+
+                            string normalize(string? v)
+                            {
+                                if (string.IsNullOrWhiteSpace(v)) return string.Empty;
+                                var cleaned = Regex.Replace(v!.Trim(), @"\s+", "");
+                                cleaned = cleaned.Replace("/", "").Replace("-", "").ToUpperInvariant();
+                                return cleaned;
+                            }
+
+                            var normalizedRequested = requestedStorage
+                                .Select(s => normalize(s))
+                                .Where(s => !string.IsNullOrEmpty(s))
+                                .ToList();
+
+                            var matchedProductIds = candidateConfigs
+                                .Where(c => !string.IsNullOrWhiteSpace(c.Rom))
+                                .Where(c =>
+                                {
+                                    var romNorm = normalize(c.Rom);
+                                    return normalizedRequested.Any(req => romNorm.Contains(req));
+                                })
+                                .Select(c => c.ProductId!)
+                                .Distinct()
+                                .ToList();
+
+                            if (!matchedProductIds.Any())
+                            {
+                                return Ok(new
+                                {
+                                    products = new List<object>(),
+                                    totalCount = 0,
+                                    page = page,
+                                    pageSize = pageSize,
+                                    totalPages = 0
+                                });
+                            }
+
+                            productIdsFromConfigs = matchedProductIds;
+                        }
+                        else
+                        {
+                            productIdsFromConfigs = configQuery
+                                .Select(pc => pc.ProductId!)
+                                .Distinct()
+                                .ToList();
                         }
                     }
-
-                    productIdsFromConfigs = configQuery
-                        .Select(pc => pc.ProductId!)
-                        .Distinct()
-                        .ToList();
+                    else
+                    {
+                        productIdsFromConfigs = configQuery
+                            .Select(pc => pc.ProductId!)
+                            .Distinct()
+                            .ToList();
+                    }
                 }
 
-                // 3) Determine final product IDs:
-                // - If we had both product-based filters and config-based filters, take intersection.
-                // - If only one side provided IDs, use that side.
-                // - If neither (no filters at all), take all products.
+                // 3) Determine final product IDs
                 List<string> finalProductIds;
                 bool noFiltersAtAll = !(hasBrandFilter || hasPriceFilter || hasRamFilter || hasStorageFilter);
 
@@ -267,7 +322,6 @@ namespace WebLaptopBE.Controllers
                 }
                 else if (productIdsFromProducts.Any() && productIdsFromConfigs.Any())
                 {
-                    // intersection
                     finalProductIds = productIdsFromProducts.Intersect(productIdsFromConfigs).ToList();
                 }
                 else if (productIdsFromProducts.Any())
@@ -280,7 +334,6 @@ namespace WebLaptopBE.Controllers
                 }
                 else
                 {
-                    // No matching products
                     return Ok(new
                     {
                         products = new List<object>(),
@@ -302,8 +355,8 @@ namespace WebLaptopBE.Controllers
                         p.ProductName,
                         p.ProductModel,
                         p.WarrantyPeriod,
-                        p.OriginalSellingPrice, // will be used for crossed-out display
-                        p.SellingPrice,         // primary price (used for filtering)
+                        p.OriginalSellingPrice,
+                        p.SellingPrice,
                         p.Screen,
                         p.Camera,
                         p.Connect,
@@ -319,7 +372,6 @@ namespace WebLaptopBE.Controllers
                     })
                     .ToList();
 
-                // 5) Compute MinConfigPrice lookup (optional, useful if you still want min config price info)
                 var minPriceLookup = _db.ProductConfigurations
                     .AsNoTracking()
                     .Where(pc => pc.ProductId != null && finalProductIds.Contains(pc.ProductId) && pc.Price != null && pc.Price > 0)
@@ -332,7 +384,6 @@ namespace WebLaptopBE.Controllers
                     .ToList()
                     .ToDictionary(x => x.ProductId, x => x.MinPrice);
 
-                // 6) Build final results with MinConfigPrice fallback to SellingPrice
                 var finalProducts = productsList.Select(p =>
                 {
                     decimal minConfigPrice = 0;
@@ -352,7 +403,7 @@ namespace WebLaptopBE.Controllers
                         p.ProductModel,
                         p.WarrantyPeriod,
                         OriginalSellingPrice = p.OriginalSellingPrice,
-                        SellingPrice = p.SellingPrice ?? 0m,     // main price (used on UI)
+                        SellingPrice = p.SellingPrice ?? 0m,
                         p.Screen,
                         p.Camera,
                         p.Connect,
@@ -365,8 +416,6 @@ namespace WebLaptopBE.Controllers
                     };
                 }).ToList();
 
-                // 7) Sort finalProducts: by SellingPrice when sortBy == price (as per your request),
-                // otherwise price_desc uses SellingPrice desc, name sorts by ProductName.
                 switch (sortBy?.ToLower())
                 {
                     case "price":
@@ -383,7 +432,6 @@ namespace WebLaptopBE.Controllers
                         break;
                 }
 
-                // If user didn't apply ANY filters, return the FULL list (no paging) as requested.
                 if (noFiltersAtAll)
                 {
                     var total = finalProducts.Count;
@@ -397,7 +445,6 @@ namespace WebLaptopBE.Controllers
                     });
                 }
 
-                // 8) Paging in-memory (only when some filters were applied)
                 var totalCount = finalProducts.Count;
                 var paged = finalProducts
                     .Skip((page - 1) * pageSize)
@@ -441,7 +488,6 @@ namespace WebLaptopBE.Controllers
             return upper.Contains("TB") ? number * 1024 : number;
         }
 
-        // helper to normalize spec strings (remove spaces and uppercase)
         private static string NormalizeSpecString(string? s)
         {
             if (string.IsNullOrWhiteSpace(s)) return string.Empty;
