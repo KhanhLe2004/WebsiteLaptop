@@ -1,0 +1,547 @@
+﻿@{
+    ViewData["Title"] = "Quản lý hóa đơn";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutManageSaleInvoice.cshtml";
+}
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card my-4">
+                <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                    <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="text-white text-capitalize ps-3 mb-0">Quản lý hóa đơn bán</h6>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body px-3 pb-2">
+                    <!-- Bộ lọc và tìm kiếm -->
+                    <div class="row mb-3 g-2 align-items-end">
+                        <div class="col-lg-4 col-md-6">
+                            <div class="input-group input-group-outline">
+                                <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm hóa đơn...">
+                            </div>
+                        </div>
+                        <div class="col-lg-2 col-md-3">
+                            <select id="statusFilter" class="form-select">
+                                <option value="">Tất cả trạng thái</option>
+                                <option value="Pending">Chờ xử lý</option>
+                                <option value="Processing">Đang xử lý</option>
+                                <option value="Completed">Hoàn thành</option>
+                                <option value="Cancelled">Đã hủy</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Bảng hóa đơn -->
+                    <div class="table-responsive p-0">
+                        <table class="table align-items-center mb-0" style="table-layout: fixed; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Mã hóa đơn</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 20%;">Khách hàng</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Nhân viên</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 12%;">Tổng tiền</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 12%;">Ngày tạo</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Trạng thái</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 11%;">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="invoiceTableBody">
+                                <!-- Dữ liệu sẽ được load bằng AJAX -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Phân trang -->
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <p class="text-sm mb-0" id="pageInfo">Đang tải...</p>
+                        </div>
+                        <div class="col-md-6">
+                            <nav aria-label="Page navigation">
+                                <ul class="pagination justify-content-end mb-0" id="pagination">
+                                    <!-- Phân trang sẽ được tạo bằng JavaScript -->
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xem chi tiết -->
+<div class="modal fade" id="viewModal" tabindex="-1" aria-labelledby="viewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-info">
+                <h5 class="modal-title text-white" id="viewModalLabel">Chi tiết hóa đơn</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="viewModalBody">
+                <!-- Nội dung sẽ được load bằng JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Cập nhật trạng thái -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-warning">
+                <h5 class="modal-title text-white" id="statusModalLabel">Cập nhật trạng thái</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="statusForm">
+                    <input type="hidden" id="statusInvoiceId" value="">
+                    <div class="input-group input-group-outline mb-3">
+                        <label class="form-label">Trạng thái *</label>
+                        <select class="form-control" id="statusSelect" required>
+                            <option value="Pending">Chờ xử lý</option>
+                            <option value="Processing">Đang xử lý</option>
+                            <option value="Completed">Hoàn thành</option>
+                            <option value="Cancelled">Đã hủy</option>
+                        </select>
+                    </div>
+                    <div class="text-danger mb-3" id="statusErrorMessage" style="display:none;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" onclick="saveStatus()">
+                    <i class="material-icons text-sm">save</i> Lưu
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const API_URL = 'http://localhost:5068/api/admin/sale-invoices';
+        let currentPage = 1;
+        let pageSize = 10;
+        let searchDebounceTimer = null;
+        const SEARCH_DEBOUNCE_DELAY = 300;
+
+        $(document).ready(function() {
+            loadSaleInvoices();
+
+            // Tìm kiếm tự động
+            $('#searchInput').on('input', function() {
+                triggerAutoSearch();
+            });
+
+            // Lọc theo trạng thái
+            $('#statusFilter').on('change', function() {
+                triggerAutoSearch();
+            });
+
+            // Xử lý label cho Material Dashboard inputs
+            window.updateInputLabels = function() {
+                $('.input-group-outline input, .input-group-outline select').each(function() {
+                    const $input = $(this);
+                    const value = $input.val();
+                    if (value && value.trim() !== '') {
+                        $input.closest('.input-group-outline').addClass('is-filled');
+                    } else {
+                        $input.closest('.input-group-outline').removeClass('is-filled');
+                    }
+                });
+            };
+
+            $(document).on('input change', '.input-group-outline input, .input-group-outline select', function() {
+                const $input = $(this);
+                const value = $input.val();
+                if (value && value.trim() !== '') {
+                    $input.closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    $input.closest('.input-group-outline').removeClass('is-filled');
+                }
+            });
+
+            $(document).on('focus', '.input-group-outline input, .input-group-outline select', function() {
+                $(this).closest('.input-group-outline').addClass('is-focused');
+            });
+
+            $(document).on('blur', '.input-group-outline input, .input-group-outline select', function() {
+                const $input = $(this);
+                const $group = $input.closest('.input-group-outline');
+                $group.removeClass('is-focused');
+                const value = $input.val();
+                if (value && value.trim() !== '') {
+                    $group.addClass('is-filled');
+                } else {
+                    $group.removeClass('is-filled');
+                }
+            });
+        });
+
+        function triggerAutoSearch() {
+            currentPage = 1;
+            if (searchDebounceTimer) {
+                clearTimeout(searchDebounceTimer);
+            }
+            searchDebounceTimer = setTimeout(() => {
+                loadSaleInvoices();
+            }, SEARCH_DEBOUNCE_DELAY);
+        }
+
+        // Load danh sách hóa đơn
+        function loadSaleInvoices(page = currentPage) {
+            currentPage = page;
+            const searchTerm = $('#searchInput').val().trim();
+            const statusFilter = $('#statusFilter').val();
+
+            const dataParams = {
+                pageNumber: currentPage,
+                pageSize: pageSize,
+                searchTerm: searchTerm
+            };
+
+            if (statusFilter !== '') {
+                dataParams.status = statusFilter;
+            }
+
+            $.ajax({
+                url: API_URL,
+                type: 'GET',
+                data: dataParams,
+                success: function(response) {
+                    displaySaleInvoices(response.items);
+                    displayPagination(response);
+                    updatePageInfo(response);
+                },
+                error: function(xhr) {
+                    console.error('Lỗi khi tải hóa đơn:', xhr);
+                    showNotification('Lỗi khi tải dữ liệu hóa đơn', 'error');
+                }
+            });
+        }
+
+        // Hiển thị hóa đơn
+        function displaySaleInvoices(invoices) {
+            const tbody = $('#invoiceTableBody');
+            tbody.empty();
+
+            if (invoices.length === 0) {
+                tbody.append(`
+                    <tr>
+                        <td colspan="7" class="text-center text-secondary py-4">
+                            Không có hóa đơn nào
+                        </td>
+                    </tr>
+                `);
+                return;
+            }
+
+            $.each(invoices, function(index, invoice) {
+                const timeCreate = invoice.timeCreate ? new Date(invoice.timeCreate).toLocaleString('vi-VN') : '-';
+                const totalAmount = invoice.totalAmount ? formatCurrency(invoice.totalAmount) : '0';
+                const status = invoice.status || 'Pending';
+                const statusBadge = getStatusBadge(status);
+
+                tbody.append(`
+                    <tr>
+                        <td style="vertical-align: middle;">
+                            <span class="text-xs font-weight-bold">${invoice.saleInvoiceId}</span>
+                        </td>
+                        <td style="vertical-align: middle;">
+                            <span class="text-xs font-weight-bold">${invoice.customerName || '-'}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold">${invoice.employeeName || '-'}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold">${totalAmount}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold">${timeCreate}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            ${statusBadge}
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;" class="table-actions">
+                            <button class="btn btn-info action-btn" onclick='viewSaleInvoice("${invoice.saleInvoiceId}")' title="Xem">
+                                <i class="material-icons text-sm">visibility</i>
+                            </button>
+                            <button class="btn btn-warning action-btn" onclick='updateStatus("${invoice.saleInvoiceId}", "${status}")' title="Cập nhật trạng thái">
+                                <i class="material-icons text-sm">edit</i>
+                            </button>
+                        </td>
+                    </tr>
+                `);
+            });
+        }
+
+        // Hiển thị phân trang
+        function displayPagination(response) {
+            const pagination = $('#pagination');
+            pagination.empty();
+
+            if (response.totalPages <= 1) return;
+
+            pagination.append(`
+                <li class="page-item ${response.hasPreviousPage ? '' : 'disabled'}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadSaleInvoices(${currentPage - 1})">
+                        <i class="material-icons text-sm">chevron_left</i>
+                    </a>
+                </li>
+            `);
+
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(response.totalPages, currentPage + 2);
+
+            if (startPage > 1) {
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadSaleInvoices(1)">1</a></li>`);
+                if (startPage > 2) {
+                    pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                pagination.append(`
+                    <li class="page-item ${i === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="javascript:void(0)" onclick="loadSaleInvoices(${i})">${i}</a>
+                    </li>
+                `);
+            }
+
+            if (endPage < response.totalPages) {
+                if (endPage < response.totalPages - 1) {
+                    pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadSaleInvoices(${response.totalPages})">${response.totalPages}</a></li>`);
+            }
+
+            pagination.append(`
+                <li class="page-item ${response.hasNextPage ? '' : 'disabled'}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadSaleInvoices(${currentPage + 1})">
+                        <i class="material-icons text-sm">chevron_right</i>
+                    </a>
+                </li>
+            `);
+        }
+
+        // Cập nhật thông tin trang
+        function updatePageInfo(response) {
+            const start = (response.pageNumber - 1) * response.pageSize + 1;
+            const end = Math.min(response.pageNumber * response.pageSize, response.totalItems);
+            $('#pageInfo').text(`Hiển thị ${start} - ${end} trong tổng số ${response.totalItems} hóa đơn`);
+        }
+
+        // Xem chi tiết hóa đơn
+        function viewSaleInvoice(invoiceId) {
+            $.ajax({
+                url: `${API_URL}/${invoiceId}`,
+                type: 'GET',
+                success: function(invoice) {
+                    let html = `
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Mã hóa đơn:</strong> ${invoice.saleInvoiceId}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Ngày tạo:</strong> ${invoice.timeCreate ? new Date(invoice.timeCreate).toLocaleString('vi-VN') : '-'}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Khách hàng:</strong> ${invoice.customerName || '-'}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Nhân viên:</strong> ${invoice.employeeName || '-'}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Phương thức thanh toán:</strong> ${invoice.paymentMethod || '-'}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Trạng thái:</strong> ${getStatusBadge(invoice.status || 'Pending')}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Phí giao hàng:</strong> ${formatCurrency(invoice.deliveryFee || 0)}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Tổng tiền:</strong> ${formatCurrency(invoice.totalAmount || 0)}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <strong>Địa chỉ giao hàng:</strong> ${invoice.deliveryAddress || '-'}
+                            </div>
+                        </div>
+                        <hr>
+                        <h6>Chi tiết hóa đơn:</h6>
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Sản phẩm</th>
+                                    <th>Số lượng</th>
+                                    <th>Đơn giá</th>
+                                    <th>Thông số</th>
+                                    <th>Thành tiền</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+
+                    if (invoice.details && invoice.details.length > 0) {
+                        invoice.details.forEach(function(detail) {
+                            const subtotal = (detail.quantity || 0) * (detail.unitPrice || 0);
+                            html += `
+                                <tr>
+                                    <td>${detail.productName || detail.productId || '-'}</td>
+                                    <td>${detail.quantity || 0}</td>
+                                    <td>${formatCurrency(detail.unitPrice || 0)}</td>
+                                    <td>${detail.specifications || '-'}</td>
+                                    <td>${formatCurrency(subtotal)}</td>
+                                </tr>
+                            `;
+                        });
+                    } else {
+                        html += '<tr><td colspan="5" class="text-center">Không có chi tiết</td></tr>';
+                    }
+
+                    html += `
+                            </tbody>
+                        </table>
+                    `;
+
+                    $('#viewModalBody').html(html);
+                    const modal = new bootstrap.Modal(document.getElementById('viewModal'));
+                    modal.show();
+                },
+                error: function(xhr) {
+                    console.error('Error loading invoice:', xhr);
+                    showNotification('Lỗi khi tải thông tin hóa đơn', 'error');
+                }
+            });
+        }
+
+        // Cập nhật trạng thái
+        function updateStatus(invoiceId, currentStatus) {
+            $('#statusInvoiceId').val(invoiceId);
+            $('#statusSelect').val(currentStatus);
+            $('#statusErrorMessage').hide();
+            
+            setTimeout(function() {
+                updateInputLabels();
+            }, 100);
+
+            const modal = new bootstrap.Modal(document.getElementById('statusModal'));
+            modal.show();
+        }
+
+        // Lưu trạng thái
+        function saveStatus() {
+            $('#statusErrorMessage').hide();
+
+            const invoiceId = $('#statusInvoiceId').val();
+            const status = $('#statusSelect').val();
+
+            if (!invoiceId || !status) {
+                showStatusError('Vui lòng chọn trạng thái');
+                return;
+            }
+
+            $.ajax({
+                url: `${API_URL}/${invoiceId}/status`,
+                type: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify({ status: status }),
+                success: function(response) {
+                    showNotification('Cập nhật trạng thái thành công', 'success');
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('statusModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                    loadSaleInvoices();
+                },
+                error: function(xhr) {
+                    console.error('Error updating status:', xhr);
+                    let message = 'Có lỗi xảy ra khi cập nhật trạng thái';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showStatusError(message);
+                }
+            });
+        }
+
+        // Hiển thị thông báo
+        function showNotification(message, type) {
+            const bgColor = type === 'success' ? 'bg-gradient-success' : 'bg-gradient-danger';
+            const notification = $(
+                `<div class="alert ${bgColor} text-white alert-dismissible fade show position-fixed" 
+                     style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>`
+            );
+            $('body').append(notification);
+            setTimeout(() => notification.alert('close'), 3000);
+        }
+
+        // Hiển thị lỗi trong modal trạng thái
+        function showStatusError(message) {
+            $('#statusErrorMessage').html(message).show();
+        }
+
+        // Format tiền tệ
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+        }
+
+        // Lấy badge trạng thái
+        function getStatusBadge(status) {
+            const badges = {
+                'Pending': '<span class="badge bg-gradient-warning">Chờ xử lý</span>',
+                'Processing': '<span class="badge bg-gradient-info">Đang xử lý</span>',
+                'Completed': '<span class="badge bg-gradient-success">Hoàn thành</span>',
+                'Cancelled': '<span class="badge bg-gradient-danger">Đã hủy</span>'
+            };
+            return badges[status] || '<span class="badge bg-gradient-secondary">' + status + '</span>';
+        }
+
+        // Reset khi đóng modal
+        $(document).on('hidden.bs.modal', '#statusModal', function() {
+            $('#statusForm')[0].reset();
+            $('#statusInvoiceId').val('');
+            $('#statusErrorMessage').hide();
+            $('.input-group-outline').removeClass('is-filled is-focused');
+            if (typeof updateInputLabels === 'function') {
+                setTimeout(function() {
+                    updateInputLabels();
+                }, 50);
+            }
+        });
+    </script>
+}
+
+<style>
+    .action-btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        margin: 0 0.125rem;
+    }
+
+    .table-actions {
+        white-space: nowrap;
+    }
+
+    #invoiceTableBody tr td {
+        vertical-align: middle !important;
+        padding: 0.75rem 0.5rem !important;
+    }
+</style>
