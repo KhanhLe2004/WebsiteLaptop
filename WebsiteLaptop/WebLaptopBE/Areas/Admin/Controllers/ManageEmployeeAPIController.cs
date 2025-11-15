@@ -166,8 +166,25 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     }
                 }
 
-                // Tạo mã nhân viên mới
-                string newEmployeeId = await GenerateEmployeeIdAsync();
+                // Tạo mã nhân viên mới (tự động generate nếu chưa có)
+                string newEmployeeId;
+                if (!string.IsNullOrWhiteSpace(dto.EmployeeId))
+                {
+                    // Sử dụng EmployeeId từ frontend (đã được generate tự động)
+                    newEmployeeId = dto.EmployeeId.Trim();
+                    
+                    // Kiểm tra mã đã tồn tại chưa
+                    if (await _context.Employees.AnyAsync(e => e.EmployeeId == newEmployeeId))
+                    {
+                        // Nếu đã tồn tại, tạo mã mới
+                        newEmployeeId = await GenerateEmployeeIdAsync();
+                    }
+                }
+                else
+                {
+                    // Tự động tạo mã mới
+                    newEmployeeId = await GenerateEmployeeIdAsync();
+                }
 
                 // Xử lý upload ảnh
                 string? avatarFileName = null;
@@ -374,6 +391,70 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             {
                 Console.WriteLine($"Error restoring employee: {ex.Message}");
                 return StatusCode(500, new { message = "Lỗi khi khôi phục nhân viên", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/employees/next-id
+        // Lấy EmployeeId tiếp theo (tự động generate)
+        [HttpGet("next-id")]
+        public async Task<ActionResult> GetNextEmployeeId()
+        {
+            try
+            {
+                var nextId = await GenerateEmployeeIdAsync();
+                return Ok(new { employeeId = nextId });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi tạo EmployeeId", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/employees/branches
+        // Lấy danh sách chi nhánh
+        [HttpGet("branches")]
+        public async Task<ActionResult<List<BranchDTO>>> GetBranches()
+        {
+            try
+            {
+                var branches = await _context.Branches
+                    .OrderBy(b => b.BranchesName)
+                    .Select(b => new BranchDTO
+                    {
+                        BranchesId = b.BranchesId,
+                        BranchesName = b.BranchesName
+                    })
+                    .ToListAsync();
+
+                return Ok(branches);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy danh sách chi nhánh", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/employees/roles
+        // Lấy danh sách vai trò
+        [HttpGet("roles")]
+        public async Task<ActionResult<List<RoleDTO>>> GetRoles()
+        {
+            try
+            {
+                var roles = await _context.Roles
+                    .OrderBy(r => r.RoleName)
+                    .Select(r => new RoleDTO
+                    {
+                        RoleId = r.RoleId,
+                        RoleName = r.RoleName
+                    })
+                    .ToListAsync();
+
+                return Ok(roles);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy danh sách vai trò", error = ex.Message });
             }
         }
 

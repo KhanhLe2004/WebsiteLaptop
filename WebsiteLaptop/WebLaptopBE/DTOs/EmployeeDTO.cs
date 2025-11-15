@@ -22,6 +22,9 @@ namespace WebLaptopBE.DTOs
     // DTO cho tạo mới nhân viên
     public class EmployeeCreateDTO
     {
+        // EmployeeId có thể được gửi từ frontend (đã được generate tự động) hoặc để trống để tự động tạo
+        public string? EmployeeId { get; set; }
+
         [Required(ErrorMessage = "Tên nhân viên là bắt buộc")]
         [StringLength(100, ErrorMessage = "Tên nhân viên không được quá 100 ký tự")]
         public string EmployeeName { get; set; } = null!;
@@ -84,6 +87,20 @@ namespace WebLaptopBE.DTOs
 
         // Flag để xóa avatar (true nếu muốn xóa avatar hiện có)
         public bool? AvatarToDelete { get; set; }
+    }
+
+    // DTO cho chi nhánh (dùng cho combobox)
+    public class BranchDTO
+    {
+        public string BranchesId { get; set; } = null!;
+        public string? BranchesName { get; set; }
+    }
+
+    // DTO cho vai trò (dùng cho combobox)
+    public class RoleDTO
+    {
+        public string RoleId { get; set; } = null!;
+        public string? RoleName { get; set; }
     }
 }
 

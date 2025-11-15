@@ -102,7 +102,7 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
-                                <label class="form-label">Ngày sinh</label>
+                                <label class="form-label">Ngày Sinh</label>
                                 <input type="date" class="form-control" id="dateOfBirth">
                             </div>
                         </div>
@@ -147,14 +147,18 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
-                                <label class="form-label">Mã chi nhánh</label>
-                                <input type="text" class="form-control" id="branchesId">
+                                <label class="form-label">Chi nhánh</label>
+                                <select class="form-control" id="branchesId">
+                                    <option value=""></option>
+                                </select>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
-                                <label class="form-label">Mã vai trò</label>
-                                <input type="text" class="form-control" id="roleId">
+                                <label class="form-label">Vai trò</label>
+                                <select class="form-control" id="roleId">
+                                    <option value=""></option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -214,8 +218,13 @@
         let searchDebounceTimer = null;
         const SEARCH_DEBOUNCE_DELAY = 300;
 
+        let branchesList = [];
+        let rolesList = [];
+
         $(document).ready(function() {
             loadEmployees();
+            loadBranches();
+            loadRoles();
 
             // Tìm kiếm tự động theo tên
             $('#searchInput').on('input', function() {
@@ -225,6 +234,92 @@
             // Tìm kiếm tự động theo trạng thái active
             $('#activeFilter').on('change', function() {
                 triggerAutoSearch();
+            });
+
+            // Reset class edit-mode khi modal đóng
+            $('#employeeModal').on('hidden.bs.modal', function() {
+                $('#dateOfBirth').closest('.input-group-outline').removeClass('edit-mode');
+            });
+
+            // Xử lý label cho Material Dashboard inputs (định nghĩa ở phạm vi global)
+            window.updateInputLabels = function() {
+                $('.input-group-outline input, .input-group-outline select').each(function() {
+                    const $input = $(this);
+                    const $group = $input.closest('.input-group-outline');
+                    const value = $input.val();
+                    
+                    if (value && value.trim() !== '') {
+                        $group.addClass('is-filled');
+                    } else {
+                        $group.removeClass('is-filled');
+                    }
+                });
+            };
+
+            // Xử lý khi input thay đổi
+            $(document).on('input change', '.input-group-outline input, .input-group-outline select', function() {
+                const $input = $(this);
+                const $group = $input.closest('.input-group-outline');
+                const value = $input.val();
+                
+                if (value && value.trim() !== '') {
+                    $group.addClass('is-filled');
+                } else {
+                    $group.removeClass('is-filled');
+                }
+            });
+
+            // Xử lý riêng cho input date để đảm bảo attribute value được cập nhật
+            $(document).on('change input', 'input[type="date"]', function() {
+                const $input = $(this);
+                const value = $input.val();
+                // Đảm bảo attribute value được cập nhật để CSS selector hoạt động
+                if (value && value.trim() !== '') {
+                    $input.attr('value', value).attr('data-has-input', 'true');
+                } else {
+                    $input.removeAttr('value');
+                    // Chỉ xóa data-has-input nếu không còn focus (người dùng đã rời khỏi input)
+                    if (!$input.is(':focus')) {
+                        $input.removeAttr('data-has-input');
+                    }
+                }
+            });
+
+            // Khi focus vào input date, set attribute để hiển thị dd/mm/yyyy ngay khi bắt đầu nhập
+            $(document).on('focus', 'input[type="date"]', function() {
+                const $input = $(this);
+                // Nếu chưa có value, set data-has-input để hiển thị dd/mm/yyyy khi bắt đầu nhập
+                if (!$input.attr('value')) {
+                    $input.attr('data-has-input', 'true');
+                }
+            });
+
+            // Khi blur khỏi input date, nếu không có value thì xóa data-has-input
+            $(document).on('blur', 'input[type="date"]', function() {
+                const $input = $(this);
+                const value = $input.val();
+                if (!value || value.trim() === '') {
+                    $input.removeAttr('data-has-input');
+                }
+            });
+
+            // Xử lý khi focus vào input
+            $(document).on('focus', '.input-group-outline input, .input-group-outline select', function() {
+                $(this).closest('.input-group-outline').addClass('is-focused');
+            });
+
+            // Xử lý khi blur khỏi input
+            $(document).on('blur', '.input-group-outline input, .input-group-outline select', function() {
+                const $input = $(this);
+                const $group = $input.closest('.input-group-outline');
+                $group.removeClass('is-focused');
+                
+                const value = $input.val();
+                if (value && value.trim() !== '') {
+                    $group.addClass('is-filled');
+                } else {
+                    $group.removeClass('is-filled');
+                }
             });
 
             // Lưu độ dài mật khẩu khi người dùng nhập
@@ -278,6 +373,62 @@
             searchDebounceTimer = setTimeout(() => {
                 loadEmployees();
             }, SEARCH_DEBOUNCE_DELAY);
+        }
+
+        // Load danh sách chi nhánh
+        function loadBranches() {
+            $.ajax({
+                url: `${API_URL}/branches`,
+                type: 'GET',
+                success: function(branches) {
+                    branchesList = branches;
+                    populateBranchesCombo();
+                },
+                error: function(xhr) {
+                    console.error('Lỗi khi tải danh sách chi nhánh:', xhr);
+                    showNotification('Lỗi khi tải danh sách chi nhánh', 'error');
+                }
+            });
+        }
+
+        // Load danh sách vai trò
+        function loadRoles() {
+            $.ajax({
+                url: `${API_URL}/roles`,
+                type: 'GET',
+                success: function(roles) {
+                    rolesList = roles;
+                    populateRolesCombo();
+                },
+                error: function(xhr) {
+                    console.error('Lỗi khi tải danh sách vai trò:', xhr);
+                    showNotification('Lỗi khi tải danh sách vai trò', 'error');
+                }
+            });
+        }
+
+        // Populate combobox chi nhánh (hiển thị tên, value là mã)
+        function populateBranchesCombo(selectedId = '') {
+            const select = $('#branchesId');
+            select.empty();
+            select.append('<option value=""></option>');
+            
+            branchesList.forEach(function(branch) {
+                const selected = branch.branchesId === selectedId ? 'selected' : '';
+                select.append(`<option value="${branch.branchesId}" ${selected}>${branch.branchesName || branch.branchesId}</option>`);
+            });
+        }
+
+        // Populate combobox vai trò (hiển thị tên, value là mã)
+        function populateRolesCombo(selectedId = '') {
+            const select = $('#roleId');
+            select.empty();
+            select.append('<option value=""></option>');
+            
+            rolesList.forEach(function(role) {
+                const selected = role.roleId === selectedId ? 'selected' : '';
+                select.append(`<option value="${role.roleId}" ${selected}>${role.roleName || role.roleId}</option>`);
+            });
         }
 
         // Load danh sách nhân viên
@@ -521,12 +672,39 @@
             
             // Reset form
             $('#employeeForm')[0].reset();
-            $('#employeeId').val(''); // Mã sẽ được tạo tự động
             $('#imagePreview').hide();
             $('#errorMessage').hide();
             
+            // Xóa class edit-mode và attribute value, data-has-input khỏi input date (để ẩn dd/mm/yyyy)
+            $('#dateOfBirth').closest('.input-group-outline').removeClass('edit-mode');
+            $('#dateOfBirth').removeAttr('value').removeAttr('data-has-input');
+            
+            // Populate combobox (không có giá trị selected)
+            populateBranchesCombo('');
+            populateRolesCombo('');
+            
+            // Lấy mã nhân viên tự động
+            $.ajax({
+                url: `${API_URL}/next-id`,
+                type: 'GET',
+                success: function(response) {
+                    if (response && response.employeeId) {
+                        $('#employeeId').val(response.employeeId);
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Lỗi khi lấy mã nhân viên:', xhr);
+                    // Vẫn cho phép thêm nhân viên, mã sẽ được tạo tự động ở backend
+                }
+            });
+            
             // Enable tất cả inputs
             setViewMode(false);
+            
+            // Cập nhật label sau khi modal hiển thị
+            setTimeout(function() {
+                updateInputLabels();
+            }, 100);
             
             const modal = new bootstrap.Modal(document.getElementById('employeeModal'));
             modal.show();
@@ -573,6 +751,9 @@
                     // Reset form trước
                     $('#employeeForm')[0].reset();
                     
+                    // Thêm class edit-mode vào input date (để hiển thị dd/mm/yyyy)
+                    $('#dateOfBirth').closest('.input-group-outline').addClass('edit-mode');
+                    
                     // Fill form với dữ liệu
                     fillFormWithEmployee(employee, false);
                     
@@ -609,22 +790,27 @@
             $('#employeeName').val(employee.employeeName || '');
             
             // Format date for input[type="date"]
+            const $dateOfBirth = $('#dateOfBirth');
             if (employee.dateOfBirth) {
                 const date = new Date(employee.dateOfBirth);
                 const year = date.getFullYear();
                 const month = String(date.getMonth() + 1).padStart(2, '0');
                 const day = String(date.getDate()).padStart(2, '0');
-                $('#dateOfBirth').val(`${year}-${month}-${day}`);
+                const dateValue = `${year}-${month}-${day}`;
+                $dateOfBirth.val(dateValue).attr('value', dateValue);
             } else {
-                $('#dateOfBirth').val('');
+                $dateOfBirth.val('').removeAttr('value');
             }
             
             $('#phoneNumber').val(employee.phoneNumber || '');
             $('#email').val(employee.email || '');
             $('#address').val(employee.address || '');
             $('#username').val(employee.username || '');
-            $('#branchesId').val(employee.branchesId || '');
-            $('#roleId').val(employee.roleId || '');
+            
+            // Populate combobox với giá trị đã chọn (hiển thị tên, value là mã)
+            populateBranchesCombo(employee.branchesId || '');
+            populateRolesCombo(employee.roleId || '');
+            
             // Không fill password vì lý do bảo mật
             // Sử dụng độ dài mật khẩu từ API (passwordLength) hoặc mặc định 8
             const passwordLength = employee.passwordLength || 8;
@@ -647,13 +833,9 @@
 
             // Add is-filled class to input groups with values
             setTimeout(function() {
-                $('.input-group-outline input, .input-group-outline select').each(function() {
-                    if ($(this).val()) {
-                        $(this).closest('.input-group-outline').addClass('is-filled');
-                    } else {
-                        $(this).closest('.input-group-outline').removeClass('is-filled');
-                    }
-                });
+                if (typeof updateInputLabels === 'function') {
+                    updateInputLabels();
+                }
             }, 100);
 
             // Load avatar
@@ -707,6 +889,15 @@
             }
 
             const formData = new FormData();
+            
+            // Gửi EmployeeId nếu đang thêm mới (đã được generate tự động)
+            if (!isEdit) {
+                const empId = $('#employeeId').val().trim();
+                if (empId) {
+                    formData.append('EmployeeId', empId);
+                }
+            }
+            
             formData.append('EmployeeName', employeeName);
             formData.append('DateOfBirth', $('#dateOfBirth').val() || '');
             formData.append('PhoneNumber', $('#phoneNumber').val() || '');
@@ -905,10 +1096,21 @@
             $('#employeeForm')[0].reset();
             // Reset password về type="password" và clear data
             $('#password').attr('type', 'password').val('').data('password-length', 0);
+            // Reset input date: xóa attribute value và data-has-input để ẩn dd/mm/yyyy
+            $('#dateOfBirth').removeAttr('value').removeAttr('data-has-input');
             $('#errorMessage').hide();
             
-            // Remove is-filled classes
-            $('.input-group-outline').removeClass('is-filled');
+            // Reset combobox về giá trị mặc định
+            populateBranchesCombo('');
+            populateRolesCombo('');
+            
+            // Remove is-filled classes và cập nhật labels
+            $('.input-group-outline').removeClass('is-filled is-focused');
+            if (typeof updateInputLabels === 'function') {
+                setTimeout(function() {
+                    updateInputLabels();
+                }, 50);
+            }
             
             // Enable all controls để sẵn sàng cho lần mở tiếp theo
             $('#employeeForm input:not([type="hidden"]), #employeeForm select').prop('disabled', false);
@@ -1001,5 +1203,68 @@
     #password:-ms-input-placeholder {
         color: transparent !important;
         opacity: 0 !important;
+    }
+
+    /* Ẩn text mờ trong select (combobox) khi chưa chọn */
+    #branchesId option:first-child,
+    #roleId option:first-child {
+        color: transparent !important;
+    }
+
+    #branchesId:invalid,
+    #roleId:invalid {
+        color: #495057;
+    }
+
+    #branchesId option:not(:first-child),
+    #roleId option:not(:first-child) {
+        color: #495057;
+    }
+
+    /* Xử lý đặc biệt cho input date - ẩn label trống */
+    .input-group-outline:has(input[type="date"]) .form-label:empty {
+        display: none;
+    }
+
+    .input-group-outline input[type="date"] {
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+
+    /* Ẩn placeholder dd/mm/yyyy trong input date */
+    input[type="date"]::placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]::-webkit-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]::-moz-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]:-ms-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    /* Ẩn text placeholder mặc định của input date (dd/mm/yyyy) khi KHÔNG có dữ liệu và KHÔNG đang nhập */
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input])::-webkit-datetime-edit,
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input]):invalid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input]):valid::-webkit-datetime-edit {
+        color: transparent !important;
+    }
+
+    /* Hiển thị dd/mm/yyyy khi CÓ dữ liệu ngày được nhập vào (có attribute value) hoặc đang nhập (có data-has-input) */
+    .input-group-outline input[type="date"][value]::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][value]:valid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]:invalid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]:valid::-webkit-datetime-edit {
+        color: #495057 !important;
     }
 </style>
