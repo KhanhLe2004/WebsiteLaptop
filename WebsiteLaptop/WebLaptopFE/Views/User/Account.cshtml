@@ -1,0 +1,197 @@
+﻿@{
+    ViewData["Title"] = "Thanh toán";
+    Layout = "~/Views/Shared/_LayoutAccount.cshtml";
+}
+<div class="pt-5"></div>
+<div class="container py-5">
+    <div class="row g-4">
+      <!-- Sidebar tài khoản -->
+      <aside class="col-lg-3">
+        <div class="card shadow-sm account-sidebar">
+          <div class="card-body text-center">
+            <div class="avatar-preview mx-auto mb-3">
+              <img id="avatarImg" src="../LaptopFe/img/avatar.jpg" alt="avatar" class="rounded-circle" style="width:96px;height:96px;object-fit:cover; border:3px solid rgba(129,196,8,0.12);">
+            </div>
+            <h5 id="userName">Tên khách hàng</h5>
+            <p class="text-muted small mb-3">username</p>
+            <button class="btn btn-outline-secondary btn-sm w-100 mb-2" id="btnUploadAvatar"><i class="fas fa-camera"></i> Thay ảnh</button>
+            <input id="avatarInput" type="file" accept="image/*" style="display:none">
+
+            <hr>
+
+            <nav class="nav flex-column account-menu">
+              <a href="#tab-profile" class="nav-link active" data-bs-toggle="tab"><i class="fas fa-user-edit me-2"></i> Thông tin cá nhân</a>
+              <a href="#tab-your-orders" class="nav-link" data-bs-toggle="tab"><i class="fas fa-shopping-cart me-2"></i> Đơn hàng của bạn</a>
+              <a href="#tab-history" class="nav-link" data-bs-toggle="tab"><i class="fas fa-box-open me-2"></i> Lịch sử mua hàng</a>
+              <a href="#" class="nav-link text-danger" id="btnLogout"><i class="fas fa-sign-out-alt me-2"></i> Đăng xuất</a>
+            </nav>
+          </div>
+        </div>
+      </aside>
+
+      <main class="col-lg-9">
+        <div class="card shadow-sm">
+          <div class="card-body tab-content">
+
+            <!-- Thông tin cá nhân -->
+            <div class="tab-pane fade show active" id="tab-profile">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0">Thông tin cá nhân</h4>
+                <button id="toggleEditProfile" class="btn btn-outline-secondary btn-sm">Chỉnh sửa</button>
+              </div>
+              <form id="profileForm">
+                <div class="row g-3">
+                  <!-- Họ và tên -->
+                  <div class="col-md-6">
+                    <label class="form-label small">Họ và tên</label>
+                    <input type="text" name="fullname" class="form-control" placeholder="Nguyễn Văn A" disabled required>
+                  </div>
+
+                  <!-- Ngày sinh -->
+                  <div class="col-md-6">
+                    <label class="form-label small">Ngày sinh</label>
+                    <div class="d-flex">
+                      <select id="birthDay" class="form-select me-1" disabled required></select>
+                      <select id="birthMonth" class="form-select me-1" disabled required></select>
+                      <select id="birthYear" class="form-select" disabled required></select>
+                    </div>
+                  </div>
+
+                  <!-- Email -->
+                  <div class="col-md-6">
+                    <label class="form-label small">Email</label>
+                    <input type="email" name="email" class="form-control" placeholder="email@example.com" disabled required>
+                  </div>
+
+                  <!-- Số điện thoại -->
+                  <div class="col-md-6">
+                    <label class="form-label small">Số điện thoại</label>
+                    <input type="text" name="phone" class="form-control" placeholder="0987654321" disabled required>
+                  </div>
+
+                  <!-- Tỉnh / Thành phố -->
+                  <div class="col-md-6">
+                    <label class="form-label small">Tỉnh / Thành phố</label>
+                    <select id="province" class="form-select" disabled required>
+                      <option value="">-- Chọn tỉnh/thành phố --</option>
+                    </select>
+                  </div>
+
+                  <!-- Xã / Phường -->
+                  <div class="col-md-6">
+                    <label class="form-label small">Xã / Phường</label>
+                    <select id="ward" class="form-select" disabled required>
+                      <option value="">-- Chọn xã/phường --</option>
+                    </select>
+                  </div>
+
+                  <!-- Địa chỉ chi tiết -->
+                  <div class="col-12">
+                    <label class="form-label small">Địa chỉ chi tiết</label>
+                    <input type="text" id="detailAddress" class="form-control" placeholder="Số nhà, đường..." disabled required>
+                  </div>
+
+                  <div class="col-12 text-end">
+                    <button type="submit" class="btn btn-primary" disabled>Lưu thay đổi</button>
+                  </div>
+                </div>
+              </form>
+
+              <hr class="my-4">
+
+              <!-- Đổi mật khẩu -->
+              <h5>Đổi mật khẩu</h5>
+              <form id="passwordForm" class="row g-3 mt-2">
+                <div class="col-md-6">
+                  <label class="form-label small">Mật khẩu hiện tại</label>
+                  <input type="password" name="current" class="form-control" placeholder="Nhập mật khẩu hiện tại" required>
+                </div>
+                <div class="col-md-6"></div>
+                <div class="col-md-6">
+                  <label class="form-label small">Mật khẩu mới</label>
+                  <input type="password" name="new" class="form-control" placeholder="Nhập mật khẩu mới" required>
+                  <small class="text-muted">Tối đa 6 ký tự, gồm chữ và số</small>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small">Xác nhận mật khẩu mới</label>
+                  <input type="password" name="confirm" class="form-control" placeholder="Nhập lại mật khẩu mới" required>
+                </div>
+                <div class="col-12 text-end">
+                  <button type="submit" class="btn btn-success">Cập nhật mật khẩu</button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Đơn hàng của bạn -->
+            <div class="tab-pane fade" id="tab-your-orders">
+              <h4>Đơn hàng của bạn</h4>
+              <div class="table-responsive mt-3">
+                <table class="table table-hover align-middle">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Mã đơn hàng</th>
+                      <th>Ngày đặt</th>
+                      <th>Trạng thái</th>
+                      <th>Tổng</th>
+                      <th>Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody id="yourOrdersBody">
+                    <tr data-status="processing">
+                      <td>#CP00234</td>
+                      <td>10/11/2025</td>
+                      <td><span class="badge bg-warning text-dark">Đang xử lý</span></td>
+                      <td>12,500,000 ₫</td>
+                      <td><button class="btn btn-sm btn-outline-primary view-order">Chi tiết</button></td>
+                    </tr>
+                    <tr data-status="shipped">
+                      <td>#CP00230</td>
+                      <td>05/11/2025</td>
+                      <td><span class="badge bg-info text-dark">Đã gửi</span></td>
+                      <td>8,000,000 ₫</td>
+                      <td><button class="btn btn-sm btn-outline-primary view-order">Chi tiết</button></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Lịch sử mua hàng -->
+            <div class="tab-pane fade" id="tab-history">
+              <h4>Lịch sử mua hàng</h4>
+              <div class="table-responsive mt-3">
+                <table class="table table-hover align-middle">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Mã đơn</th>
+                      <th>Ngày</th>
+                      <th>Trạng thái</th>
+                      <th>Tổng tiền</th>
+                      <th>Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody id="orderHistoryBody">
+                    <tr>
+                      <td>#CP00123</td>
+                      <td>01/10/2025</td>
+                      <td><span class="badge bg-secondary">Hoàn thành</span></td>
+                      <td>15,200,000 ₫</td>
+                      <td><button class="btn btn-sm btn-outline-primary view-order">Xem</button></td>
+                    </tr>
+                    <tr>
+                      <td>#CP00120</td>
+                      <td>25/09/2025</td>
+                      <td><span class="badge bg-success">Đã giao</span></td>
+                      <td>8,990,000 ₫</td>
+                      <td><button class="btn btn-sm btn-outline-primary view-order">Xem</button></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
