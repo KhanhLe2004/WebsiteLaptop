@@ -426,17 +426,18 @@
                         </div>
                         <hr>
                         <h6>Chi tiết phiếu nhập hàng:</h6>
-                        <table class="table table-bordered">
-                            <thead>
-                                <tr>
-                                    <th>Sản phẩm</th>
-                                    <th>Thông số</th>
-                                    <th>Số lượng</th>
-                                    <th>Đơn giá</th>
-                                    <th>Thành tiền</th>
-                                </tr>
-                            </thead>
-                            <tbody>
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 20%;">Sản phẩm</th>
+                                        <th style="width: 40%;">Thông số</th>
+                                        <th style="width: 10%; text-align: center;">Số lượng</th>
+                                        <th style="width: 15%; text-align: right;">Đơn giá</th>
+                                        <th style="width: 15%; text-align: right;">Thành tiền</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
                     `;
 
                     if (stockImport.details && stockImport.details.length > 0) {
@@ -445,10 +446,10 @@
                             html += `
                                 <tr>
                                     <td>${detail.productName || detail.productId || '-'}</td>
-                                    <td>${detail.specifications || '-'}</td>
-                                    <td>${detail.quantity || 0}</td>
-                                    <td>${formatCurrency(detail.price || 0)}</td>
-                                    <td>${formatCurrency(subtotal)}</td>
+                                    <td class="spec-cell">${detail.specifications || '-'}</td>
+                                    <td style="text-align: center;">${detail.quantity || 0}</td>
+                                    <td style="text-align: right;">${formatCurrency(detail.price || 0)}</td>
+                                    <td style="text-align: right;">${formatCurrency(subtotal)}</td>
                                 </tr>
                             `;
                         });
@@ -457,8 +458,9 @@
                     }
 
                     html += `
-                            </tbody>
-                        </table>
+                                </tbody>
+                            </table>
+                        </div>
                     `;
 
                     $('#viewModalBody').html(html);
@@ -550,9 +552,16 @@
                     $('#employeeIdInput').val(stockImport.employeeId || '');
                     
                     if (stockImport.time) {
+                        // Parse time từ server (có thể là UTC hoặc local time string)
                         const time = new Date(stockImport.time);
-                        time.setMinutes(time.getMinutes() - time.getTimezoneOffset());
-                        $('#timeInput').val(time.toISOString().slice(0, 16));
+                        // Convert về local time để hiển thị trong datetime-local input
+                        // datetime-local input cần format "YYYY-MM-DDTHH:mm" (local time)
+                        const year = time.getFullYear();
+                        const month = String(time.getMonth() + 1).padStart(2, '0');
+                        const day = String(time.getDate()).padStart(2, '0');
+                        const hours = String(time.getHours()).padStart(2, '0');
+                        const minutes = String(time.getMinutes()).padStart(2, '0');
+                        $('#timeInput').val(`${year}-${month}-${day}T${hours}:${minutes}`);
                     }
                     
                     $('#totalAmountInput').val(stockImport.totalAmount || 0);
@@ -1036,11 +1045,33 @@
             const url = isEdit ? `${API_URL}/${stockImportId}` : API_URL;
             const method = isEdit ? 'PUT' : 'POST';
 
+            // Xử lý time để tránh lỗi timezone
+            // time từ input datetime-local là format "YYYY-MM-DDTHH:mm" (local time, không có timezone)
+            // Gửi time string trực tiếp và thêm ":00" để có format đầy đủ, backend sẽ parse như local time
+            let timeValue;
+            if (time) {
+                // Thêm ":00" nếu chưa có giây
+                if (time.length === 16) {
+                    timeValue = time + ":00";
+                } else {
+                    timeValue = time;
+                }
+            } else {
+                // Nếu không có time, dùng thời gian hiện tại
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                timeValue = `${year}-${month}-${day}T${hours}:${minutes}:00`;
+            }
+
             const data = {
                 stockImportId: stockImportId || null, // null để backend tự động tạo khi thêm mới
                 supplierId: supplierId || null,
                 employeeId: employeeId || null,
-                time: new Date(time).toISOString(),
+                time: timeValue,
                 totalAmount: totalAmount,
                 details: details
             };
@@ -1161,5 +1192,28 @@
     #stockImportTableBody tr td {
         vertical-align: middle !important;
         padding: 0.75rem 0.5rem !important;
+    }
+
+    /* CSS cho bảng xem chi tiết */
+    #viewModal .table-responsive {
+        max-height: 500px;
+        overflow-y: auto;
+    }
+
+    #viewModal .spec-cell {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        white-space: normal;
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+
+    #viewModal table {
+        table-layout: fixed;
+        width: 100%;
+    }
+
+    #viewModal table td {
+        vertical-align: middle;
     }
 </style>

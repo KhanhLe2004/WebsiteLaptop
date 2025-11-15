@@ -265,12 +265,33 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     totalAmount = dto.Details.Sum(d => (d.Quantity ?? 0) * (d.Price ?? 0));
                 }
 
+                // Xử lý Time: Parse time từ client (có thể là string hoặc DateTime)
+                DateTime? importTime = dto.Time;
+                if (importTime.HasValue)
+                {
+                    // Nếu là UTC, convert về local time
+                    if (importTime.Value.Kind == DateTimeKind.Utc)
+                    {
+                        importTime = importTime.Value.ToLocalTime();
+                    }
+                    // Nếu là Unspecified (từ string parse), giữ nguyên (đã là local time)
+                    else if (importTime.Value.Kind == DateTimeKind.Unspecified)
+                    {
+                        // Giữ nguyên, coi như local time
+                        importTime = DateTime.SpecifyKind(importTime.Value, DateTimeKind.Local);
+                    }
+                }
+                else
+                {
+                    importTime = DateTime.Now;
+                }
+
                 var stockImport = new StockImport
                 {
                     StockImportId = stockImportId,
                     SupplierId = dto.SupplierId,
                     EmployeeId = dto.EmployeeId,
-                    Time = dto.Time ?? DateTime.Now,
+                    Time = importTime.Value,
                     TotalAmount = dto.TotalAmount ?? totalAmount
                 };
 
@@ -301,6 +322,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         if (!string.IsNullOrEmpty(detailDto.ProductId) && detailDto.Quantity.HasValue && detailDto.Quantity.Value > 0)
                         {
                             await UpdateProductConfigurationQuantity(detailDto.ProductId, detailDto.Specifications, detailDto.Quantity.Value);
+                            
+                            // Tạo ProductSerial cho mỗi đơn vị sản phẩm
+                            await CreateProductSerials(
+                                detailDto.ProductId, 
+                                detailDto.Specifications, 
+                                detailDto.Quantity.Value, 
+                                stockImport.Time ?? DateTime.Now);
                         }
                         
                         detailIndex++;
@@ -377,12 +405,25 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 stockImport.EmployeeId = dto.EmployeeId ?? stockImport.EmployeeId;
                 if (dto.Time.HasValue)
                 {
-                    stockImport.Time = dto.Time.Value;
+                    // Xử lý Time: Parse time từ client (có thể là string hoặc DateTime)
+                    DateTime updateTime = dto.Time.Value;
+                    if (updateTime.Kind == DateTimeKind.Utc)
+                    {
+                        updateTime = updateTime.ToLocalTime();
+                    }
+                    // Nếu là Unspecified (từ string parse), giữ nguyên (đã là local time)
+                    else if (updateTime.Kind == DateTimeKind.Unspecified)
+                    {
+                        updateTime = DateTime.SpecifyKind(updateTime, DateTimeKind.Local);
+                    }
+                    stockImport.Time = updateTime;
                 }
 
-                // Trừ lại Quantity của ProductConfiguration từ chi tiết cũ trước khi xóa
+                // Xóa ProductSerial và trừ lại Quantity của ProductConfiguration từ chi tiết cũ trước khi xóa
                 if (stockImport.StockImportDetails != null && stockImport.StockImportDetails.Any())
                 {
+                    DateTime oldImportDate = stockImport.Time ?? DateTime.Now;
+                    
                     foreach (var oldDetail in stockImport.StockImportDetails)
                     {
                         if (!string.IsNullOrEmpty(oldDetail.ProductId) && 
@@ -390,6 +431,14 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                             oldDetail.Quantity.Value > 0 &&
                             !string.IsNullOrEmpty(oldDetail.Specifications))
                         {
+                            // Xóa ProductSerial của chi tiết cũ
+                            await DeleteProductSerials(
+                                oldDetail.ProductId, 
+                                oldDetail.Specifications, 
+                                oldDetail.Quantity.Value, 
+                                oldImportDate);
+                            
+                            // Trừ lại Quantity của ProductConfiguration
                             await UpdateProductConfigurationQuantity(
                                 oldDetail.ProductId, 
                                 oldDetail.Specifications, 
@@ -431,10 +480,18 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         };
                         _context.StockImportDetails.Add(detail);
                         
-                        // Cập nhật Quantity của ProductConfiguration (cộng thêm số lượng mới)
+                        // Cập nhật Quantity của ProductConfiguration và tạo ProductSerial mới
                         if (!string.IsNullOrEmpty(detailDto.ProductId) && detailDto.Quantity.HasValue && detailDto.Quantity.Value > 0)
                         {
                             await UpdateProductConfigurationQuantity(detailDto.ProductId, detailDto.Specifications, detailDto.Quantity.Value);
+                            
+                            // Tạo ProductSerial mới cho chi tiết mới
+                            DateTime newImportDate = stockImport.Time ?? DateTime.Now;
+                            await CreateProductSerials(
+                                detailDto.ProductId, 
+                                detailDto.Specifications, 
+                                detailDto.Quantity.Value, 
+                                newImportDate);
                         }
                         
                         detailIndex++;
@@ -501,9 +558,11 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     return NotFound(new { message = "Không tìm thấy phiếu nhập hàng" });
                 }
 
-                // Trừ lại Quantity của ProductConfiguration từ chi tiết trước khi xóa
+                // Xóa ProductSerial tương ứng và trừ lại Quantity của ProductConfiguration từ chi tiết trước khi xóa
                 if (stockImport.StockImportDetails != null && stockImport.StockImportDetails.Any())
                 {
+                    DateTime importDate = stockImport.Time ?? DateTime.Now;
+                    
                     foreach (var detail in stockImport.StockImportDetails)
                     {
                         if (!string.IsNullOrEmpty(detail.ProductId) && 
@@ -511,6 +570,14 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                             detail.Quantity.Value > 0 &&
                             !string.IsNullOrEmpty(detail.Specifications))
                         {
+                            // Xóa ProductSerial tương ứng
+                            await DeleteProductSerials(
+                                detail.ProductId, 
+                                detail.Specifications, 
+                                detail.Quantity.Value, 
+                                importDate);
+                            
+                            // Trừ lại Quantity của ProductConfiguration
                             await UpdateProductConfigurationQuantity(
                                 detail.ProductId, 
                                 detail.Specifications, 
@@ -676,6 +743,163 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
 
             return result;
+        }
+
+        // Lấy ConfigurationId từ ProductId và Specifications
+        private async Task<string?> GetConfigurationId(string productId, string? specifications)
+        {
+            if (string.IsNullOrEmpty(productId) || string.IsNullOrEmpty(specifications))
+            {
+                return null;
+            }
+
+            try
+            {
+                // Parse Specifications string
+                var specDict = ParseSpecifications(specifications);
+                
+                // Tìm ProductConfiguration khớp với ProductId và các thông số
+                var query = _context.ProductConfigurations
+                    .Where(pc => pc.ProductId == productId);
+
+                // Lọc theo CPU nếu có
+                if (specDict.ContainsKey("CPU") && !string.IsNullOrEmpty(specDict["CPU"]))
+                {
+                    query = query.Where(pc => pc.Cpu == specDict["CPU"]);
+                }
+
+                // Lọc theo RAM nếu có
+                if (specDict.ContainsKey("RAM") && !string.IsNullOrEmpty(specDict["RAM"]))
+                {
+                    query = query.Where(pc => pc.Ram == specDict["RAM"]);
+                }
+
+                // Lọc theo ROM nếu có
+                if (specDict.ContainsKey("ROM") && !string.IsNullOrEmpty(specDict["ROM"]))
+                {
+                    query = query.Where(pc => pc.Rom == specDict["ROM"]);
+                }
+
+                // Lọc theo Card nếu có
+                if (specDict.ContainsKey("Card") && !string.IsNullOrEmpty(specDict["Card"]))
+                {
+                    query = query.Where(pc => pc.Card == specDict["Card"]);
+                }
+
+                var productConfig = await query.FirstOrDefaultAsync();
+                return productConfig?.ConfigurationId;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error getting ConfigurationId: {ex.Message}");
+                return null;
+            }
+        }
+
+        // Tạo ProductSerial cho mỗi đơn vị sản phẩm
+        private async Task CreateProductSerials(string productId, string? specifications, int quantity, DateTime importDate)
+        {
+            if (string.IsNullOrEmpty(productId) || quantity <= 0)
+            {
+                return;
+            }
+
+            try
+            {
+                // Lấy ConfigurationId
+                var configurationId = await GetConfigurationId(productId, specifications);
+                
+                if (string.IsNullOrEmpty(configurationId))
+                {
+                    System.Diagnostics.Debug.WriteLine($"Warning: Không tìm thấy ConfigurationId cho ProductId: {productId}, Specifications: {specifications}");
+                    return;
+                }
+
+                // Tìm số lớn nhất của SerialID có format SR+ProductId+ConfigurationId+001
+                string prefix = $"SR{productId}{configurationId}";
+                var existingSerials = await _context.ProductSerials
+                    .Where(ps => ps.SerialId != null && ps.SerialId.StartsWith(prefix))
+                    .Select(ps => ps.SerialId)
+                    .ToListAsync();
+
+                int maxNumber = 0;
+                foreach (var serialId in existingSerials)
+                {
+                    if (serialId != null && serialId.StartsWith(prefix) && serialId.Length > prefix.Length)
+                    {
+                        string numberPart = serialId.Substring(prefix.Length);
+                        if (int.TryParse(numberPart, out int num))
+                        {
+                            maxNumber = Math.Max(maxNumber, num);
+                        }
+                    }
+                }
+
+                // Tạo ProductSerial cho mỗi đơn vị
+                for (int i = 1; i <= quantity; i++)
+                {
+                    int serialNumber = maxNumber + i;
+                    string serialId = $"{prefix}{serialNumber:D3}";
+
+                    var productSerial = new ProductSerial
+                    {
+                        SerialId = serialId,
+                        ProductId = productId,
+                        Specifications = specifications,
+                        StockExportDetailId = null,
+                        Status = "in stock",
+                        ImportDate = importDate,
+                        ExportDate = null,
+                        WarrantyStartDate = null,
+                        WarrantyEndDate = null,
+                        Note = null
+                    };
+
+                    _context.ProductSerials.Add(productSerial);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error creating ProductSerials: {ex.Message}");
+            }
+        }
+
+        // Xóa ProductSerial tương ứng với phiếu nhập hàng
+        private async Task DeleteProductSerials(string productId, string? specifications, int quantity, DateTime importDate)
+        {
+            if (string.IsNullOrEmpty(productId) || quantity <= 0)
+            {
+                return;
+            }
+
+            try
+            {
+                // Tìm các ProductSerial có ProductId, Specifications, ImportDate khớp và Status = "in stock"
+                // Chỉ xóa những serial chưa được xuất (in stock)
+                var productSerials = await _context.ProductSerials
+                    .Where(ps => ps.ProductId == productId &&
+                                 ps.Specifications == specifications &&
+                                 ps.ImportDate.HasValue &&
+                                 ps.ImportDate.Value.Date == importDate.Date &&
+                                 ps.Status == "in stock")
+                    .OrderBy(ps => ps.SerialId) // Sắp xếp để xóa theo thứ tự
+                    .Take(quantity) // Chỉ lấy đúng số lượng cần xóa
+                    .ToListAsync();
+
+                if (productSerials.Count > 0)
+                {
+                    _context.ProductSerials.RemoveRange(productSerials);
+                    System.Diagnostics.Debug.WriteLine($"Deleted {productSerials.Count} ProductSerials for ProductId: {productId}");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"Warning: Không tìm thấy ProductSerial để xóa cho ProductId: {productId}, Specifications: {specifications}, ImportDate: {importDate}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error deleting ProductSerials: {ex.Message}");
+            }
         }
 
     }
