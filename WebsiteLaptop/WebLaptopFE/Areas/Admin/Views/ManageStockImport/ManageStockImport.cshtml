@@ -1,0 +1,1165 @@
+﻿@{
+    ViewData["Title"] = "Quản lý nhập hàng";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutManageStockImport.cshtml";
+}
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card my-4">
+                <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                    <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="text-white text-capitalize ps-3 mb-0">Quản lý nhập hàng</h6>
+                            <button class="btn btn-light btn-sm me-3" onclick="showCreateModal()">
+                                <i class="material-icons text-sm">add</i> Thêm mới
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body px-3 pb-2">
+                    <!-- Bộ lọc và tìm kiếm -->
+                    <div class="row mb-3 g-2 align-items-end">
+                        <div class="col-lg-4 col-md-6">
+                            <div class="input-group input-group-outline">
+                                <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm phiếu nhập hàng...">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bảng phiếu nhập hàng -->
+                    <div class="table-responsive p-0">
+                        <table class="table align-items-center mb-0" style="table-layout: fixed; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Mã phiếu nhập</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 20%;">Nhà cung cấp</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Nhân viên</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 12%;">Tổng tiền</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 12%;">Ngày nhập</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 11%;">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stockImportTableBody">
+                                <!-- Dữ liệu sẽ được load bằng AJAX -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Phân trang -->
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <p class="text-sm mb-0" id="pageInfo">Đang tải...</p>
+                        </div>
+                        <div class="col-md-6">
+                            <nav aria-label="Page navigation">
+                                <ul class="pagination justify-content-end mb-0" id="pagination">
+                                    <!-- Phân trang sẽ được tạo bằng JavaScript -->
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xem chi tiết -->
+<div class="modal fade" id="viewModal" tabindex="-1" aria-labelledby="viewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-info">
+                <h5 class="modal-title text-white" id="viewModalLabel">Chi tiết phiếu nhập hàng</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="viewModalBody">
+                <!-- Nội dung sẽ được load bằng JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Thêm/Sửa -->
+<div class="modal fade" id="createEditModal" tabindex="-1" aria-labelledby="createEditModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-primary">
+                <h5 class="modal-title text-white" id="createEditModalLabel">Thêm phiếu nhập hàng</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="stockImportForm">
+                    <input type="hidden" id="stockImportId" value="">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Mã phiếu nhập</label>
+                                <input type="text" class="form-control" id="stockImportIdInput" readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Ngày nhập *</label>
+                                <input type="datetime-local" class="form-control" id="timeInput" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Nhà cung cấp</label>
+                                <select class="form-control" id="supplierIdInput">
+                                    <option value="">-- Chọn nhà cung cấp --</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Nhân viên</label>
+                                <input type="text" class="form-control" id="employeeIdInput">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Tổng tiền</label>
+                                <input type="number" step="0.01" class="form-control" id="totalAmountInput" readonly>
+                            </div>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6>Chi tiết sản phẩm</h6>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="addDetailRow()">
+                            <i class="material-icons text-sm">add</i> Thêm sản phẩm
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Sản phẩm</th>
+                                    <th>Thông số</th>
+                                    <th>Số lượng</th>
+                                    <th>Đơn giá</th>
+                                    <th>Thành tiền</th>
+                                    <th>Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detailTableBody">
+                                <!-- Chi tiết sẽ được thêm bằng JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-danger mb-3" id="formErrorMessage" style="display:none;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" onclick="saveStockImport()">
+                    <i class="material-icons text-sm">save</i> Lưu
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xác nhận xóa -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-danger">
+                <h5 class="modal-title text-white" id="deleteModalLabel">Xác nhận xóa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Bạn có chắc chắn muốn xóa phiếu nhập hàng <strong id="deleteStockImportId"></strong>?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDelete()">Xóa</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const API_URL = 'http://localhost:5068/api/admin/stock-imports';
+        let currentPage = 1;
+        let pageSize = 10;
+        let searchDebounceTimer = null;
+        const SEARCH_DEBOUNCE_DELAY = 300;
+        let deleteStockImportId = null;
+        let detailRowIndex = 0;
+        let suppliersList = [];
+        let productsList = [];
+
+        $(document).ready(function() {
+            loadStockImports();
+            loadSuppliers();
+            loadProducts();
+
+            // Tìm kiếm tự động
+            $('#searchInput').on('input', function() {
+                triggerAutoSearch();
+            });
+
+            // Xử lý label cho Material Dashboard inputs
+            window.updateInputLabels = function() {
+                $('.input-group-outline input, .input-group-outline select').each(function() {
+                    const $input = $(this);
+                    const value = $input.val();
+                    if (value && value.trim() !== '') {
+                        $input.closest('.input-group-outline').addClass('is-filled');
+                    } else {
+                        $input.closest('.input-group-outline').removeClass('is-filled');
+                    }
+                });
+            };
+
+            $(document).on('input change', '.input-group-outline input, .input-group-outline select', function() {
+                const $input = $(this);
+                const value = $input.val();
+                if (value && value.trim() !== '') {
+                    $input.closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    $input.closest('.input-group-outline').removeClass('is-filled');
+                }
+            });
+
+            $(document).on('focus', '.input-group-outline input, .input-group-outline select', function() {
+                $(this).closest('.input-group-outline').addClass('is-focused');
+            });
+
+            $(document).on('blur', '.input-group-outline input, .input-group-outline select', function() {
+                const $input = $(this);
+                const $group = $input.closest('.input-group-outline');
+                $group.removeClass('is-focused');
+                const value = $input.val();
+                if (value && value.trim() !== '') {
+                    $group.addClass('is-filled');
+                } else {
+                    $group.removeClass('is-filled');
+                }
+            });
+        });
+
+        function triggerAutoSearch() {
+            currentPage = 1;
+            if (searchDebounceTimer) {
+                clearTimeout(searchDebounceTimer);
+            }
+            searchDebounceTimer = setTimeout(() => {
+                loadStockImports();
+            }, SEARCH_DEBOUNCE_DELAY);
+        }
+
+        // Load danh sách phiếu nhập hàng
+        function loadStockImports(page = currentPage) {
+            currentPage = page;
+            const searchTerm = $('#searchInput').val().trim();
+
+            const dataParams = {
+                pageNumber: currentPage,
+                pageSize: pageSize,
+                searchTerm: searchTerm
+            };
+
+            $.ajax({
+                url: API_URL,
+                type: 'GET',
+                data: dataParams,
+                success: function(response) {
+                    displayStockImports(response.items);
+                    displayPagination(response);
+                    updatePageInfo(response);
+                },
+                error: function(xhr) {
+                    console.error('Lỗi khi tải phiếu nhập hàng:', xhr);
+                    showNotification('Lỗi khi tải dữ liệu phiếu nhập hàng', 'error');
+                }
+            });
+        }
+
+        // Hiển thị phiếu nhập hàng
+        function displayStockImports(stockImports) {
+            const tbody = $('#stockImportTableBody');
+            tbody.empty();
+
+            if (stockImports.length === 0) {
+                tbody.append(`
+                    <tr>
+                        <td colspan="6" class="text-center text-secondary py-4">
+                            Không có phiếu nhập hàng nào
+                        </td>
+                    </tr>
+                `);
+                return;
+            }
+
+            $.each(stockImports, function(index, stockImport) {
+                const time = stockImport.time ? new Date(stockImport.time).toLocaleString('vi-VN') : '-';
+                const totalAmount = stockImport.totalAmount ? formatCurrency(stockImport.totalAmount) : '0';
+
+                tbody.append(`
+                    <tr>
+                        <td style="vertical-align: middle;">
+                            <span class="text-xs font-weight-bold">${stockImport.stockImportId}</span>
+                        </td>
+                        <td style="vertical-align: middle;">
+                            <span class="text-xs font-weight-bold">${stockImport.supplierName || '-'}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold">${stockImport.employeeName || '-'}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold">${totalAmount}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold">${time}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;" class="table-actions">
+                            <button class="btn btn-info action-btn" onclick='viewStockImport("${stockImport.stockImportId}")' title="Xem">
+                                <i class="material-icons text-sm">visibility</i>
+                            </button>
+                            <button class="btn btn-warning action-btn" onclick='editStockImport("${stockImport.stockImportId}")' title="Sửa">
+                                <i class="material-icons text-sm">edit</i>
+                            </button>
+                            <button class="btn btn-danger action-btn" onclick='deleteStockImport("${stockImport.stockImportId}")' title="Xóa">
+                                <i class="material-icons text-sm">delete</i>
+                            </button>
+                        </td>
+                    </tr>
+                `);
+            });
+        }
+
+        // Hiển thị phân trang
+        function displayPagination(response) {
+            const pagination = $('#pagination');
+            pagination.empty();
+
+            if (response.totalPages <= 1) return;
+
+            pagination.append(`
+                <li class="page-item ${response.hasPreviousPage ? '' : 'disabled'}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadStockImports(${currentPage - 1})">
+                        <i class="material-icons text-sm">chevron_left</i>
+                    </a>
+                </li>
+            `);
+
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(response.totalPages, currentPage + 2);
+
+            if (startPage > 1) {
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadStockImports(1)">1</a></li>`);
+                if (startPage > 2) {
+                    pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                pagination.append(`
+                    <li class="page-item ${i === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="javascript:void(0)" onclick="loadStockImports(${i})">${i}</a>
+                    </li>
+                `);
+            }
+
+            if (endPage < response.totalPages) {
+                if (endPage < response.totalPages - 1) {
+                    pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadStockImports(${response.totalPages})">${response.totalPages}</a></li>`);
+            }
+
+            pagination.append(`
+                <li class="page-item ${response.hasNextPage ? '' : 'disabled'}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadStockImports(${currentPage + 1})">
+                        <i class="material-icons text-sm">chevron_right</i>
+                    </a>
+                </li>
+            `);
+        }
+
+        // Cập nhật thông tin trang
+        function updatePageInfo(response) {
+            const start = (response.pageNumber - 1) * response.pageSize + 1;
+            const end = Math.min(response.pageNumber * response.pageSize, response.totalItems);
+            $('#pageInfo').text(`Hiển thị ${start} - ${end} trong tổng số ${response.totalItems} phiếu nhập hàng`);
+        }
+
+        // Xem chi tiết phiếu nhập hàng
+        function viewStockImport(stockImportId) {
+            $.ajax({
+                url: `${API_URL}/${stockImportId}`,
+                type: 'GET',
+                success: function(stockImport) {
+                    let html = `
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Mã phiếu nhập:</strong> ${stockImport.stockImportId}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Ngày nhập:</strong> ${stockImport.time ? new Date(stockImport.time).toLocaleString('vi-VN') : '-'}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Nhà cung cấp:</strong> ${stockImport.supplierName || '-'}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Nhân viên:</strong> ${stockImport.employeeName || '-'}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Tổng tiền:</strong> ${formatCurrency(stockImport.totalAmount || 0)}
+                            </div>
+                        </div>
+                        <hr>
+                        <h6>Chi tiết phiếu nhập hàng:</h6>
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Sản phẩm</th>
+                                    <th>Thông số</th>
+                                    <th>Số lượng</th>
+                                    <th>Đơn giá</th>
+                                    <th>Thành tiền</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+
+                    if (stockImport.details && stockImport.details.length > 0) {
+                        stockImport.details.forEach(function(detail) {
+                            const subtotal = (detail.quantity || 0) * (detail.price || 0);
+                            html += `
+                                <tr>
+                                    <td>${detail.productName || detail.productId || '-'}</td>
+                                    <td>${detail.specifications || '-'}</td>
+                                    <td>${detail.quantity || 0}</td>
+                                    <td>${formatCurrency(detail.price || 0)}</td>
+                                    <td>${formatCurrency(subtotal)}</td>
+                                </tr>
+                            `;
+                        });
+                    } else {
+                        html += '<tr><td colspan="5" class="text-center">Không có chi tiết</td></tr>';
+                    }
+
+                    html += `
+                            </tbody>
+                        </table>
+                    `;
+
+                    $('#viewModalBody').html(html);
+                    const modal = new bootstrap.Modal(document.getElementById('viewModal'));
+                    modal.show();
+                },
+                error: function(xhr) {
+                    console.error('Error loading stock import:', xhr);
+                    showNotification('Lỗi khi tải thông tin phiếu nhập hàng', 'error');
+                }
+            });
+        }
+
+        // Tạo ID tự động
+        function generateNextStockImportId() {
+            // Lấy tất cả ID để tìm số lớn nhất
+            $.ajax({
+                url: API_URL,
+                type: 'GET',
+                data: { pageNumber: 1, pageSize: 1000 }, // Lấy nhiều để tìm max
+                success: function(response) {
+                    let nextId = 'SI001';
+                    if (response.items && response.items.length > 0) {
+                        let maxNumber = 0;
+                        response.items.forEach(function(item) {
+                            const id = item.stockImportId;
+                            if (id && id.startsWith('SI') && id.length === 5) {
+                                const number = parseInt(id.substring(2)) || 0;
+                                maxNumber = Math.max(maxNumber, number);
+                            }
+                        });
+                        nextId = 'SI' + String(maxNumber + 1).padStart(3, '0');
+                    }
+                    $('#stockImportIdInput').val(nextId);
+                    updateInputLabels();
+                },
+                error: function() {
+                    // Nếu lỗi, tạo ID mặc định
+                    $('#stockImportIdInput').val('SI001');
+                    updateInputLabels();
+                }
+            });
+        }
+
+        // Hiển thị modal thêm mới
+        function showCreateModal() {
+            $('#createEditModalLabel').text('Thêm phiếu nhập hàng');
+            $('#stockImportForm')[0].reset();
+            $('#stockImportId').val('');
+            $('#stockImportIdInput').val('');
+            $('#stockImportIdInput').prop('readonly', true); // Không cho phép chỉnh sửa ID khi thêm mới
+            $('#detailTableBody').empty();
+            detailRowIndex = 0;
+            $('#formErrorMessage').hide();
+            $('#totalAmountInput').val('0');
+            $('#supplierIdInput').val('');
+            
+            // Tự động tạo ID khi mở modal
+            generateNextStockImportId();
+            
+            // Set ngày hiện tại
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            $('#timeInput').val(now.toISOString().slice(0, 16));
+
+            const modal = new bootstrap.Modal(document.getElementById('createEditModal'));
+            modal.show();
+            
+            // Luôn load lại suppliers khi mở modal để đảm bảo có dữ liệu mới nhất
+            loadSuppliers();
+            
+            // Đợi modal hiển thị xong rồi update lại combobox
+            setTimeout(function() {
+                populateSupplierSelect();
+            }, 500);
+        }
+
+        // Sửa phiếu nhập hàng
+        function editStockImport(stockImportId) {
+            $.ajax({
+                url: `${API_URL}/${stockImportId}`,
+                type: 'GET',
+                success: function(stockImport) {
+                    $('#createEditModalLabel').text('Sửa phiếu nhập hàng');
+                    $('#stockImportId').val(stockImport.stockImportId);
+                    $('#stockImportIdInput').val(stockImport.stockImportId);
+                    $('#stockImportIdInput').prop('readonly', true);
+                    $('#supplierIdInput').val(stockImport.supplierId || '');
+                    $('#employeeIdInput').val(stockImport.employeeId || '');
+                    
+                    if (stockImport.time) {
+                        const time = new Date(stockImport.time);
+                        time.setMinutes(time.getMinutes() - time.getTimezoneOffset());
+                        $('#timeInput').val(time.toISOString().slice(0, 16));
+                    }
+                    
+                    $('#totalAmountInput').val(stockImport.totalAmount || 0);
+                    
+                    // Load chi tiết
+                    $('#detailTableBody').empty();
+                    detailRowIndex = 0;
+                    if (stockImport.details && stockImport.details.length > 0) {
+                        // Load từng detail một cách tuần tự để đảm bảo combobox được load đúng
+                        let detailIndex = 0;
+                        function loadNextDetail() {
+                            if (detailIndex < stockImport.details.length) {
+                                const detail = stockImport.details[detailIndex];
+                                addDetailRow(detail);
+                                detailIndex++;
+                                // Đợi một chút để DOM được cập nhật
+                                setTimeout(loadNextDetail, 100);
+                            } else {
+                                setTimeout(function() {
+                                    updateInputLabels();
+                                }, 100);
+                            }
+                        }
+                        loadNextDetail();
+                    } else {
+                        setTimeout(function() {
+                            updateInputLabels();
+                        }, 100);
+                    }
+                    
+                    $('#formErrorMessage').hide();
+
+                    const modal = new bootstrap.Modal(document.getElementById('createEditModal'));
+                    modal.show();
+                },
+                error: function(xhr) {
+                    console.error('Error loading stock import:', xhr);
+                    showNotification('Lỗi khi tải thông tin phiếu nhập hàng', 'error');
+                }
+            });
+        }
+
+        // Load danh sách nhà cung cấp
+        function loadSuppliers(callback) {
+            $.ajax({
+                url: `${API_URL}/suppliers`,
+                type: 'GET',
+                dataType: 'json',
+                success: function(response) {
+                    console.log('Suppliers response:', response);
+                    
+                    // Kiểm tra nếu response là object có chứa data
+                    let suppliers = response;
+                    if (response && response.data) {
+                        suppliers = response.data;
+                    } else if (Array.isArray(response)) {
+                        suppliers = response;
+                    } else if (response && response.value) {
+                        // Có thể response được wrap trong value
+                        suppliers = response.value;
+                    }
+                    
+                    suppliersList = suppliers || [];
+                    console.log('Suppliers list:', suppliersList);
+                    console.log('Suppliers count:', suppliersList.length);
+                    
+                    // Luôn populate sau khi load xong
+                    populateSupplierSelect();
+                    
+                    // Gọi callback nếu có
+                    if (callback && typeof callback === 'function') {
+                        callback();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading suppliers:', {
+                        status: status,
+                        error: error,
+                        response: xhr.responseText,
+                        statusCode: xhr.status,
+                        responseJSON: xhr.responseJSON
+                    });
+                    showNotification('Lỗi khi tải danh sách nhà cung cấp: ' + (xhr.responseJSON?.message || error), 'error');
+                    
+                    // Gọi callback ngay cả khi lỗi
+                    if (callback && typeof callback === 'function') {
+                        callback();
+                    }
+                }
+            });
+        }
+
+        // Populate combobox nhà cung cấp
+        function populateSupplierSelect() {
+            const select = $('#supplierIdInput');
+            if (select.length === 0) {
+                console.warn('Supplier select element not found, retrying...');
+                // Retry sau 100ms nếu element chưa có
+                setTimeout(populateSupplierSelect, 100);
+                return;
+            }
+            
+            console.log('Populating supplier select, suppliersList length:', suppliersList ? suppliersList.length : 0);
+            
+            select.empty();
+            select.append('<option value=""></option>');
+            
+            if (suppliersList && suppliersList.length > 0) {
+                suppliersList.forEach(function(supplier) {
+                    const supplierId = supplier.supplierId || supplier.SupplierId;
+                    const supplierName = supplier.supplierName || supplier.SupplierName || supplierId;
+                    console.log('Adding supplier:', supplierId, supplierName);
+                    select.append(`<option value="${supplierId}">${supplierName}</option>`);
+                });
+                console.log('Successfully populated', suppliersList.length, 'suppliers');
+            } else {
+                console.warn('No suppliers found in suppliersList. suppliersList:', suppliersList);
+            }
+            
+            // Trigger change để Material Dashboard update
+            select.trigger('change');
+            updateInputLabels();
+        }
+
+        // Load danh sách sản phẩm
+        function loadProducts() {
+            $.ajax({
+                url: `${API_URL}/products`,
+                type: 'GET',
+                dataType: 'json',
+                success: function(response) {
+                    // Kiểm tra nếu response là object có chứa data
+                    let products = response;
+                    if (response && response.data) {
+                        products = response.data;
+                    } else if (Array.isArray(response)) {
+                        products = response;
+                    }
+                    
+                    productsList = products || [];
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading products:', {
+                        status: status,
+                        error: error,
+                        response: xhr.responseText,
+                        statusCode: xhr.status
+                    });
+                    showNotification('Lỗi khi tải danh sách sản phẩm: ' + (xhr.responseJSON?.message || error), 'error');
+                }
+            });
+        }
+
+        // Load cấu hình sản phẩm
+        function loadProductConfigurations(productId, selectElement, selectedValue = '', callback = null) {
+            if (!productId) {
+                selectElement.empty();
+                selectElement.append('<option value="">-- Chọn sản phẩm trước --</option>');
+                if (callback) callback();
+                return;
+            }
+
+            $.ajax({
+                url: `${API_URL}/product-configurations/${productId}`,
+                type: 'GET',
+                success: function(configurations) {
+                    selectElement.empty();
+                    selectElement.append('<option value="">-- Chọn thông số --</option>');
+                    
+                    if (configurations && configurations.length > 0) {
+                        configurations.forEach(function(config) {
+                            // Tạo chuỗi hiển thị thông số
+                            const specParts = [];
+                            if (config.cpu) specParts.push(`CPU: ${config.cpu}`);
+                            if (config.ram) specParts.push(`RAM: ${config.ram}`);
+                            if (config.rom) specParts.push(`ROM: ${config.rom}`);
+                            if (config.card) specParts.push(`Card: ${config.card}`);
+                            
+                            const specText = specParts.length > 0 ? specParts.join(', ') : config.configurationId;
+                            const optionValue = JSON.stringify({
+                                configurationId: config.configurationId,
+                                cpu: config.cpu || '',
+                                ram: config.ram || '',
+                                rom: config.rom || '',
+                                card: config.card || ''
+                            });
+                            
+                            // Dùng jQuery để tạo option element, tự động xử lý escape
+                            const $option = $('<option></option>')
+                                .attr('value', optionValue)
+                                .text(specText);
+                            
+                            // So sánh với selectedValue để set selected
+                            if (selectedValue) {
+                                // So sánh cả escaped và unescaped (jQuery có thể unescape khi lấy value)
+                                const normalizedSelected = selectedValue.replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+                                if (selectedValue === optionValue || normalizedSelected === optionValue) {
+                                    $option.prop('selected', true);
+                                }
+                            }
+                            
+                            selectElement.append($option);
+                        });
+                    } else {
+                        selectElement.append('<option value="">Không có thông số</option>');
+                    }
+                    
+                    if (callback) callback();
+                },
+                error: function(xhr) {
+                    console.error('Error loading configurations:', xhr);
+                    selectElement.empty();
+                    selectElement.append('<option value="">Lỗi khi tải thông số</option>');
+                    if (callback) callback();
+                }
+            });
+        }
+
+        // Thêm dòng chi tiết
+        function addDetailRow(detail = null) {
+            const index = detailRowIndex++;
+            
+            // Tạo select cho sản phẩm
+            let productSelect = '<select class="form-control form-control-sm detail-product" onchange="onProductChange(' + index + ')"><option value="">-- Chọn sản phẩm --</option>';
+            productsList.forEach(function(product) {
+                const selected = detail && detail.productId === product.productId ? 'selected' : '';
+                productSelect += `<option value="${product.productId}" ${selected}>${product.displayName}</option>`;
+            });
+            productSelect += '</select>';
+
+            // Tạo select cho thông số
+            let specSelect = '<select class="form-control form-control-sm detail-spec"><option value="">-- Chọn sản phẩm trước --</option></select>';
+
+            const row = `
+                <tr data-index="${index}">
+                    <td>
+                        ${productSelect}
+                    </td>
+                    <td>
+                        ${specSelect}
+                    </td>
+                    <td>
+                        <input type="number" class="form-control form-control-sm detail-quantity" 
+                               value="${detail ? (detail.quantity || '') : ''}" 
+                               min="1" placeholder="Số lượng" onchange="calculateDetailTotal(${index})">
+                    </td>
+                    <td>
+                        <input type="number" step="0.01" class="form-control form-control-sm detail-price" 
+                               value="${detail ? (detail.price || '') : ''}" 
+                               min="0" placeholder="Đơn giá" onchange="calculateDetailTotal(${index})">
+                    </td>
+                    <td>
+                        <input type="text" class="form-control form-control-sm detail-total" 
+                               value="${detail ? formatCurrency((detail.quantity || 0) * (detail.price || 0)) : '0'}" 
+                               readonly>
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="removeDetailRow(${index})">
+                            <i class="material-icons text-sm">delete</i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+            $('#detailTableBody').append(row);
+            
+            // Nếu có detail và productId, load lại cấu hình sau khi append và tìm thông số tương ứng
+            if (detail && detail.productId) {
+                const savedSpec = (detail.specifications || '').trim();
+                
+                console.log('Loading config for detail:', {
+                    productId: detail.productId,
+                    savedSpec: savedSpec,
+                    index: index
+                });
+                
+                // Đợi một chút để DOM được render xong
+                setTimeout(function() {
+                    const specSelectElement = $(`tr[data-index="${index}"] .detail-spec`);
+                    
+                    if (specSelectElement.length === 0) {
+                        console.error('Spec select element not found for index:', index);
+                        return;
+                    }
+                    
+                    // Load cấu hình và sau đó tìm match
+                    loadProductConfigurations(detail.productId, specSelectElement, '', function() {
+                    // Sau khi load xong, tìm option phù hợp với savedSpec
+                    if (savedSpec) {
+                        let found = false;
+                        console.log('Matching savedSpec:', savedSpec);
+                        
+                        specSelectElement.find('option').each(function() {
+                            if (found) return false; // Đã tìm thấy, dừng lại
+                            
+                            const optionValue = $(this).val();
+                            const optionText = $(this).text().trim();
+                            
+                            if (!optionValue) return true; // Bỏ qua option rỗng
+                            
+                            try {
+                                // jQuery tự động unescape khi lấy value từ DOM, nhưng đảm bảo parse được
+                                let unescapedValue = optionValue;
+                                // Nếu có HTML entities, unescape chúng
+                                if (optionValue.includes('&quot;') || optionValue.includes('&#39;')) {
+                                    unescapedValue = optionValue.replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+                                }
+                                
+                                const specObj = JSON.parse(unescapedValue);
+                                const specParts = [];
+                                if (specObj.cpu) specParts.push(`CPU: ${specObj.cpu}`);
+                                if (specObj.ram) specParts.push(`RAM: ${specObj.ram}`);
+                                if (specObj.rom) specParts.push(`ROM: ${specObj.rom}`);
+                                if (specObj.card) specParts.push(`Card: ${specObj.card}`);
+                                const specText = specParts.length > 0 ? specParts.join(', ') : '';
+                                
+                                // Normalize để so sánh (loại bỏ khoảng trắng thừa, chuyển về lowercase)
+                                const normalizeString = (str) => {
+                                    return str.trim().toLowerCase().replace(/\s+/g, ' ');
+                                };
+                                
+                                const normalizedSpecText = normalizeString(specText);
+                                const normalizedSavedSpec = normalizeString(savedSpec);
+                                const normalizedOptionText = normalizeString(optionText);
+                                
+                                console.log('Comparing:', {
+                                    normalizedSpecText: normalizedSpecText,
+                                    normalizedSavedSpec: normalizedSavedSpec,
+                                    normalizedOptionText: normalizedOptionText,
+                                    optionText: optionText,
+                                    configurationId: specObj.configurationId,
+                                    rawSavedSpec: savedSpec
+                                });
+                                
+                                // So sánh theo nhiều cách:
+                                // 1. So sánh formatted text (normalized)
+                                // 2. So sánh option text (normalized)
+                                // 3. So sánh với configurationId nếu có
+                                // 4. So sánh trực tiếp (case-sensitive) nếu normalized không match
+                                if (normalizedSpecText === normalizedSavedSpec || 
+                                    normalizedOptionText === normalizedSavedSpec ||
+                                    specText.trim() === savedSpec.trim() ||
+                                    optionText.trim() === savedSpec.trim() ||
+                                    (specObj.configurationId && specObj.configurationId === normalizedSavedSpec)) {
+                                    $(this).prop('selected', true);
+                                    specSelectElement.val(optionValue); // Đảm bảo select được set
+                                    specSelectElement.trigger('change'); // Trigger change event
+                                    found = true;
+                                    console.log('Found match! Selected option:', optionText);
+                                    return false; // break
+                                }
+                            } catch (e) {
+                                console.log('Error parsing option value:', e, optionValue);
+                                // Nếu không parse được JSON, so sánh trực tiếp với text hoặc value
+                                if (optionText === savedSpec || optionValue === savedSpec) {
+                                    $(this).prop('selected', true);
+                                    specSelectElement.val(optionValue);
+                                    specSelectElement.trigger('change');
+                                    found = true;
+                                    console.log('Found match by text/value!');
+                                    return false;
+                                }
+                            }
+                        });
+                        
+                        if (!found && savedSpec) {
+                            console.warn('No match found for savedSpec:', savedSpec);
+                            // Thêm option tạm thời để hiển thị savedSpec nếu không tìm thấy match
+                            const tempOption = $('<option></option>')
+                                .attr('value', savedSpec)
+                                .text(savedSpec)
+                                .prop('selected', true);
+                            specSelectElement.append(tempOption);
+                            specSelectElement.val(savedSpec);
+                            specSelectElement.trigger('change');
+                            console.log('Added temporary option for savedSpec:', savedSpec);
+                        }
+                    }
+                    });
+                }, 50); // Delay 50ms để đảm bảo DOM đã render
+            }
+            
+            calculateTotalAmount();
+        }
+
+        // Xử lý khi chọn sản phẩm
+        function onProductChange(index) {
+            const productId = $(`tr[data-index="${index}"] .detail-product`).val();
+            const specSelect = $(`tr[data-index="${index}"] .detail-spec`);
+            loadProductConfigurations(productId, specSelect);
+        }
+
+        // Xóa dòng chi tiết
+        function removeDetailRow(index) {
+            $(`tr[data-index="${index}"]`).remove();
+            calculateTotalAmount();
+        }
+
+        // Tính tổng tiền cho một dòng chi tiết
+        function calculateDetailTotal(index) {
+            const quantity = parseFloat($(`tr[data-index="${index}"] .detail-quantity`).val()) || 0;
+            const price = parseFloat($(`tr[data-index="${index}"] .detail-price`).val()) || 0;
+            const total = quantity * price;
+            $(`tr[data-index="${index}"] .detail-total`).val(formatCurrency(total));
+            calculateTotalAmount();
+        }
+
+        // Tính tổng tiền
+        function calculateTotalAmount() {
+            let total = 0;
+            $('#detailTableBody tr').each(function() {
+                const quantity = parseFloat($(this).find('.detail-quantity').val()) || 0;
+                const price = parseFloat($(this).find('.detail-price').val()) || 0;
+                total += quantity * price;
+            });
+            $('#totalAmountInput').val(total.toFixed(2));
+        }
+
+        // Lưu phiếu nhập hàng
+        function saveStockImport() {
+            $('#formErrorMessage').hide();
+
+            let stockImportId = $('#stockImportIdInput').val().trim();
+            const time = $('#timeInput').val();
+            const supplierId = $('#supplierIdInput').val().trim();
+            const employeeId = $('#employeeIdInput').val().trim();
+            const totalAmount = parseFloat($('#totalAmountInput').val()) || 0;
+
+            const isEdit = $('#stockImportId').val() !== '';
+            
+            // Khi thêm mới, nếu không có ID thì để null để backend tự động tạo
+            if (!isEdit && !stockImportId) {
+                stockImportId = null;
+            }
+
+            if (!time) {
+                showFormError('Vui lòng chọn ngày nhập');
+                return;
+            }
+
+            // Lấy chi tiết
+            const details = [];
+            $('#detailTableBody tr').each(function() {
+                const productId = $(this).find('.detail-product').val().trim();
+                const quantity = parseInt($(this).find('.detail-quantity').val()) || 0;
+                const price = parseFloat($(this).find('.detail-price').val()) || 0;
+                let specifications = $(this).find('.detail-spec').val().trim();
+
+                // Nếu specifications là JSON string, parse nó và lấy thông tin
+                if (specifications) {
+                    try {
+                        // jQuery tự động unescape khi lấy value từ DOM, nhưng đảm bảo parse được
+                        let unescapedSpec = specifications;
+                        // Nếu có HTML entities, unescape chúng
+                        if (specifications.includes('&quot;') || specifications.includes('&#39;')) {
+                            unescapedSpec = specifications.replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+                        }
+                        
+                        const specObj = JSON.parse(unescapedSpec);
+                        const specParts = [];
+                        if (specObj.cpu) specParts.push(`CPU: ${specObj.cpu}`);
+                        if (specObj.ram) specParts.push(`RAM: ${specObj.ram}`);
+                        if (specObj.rom) specParts.push(`ROM: ${specObj.rom}`);
+                        if (specObj.card) specParts.push(`Card: ${specObj.card}`);
+                        specifications = specParts.length > 0 ? specParts.join(', ') : specifications;
+                    } catch (e) {
+                        // Nếu không phải JSON, giữ nguyên (có thể đã là formatted string)
+                        // Không cần làm gì, giữ nguyên giá trị
+                    }
+                }
+
+                if (productId && quantity > 0 && price > 0) {
+                    details.push({
+                        productId: productId,
+                        quantity: quantity,
+                        price: price,
+                        specifications: specifications || null
+                    });
+                }
+            });
+
+            const url = isEdit ? `${API_URL}/${stockImportId}` : API_URL;
+            const method = isEdit ? 'PUT' : 'POST';
+
+            const data = {
+                stockImportId: stockImportId || null, // null để backend tự động tạo khi thêm mới
+                supplierId: supplierId || null,
+                employeeId: employeeId || null,
+                time: new Date(time).toISOString(),
+                totalAmount: totalAmount,
+                details: details
+            };
+
+            $.ajax({
+                url: url,
+                type: method,
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                success: function(response) {
+                    showNotification(isEdit ? 'Cập nhật phiếu nhập hàng thành công' : 'Thêm phiếu nhập hàng thành công', 'success');
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('createEditModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                    loadStockImports();
+                },
+                error: function(xhr) {
+                    console.error('Error saving stock import:', xhr);
+                    let message = 'Có lỗi xảy ra khi lưu phiếu nhập hàng';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showFormError(message);
+                }
+            });
+        }
+
+        // Xóa phiếu nhập hàng
+        function deleteStockImport(stockImportId) {
+            deleteStockImportId = stockImportId;
+            $('#deleteStockImportId').text(stockImportId);
+            const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+            modal.show();
+        }
+
+        // Xác nhận xóa
+        function confirmDelete() {
+            if (!deleteStockImportId) return;
+
+            $.ajax({
+                url: `${API_URL}/${deleteStockImportId}`,
+                type: 'DELETE',
+                success: function(response) {
+                    showNotification('Xóa phiếu nhập hàng thành công', 'success');
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                    loadStockImports();
+                    deleteStockImportId = null;
+                },
+                error: function(xhr) {
+                    console.error('Error deleting stock import:', xhr);
+                    let message = 'Có lỗi xảy ra khi xóa phiếu nhập hàng';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showNotification(message, 'error');
+                }
+            });
+        }
+
+        // Hiển thị thông báo
+        function showNotification(message, type) {
+            const bgColor = type === 'success' ? 'bg-gradient-success' : 'bg-gradient-danger';
+            const notification = $(
+                `<div class="alert ${bgColor} text-white alert-dismissible fade show position-fixed" 
+                     style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>`
+            );
+            $('body').append(notification);
+            setTimeout(() => notification.alert('close'), 3000);
+        }
+
+        // Hiển thị lỗi trong form
+        function showFormError(message) {
+            $('#formErrorMessage').html(message).show();
+        }
+
+        // Format tiền tệ
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+        }
+
+        // Reset khi đóng modal
+        $(document).on('hidden.bs.modal', '#createEditModal', function() {
+            $('#stockImportForm')[0].reset();
+            $('#stockImportId').val('');
+            $('#stockImportIdInput').prop('readonly', false);
+            $('#detailTableBody').empty();
+            detailRowIndex = 0;
+            $('#formErrorMessage').hide();
+            $('#totalAmountInput').val('0');
+            $('.input-group-outline').removeClass('is-filled is-focused');
+            if (typeof updateInputLabels === 'function') {
+                setTimeout(function() {
+                    updateInputLabels();
+                }, 50);
+            }
+        });
+    </script>
+}
+
+<style>
+    .action-btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        margin: 0 0.125rem;
+    }
+
+    .table-actions {
+        white-space: nowrap;
+    }
+
+    #stockImportTableBody tr td {
+        vertical-align: middle !important;
+        padding: 0.75rem 0.5rem !important;
+    }
+</style>
