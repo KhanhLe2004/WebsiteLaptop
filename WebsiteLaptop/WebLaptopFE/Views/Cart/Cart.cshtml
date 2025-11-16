@@ -1,0 +1,171 @@
+﻿@{
+    ViewData["Title"] = "Giỏ hàng";
+    Layout = "~/Views/Shared/_LayoutCart.cshtml";
+}
+
+<!-- Cart Page Start -->
+        <div class="container-fluid py-5">
+            <div class="container py-5">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                          <tr>
+                            <th scope="col">Sản phẩm</th>
+                            <th scope="col">Tên</th>
+                            <th scope="col">Giá</th>
+                            <th scope="col">Số lượng</th>
+                            <th scope="col">Thành tiền</th>
+                            <th scope="col">Thao tác</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <th scope="row">
+                                    <div class="d-flex align-items-center">
+                                        <img src="img/vegetable-item-3.png" class="img-fluid me-5 rounded-circle" style="width: 80px; height: 80px;" alt="">
+                                    </div>
+                                </th>
+                                <td>
+                                    <p class="mb-0 mt-4">Chuối lớn</p>
+                                </td>
+                                <td>
+                                    <p class="mb-0 mt-4">2.99 $</p>
+                                </td>
+                                <td>
+                                    <div class="input-group quantity mt-4" style="width: 100px;">
+                                        <div class="input-group-btn">
+                                            <button class="btn btn-sm btn-minus rounded-circle bg-light border" >
+                                            <i class="fa fa-minus"></i>
+                                            </button>
+                                        </div>
+                                        <input type="text" class="form-control form-control-sm text-center border-0" value="1">
+                                        <div class="input-group-btn">
+                                            <button class="btn btn-sm btn-plus rounded-circle bg-light border">
+                                                <i class="fa fa-plus"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <p class="mb-0 mt-4">2.99 $</p>
+                                </td>
+                                <td>
+                                    <button class="btn btn-md rounded-circle bg-light border mt-4" >
+                                        <i class="fa fa-times text-danger"></i>
+                                    </button>
+                                </td>
+
+                            </tr>
+                            <tr>
+                                <th scope="row">
+                                    <div class="d-flex align-items-center">
+                                        <img src="img/vegetable-item-5.jpg" class="img-fluid me-5 rounded-circle" style="width: 80px; height: 80px;" alt="" alt="">
+                                    </div>
+                                </th>
+                                <td>
+                                    <p class="mb-0 mt-4">Khoai tây</p>
+                                </td>
+                                <td>
+                                    <p class="mb-0 mt-4">2.99 $</p>
+                                </td>
+                                <td>
+                                    <div class="input-group quantity mt-4" style="width: 100px;">
+                                        <div class="input-group-btn">
+                                            <button class="btn btn-sm btn-minus rounded-circle bg-light border" >
+                                            <i class="fa fa-minus"></i>
+                                            </button>
+                                        </div>
+                                        <input type="text" class="form-control form-control-sm text-center border-0" value="1">
+                                        <div class="input-group-btn">
+                                            <button class="btn btn-sm btn-plus rounded-circle bg-light border">
+                                                <i class="fa fa-plus"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <p class="mb-0 mt-4">2.99 $</p>
+                                </td>
+                                <td>
+                                    <button class="btn btn-md rounded-circle bg-light border mt-4" >
+                                        <i class="fa fa-times text-danger"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">
+                                    <div class="d-flex align-items-center">
+                                        <img src="img/vegetable-item-2.jpg" class="img-fluid me-5 rounded-circle" style="width: 80px; height: 80px;" alt="" alt="">
+                                    </div>
+                                </th>
+                                <td>
+                                    <p class="mb-0 mt-4">Bông cải tuyệt vời</p>
+                                </td>
+                                <td>
+                                    <p class="mb-0 mt-4">2.99 $</p>
+                                </td>
+                                <td>
+                                    <div class="input-group quantity mt-4" style="width: 100px;">
+                                        <div class="input-group-btn">
+                                            <button class="btn btn-sm btn-minus rounded-circle bg-light border" >
+                                            <i class="fa fa-minus"></i>
+                                            </button>
+                                        </div>
+                                        <input type="text" class="form-control form-control-sm text-center border-0" value="1">
+                                        <div class="input-group-btn">
+                                            <button class="btn btn-sm btn-plus rounded-circle bg-light border">
+                                                <i class="fa fa-plus"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <p class="mb-0 mt-4">2.99 $</p>
+                                </td>
+                                <td>
+                                    <button class="btn btn-md rounded-circle bg-light border mt-4" >
+                                        <i class="fa fa-times text-danger"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="row g-4 align-items-center mt-5">
+                <!-- cột trái 4/12 -->
+                <div class="col-12 col-md-6">
+                    <div class="d-flex align-items-center w-100 px-5">
+                        <div class="col-8 pe-3">
+                            <input type="text"
+                                class="form-control border-0 border-bottom rounded py-3"
+                                placeholder="Mã giảm giá" style="box-shadow:none;">
+                        </div>
+
+                        <div class="col-4">
+                            <button class="btn w-100 border-secondary rounded-pill px-4 py-3 text-primary">
+                                Áp dụng mã
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- cột phải 8/12 -->
+                <div class="col-12 col-md-6">
+                    <div class="bg-light rounded">
+                    <div class="p-4">
+                        <div class="d-flex justify-content-between mb-4">
+                        <h3 class="mb-0 me-4">Tạm tính: </h3>
+                        <p class="mb-0 number-text" style="font-size: x-large">$96.00</p>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-center">
+                        <button class="btn border-secondary rounded-pill px-5 py-3 text-primary text-uppercase mb-4" type="button" onclick="window.location.href='/Cart/Checkout'">
+                        Thanh toán
+                    </button>
+                    </div>
+                    </div>
+                </div>
+                </div>
+            </div>
+        </div>
+        <!-- Cart Page End -->

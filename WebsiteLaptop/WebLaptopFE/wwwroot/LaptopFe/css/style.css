@@ -1052,3 +1052,8 @@
             transform: translateX(-50%);
         }
 }
+
+
+.number-text {
+    font-family: 'Times New Roman', Times, serif !important;
+}
