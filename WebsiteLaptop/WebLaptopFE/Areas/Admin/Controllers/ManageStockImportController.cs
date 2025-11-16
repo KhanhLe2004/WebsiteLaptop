@@ -5,9 +5,10 @@ namespace WebLaptopFE.Areas.Admin.Controllers
     [Area("Admin")]
     public class ManageStockImportController : Controller
     {
-        public IActionResult ManageStockImport()
+        // GET: Admin/ManageStockImport
+        public IActionResult Index()
         {
-            return View();
+            return View("ManageStockImport");
         }
     }
 }

@@ -5,9 +5,9 @@ namespace WebLaptopFE.Areas.Admin.Controllers
     [Area("Admin")]
     public class ManageEmployeeController : Controller
     {
-        public IActionResult ManageEmployee()
+        public IActionResult Index()
         {
-            return View();
+            return View("ManageEmployee");
         }
     }
 }

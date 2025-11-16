@@ -6,9 +6,9 @@ namespace WebLaptopFE.Areas.Admin.Controllers
     public class ManageProductController : Controller
     {
         // GET: Admin/Product
-        public IActionResult ManageProduct()
+        public IActionResult Index()
         {
-             return View();
+             return View("ManageProduct");
         }
     }
 }

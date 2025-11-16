@@ -5,9 +5,10 @@ namespace WebLaptopFE.Areas.Admin.Controllers
     [Area("Admin")]
     public class ManageSaleInvoiceController : Controller
     {
-        public IActionResult ManageSaleInvoice()
+        // GET: Admin/ManageSaleInvoice
+        public IActionResult Index()
         {
-            return View();
+            return View("ManageSaleInvoice");
         }
     }
 }
