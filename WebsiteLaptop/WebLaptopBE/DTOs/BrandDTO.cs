@@ -7,6 +7,7 @@ namespace WebLaptopBE.DTOs
     {
         public string BrandId { get; set; } = null!;
         public string? BrandName { get; set; }
+        public bool? Active { get; set; }
         public int ProductCount { get; set; }
     }
 

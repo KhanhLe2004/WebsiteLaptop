@@ -13,9 +13,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageStockImportAPIController : ControllerBase
     {
-        private readonly Testlaptop29Context _context;
+        private readonly Testlaptop30Context _context;
 
-        public ManageStockImportAPIController(Testlaptop29Context context)
+        public ManageStockImportAPIController(Testlaptop30Context context)
         {
             _context = context;
         }
@@ -902,13 +902,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
         }
 
-    }
-
-    // DTO cho nhà cung cấp
-    public class SupplierDTO
-    {
-        public string SupplierId { get; set; } = null!;
-        public string? SupplierName { get; set; }
     }
 
     // DTO cho sản phẩm (select)

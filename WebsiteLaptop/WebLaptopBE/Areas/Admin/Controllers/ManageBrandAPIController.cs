@@ -14,9 +14,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageBrandAPIController : ControllerBase
     {
-        private readonly Testlaptop29Context _context;
+        private readonly Testlaptop30Context _context;
 
-        public ManageBrandAPIController(Testlaptop29Context context)
+        public ManageBrandAPIController(Testlaptop30Context context)
         {
             _context = context;
         }
@@ -27,7 +27,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
         public async Task<ActionResult<PagedResult<BrandDTO>>> GetBrands(
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
-            [FromQuery] string? searchTerm = null)
+            [FromQuery] string? searchTerm = null,
+            [FromQuery] bool? active = null)
         {
             try
             {
@@ -48,6 +49,12 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         (b.BrandName != null && b.BrandName.ToLower().Contains(searchTerm)));
                 }
 
+                // Lọc theo trạng thái active
+                if (active.HasValue)
+                {
+                    query = query.Where(b => b.Active == active.Value);
+                }
+
                 // Đếm tổng số
                 var totalItems = await query.CountAsync();
 
@@ -62,7 +69,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 {
                     BrandId = b.BrandId,
                     BrandName = b.BrandName,
-                    ProductCount = b.Products != null ? b.Products.Count : 0
+                    Active = b.Active,
+                    ProductCount = b.Products != null ? b.Products.Count(p => p.Active == true) : 0
                 }).ToList();
 
                 var result = new PagedResult<BrandDTO>
@@ -101,7 +109,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 {
                     BrandId = brand.BrandId,
                     BrandName = brand.BrandName,
-                    ProductCount = brand.Products != null ? brand.Products.Count : 0
+                    Active = brand.Active,
+                    ProductCount = brand.Products != null ? brand.Products.Count(p => p.Active == true) : 0
                 };
 
                 return Ok(brandDTO);
@@ -151,7 +160,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 var brand = new Brand
                 {
                     BrandId = brandId,
-                    BrandName = dto.BrandName.Trim()
+                    BrandName = dto.BrandName.Trim(),
+                    Active = true // Mặc định hãng mới tạo sẽ active
                 };
 
                 _context.Brands.Add(brand);
@@ -161,6 +171,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 {
                     BrandId = brand.BrandId,
                     BrandName = brand.BrandName,
+                    Active = brand.Active,
                     ProductCount = 0
                 };
 
@@ -208,7 +219,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     return BadRequest(new { message = "Tên hãng đã tồn tại" });
                 }
 
-                // Cập nhật thông tin
+                // Cập nhật thông tin (không cập nhật Active - chỉ xóa mới set active = false)
                 brand.BrandName = dto.BrandName.Trim();
 
                 await _context.SaveChangesAsync();
@@ -217,7 +228,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 {
                     BrandId = brand.BrandId,
                     BrandName = brand.BrandName,
-                    ProductCount = brand.Products != null ? brand.Products.Count : 0
+                    Active = brand.Active,
+                    ProductCount = brand.Products != null ? brand.Products.Count(p => p.Active == true) : 0
                 };
 
                 return Ok(result);
@@ -229,7 +241,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
         }
 
         // DELETE: api/admin/brands/{id}
-        // Xóa hãng
+        // Ẩn hãng (set active = false) thay vì xóa thực sự
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteBrand(string id)
         {
@@ -244,20 +256,47 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     return NotFound(new { message = "Không tìm thấy hãng" });
                 }
 
-                // Kiểm tra xem hãng có sản phẩm nào không
-                if (brand.Products != null && brand.Products.Count > 0)
+                // Kiểm tra xem hãng có sản phẩm đang hoạt động nào không (chỉ đếm sản phẩm active = true)
+                if (brand.Products != null && brand.Products.Any(p => p.Active == true))
                 {
-                    return BadRequest(new { message = "Không thể xóa hãng vì đang có sản phẩm thuộc hãng này" });
+                    var activeProductCount = brand.Products.Count(p => p.Active == true);
+                    return BadRequest(new { message = $"Không thể xóa hãng vì đang có {activeProductCount} sản phẩm đang hoạt động thuộc hãng này" });
                 }
 
-                _context.Brands.Remove(brand);
+                // Set active = false thay vì xóa
+                brand.Active = false;
                 await _context.SaveChangesAsync();
 
-                return Ok(new { message = "Xóa hãng thành công" });
+                return Ok(new { message = "Đã ẩn hãng thành công" });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Lỗi khi xóa hãng", error = ex.Message });
+                return StatusCode(500, new { message = "Lỗi khi ẩn hãng", error = ex.Message });
+            }
+        }
+
+        // POST: api/admin/brands/{id}/restore
+        // Khôi phục hãng (set active = true)
+        [HttpPost("{id}/restore")]
+        public async Task<IActionResult> RestoreBrand(string id)
+        {
+            try
+            {
+                var brand = await _context.Brands.FindAsync(id);
+                if (brand == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy hãng" });
+                }
+
+                // Set active = true
+                brand.Active = true;
+                await _context.SaveChangesAsync();
+
+                return Ok(new { message = "Khôi phục hãng thành công" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi khôi phục hãng", error = ex.Message });
             }
         }
 
