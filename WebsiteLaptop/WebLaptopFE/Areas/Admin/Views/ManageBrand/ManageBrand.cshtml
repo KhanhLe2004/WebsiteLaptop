@@ -2,3 +2,601 @@
     ViewData["Title"] = "Quản lý hãng";
     Layout = "~/Areas/Admin/Views/Shared/_LayoutManageBrand.cshtml";
 }
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card my-4">
+                <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                    <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="text-white text-capitalize ps-3 mb-0">Quản lý hãng</h6>
+                            <button class="btn btn-light btn-sm me-3" onclick="showCreateModal()">
+                                <i class="material-icons text-sm">add</i> Thêm mới
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body px-3 pb-2">
+                    <!-- Bộ lọc và tìm kiếm -->
+                    <div class="row mb-3 g-2 align-items-end">
+                        <div class="col-lg-4 col-md-6">
+                            <div class="input-group input-group-outline">
+                                <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm hãng...">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bảng hãng -->
+                    <div class="table-responsive p-0">
+                        <table class="table align-items-center mb-0" style="table-layout: fixed; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 20%;">Mã hãng</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 40%;">Tên hãng</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 20%;">Số sản phẩm</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 20%;">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="brandTableBody">
+                                <!-- Dữ liệu sẽ được load bằng AJAX -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Phân trang -->
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <p class="text-sm mb-0" id="pageInfo">Đang tải...</p>
+                        </div>
+                        <div class="col-md-6">
+                            <nav aria-label="Page navigation">
+                                <ul class="pagination justify-content-end mb-0" id="pagination">
+                                    <!-- Phân trang sẽ được tạo bằng JavaScript -->
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xem chi tiết -->
+<div class="modal fade" id="viewModal" tabindex="-1" aria-labelledby="viewModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-info">
+                <h5 class="modal-title text-white" id="viewModalLabel">Chi tiết hãng</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="viewModalBody">
+                <!-- Nội dung sẽ được load bằng JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Thêm/Sửa -->
+<div class="modal fade" id="createEditModal" tabindex="-1" aria-labelledby="createEditModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-primary">
+                <h5 class="modal-title text-white" id="createEditModalLabel">Thêm hãng</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="brandForm">
+                    <input type="hidden" id="brandId" value="">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Mã hãng</label>
+                                <input type="text" class="form-control" id="brandIdInput" readonly>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Tên hãng *</label>
+                                <input type="text" class="form-control" id="brandNameInput" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-danger mb-3" id="formErrorMessage" style="display:none;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" onclick="saveBrand()">
+                    <i class="material-icons text-sm">save</i> Lưu
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xác nhận xóa -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-danger">
+                <h5 class="modal-title text-white" id="deleteModalLabel">Xác nhận xóa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Bạn có chắc chắn muốn xóa hãng <strong id="deleteBrandId"></strong>?</p>
+                <p class="text-danger text-sm mt-2" id="deleteWarningMessage" style="display:none;"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDelete()">Xóa</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const API_URL = 'http://localhost:5068/api/admin/brands';
+        let currentPage = 1;
+        let pageSize = 10;
+        let searchDebounceTimer = null;
+        const SEARCH_DEBOUNCE_DELAY = 300;
+        let deleteBrandId = null;
+
+        $(document).ready(function() {
+            loadBrands();
+
+            // Tìm kiếm tự động
+            $('#searchInput').on('input', function() {
+                triggerAutoSearch();
+            });
+
+            // Xử lý label cho Material Dashboard inputs
+            window.updateInputLabels = function() {
+                $('.input-group-outline input, .input-group-outline select, .input-group-outline textarea').each(function() {
+                    const $input = $(this);
+                    const value = $input.val();
+                    if (value && value.trim() !== '') {
+                        $input.closest('.input-group-outline').addClass('is-filled');
+                    } else {
+                        $input.closest('.input-group-outline').removeClass('is-filled');
+                    }
+                });
+            };
+
+            $(document).on('input change', '.input-group-outline input, .input-group-outline select, .input-group-outline textarea', function() {
+                const $input = $(this);
+                const value = $input.val();
+                if (value && value.trim() !== '') {
+                    $input.closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    $input.closest('.input-group-outline').removeClass('is-filled');
+                }
+            });
+
+            $(document).on('focus', '.input-group-outline input, .input-group-outline select, .input-group-outline textarea', function() {
+                $(this).closest('.input-group-outline').addClass('is-focused');
+            });
+
+            $(document).on('blur', '.input-group-outline input, .input-group-outline select, .input-group-outline textarea', function() {
+                const $input = $(this);
+                const $group = $input.closest('.input-group-outline');
+                $group.removeClass('is-focused');
+                const value = $input.val();
+                if (value && value.trim() !== '') {
+                    $group.addClass('is-filled');
+                } else {
+                    $group.removeClass('is-filled');
+                }
+            });
+        });
+
+        function triggerAutoSearch() {
+            currentPage = 1;
+            if (searchDebounceTimer) {
+                clearTimeout(searchDebounceTimer);
+            }
+            searchDebounceTimer = setTimeout(() => {
+                loadBrands();
+            }, SEARCH_DEBOUNCE_DELAY);
+        }
+
+        // Load danh sách hãng
+        function loadBrands(page = currentPage) {
+            currentPage = page;
+            const searchTerm = $('#searchInput').val().trim();
+
+            const dataParams = {
+                pageNumber: currentPage,
+                pageSize: pageSize,
+                searchTerm: searchTerm || null
+            };
+
+            $.ajax({
+                url: API_URL,
+                type: 'GET',
+                data: dataParams,
+                success: function(response) {
+                    displayBrands(response.items);
+                    displayPagination(response);
+                    updatePageInfo(response);
+                },
+                error: function(xhr) {
+                    console.error('Lỗi khi tải hãng:', xhr);
+                    showNotification('Lỗi khi tải dữ liệu hãng', 'error');
+                }
+            });
+        }
+
+        // Hiển thị hãng
+        function displayBrands(brands) {
+            const tbody = $('#brandTableBody');
+            tbody.empty();
+
+            if (brands.length === 0) {
+                tbody.append(`
+                    <tr>
+                        <td colspan="4" class="text-center text-secondary py-4">
+                            Không có hãng nào
+                        </td>
+                    </tr>
+                `);
+                return;
+            }
+
+            $.each(brands, function(index, brand) {
+                tbody.append(`
+                    <tr>
+                        <td style="vertical-align: middle;">
+                            <span class="text-xs font-weight-bold">${brand.brandId}</span>
+                        </td>
+                        <td style="vertical-align: middle;">
+                            <span class="text-xs font-weight-bold">${brand.brandName || '-'}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold">${brand.productCount || 0}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;" class="table-actions">
+                            <button class="btn btn-info action-btn" onclick='viewBrand("${brand.brandId}")' title="Xem">
+                                <i class="material-icons text-sm">visibility</i>
+                            </button>
+                            <button class="btn btn-warning action-btn" onclick='editBrand("${brand.brandId}")' title="Sửa">
+                                <i class="material-icons text-sm">edit</i>
+                            </button>
+                            <button class="btn btn-danger action-btn" onclick='deleteBrand("${brand.brandId}")' title="Xóa">
+                                <i class="material-icons text-sm">delete</i>
+                            </button>
+                        </td>
+                    </tr>
+                `);
+            });
+        }
+
+        // Hiển thị phân trang
+        function displayPagination(response) {
+            const pagination = $('#pagination');
+            pagination.empty();
+
+            if (response.totalPages <= 1) return;
+
+            pagination.append(`
+                <li class="page-item ${response.hasPreviousPage ? '' : 'disabled'}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadBrands(${currentPage - 1})">
+                        <i class="material-icons text-sm">chevron_left</i>
+                    </a>
+                </li>
+            `);
+
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(response.totalPages, currentPage + 2);
+
+            if (startPage > 1) {
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadBrands(1)">1</a></li>`);
+                if (startPage > 2) {
+                    pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                pagination.append(`
+                    <li class="page-item ${i === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="javascript:void(0)" onclick="loadBrands(${i})">${i}</a>
+                    </li>
+                `);
+            }
+
+            if (endPage < response.totalPages) {
+                if (endPage < response.totalPages - 1) {
+                    pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadBrands(${response.totalPages})">${response.totalPages}</a></li>`);
+            }
+
+            pagination.append(`
+                <li class="page-item ${response.hasNextPage ? '' : 'disabled'}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadBrands(${currentPage + 1})">
+                        <i class="material-icons text-sm">chevron_right</i>
+                    </a>
+                </li>
+            `);
+        }
+
+        // Cập nhật thông tin trang
+        function updatePageInfo(response) {
+            const start = (response.pageNumber - 1) * response.pageSize + 1;
+            const end = Math.min(response.pageNumber * response.pageSize, response.totalItems);
+            $('#pageInfo').text(`Hiển thị ${start} - ${end} trong tổng số ${response.totalItems} hãng`);
+        }
+
+        // Xem chi tiết hãng
+        function viewBrand(brandId) {
+            $.ajax({
+                url: `${API_URL}/${brandId}`,
+                type: 'GET',
+                success: function(brand) {
+                    let html = `
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Mã hãng:</strong> ${brand.brandId}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Số sản phẩm:</strong> ${brand.productCount || 0}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <strong>Tên hãng:</strong> ${brand.brandName || '-'}
+                            </div>
+                        </div>
+                    `;
+
+                    $('#viewModalBody').html(html);
+                    const modal = new bootstrap.Modal(document.getElementById('viewModal'));
+                    modal.show();
+                },
+                error: function(xhr) {
+                    console.error('Error loading brand:', xhr);
+                    showNotification('Lỗi khi tải thông tin hãng', 'error');
+                }
+            });
+        }
+
+        // Tạo ID tự động
+        function generateNextBrandId() {
+            $.ajax({
+                url: API_URL,
+                type: 'GET',
+                data: { pageNumber: 1, pageSize: 1000 },
+                success: function(response) {
+                    let nextId = 'B001';
+                    if (response.items && response.items.length > 0) {
+                        let maxNumber = 0;
+                        response.items.forEach(function(item) {
+                            const id = item.brandId;
+                            // Format: B001 (4 ký tự: B + 3 số)
+                            if (id && id.startsWith('B') && id.length === 4) {
+                                // Lấy phần số sau ký tự "B" (từ vị trí 1)
+                                const number = parseInt(id.substring(1)) || 0;
+                                maxNumber = Math.max(maxNumber, number);
+                            }
+                        });
+                        nextId = 'B' + String(maxNumber + 1).padStart(3, '0');
+                    }
+                    $('#brandIdInput').val(nextId);
+                    updateInputLabels();
+                },
+                error: function() {
+                    $('#brandIdInput').val('B001');
+                    updateInputLabels();
+                }
+            });
+        }
+
+        // Hiển thị modal thêm mới
+        function showCreateModal() {
+            $('#createEditModalLabel').text('Thêm hãng');
+            $('#brandForm')[0].reset();
+            $('#brandId').val('');
+            $('#brandIdInput').val('');
+            $('#brandIdInput').prop('readonly', true);
+            $('#formErrorMessage').hide();
+            
+            generateNextBrandId();
+
+            const modal = new bootstrap.Modal(document.getElementById('createEditModal'));
+            modal.show();
+        }
+
+        // Sửa hãng
+        function editBrand(brandId) {
+            $.ajax({
+                url: `${API_URL}/${brandId}`,
+                type: 'GET',
+                success: function(brand) {
+                    $('#createEditModalLabel').text('Sửa hãng');
+                    $('#brandId').val(brand.brandId);
+                    $('#brandIdInput').val(brand.brandId);
+                    $('#brandIdInput').prop('readonly', true);
+                    $('#brandNameInput').val(brand.brandName || '');
+                    $('#formErrorMessage').hide();
+                    
+                    updateInputLabels();
+
+                    const modal = new bootstrap.Modal(document.getElementById('createEditModal'));
+                    modal.show();
+                },
+                error: function(xhr) {
+                    console.error('Error loading brand:', xhr);
+                    showNotification('Lỗi khi tải thông tin hãng', 'error');
+                }
+            });
+        }
+
+        // Lưu hãng
+        function saveBrand() {
+            $('#formErrorMessage').hide();
+
+            const brandId = $('#brandIdInput').val().trim();
+            const brandName = $('#brandNameInput').val().trim();
+
+            if (!brandName) {
+                showFormError('Vui lòng nhập tên hãng');
+                return;
+            }
+
+            const isEdit = $('#brandId').val() !== '';
+            const url = isEdit ? `${API_URL}/${brandId}` : API_URL;
+            const method = isEdit ? 'PUT' : 'POST';
+
+            const data = isEdit 
+                ? {
+                    brandName: brandName
+                }
+                : {
+                    brandId: brandId || null,
+                    brandName: brandName
+                };
+
+            $.ajax({
+                url: url,
+                type: method,
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                success: function(response) {
+                    showNotification(isEdit ? 'Cập nhật hãng thành công' : 'Thêm hãng thành công', 'success');
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('createEditModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                    loadBrands();
+                },
+                error: function(xhr) {
+                    console.error('Error saving brand:', xhr);
+                    let message = 'Có lỗi xảy ra khi lưu hãng';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showFormError(message);
+                }
+            });
+        }
+
+        // Xóa hãng
+        function deleteBrand(brandId) {
+            deleteBrandId = brandId;
+            $('#deleteBrandId').text(brandId);
+            $('#deleteWarningMessage').hide();
+            
+            // Kiểm tra số sản phẩm trước khi xóa
+            $.ajax({
+                url: `${API_URL}/${brandId}`,
+                type: 'GET',
+                success: function(brand) {
+                    if (brand.productCount > 0) {
+                        $('#deleteWarningMessage').text(`Cảnh báo: Hãng này đang có ${brand.productCount} sản phẩm. Không thể xóa!`).show();
+                    } else {
+                        $('#deleteWarningMessage').hide();
+                    }
+                    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+                    modal.show();
+                },
+                error: function() {
+                    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+                    modal.show();
+                }
+            });
+        }
+
+        // Xác nhận xóa
+        function confirmDelete() {
+            if (!deleteBrandId) return;
+
+            $.ajax({
+                url: `${API_URL}/${deleteBrandId}`,
+                type: 'DELETE',
+                success: function(response) {
+                    showNotification('Xóa hãng thành công', 'success');
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                    loadBrands();
+                    deleteBrandId = null;
+                },
+                error: function(xhr) {
+                    console.error('Error deleting brand:', xhr);
+                    let message = 'Có lỗi xảy ra khi xóa hãng';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showNotification(message, 'error');
+                    
+                    // Nếu lỗi do có sản phẩm, đóng modal
+                    if (xhr.status === 400) {
+                        const modalInstance = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
+                        if (modalInstance) {
+                            modalInstance.hide();
+                        }
+                    }
+                }
+            });
+        }
+
+        // Hiển thị thông báo
+        function showNotification(message, type) {
+            const bgColor = type === 'success' ? 'bg-gradient-success' : 'bg-gradient-danger';
+            const notification = $(
+                `<div class="alert ${bgColor} text-white alert-dismissible fade show position-fixed" 
+                     style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>`
+            );
+            $('body').append(notification);
+            setTimeout(() => notification.alert('close'), 3000);
+        }
+
+        // Hiển thị lỗi trong form
+        function showFormError(message) {
+            $('#formErrorMessage').html(message).show();
+        }
+
+        // Reset khi đóng modal
+        $(document).on('hidden.bs.modal', '#createEditModal', function() {
+            $('#brandForm')[0].reset();
+            $('#brandId').val('');
+            $('#brandIdInput').prop('readonly', false);
+            $('#formErrorMessage').hide();
+            $('.input-group-outline').removeClass('is-filled is-focused');
+            if (typeof updateInputLabels === 'function') {
+                setTimeout(function() {
+                    updateInputLabels();
+                }, 50);
+            }
+        });
+    </script>
+}
+
+<style>
+    .action-btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        margin: 0 0.125rem;
+    }
+
+    .table-actions {
+        white-space: nowrap;
+    }
+
+    #brandTableBody tr td {
+        vertical-align: middle !important;
+        padding: 0.75rem 0.5rem !important;
+    }
+</style>

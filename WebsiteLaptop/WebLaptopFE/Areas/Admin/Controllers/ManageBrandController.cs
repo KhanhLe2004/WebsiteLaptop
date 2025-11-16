@@ -2,11 +2,12 @@
 
 namespace WebLaptopFE.Areas.Admin.Controllers
 {
+    [Area("Admin")]
     public class ManageBrandController : Controller
     {
         public IActionResult Index()
         {
-            return View();
+            return View("ManageBrand");
         }
     }
 }
