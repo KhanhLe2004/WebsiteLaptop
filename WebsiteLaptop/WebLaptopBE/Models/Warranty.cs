@@ -9,6 +9,8 @@ public partial class Warranty
 
     public string? CustomerId { get; set; }
 
+    public string? PhoneNumber { get; set; }
+
     public string? SerialId { get; set; }
 
     public string? EmployeeId { get; set; }

@@ -14,10 +14,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageProductAPIController : ControllerBase
     {
-        private readonly Testlaptop27Context _context;
+        private readonly Testlaptop29Context _context;
         private readonly IWebHostEnvironment _environment;
 
-        public ManageProductAPIController(Testlaptop27Context context, IWebHostEnvironment environment)
+        public ManageProductAPIController(Testlaptop29Context context, IWebHostEnvironment environment)
         {
             _context = context;
             _environment = environment;

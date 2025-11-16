@@ -5,13 +5,13 @@ using WebLaptopBE.Models;
 
 namespace WebLaptopBE.Data;
 
-public partial class Testlaptop27Context : DbContext
+public partial class Testlaptop29Context : DbContext
 {
-    public Testlaptop27Context()
+    public Testlaptop29Context()
     {
     }
 
-    public Testlaptop27Context(DbContextOptions<Testlaptop27Context> options)
+    public Testlaptop29Context(DbContextOptions<Testlaptop29Context> options)
         : base(options)
     {
     }
@@ -64,7 +64,7 @@ public partial class Testlaptop27Context : DbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseSqlServer("Data Source=DESKTOP-GDN4V8P;Initial Catalog=testlaptop27;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False");
+        => optionsBuilder.UseSqlServer("Data Source=DESKTOP-GDN4V8P;Initial Catalog=testlaptop29;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -701,6 +701,9 @@ public partial class Testlaptop27Context : DbContext
             entity.Property(e => e.EmployeeId)
                 .HasMaxLength(20)
                 .HasColumnName("employee_id");
+            entity.Property(e => e.PhoneNumber)
+                .HasMaxLength(20)
+                .HasColumnName("phone_number");
             entity.Property(e => e.SerialId)
                 .HasMaxLength(20)
                 .HasColumnName("serial_id");
