@@ -2,6 +2,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
+using System.Text.Json;
+using System.Threading;
 using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
@@ -14,11 +16,15 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     {
         private readonly Testlaptop30Context _context;
         private readonly IWebHostEnvironment _environment;
+        private readonly HttpClient _httpClient;
+        private const string ADDRESS_API_BASE_URL = "https://production.cas.so/address-kit/2025-07-01";
 
-        public ManageCustomerAPIController(Testlaptop30Context context, IWebHostEnvironment environment)
+        public ManageCustomerAPIController(Testlaptop30Context context, IWebHostEnvironment environment, IHttpClientFactory httpClientFactory)
         {
             _context = context;
             _environment = environment;
+            _httpClient = httpClientFactory.CreateClient();
+            _httpClient.Timeout = TimeSpan.FromSeconds(30);
         }
 
         // GET: api/admin/customers
@@ -65,19 +71,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     .Take(pageSize)
                     .ToListAsync();
 
-                var customerDTOs = customers.Select(c => new CustomerDTO
-                {
-                    CustomerId = c.CustomerId,
-                    CustomerName = c.CustomerName,
-                    DateOfBirth = c.DateOfBirth,
-                    PhoneNumber = c.PhoneNumber,
-                    Address = c.Address,
-                    Email = c.Email,
-                    Avatar = c.Avatar,
-                    Username = c.Username,
-                    Active = c.Active,
-                    PasswordLength = !string.IsNullOrEmpty(c.Password) ? c.Password.Length : (int?)null
-                }).ToList();
+                var customerDTOs = customers.Select(c => ParseCustomerAddress(c)).ToList();
 
                 var result = new PagedResult<CustomerDTO>
                 {
@@ -110,19 +104,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     return NotFound(new { message = "Không tìm thấy khách hàng" });
                 }
 
-                var customerDTO = new CustomerDTO
-                {
-                    CustomerId = customer.CustomerId,
-                    CustomerName = customer.CustomerName,
-                    DateOfBirth = customer.DateOfBirth,
-                    PhoneNumber = customer.PhoneNumber,
-                    Address = customer.Address,
-                    Email = customer.Email,
-                    Avatar = customer.Avatar,
-                    Username = customer.Username,
-                    Active = customer.Active,
-                    PasswordLength = !string.IsNullOrEmpty(customer.Password) ? customer.Password.Length : (int?)null
-                };
+                var customerDTO = ParseCustomerAddress(customer);
 
                 return Ok(customerDTO);
             }
@@ -193,7 +175,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 customer.CustomerName = dto.CustomerName;
                 customer.DateOfBirth = dto.DateOfBirth;
                 customer.PhoneNumber = dto.PhoneNumber;
-                customer.Address = dto.Address;
                 customer.Email = dto.Email;
                 customer.Username = dto.Username;
                 
@@ -203,30 +184,129 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     customer.Password = dto.Password; // Lưu mật khẩu dạng plain text (nên hash trong production)
                 }
 
+                // Xử lý địa chỉ mới
+                string? provinceName = null;
+                string? communeName = null;
+
+                if (!string.IsNullOrWhiteSpace(dto.ProvinceCode))
+                {
+                    try
+                    {
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                        var provinceResponse = await _httpClient.GetAsync($"{ADDRESS_API_BASE_URL}/provinces", cts.Token);
+                        if (provinceResponse.IsSuccessStatusCode)
+                        {
+                            var provinceJson = await provinceResponse.Content.ReadAsStringAsync(cts.Token);
+                            var provinceDoc = JsonDocument.Parse(provinceJson);
+                            if (provinceDoc.RootElement.TryGetProperty("provinces", out var provincesElement))
+                            {
+                                foreach (var province in provincesElement.EnumerateArray())
+                                {
+                                    if (province.TryGetProperty("code", out var code) && code.GetString() == dto.ProvinceCode)
+                                    {
+                                        if (province.TryGetProperty("name", out var name))
+                                        {
+                                            provinceName = name.GetString();
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception apiEx)
+                    {
+                        // Log warning nhưng không block update
+                        Console.WriteLine($"Warning: Could not fetch province name from API: {apiEx.Message}");
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(dto.CommuneCode) && !string.IsNullOrWhiteSpace(dto.ProvinceCode))
+                {
+                    try
+                    {
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                        var response = await _httpClient.GetAsync($"{ADDRESS_API_BASE_URL}/provinces/{dto.ProvinceCode}/communes", cts.Token);
+                        if (response.IsSuccessStatusCode)
+                        {
+                            var jsonString = await response.Content.ReadAsStringAsync(cts.Token);
+                            var jsonDoc = JsonDocument.Parse(jsonString);
+                            if (jsonDoc.RootElement.TryGetProperty("communes", out var communesElement))
+                            {
+                                foreach (var commune in communesElement.EnumerateArray())
+                                {
+                                    if (commune.TryGetProperty("code", out var code) && code.GetString() == dto.CommuneCode)
+                                    {
+                                        if (commune.TryGetProperty("name", out var name))
+                                        {
+                                            communeName = name.GetString();
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log warning nhưng không block update
+                        Console.WriteLine($"Warning: Không thể lấy tên phường/xã: {ex.Message}");
+                    }
+                }
+
+                // Xử lý địa chỉ: ghép từ các thành phần
+                string? fullAddress = BuildFullAddress(dto.AddressDetail, communeName, provinceName);
+                if (string.IsNullOrWhiteSpace(fullAddress) && !string.IsNullOrWhiteSpace(dto.Address))
+                {
+                    fullAddress = dto.Address; // Giữ nguyên Address cũ nếu không có thông tin mới
+                }
+
+                // Lưu thông tin địa chỉ chi tiết vào Address dưới dạng JSON
+                // Nhưng nếu JSON quá dài (> 200 ký tự), chỉ lưu FullAddress
+                string? finalAddress = fullAddress;
+                if (!string.IsNullOrWhiteSpace(dto.ProvinceCode) || !string.IsNullOrWhiteSpace(dto.CommuneCode) || !string.IsNullOrWhiteSpace(dto.AddressDetail))
+                {
+                    try
+                    {
+                        finalAddress = SerializeAddress(dto.ProvinceCode, provinceName, dto.CommuneCode, communeName, dto.AddressDetail, fullAddress);
+                        if (string.IsNullOrWhiteSpace(finalAddress))
+                        {
+                            finalAddress = fullAddress;
+                        }
+                    }
+                    catch (Exception jsonEx)
+                    {
+                        // Nếu có lỗi khi serialize JSON, chỉ lưu FullAddress
+                        Console.WriteLine($"Error serializing address JSON: {jsonEx.Message}");
+                        finalAddress = fullAddress;
+                    }
+                }
+
+                customer.Address = finalAddress;
+
                 await _context.SaveChangesAsync();
 
                 // Reload customer để lấy thông tin đầy đủ
                 await _context.Entry(customer).ReloadAsync();
                 
-                var result = new CustomerDTO
-                {
-                    CustomerId = customer.CustomerId,
-                    CustomerName = customer.CustomerName,
-                    DateOfBirth = customer.DateOfBirth,
-                    PhoneNumber = customer.PhoneNumber,
-                    Address = customer.Address,
-                    Email = customer.Email,
-                    Avatar = customer.Avatar,
-                    Username = customer.Username,
-                    Active = customer.Active,
-                    PasswordLength = !string.IsNullOrEmpty(customer.Password) ? customer.Password.Length : (int?)null
-                };
+                var result = ParseCustomerAddress(customer);
                 
                 return Ok(result);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Lỗi khi cập nhật khách hàng", error = ex.Message });
+                // Log inner exception để debug
+                var errorMessage = ex.Message;
+                if (ex.InnerException != null)
+                {
+                    errorMessage += $" | Inner: {ex.InnerException.Message}";
+                }
+                
+                // Log stack trace để debug
+                Console.WriteLine($"Error updating customer: {errorMessage}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                
+                return StatusCode(500, new { message = "Lỗi khi cập nhật khách hàng", error = errorMessage });
             }
         }
 
@@ -410,6 +490,315 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             catch
             {
                 // Không throw exception nếu xóa file thất bại
+            }
+        }
+
+        // GET: api/admin/customers/provinces
+        // Lấy danh sách tỉnh/thành
+        [HttpGet("provinces")]
+        public async Task<ActionResult<List<ProvinceDTO>>> GetProvinces()
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync($"{ADDRESS_API_BASE_URL}/provinces");
+                response.EnsureSuccessStatusCode();
+
+                var jsonString = await response.Content.ReadAsStringAsync();
+                var jsonDoc = JsonDocument.Parse(jsonString);
+                
+                var provinces = new List<ProvinceDTO>();
+                if (jsonDoc.RootElement.TryGetProperty("provinces", out var provincesElement))
+                {
+                    foreach (var province in provincesElement.EnumerateArray())
+                    {
+                        provinces.Add(new ProvinceDTO
+                        {
+                            Code = province.TryGetProperty("code", out var code) ? code.GetString() ?? "" : "",
+                            Name = province.TryGetProperty("name", out var name) ? name.GetString() : null,
+                            EnglishName = province.TryGetProperty("englishName", out var englishName) ? englishName.GetString() : null,
+                            AdministrativeLevel = province.TryGetProperty("administrativeLevel", out var level) ? level.GetString() : null
+                        });
+                    }
+                }
+
+                return Ok(provinces.OrderBy(p => p.Name).ToList());
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy danh sách tỉnh/thành", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/customers/provinces/{provinceCode}/communes
+        // Lấy danh sách phường/xã theo tỉnh/thành
+        [HttpGet("provinces/{provinceCode}/communes")]
+        public async Task<ActionResult<List<CommuneDTO>>> GetCommunes(string provinceCode)
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync($"{ADDRESS_API_BASE_URL}/provinces/{provinceCode}/communes");
+                response.EnsureSuccessStatusCode();
+
+                var jsonString = await response.Content.ReadAsStringAsync();
+                var jsonDoc = JsonDocument.Parse(jsonString);
+                
+                var communes = new List<CommuneDTO>();
+                if (jsonDoc.RootElement.TryGetProperty("communes", out var communesElement))
+                {
+                    foreach (var commune in communesElement.EnumerateArray())
+                    {
+                        communes.Add(new CommuneDTO
+                        {
+                            Code = commune.TryGetProperty("code", out var code) ? code.GetString() ?? "" : "",
+                            Name = commune.TryGetProperty("name", out var name) ? name.GetString() : null,
+                            EnglishName = commune.TryGetProperty("englishName", out var englishName) ? englishName.GetString() : null,
+                            AdministrativeLevel = commune.TryGetProperty("administrativeLevel", out var level) ? level.GetString() : null,
+                            ProvinceCode = commune.TryGetProperty("provinceCode", out var provCode) ? provCode.GetString() : null,
+                            ProvinceName = commune.TryGetProperty("provinceName", out var provName) ? provName.GetString() : null
+                        });
+                    }
+                }
+
+                return Ok(communes.OrderBy(c => c.Name).ToList());
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy danh sách phường/xã", error = ex.Message });
+            }
+        }
+
+        // Helper method để parse địa chỉ từ Customer và tạo CustomerDTO
+        private CustomerDTO ParseCustomerAddress(Customer customer)
+        {
+            try
+            {
+                var dto = new CustomerDTO
+                {
+                    CustomerId = customer.CustomerId,
+                    CustomerName = customer.CustomerName,
+                    DateOfBirth = customer.DateOfBirth,
+                    PhoneNumber = customer.PhoneNumber,
+                    Address = customer.Address,
+                    Email = customer.Email,
+                    Avatar = customer.Avatar,
+                    Username = customer.Username,
+                    Active = customer.Active,
+                    PasswordLength = !string.IsNullOrEmpty(customer.Password) ? customer.Password.Length : (int?)null
+                };
+
+                // Thử parse JSON từ Address (hỗ trợ cả format cũ và mới dạng key ngắn)
+                if (!string.IsNullOrWhiteSpace(customer.Address))
+                {
+                    try
+                    {
+                        var jsonDoc = JsonDocument.Parse(customer.Address);
+                        var root = jsonDoc.RootElement;
+
+                        dto.ProvinceCode = root.TryGetProperty("ProvinceCode", out var provinceCode) ? provinceCode.GetString()
+                            : root.TryGetProperty("p", out var pShort) ? pShort.GetString() : dto.ProvinceCode;
+
+                        dto.CommuneCode = root.TryGetProperty("CommuneCode", out var communeCode) ? communeCode.GetString()
+                            : root.TryGetProperty("c", out var cShort) ? cShort.GetString() : dto.CommuneCode;
+
+                        dto.AddressDetail = root.TryGetProperty("AddressDetail", out var addressDetail) ? addressDetail.GetString()
+                            : root.TryGetProperty("ad", out var adShort) ? adShort.GetString() : dto.AddressDetail;
+
+                        if (root.TryGetProperty("FullAddress", out var fullAddress))
+                        {
+                            dto.Address = fullAddress.GetString();
+                        }
+                        else if (root.TryGetProperty("fa", out var faShort))
+                        {
+                            dto.Address = faShort.GetString();
+                        }
+                    }
+                    catch
+                    {
+                        // Nếu không phải JSON, giữ nguyên Address và thử parse format legacy
+                        try
+                        {
+                            ParseLegacyAddress(customer.Address, dto);
+                        }
+                        catch
+                        {
+                            // Nếu parse legacy cũng lỗi, giữ nguyên Address
+                        }
+                    }
+                }
+                else
+                {
+                    try
+                    {
+                        ParseLegacyAddress(customer.Address, dto);
+                    }
+                    catch
+                    {
+                        // Nếu parse legacy lỗi, giữ nguyên Address
+                    }
+                }
+
+                return dto;
+            }
+            catch (Exception ex)
+            {
+                // Nếu có lỗi nghiêm trọng, trả về DTO cơ bản
+                return new CustomerDTO
+                {
+                    CustomerId = customer?.CustomerId ?? "",
+                    CustomerName = customer?.CustomerName,
+                    DateOfBirth = customer?.DateOfBirth,
+                    PhoneNumber = customer?.PhoneNumber,
+                    Address = customer?.Address,
+                    Email = customer?.Email,
+                    Avatar = customer?.Avatar,
+                    Username = customer?.Username,
+                    Active = customer?.Active,
+                    PasswordLength = !string.IsNullOrEmpty(customer?.Password) ? customer.Password.Length : (int?)null
+                };
+            }
+        }
+
+        private void ParseLegacyAddress(string? address, CustomerDTO dto)
+        {
+            if (string.IsNullOrWhiteSpace(address))
+            {
+                return;
+            }
+
+            dto.Address ??= address;
+
+            // Ưu tiên tìm mã từ format có nhãn [Phường/Xã: code], [Tỉnh/Thành: code]
+            string detailPart = address;
+            bool foundProvinceCode = false;
+            bool foundCommuneCode = false;
+
+            int communeIndex = address.IndexOf("[Phường/Xã:", StringComparison.OrdinalIgnoreCase);
+            if (communeIndex >= 0)
+            {
+                int end = address.IndexOf(']', communeIndex);
+                if (end > communeIndex)
+                {
+                    var communeSegment = address.Substring(communeIndex, end - communeIndex);
+                    var code = communeSegment.Split(':').LastOrDefault()?.Trim();
+                    if (!string.IsNullOrWhiteSpace(code))
+                    {
+                        dto.CommuneCode ??= code;
+                        foundCommuneCode = true;
+                    }
+                }
+                detailPart = address.Substring(0, communeIndex).Trim().TrimEnd(',');
+            }
+
+            int provinceIndex = address.IndexOf("[Tỉnh/Thành:", StringComparison.OrdinalIgnoreCase);
+            if (provinceIndex >= 0)
+            {
+                int end = address.IndexOf(']', provinceIndex);
+                if (end > provinceIndex)
+                {
+                    var provinceSegment = address.Substring(provinceIndex, end - provinceIndex);
+                    var code = provinceSegment.Split(':').LastOrDefault()?.Trim();
+                    if (!string.IsNullOrWhiteSpace(code))
+                    {
+                        dto.ProvinceCode ??= code;
+                        foundProvinceCode = true;
+                    }
+                }
+                if (provinceIndex < detailPart.Length)
+                {
+                    detailPart = detailPart.Substring(0, provinceIndex).Trim().TrimEnd(',');
+                }
+            }
+
+            // Nếu chưa tìm được mã từ format có nhãn, thử parse theo dấu phẩy
+            // Nhưng chỉ lấy địa chỉ cụ thể, không gán tên vào mã
+            if (!foundProvinceCode || !foundCommuneCode)
+            {
+                var parts = address
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(p => p.Trim())
+                    .Where(p => !string.IsNullOrWhiteSpace(p))
+                    .ToList();
+
+                if (parts.Count >= 1)
+                {
+                    // Chỉ lấy địa chỉ cụ thể từ phần đầu
+                    // Không gán tên vào ProvinceCode/CommuneCode vì đó là tên, không phải mã
+                    if (string.IsNullOrWhiteSpace(dto.AddressDetail))
+                    {
+                        dto.AddressDetail = parts[0];
+                    }
+                }
+            }
+            else
+            {
+                // Nếu đã tìm được mã từ format có nhãn, lấy địa chỉ cụ thể từ detailPart
+                dto.AddressDetail ??= detailPart;
+            }
+        }
+
+        // Helper method để ghép địa chỉ đầy đủ từ các thành phần
+        private string? BuildFullAddress(string? addressDetail, string? communeName, string? provinceName)
+        {
+            var parts = new List<string>();
+            
+            if (!string.IsNullOrWhiteSpace(addressDetail))
+            {
+                parts.Add(addressDetail.Trim());
+            }
+            
+            if (!string.IsNullOrWhiteSpace(communeName))
+            {
+                parts.Add(communeName);
+            }
+            
+            if (!string.IsNullOrWhiteSpace(provinceName))
+            {
+                parts.Add(provinceName);
+            }
+            
+            return parts.Count > 0 ? string.Join(", ", parts) : null;
+        }
+
+        // Helper method để serialize địa chỉ thành JSON
+        private string? SerializeAddress(string? provinceCode, string? provinceName, string? communeCode, string? communeName, string? addressDetail, string? fullAddress)
+        {
+            try
+            {
+                var addressObj = new Dictionary<string, string?>();
+                
+                if (!string.IsNullOrWhiteSpace(provinceCode))
+                    addressObj["p"] = provinceCode;
+                if (!string.IsNullOrWhiteSpace(provinceName))
+                    addressObj["pn"] = provinceName;
+                if (!string.IsNullOrWhiteSpace(communeCode))
+                    addressObj["c"] = communeCode;
+                if (!string.IsNullOrWhiteSpace(communeName))
+                    addressObj["cn"] = communeName;
+                if (!string.IsNullOrWhiteSpace(addressDetail))
+                    addressObj["ad"] = addressDetail;
+                if (!string.IsNullOrWhiteSpace(fullAddress))
+                    addressObj["fa"] = fullAddress;
+
+                if (addressObj.Count == 0)
+                    return null;
+
+                var jsonString = JsonSerializer.Serialize(addressObj);
+                
+                // Kiểm tra độ dài (giới hạn 200 ký tự)
+                if (jsonString.Length <= 200)
+                {
+                    return jsonString;
+                }
+                else
+                {
+                    // Nếu quá dài, chỉ lưu fullAddress
+                    return fullAddress;
+                }
+            }
+            catch
+            {
+                // Nếu serialize lỗi, trả về fullAddress
+                return fullAddress;
             }
         }
     }

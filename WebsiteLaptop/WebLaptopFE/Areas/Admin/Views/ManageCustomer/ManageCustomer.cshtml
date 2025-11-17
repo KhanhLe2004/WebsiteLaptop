@@ -134,10 +134,36 @@
                                 <input type="email" class="form-control" id="email">
                             </div>
                         </div>
+                    </div>
+
+                    <div class="row">
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
-                                <label class="form-label">Địa chỉ</label>
-                                <input type="text" class="form-control" id="address">
+                                <label class="form-label">Tỉnh/Thành</label>
+                                <div class="autocomplete-wrapper position-relative" style="width: 100%;">
+                                    <input type="text" id="provinceCode" class="form-control" autocomplete="off">
+                                    <input type="hidden" id="provinceCodeValue" value="">
+                                    <div id="provinceCodeDropdown" class="autocomplete-dropdown"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Phường/Xã</label>
+                                <div class="autocomplete-wrapper position-relative" style="width: 100%;">
+                                    <input type="text" id="communeCode" class="form-control" autocomplete="off" disabled>
+                                    <input type="hidden" id="communeCodeValue" value="">
+                                    <div id="communeCodeDropdown" class="autocomplete-dropdown"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Địa chỉ cụ thể</label>
+                                <input type="text" class="form-control" id="addressDetail">
                             </div>
                         </div>
                     </div>
@@ -217,8 +243,14 @@
         let searchDebounceTimer = null;
         const SEARCH_DEBOUNCE_DELAY = 300;
 
+        let provincesList = [];
+        let communesList = [];
+        let provincesPromise = null;
+        let communesCache = {};
+
         $(document).ready(function() {
             loadCustomers();
+            loadProvinces();
 
             // Tìm kiếm tự động theo tên
             $('#searchInput').on('input', function() {
@@ -228,6 +260,19 @@
             // Tìm kiếm tự động theo trạng thái active
             $('#activeFilter').on('change', function() {
                 triggerAutoSearch();
+            });
+
+            // Reset địa chỉ khi đóng modal
+            $('#customerModal').on('hidden.bs.modal', function() {
+                $('#provinceCode').val('');
+                $('#provinceCodeValue').val('');
+                $('#provinceCode').closest('.input-group-outline').removeClass('is-filled');
+                $('#communeCode').val('');
+                $('#communeCodeValue').val('');
+                $('#communeCode').prop('disabled', true);
+                $('#communeCode').closest('.input-group-outline').removeClass('is-filled');
+                $('#addressDetail').val('');
+                communesList = [];
             });
 
             // Lưu độ dài mật khẩu khi người dùng nhập
@@ -281,6 +326,368 @@
             searchDebounceTimer = setTimeout(() => {
                 loadCustomers();
             }, SEARCH_DEBOUNCE_DELAY);
+        }
+
+        function normalizeText(text) {
+            if (!text) return '';
+            return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        }
+
+        function extractAddressParts(address) {
+            if (!address) return {};
+            const parts = address.split(',')
+                .map(part => part.trim())
+                .filter(part => part.length > 0);
+
+            if (parts.length >= 3) {
+                return {
+                    detail: parts[0],
+                    communeName: parts[parts.length - 2],
+                    provinceName: parts[parts.length - 1]
+                };
+            }
+
+            if (parts.length === 2) {
+                return {
+                    detail: parts[0],
+                    provinceName: parts[1]
+                };
+            }
+
+            return {
+                detail: parts[0] || address
+            };
+        }
+
+        function resetCommuneInput() {
+            $('#communeCode').val('').prop('disabled', true);
+            $('#communeCodeValue').val('');
+            $('#communeCode').closest('.input-group-outline').removeClass('is-filled');
+        }
+
+        // Load danh sách tỉnh/thành
+        function loadProvinces(force = false) {
+            if (provincesPromise && !force) {
+                return provincesPromise;
+            }
+
+            provincesPromise = $.ajax({
+                url: `${API_URL}/provinces`,
+                type: 'GET'
+            }).then(function(provinces) {
+                provincesList = provinces || [];
+                initializeProvinceAutocomplete();
+                return provincesList;
+            }).catch(function(xhr) {
+                console.error('Lỗi khi tải danh sách tỉnh/thành:', xhr);
+                showNotification('Lỗi khi tải danh sách tỉnh/thành', 'error');
+                provincesList = [];
+                initializeProvinceAutocomplete();
+                return provincesList;
+            });
+
+            return provincesPromise;
+        }
+
+        // Load danh sách phường/xã theo tỉnh/thành
+        function loadCommunes(provinceCode, force = false) {
+            if (!provinceCode) {
+                resetCommuneInput();
+                const deferred = $.Deferred();
+                deferred.resolve([]);
+                return deferred.promise();
+            }
+
+            if (communesCache[provinceCode] && !force) {
+                const cached = communesCache[provinceCode];
+                cached.then && cached.then(function(list) {
+                    communesList = list || [];
+                    initializeCommuneAutocomplete();
+                });
+                return cached;
+            }
+
+            const request = $.ajax({
+                url: `${API_URL}/provinces/${provinceCode}/communes`,
+                type: 'GET'
+            }).then(function(communes) {
+                communesList = communes || [];
+                $('#communeCode').prop('disabled', false);
+                initializeCommuneAutocomplete();
+                communesCache[provinceCode] = $.Deferred().resolve(communesList).promise();
+                return communesList;
+            }).catch(function(xhr) {
+                console.error('Lỗi khi tải danh sách phường/xã:', xhr);
+                showNotification('Lỗi khi tải danh sách phường/xã', 'error');
+                communesList = [];
+                $('#communeCode').prop('disabled', true);
+                communesCache[provinceCode] = $.Deferred().resolve([]).promise();
+                return [];
+            });
+
+            communesCache[provinceCode] = request;
+            return request;
+        }
+
+        // Khởi tạo autocomplete cho tỉnh/thành
+        function initializeProvinceAutocomplete() {
+            const provinceInput = $('#provinceCode');
+            const provinceValue = $('#provinceCodeValue');
+            const dropdown = $('#provinceCodeDropdown');
+            let selectedIndex = -1;
+            let filteredProvinces = [];
+
+            function showDropdown(provinces) {
+                if (!provinces || provinces.length === 0) {
+                    dropdown.html('<div class="autocomplete-item" style="color: #6c757d; cursor: default;">Không tìm thấy tỉnh/thành</div>').show();
+                    selectedIndex = -1;
+                    return;
+                }
+
+                let html = '';
+                provinces.forEach((province, index) => {
+                    const provinceName = province.name || province.code;
+                    const provinceNameEscaped = (provinceName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    html += `<div class="autocomplete-item" data-index="${index}" data-province-code="${province.code}" data-province-name="${provinceNameEscaped}">${provinceName}</div>`;
+                });
+                dropdown.html(html).show();
+                selectedIndex = -1;
+            }
+
+            function updateSelectedItem() {
+                $('#provinceCodeDropdown .autocomplete-item').removeClass('selected');
+                if (selectedIndex >= 0 && selectedIndex < filteredProvinces.length) {
+                    $('#provinceCodeDropdown .autocomplete-item').eq(selectedIndex).addClass('selected');
+                }
+            }
+
+            // Xử lý khi gõ
+            provinceInput.off('input.province').on('input.province', function() {
+                const searchTerm = $(this).val().toLowerCase().trim();
+                
+                if (searchTerm) {
+                    $(this).closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    $(this).closest('.input-group-outline').removeClass('is-filled');
+                }
+                
+                if (searchTerm === '') {
+                    dropdown.hide();
+                    provinceValue.val('');
+                    loadCommunes(''); // Clear communes khi xóa tỉnh/thành
+                    return;
+                }
+
+                filteredProvinces = provincesList.filter(province => {
+                    const provinceName = (province.name || province.code || '').toLowerCase();
+                    return provinceName.includes(searchTerm);
+                });
+
+                showDropdown(filteredProvinces);
+            });
+
+            // Xử lý khi click vào item
+            $(document).off('click.province-item').on('click.province-item', '#provinceCodeDropdown .autocomplete-item', function() {
+                const provinceCode = $(this).data('province-code');
+                const provinceName = $(this).data('province-name');
+                
+                if (provinceCode && provinceName) {
+                    provinceInput.val(provinceName);
+                    provinceValue.val(provinceCode);
+                    provinceInput.closest('.input-group-outline').addClass('is-filled');
+                    dropdown.hide();
+                    
+                    // Load communes khi chọn tỉnh/thành
+                    loadCommunes(provinceCode);
+                }
+            });
+
+            // Xử lý phím tắt
+            provinceInput.off('keydown.province').on('keydown.province', function(e) {
+                if (dropdown.is(':visible') && filteredProvinces.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        selectedIndex = Math.min(selectedIndex + 1, filteredProvinces.length - 1);
+                        updateSelectedItem();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        selectedIndex = Math.max(selectedIndex - 1, -1);
+                        updateSelectedItem();
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (selectedIndex >= 0 && selectedIndex < filteredProvinces.length) {
+                            const province = filteredProvinces[selectedIndex];
+                            provinceInput.val(province.name || province.code);
+                            provinceValue.val(province.code);
+                            provinceInput.closest('.input-group-outline').addClass('is-filled');
+                            dropdown.hide();
+                            loadCommunes(province.code);
+                        }
+                    } else if (e.key === 'Escape') {
+                        dropdown.hide();
+                        selectedIndex = -1;
+                    }
+                }
+            });
+
+            // Ẩn dropdown khi click ra ngoài
+            $(document).off('click.province-close').on('click.province-close', function(e) {
+                if (!$(e.target).closest('#provinceCode').closest('.autocomplete-wrapper').length) {
+                    dropdown.hide();
+                    selectedIndex = -1;
+                }
+            });
+
+            // Xử lý khi focus vào input
+            provinceInput.off('focus.province').on('focus.province', function() {
+                $(this).closest('.input-group-outline').addClass('is-filled');
+                
+                const val = $(this).val().trim();
+                if (val) {
+                    $(this).trigger('input.province');
+                } else {
+                    if (provincesList.length > 0) {
+                        filteredProvinces = provincesList;
+                        showDropdown(filteredProvinces);
+                    }
+                }
+            });
+
+            // Xử lý khi blur
+            provinceInput.off('blur.province').on('blur.province', function() {
+                const val = $(this).val().trim();
+                if (!val) {
+                    $(this).closest('.input-group-outline').removeClass('is-filled');
+                }
+            });
+        }
+
+        // Khởi tạo autocomplete cho phường/xã
+        function initializeCommuneAutocomplete() {
+            const communeInput = $('#communeCode');
+            const communeValue = $('#communeCodeValue');
+            const dropdown = $('#communeCodeDropdown');
+            let selectedIndex = -1;
+            let filteredCommunes = [];
+
+            function showDropdown(communes) {
+                if (!communes || communes.length === 0) {
+                    dropdown.html('<div class="autocomplete-item" style="color: #6c757d; cursor: default;">Không tìm thấy phường/xã</div>').show();
+                    selectedIndex = -1;
+                    return;
+                }
+
+                let html = '';
+                communes.forEach((commune, index) => {
+                    const communeName = commune.name || commune.code;
+                    const communeNameEscaped = (communeName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    html += `<div class="autocomplete-item" data-index="${index}" data-commune-code="${commune.code}" data-commune-name="${communeNameEscaped}">${communeName}</div>`;
+                });
+                dropdown.html(html).show();
+                selectedIndex = -1;
+            }
+
+            function updateSelectedItem() {
+                $('#communeCodeDropdown .autocomplete-item').removeClass('selected');
+                if (selectedIndex >= 0 && selectedIndex < filteredCommunes.length) {
+                    $('#communeCodeDropdown .autocomplete-item').eq(selectedIndex).addClass('selected');
+                }
+            }
+
+            // Xử lý khi gõ
+            communeInput.off('input.commune').on('input.commune', function() {
+                const searchTerm = $(this).val().toLowerCase().trim();
+                
+                if (searchTerm) {
+                    $(this).closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    $(this).closest('.input-group-outline').removeClass('is-filled');
+                }
+                
+                if (searchTerm === '') {
+                    dropdown.hide();
+                    communeValue.val('');
+                    return;
+                }
+
+                filteredCommunes = communesList.filter(commune => {
+                    const communeName = (commune.name || commune.code || '').toLowerCase();
+                    return communeName.includes(searchTerm);
+                });
+
+                showDropdown(filteredCommunes);
+            });
+
+            // Xử lý khi click vào item
+            $(document).off('click.commune-item').on('click.commune-item', '#communeCodeDropdown .autocomplete-item', function() {
+                const communeCode = $(this).data('commune-code');
+                const communeName = $(this).data('commune-name');
+                
+                if (communeCode && communeName) {
+                    communeInput.val(communeName);
+                    communeValue.val(communeCode);
+                    communeInput.closest('.input-group-outline').addClass('is-filled');
+                    dropdown.hide();
+                }
+            });
+
+            // Xử lý phím tắt
+            communeInput.off('keydown.commune').on('keydown.commune', function(e) {
+                if (dropdown.is(':visible') && filteredCommunes.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        selectedIndex = Math.min(selectedIndex + 1, filteredCommunes.length - 1);
+                        updateSelectedItem();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        selectedIndex = Math.max(selectedIndex - 1, -1);
+                        updateSelectedItem();
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (selectedIndex >= 0 && selectedIndex < filteredCommunes.length) {
+                            const commune = filteredCommunes[selectedIndex];
+                            communeInput.val(commune.name || commune.code);
+                            communeValue.val(commune.code);
+                            communeInput.closest('.input-group-outline').addClass('is-filled');
+                            dropdown.hide();
+                        }
+                    } else if (e.key === 'Escape') {
+                        dropdown.hide();
+                        selectedIndex = -1;
+                    }
+                }
+            });
+
+            // Ẩn dropdown khi click ra ngoài
+            $(document).off('click.commune-close').on('click.commune-close', function(e) {
+                if (!$(e.target).closest('#communeCode').closest('.autocomplete-wrapper').length) {
+                    dropdown.hide();
+                    selectedIndex = -1;
+                }
+            });
+
+            // Xử lý khi focus vào input
+            communeInput.off('focus.commune').on('focus.commune', function() {
+                $(this).closest('.input-group-outline').addClass('is-filled');
+                
+                const val = $(this).val().trim();
+                if (val) {
+                    $(this).trigger('input.commune');
+                } else {
+                    if (communesList.length > 0) {
+                        filteredCommunes = communesList;
+                        showDropdown(filteredCommunes);
+                    }
+                }
+            });
+
+            // Xử lý khi blur
+            communeInput.off('blur.commune').on('blur.commune', function() {
+                const val = $(this).val().trim();
+                if (!val) {
+                    $(this).closest('.input-group-outline').removeClass('is-filled');
+                }
+            });
         }
 
         // Load danh sách khách hàng
@@ -523,14 +930,55 @@
                 url: `${API_URL}/${customerId}`,
                 type: 'GET',
                 success: function(customer) {
-                    const avatar = customer.avatar ? `${IMAGE_BASE_URL}/${customer.avatar}` : `${IMAGE_BASE_URL}/default-avatar.jpg`;
-                    const dateOfBirth = customer.dateOfBirth ? new Date(customer.dateOfBirth).toLocaleDateString('vi-VN') : '-';
-                    const activeBadge = customer.active !== false 
-                        ? '<span class="badge bg-gradient-success">Đang hoạt động</span>' 
-                        : '<span class="badge bg-gradient-danger">Đã khóa</span>';
+                    // Load provinces để lấy tên tỉnh/thành và phường/xã
+                    loadProvinces().then(function(provinces) {
+                        let provinceName = '';
+                        let communeName = '';
+                        const fallbackAddress = extractAddressParts(customer.address);
+                        
+                        if (customer.provinceCode) {
+                            const province = provincesList.find(p => p.code === customer.provinceCode);
+                            provinceName = province ? (province.name || province.code) : 
+                                (fallbackAddress.provinceName || customer.provinceCode);
+                        } else if (fallbackAddress.provinceName) {
+                            provinceName = fallbackAddress.provinceName;
+                        }
 
-                    // Xây dựng địa chỉ đầy đủ
-                    let fullAddress = customer.address || '-';
+                        if (customer.communeCode && customer.provinceCode) {
+                            return loadCommunes(customer.provinceCode).then(function(communes) {
+                                const commune = communesList.find(c => c.code === customer.communeCode);
+                                communeName = commune ? (commune.name || commune.code) : 
+                                    (fallbackAddress.communeName || customer.communeCode);
+                                return { provinceName, communeName };
+                            });
+                        } else {
+                            communeName = fallbackAddress.communeName || '';
+                            return Promise.resolve({ provinceName, communeName });
+                        }
+                    }).then(function({ provinceName, communeName }) {
+                        const avatar = customer.avatar ? `${IMAGE_BASE_URL}/${customer.avatar}` : `${IMAGE_BASE_URL}/default-avatar.jpg`;
+                        const dateOfBirth = customer.dateOfBirth ? new Date(customer.dateOfBirth).toLocaleDateString('vi-VN') : '-';
+                        const activeBadge = customer.active !== false 
+                            ? '<span class="badge bg-gradient-success">Đang hoạt động</span>' 
+                            : '<span class="badge bg-gradient-danger">Đã khóa</span>';
+
+                        // Xây dựng địa chỉ đầy đủ
+                        let fullAddress = '';
+                        if (customer.addressDetail) {
+                            fullAddress = customer.addressDetail;
+                        }
+                        if (communeName) {
+                            fullAddress += (fullAddress ? ', ' : '') + communeName;
+                        }
+                        if (provinceName) {
+                            fullAddress += (fullAddress ? ', ' : '') + provinceName;
+                        }
+                        if (!fullAddress && customer.address) {
+                            fullAddress = customer.address;
+                        }
+                        if (!fullAddress) {
+                            fullAddress = '-';
+                        }
 
                     let html = `
                         <div class="row mb-2">
@@ -576,9 +1024,13 @@
                         </div>
                     `;
 
-                    $('#viewCustomerModalBody').html(html);
-                    const modal = new bootstrap.Modal(document.getElementById('viewCustomerModal'));
-                    modal.show();
+                        $('#viewCustomerModalBody').html(html);
+                        const modal = new bootstrap.Modal(document.getElementById('viewCustomerModal'));
+                        modal.show();
+                    }).catch(function(error) {
+                        console.error('Error loading customer details:', error);
+                        showNotification('Lỗi khi tải thông tin chi tiết khách hàng', 'error');
+                    });
                 },
                 error: function(xhr) {
                     console.error('Error loading customer for view:', xhr);
@@ -647,8 +1099,184 @@
             
             $('#phoneNumber').val(customer.phoneNumber || '');
             $('#email').val(customer.email || '');
-            $('#address').val(customer.address || '');
+            $('#addressDetail').val(customer.addressDetail || '');
             $('#username').val(customer.username || '');
+            
+            const fallbackAddress = extractAddressParts(customer.address);
+            if (!customer.addressDetail && fallbackAddress.detail) {
+                $('#addressDetail').val(fallbackAddress.detail);
+            }
+
+            let selectedProvinceCode = customer.provinceCode || '';
+            let selectedCommuneCode = customer.communeCode || '';
+            const provinceInput = $('#provinceCode');
+            const provinceValue = $('#provinceCodeValue');
+            const communeInput = $('#communeCode');
+            const communeValue = $('#communeCodeValue');
+
+            provinceValue.val(selectedProvinceCode);
+            communeValue.val(selectedCommuneCode);
+
+            loadProvinces().then(function() {
+                let provinceDisplay = '';
+                let foundProvince = false;
+
+                // Ưu tiên tìm theo mã nếu có
+                if (selectedProvinceCode) {
+                    const province = provincesList.find(p => p.code === selectedProvinceCode);
+                    if (province) {
+                        provinceDisplay = province.name || province.code;
+                        foundProvince = true;
+                    } else {
+                        // Nếu có mã nhưng không tìm thấy, thử tìm theo tên từ address
+                        if (fallbackAddress.provinceName) {
+                            const normalizedFallback = normalizeText(fallbackAddress.provinceName);
+                            const matchByName = provincesList.find(p => {
+                                const normalizedName = normalizeText(p.name || '');
+                                return normalizedName === normalizedFallback || 
+                                       normalizedName.includes(normalizedFallback) ||
+                                       normalizedFallback.includes(normalizedName);
+                            });
+                            if (matchByName) {
+                                selectedProvinceCode = matchByName.code;
+                                provinceValue.val(selectedProvinceCode);
+                                provinceDisplay = matchByName.name || matchByName.code;
+                                foundProvince = true;
+                            } else {
+                                // Nếu vẫn không tìm thấy, hiển thị tên từ address
+                                provinceDisplay = fallbackAddress.provinceName || selectedProvinceCode;
+                            }
+                        } else {
+                            // Nếu không có tên từ address, hiển thị mã
+                            provinceDisplay = selectedProvinceCode;
+                        }
+                    }
+                }
+                
+                // Nếu chưa tìm được, thử tìm theo tên từ address
+                if (!foundProvince && fallbackAddress.provinceName) {
+                    const normalizedFallback = normalizeText(fallbackAddress.provinceName);
+                    const matchByName = provincesList.find(p => {
+                        const normalizedName = normalizeText(p.name || '');
+                        return normalizedName === normalizedFallback || 
+                               normalizedName.includes(normalizedFallback) ||
+                               normalizedFallback.includes(normalizedName);
+                    });
+                    if (matchByName) {
+                        selectedProvinceCode = matchByName.code;
+                        provinceValue.val(selectedProvinceCode);
+                        provinceDisplay = matchByName.name || matchByName.code;
+                        foundProvince = true;
+                    } else {
+                        // Nếu không tìm thấy, hiển thị tên từ address
+                        provinceDisplay = fallbackAddress.provinceName;
+                    }
+                }
+
+                if (provinceDisplay) {
+                    provinceInput.val(provinceDisplay);
+                    provinceInput.closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    provinceInput.val('');
+                    provinceInput.closest('.input-group-outline').removeClass('is-filled');
+                }
+
+                // Load communes nếu có mã tỉnh/thành
+                if (selectedProvinceCode) {
+                    return loadCommunes(selectedProvinceCode);
+                }
+
+                // Nếu không có mã tỉnh/thành, vẫn thử load communes nếu có tên tỉnh/thành
+                if (fallbackAddress.provinceName && !selectedProvinceCode) {
+                    // Không thể load communes mà không có mã tỉnh/thành
+                    resetCommuneInput();
+                    const deferred = $.Deferred();
+                    deferred.resolve([]);
+                    return deferred.promise();
+                }
+
+                resetCommuneInput();
+                const deferred = $.Deferred();
+                deferred.resolve([]);
+                return deferred.promise();
+            }).then(function(communes) {
+                let communeDisplay = '';
+                const communeList = communes || communesList || [];
+                let foundCommune = false;
+
+                // Ưu tiên tìm theo mã nếu có
+                if (selectedCommuneCode) {
+                    const commune = communeList.find(c => c.code === selectedCommuneCode);
+                    if (commune) {
+                        communeDisplay = commune.name || commune.code;
+                        foundCommune = true;
+                    } else {
+                        // Nếu có mã nhưng không tìm thấy, thử tìm theo tên từ address
+                        if (fallbackAddress.communeName) {
+                            const normalizedFallback = normalizeText(fallbackAddress.communeName);
+                            const matchByName = communeList.find(c => {
+                                const normalizedName = normalizeText(c.name || '');
+                                return normalizedName === normalizedFallback || 
+                                       normalizedName.includes(normalizedFallback) ||
+                                       normalizedFallback.includes(normalizedName);
+                            });
+                            if (matchByName) {
+                                selectedCommuneCode = matchByName.code;
+                                communeValue.val(selectedCommuneCode);
+                                communeDisplay = matchByName.name || matchByName.code;
+                                foundCommune = true;
+                            } else {
+                                // Nếu vẫn không tìm thấy, hiển thị tên từ address
+                                communeDisplay = fallbackAddress.communeName || selectedCommuneCode;
+                            }
+                        } else {
+                            // Nếu không có tên từ address, hiển thị mã
+                            communeDisplay = selectedCommuneCode;
+                        }
+                    }
+                }
+                
+                // Nếu chưa tìm được, thử tìm theo tên từ address
+                if (!foundCommune && fallbackAddress.communeName) {
+                    const normalizedFallback = normalizeText(fallbackAddress.communeName);
+                    const matchByName = communeList.find(c => {
+                        const normalizedName = normalizeText(c.name || '');
+                        return normalizedName === normalizedFallback || 
+                               normalizedName.includes(normalizedFallback) ||
+                               normalizedFallback.includes(normalizedName);
+                    });
+                    if (matchByName) {
+                        selectedCommuneCode = matchByName.code;
+                        communeValue.val(selectedCommuneCode);
+                        communeDisplay = matchByName.name || matchByName.code;
+                        foundCommune = true;
+                    } else {
+                        // Nếu không tìm thấy, hiển thị tên từ address
+                        communeDisplay = fallbackAddress.communeName;
+                    }
+                }
+
+                if (communeDisplay) {
+                    communeInput.val(communeDisplay);
+                    communeInput.closest('.input-group-outline').addClass('is-filled');
+                    if (selectedCommuneCode) {
+                        communeValue.val(selectedCommuneCode);
+                    }
+                } else {
+                    resetCommuneInput();
+                }
+            }).catch(function(err) {
+                console.error('Không thể load địa chỉ khách hàng:', err);
+                // Vẫn hiển thị giá trị từ address nếu có
+                if (fallbackAddress.provinceName) {
+                    $('#provinceCode').val(fallbackAddress.provinceName);
+                    $('#provinceCode').closest('.input-group-outline').addClass('is-filled');
+                }
+                if (fallbackAddress.communeName) {
+                    $('#communeCode').val(fallbackAddress.communeName);
+                    $('#communeCode').closest('.input-group-outline').addClass('is-filled');
+                }
+            });
             // Không fill password vì lý do bảo mật
             // Sử dụng độ dài mật khẩu từ API (passwordLength) hoặc mặc định 8
             const passwordLength = customer.passwordLength || 8;
@@ -745,7 +1373,9 @@
             formData.append('DateOfBirth', $('#dateOfBirth').val() || '');
             formData.append('PhoneNumber', $('#phoneNumber').val() || '');
             formData.append('Email', $('#email').val() || '');
-            formData.append('Address', $('#address').val() || '');
+            formData.append('ProvinceCode', $('#provinceCodeValue').val() || '');
+            formData.append('CommuneCode', $('#communeCodeValue').val() || '');
+            formData.append('AddressDetail', $('#addressDetail').val() || '');
             formData.append('Username', $('#username').val() || '');
             
             // Chỉ gửi password nếu có giá trị (khi muốn đổi mật khẩu)

@@ -15,6 +15,9 @@ namespace WebLaptopBE.DTOs
         public string? Username { get; set; }
         public bool? Active { get; set; }
         public int? PasswordLength { get; set; } // Độ dài mật khẩu (không trả về mật khẩu thực)
+        public string? ProvinceCode { get; set; }
+        public string? CommuneCode { get; set; }
+        public string? AddressDetail { get; set; }
     }
 
     // DTO cho cập nhật khách hàng
@@ -31,6 +34,13 @@ namespace WebLaptopBE.DTOs
 
         [StringLength(200, ErrorMessage = "Địa chỉ không được quá 200 ký tự")]
         public string? Address { get; set; }
+
+        public string? ProvinceCode { get; set; }
+
+        public string? CommuneCode { get; set; }
+
+        [StringLength(200, ErrorMessage = "Địa chỉ cụ thể không được quá 200 ký tự")]
+        public string? AddressDetail { get; set; }
 
         [EmailAddress(ErrorMessage = "Email không hợp lệ")]
         [StringLength(100, ErrorMessage = "Email không được quá 100 ký tự")]
