@@ -73,8 +73,26 @@
     </div>
 </div>
 
+<!-- Modal Xem chi tiết -->
+<div class="modal fade" id="viewEmployeeModal" tabindex="-1" aria-labelledby="viewEmployeeModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-info">
+                <h5 class="modal-title text-white" id="viewEmployeeModalLabel">Chi tiết nhân viên</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="viewEmployeeModalBody">
+                <!-- Nội dung sẽ được load bằng JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Thêm/Sửa Nhân viên -->
-<div class="modal fade" id="employeeModal" tabindex="-1" aria-labelledby="employeeModalLabel" aria-hidden="true">
+<div class="modal fade" id="employeeModal" tabindex="-1" aria-labelledby="employeeModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-gradient-primary">
@@ -1527,21 +1545,145 @@
                 url: `${API_URL}/${employeeId}`,
                 type: 'GET',
                 success: function(employee) {
-                    $('#employeeModalLabel').text('Chi tiết nhân viên');
-                    
-                    // Đảm bảo modal được reset trước
-                    $('#employeeForm')[0].reset();
-                    
-                    // Load dữ liệu với viewOnly = true
-                    fillFormWithEmployee(employee, true);
-                    
-                    const modal = new bootstrap.Modal(document.getElementById('employeeModal'));
-                    modal.show();
-                    
-                    // Đảm bảo setViewMode được gọi sau khi modal hiển thị
-                    setTimeout(function() {
-                        setViewMode(true);
-                    }, 300);
+                    // Load tất cả dữ liệu cần thiết trước khi hiển thị
+                    Promise.all([
+                        // Load branches nếu chưa có
+                        branchesList && branchesList.length > 0 ? Promise.resolve(branchesList) : 
+                            $.ajax({ url: `${API_URL}/branches`, type: 'GET' }).then(function(branches) {
+                                branchesList = branches || [];
+                                return branchesList;
+                            }),
+                        // Load roles nếu chưa có
+                        rolesList && rolesList.length > 0 ? Promise.resolve(rolesList) : 
+                            $.ajax({ url: `${API_URL}/roles`, type: 'GET' }).then(function(roles) {
+                                rolesList = roles || [];
+                                return rolesList;
+                            }),
+                        // Load provinces
+                        loadProvinces()
+                    ]).then(function([branches, roles, provinces]) {
+                        // Tìm tên chi nhánh
+                        let branchesName = '-';
+                        if (employee.branchesId) {
+                            const branch = branchesList.find(b => b.branchesId === employee.branchesId);
+                            branchesName = branch ? (branch.branchesName || branch.branchesId) : employee.branchesId;
+                        }
+
+                        // Tìm tên vai trò
+                        let roleName = '-';
+                        if (employee.roleId) {
+                            const role = rolesList.find(r => r.roleId === employee.roleId);
+                            roleName = role ? (role.roleName || role.roleId) : employee.roleId;
+                        }
+
+                        // Tìm tên tỉnh/thành và phường/xã
+                        let provinceName = '';
+                        let communeName = '';
+                        const fallbackAddress = extractAddressParts(employee.address);
+                        
+                        if (employee.provinceCode) {
+                            const province = provincesList.find(p => p.code === employee.provinceCode);
+                            provinceName = province ? (province.name || province.code) : 
+                                (fallbackAddress.provinceName || employee.provinceCode);
+                        } else if (fallbackAddress.provinceName) {
+                            provinceName = fallbackAddress.provinceName;
+                        }
+
+                        if (employee.communeCode && employee.provinceCode) {
+                            return loadCommunes(employee.provinceCode).then(function(communes) {
+                                const commune = communesList.find(c => c.code === employee.communeCode);
+                                communeName = commune ? (commune.name || commune.code) : 
+                                    (fallbackAddress.communeName || employee.communeCode);
+                                return { provinceName, communeName, branchesName, roleName };
+                            });
+                        } else {
+                            communeName = fallbackAddress.communeName || '';
+                            return Promise.resolve({ provinceName, communeName, branchesName, roleName });
+                        }
+                    }).then(function({ provinceName, communeName, branchesName, roleName }) {
+                        const avatar = employee.avatar ? `${IMAGE_BASE_URL}/${employee.avatar}` : `${IMAGE_BASE_URL}/default-avatar.jpg`;
+                        const dateOfBirth = employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString('vi-VN') : '-';
+                        const activeBadge = employee.active !== false 
+                            ? '<span class="badge bg-gradient-success">Đang hoạt động</span>' 
+                            : '<span class="badge bg-gradient-danger">Đã khóa</span>';
+
+                        // Xây dựng địa chỉ đầy đủ
+                        let fullAddress = '';
+                        if (employee.addressDetail) {
+                            fullAddress = employee.addressDetail;
+                        }
+                        if (communeName) {
+                            fullAddress += (fullAddress ? ', ' : '') + communeName;
+                        }
+                        if (provinceName) {
+                            fullAddress += (fullAddress ? ', ' : '') + provinceName;
+                        }
+                        if (!fullAddress && employee.address) {
+                            fullAddress = employee.address;
+                        }
+                        if (!fullAddress) {
+                            fullAddress = '-';
+                        }
+
+                        let html = `
+                            <div class="row mb-2">
+                                <div class="col-md-3 text-center">
+                                    <img src="${avatar}" class="img-fluid rounded" style="max-height: 200px;" alt="${employee.employeeName || ''}" onerror="this.src='${IMAGE_BASE_URL}/default-avatar.jpg'">
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="row mb-2">
+                                        <div class="col-md-6">
+                                            <strong>Mã nhân viên:</strong> ${employee.employeeId || '-'}
+                                        </div>
+                                        <div class="col-md-6">
+                                            <strong>Tên nhân viên:</strong> ${employee.employeeName || '-'}
+                                        </div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div class="col-md-6">
+                                            <strong>Ngày sinh:</strong> ${dateOfBirth}
+                                        </div>
+                                        <div class="col-md-6">
+                                            <strong>Trạng thái:</strong> ${activeBadge}
+                                        </div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div class="col-md-6">
+                                            <strong>Số điện thoại:</strong> ${employee.phoneNumber || '-'}
+                                        </div>
+                                        <div class="col-md-6">
+                                            <strong>Email:</strong> ${employee.email || '-'}
+                                        </div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div class="col-md-6">
+                                            <strong>Chi nhánh:</strong> ${branchesName}
+                                        </div>
+                                        <div class="col-md-6">
+                                            <strong>Vai trò:</strong> ${roleName}
+                                        </div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div class="col-md-6">
+                                            <strong>Tài khoản:</strong> ${employee.username || '-'}
+                                        </div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div class="col-md-12">
+                                            <strong>Địa chỉ:</strong> ${fullAddress}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+
+                        $('#viewEmployeeModalBody').html(html);
+                        const modal = new bootstrap.Modal(document.getElementById('viewEmployeeModal'));
+                        modal.show();
+                    }).catch(function(error) {
+                        console.error('Error loading employee details:', error);
+                        showNotification('Lỗi khi tải thông tin chi tiết nhân viên', 'error');
+                    });
                 },
                 error: function(xhr) {
                     console.error('Error loading employee for view:', xhr);

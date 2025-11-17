@@ -68,8 +68,26 @@
     </div>
 </div>
 
+<!-- Modal Xem chi tiết -->
+<div class="modal fade" id="viewCustomerModal" tabindex="-1" aria-labelledby="viewCustomerModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-info">
+                <h5 class="modal-title text-white" id="viewCustomerModalLabel">Chi tiết khách hàng</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="viewCustomerModalBody">
+                <!-- Nội dung sẽ được load bằng JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Sửa Khách hàng -->
-<div class="modal fade" id="customerModal" tabindex="-1" aria-labelledby="customerModalLabel" aria-hidden="true">
+<div class="modal fade" id="customerModal" tabindex="-1" aria-labelledby="customerModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-gradient-primary">
@@ -505,21 +523,62 @@
                 url: `${API_URL}/${customerId}`,
                 type: 'GET',
                 success: function(customer) {
-                    $('#customerModalLabel').text('Chi tiết khách hàng');
-                    
-                    // Đảm bảo modal được reset trước
-                    $('#customerForm')[0].reset();
-                    
-                    // Load dữ liệu với viewOnly = true
-                    fillFormWithCustomer(customer, true);
-                    
-                    const modal = new bootstrap.Modal(document.getElementById('customerModal'));
+                    const avatar = customer.avatar ? `${IMAGE_BASE_URL}/${customer.avatar}` : `${IMAGE_BASE_URL}/default-avatar.jpg`;
+                    const dateOfBirth = customer.dateOfBirth ? new Date(customer.dateOfBirth).toLocaleDateString('vi-VN') : '-';
+                    const activeBadge = customer.active !== false 
+                        ? '<span class="badge bg-gradient-success">Đang hoạt động</span>' 
+                        : '<span class="badge bg-gradient-danger">Đã khóa</span>';
+
+                    // Xây dựng địa chỉ đầy đủ
+                    let fullAddress = customer.address || '-';
+
+                    let html = `
+                        <div class="row mb-2">
+                            <div class="col-md-3 text-center">
+                                <img src="${avatar}" class="img-fluid rounded" style="max-height: 200px;" alt="${customer.customerName || ''}" onerror="this.src='${IMAGE_BASE_URL}/default-avatar.jpg'">
+                            </div>
+                            <div class="col-md-9">
+                                <div class="row mb-2">
+                                    <div class="col-md-6">
+                                        <strong>Mã khách hàng:</strong> ${customer.customerId || '-'}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Tên khách hàng:</strong> ${customer.customerName || '-'}
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-md-6">
+                                        <strong>Ngày sinh:</strong> ${dateOfBirth}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Trạng thái:</strong> ${activeBadge}
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-md-6">
+                                        <strong>Số điện thoại:</strong> ${customer.phoneNumber || '-'}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Email:</strong> ${customer.email || '-'}
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-md-6">
+                                        <strong>Tài khoản:</strong> ${customer.username || '-'}
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-md-12">
+                                        <strong>Địa chỉ:</strong> ${fullAddress}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    $('#viewCustomerModalBody').html(html);
+                    const modal = new bootstrap.Modal(document.getElementById('viewCustomerModal'));
                     modal.show();
-                    
-                    // Đảm bảo setViewMode được gọi sau khi modal hiển thị
-                    setTimeout(function() {
-                        setViewMode(true);
-                    }, 300);
                 },
                 error: function(xhr) {
                     console.error('Error loading customer for view:', xhr);
