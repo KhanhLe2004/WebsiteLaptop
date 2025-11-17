@@ -4,6 +4,11 @@
     console.log('account.js loaded');
 
     const API_BASE = "https://provinces.open-api.vn/api/v2";
+    const CUSTOMER_API_BASE = "/api/CustomerAccount";
+    
+    // Get current customer ID from session or URL parameter
+    // TODO: Replace with actual session/authentication mechanism
+    let currentCustomerId = null;
 
     /* ===========================
        Helpers: status badge/color
@@ -79,18 +84,37 @@
 
         $('#ward').prop('disabled', true);
         try {
-            const provinceRes = await fetch(`${API_BASE}/p/${provinceCode}?depth=3`);
+            // First get the province with districts
+            const provinceRes = await fetch(`${API_BASE}/p/${provinceCode}?depth=2`);
             if (!provinceRes.ok) throw new Error('HTTP ' + provinceRes.status);
             const province = await provinceRes.json();
 
             let allWards = [];
-            if (Array.isArray(province.districts)) {
-                province.districts.forEach(district => {
-                    const list = district.wards || district.communes || district.commune || [];
-                    if (Array.isArray(list) && list.length) {
-                        allWards = allWards.concat(list.map(w => ({ ...w, districtName: district.name })));
+            
+            // Handle different response structures
+            const districts = province.districts || [];
+            if (Array.isArray(districts) && districts.length > 0) {
+                // For each district, get its wards
+                for (const district of districts) {
+                    if (district.code) {
+                        try {
+                            const districtRes = await fetch(`${API_BASE}/d/${district.code}?depth=2`);
+                            if (districtRes.ok) {
+                                const districtData = await districtRes.json();
+                                const wards = districtData.wards || districtData.communes || [];
+                                if (Array.isArray(wards) && wards.length > 0) {
+                                    allWards = allWards.concat(wards.map(w => ({ 
+                                        code: w.code || w.id || w.name,
+                                        name: w.name,
+                                        districtName: district.name || districtData.name
+                                    })));
+                                }
+                            }
+                        } catch (e) {
+                            console.warn(`Error loading wards for district ${district.code}:`, e);
+                        }
                     }
-                });
+                }
             }
 
             if (allWards.length === 0) {
@@ -99,10 +123,12 @@
                 return;
             }
 
+            // Sort and add to select
+            allWards.sort((a, b) => a.name.localeCompare(b.name));
             allWards.forEach(w => {
                 const opt = document.createElement("option");
-                opt.value = w.code ?? w.id ?? w.name;
-                opt.text = `${w.name} (${w.districtName})`;
+                opt.value = w.code || w.name;
+                opt.text = `${w.name}${w.districtName ? ' (' + w.districtName + ')' : ''}`;
                 wardSel.appendChild(opt);
             });
         } catch (err) {
@@ -245,14 +271,14 @@
     function renderOrderDetailHtml(order) {
         const items = (order.items || []).map(it => `
       <tr>
-        <td>${escapeHtml(it.name)}</td>
-        <td class="text-center">${escapeHtml(String(it.qty))}</td>
-        <td class="text-end">${formatCurrency(it.price)}</td>
-        <td class="text-end">${formatCurrency((it.price || 0) * (it.qty || 1))}</td>
+        <td>${escapeHtml(it.name || 'Sản phẩm')}</td>
+        <td class="text-center">${escapeHtml(String(it.qty || it.quantity || 0))}</td>
+        <td class="text-end">${formatCurrency(it.price || it.unitPrice || 0)}</td>
+        <td class="text-end">${formatCurrency((it.price || it.unitPrice || 0) * (it.qty || it.quantity || 1))}</td>
       </tr>
     `).join('');
 
-        const itemsTable = `
+        const itemsTable = items ? `
       <div class="table-responsive">
         <table class="table table-sm">
           <thead class="table-light">
@@ -261,21 +287,22 @@
           <tbody>${items}</tbody>
         </table>
       </div>
-    `;
+    ` : '<p class="text-muted">Không có sản phẩm</p>';
 
         return `
       <div>
-        <p><strong>Mã đơn:</strong> ${escapeHtml(order.code || order.id || '')}</p>
-        <p><strong>Ngày đặt:</strong> ${escapeHtml(order.date || '')}</p>
-        <p><strong>Trạng thái:</strong> ${escapeHtml(order.status || '')}</p>
-        <p><strong>Địa chỉ giao:</strong> ${escapeHtml(order.address || '')}</p>
+        <p><strong>Mã đơn:</strong> ${escapeHtml(order.code || order.id || order.saleInvoiceId || '')}</p>
+        <p><strong>Ngày đặt:</strong> ${escapeHtml(order.date || (order.timeCreate ? new Date(order.timeCreate).toLocaleDateString('vi-VN') : ''))}</p>
+        <p><strong>Trạng thái:</strong> ${getStatusBadge(order.status || '')}</p>
+        <p><strong>Địa chỉ giao:</strong> ${escapeHtml(order.address || order.deliveryAddress || '')}</p>
+        ${order.paymentMethod ? `<p><strong>Phương thức thanh toán:</strong> ${escapeHtml(order.paymentMethod)}</p>` : ''}
         <hr>
         ${itemsTable}
-        <div class="d-flex justify-content-end">
+        <div class="d-flex justify-content-end mt-3">
           <div>
-            <p class="mb-1">Tạm tính: <strong>${formatCurrency(order.subtotal || order.total || 0)}</strong></p>
-            <p class="mb-1">Phí vận chuyển: <strong>${formatCurrency(order.shipping || 0)}</strong></p>
-            <p class="mb-1">Tổng cộng: <strong>${formatCurrency(order.total || order.subtotal || 0)}</strong></p>
+            <p class="mb-1">Tạm tính: <strong>${formatCurrency(order.subtotal || ((order.total || 0) - (order.shipping || order.deliveryFee || 0)))}</strong></p>
+            <p class="mb-1">Phí vận chuyển: <strong>${formatCurrency(order.shipping || order.deliveryFee || 0)}</strong></p>
+            <p class="mb-1">Tổng cộng: <strong>${formatCurrency(order.total || order.totalAmount || 0)}</strong></p>
           </div>
         </div>
       </div>
@@ -285,9 +312,29 @@
     async function fetchOrderById(orderId) {
         if (!orderId) return null;
         try {
-            const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, { method: 'GET', credentials: 'same-origin' });
+            const res = await fetch(`${CUSTOMER_API_BASE}/order/${encodeURIComponent(orderId)}`, { 
+                method: 'GET', 
+                credentials: 'same-origin' 
+            });
             if (!res.ok) return null;
-            return await res.json();
+            const orderData = await res.json();
+            
+            // Transform API response to match expected format
+            return {
+                id: orderData.saleInvoiceId,
+                code: orderData.saleInvoiceId,
+                date: orderData.timeCreate ? new Date(orderData.timeCreate).toLocaleDateString('vi-VN') : '',
+                status: orderData.status || '',
+                address: orderData.deliveryAddress || '',
+                subtotal: (orderData.totalAmount || 0) - (orderData.deliveryFee || 0),
+                shipping: orderData.deliveryFee || 0,
+                total: orderData.totalAmount || 0,
+                items: (orderData.items || []).map(item => ({
+                    name: item.productName || 'Sản phẩm',
+                    qty: item.quantity || 0,
+                    price: item.unitPrice || 0
+                }))
+            };
         } catch (e) {
             console.warn('fetchOrderById failed', e);
             return null;
@@ -319,10 +366,15 @@
         const contentEl = document.getElementById('orderDetailContent');
         if (!modalEl || !contentEl) return;
 
-        const orderId = $tr.attr('data-order-id') || $tr.find('td').eq(0).text().trim();
+        let orderId = $tr.attr('data-order-id');
+        if (!orderId) {
+            // Extract from first cell, remove # if present
+            orderId = $tr.find('td').eq(0).text().trim().replace(/^#/, '');
+        }
+        
         let order = null;
-        if ($tr.attr('data-order-id')) {
-            order = await fetchOrderById($tr.attr('data-order-id'));
+        if (orderId) {
+            order = await fetchOrderById(orderId);
         }
         if (!order) {
             order = buildOrderFromRow($tr);
@@ -408,10 +460,146 @@
     }
 
     /* ===========================
+       Load customer data from API
+       =========================== */
+
+    async function loadCustomerData(customerId) {
+        if (!customerId) {
+            console.warn('No customer ID provided');
+            return;
+        }
+
+        try {
+            // Load customer info
+            const customerRes = await fetch(`${CUSTOMER_API_BASE}/${customerId}`, {
+                method: 'GET',
+                credentials: 'same-origin'
+            });
+            
+            if (customerRes.ok) {
+                const customer = await customerRes.json();
+                
+                // Populate form fields
+                $('input[name=fullname]').val(customer.customerName || '');
+                $('input[name=email]').val(customer.email || '');
+                $('input[name=phone]').val(customer.phoneNumber || '');
+                $('#detailAddress').val(customer.address || '');
+                
+                // Set avatar
+                if (customer.avatar) {
+                    $('#avatarImg').attr('src', customer.avatar);
+                }
+                
+                // Set username
+                $('#userName').text(customer.customerName || 'Tên khách hàng');
+                $('.text-muted.small').text(customer.username || 'username');
+                
+                // Set date of birth
+                if (customer.dateOfBirth) {
+                    const dob = new Date(customer.dateOfBirth);
+                    $('#birthDay').val(dob.getDate());
+                    $('#birthMonth').val(dob.getMonth() + 1);
+                    $('#birthYear').val(dob.getFullYear());
+                }
+                
+                // Parse address to set province and ward if possible
+                // Note: This is a simplified approach - you may need to store province/ward codes separately
+                if (customer.address) {
+                    // Try to extract province from address
+                    // This is a basic implementation - you may need to enhance it
+                }
+            }
+            
+            // Load orders
+            await loadCustomerOrders(customerId);
+            
+            // Load order history
+            await loadCustomerHistory(customerId);
+            
+        } catch (e) {
+            console.error('Error loading customer data:', e);
+        }
+    }
+
+    async function loadCustomerOrders(customerId) {
+        try {
+            const res = await fetch(`${CUSTOMER_API_BASE}/${customerId}/orders`, {
+                method: 'GET',
+                credentials: 'same-origin'
+            });
+            
+            if (res.ok) {
+                const orders = await res.json();
+                const $body = $('#yourOrdersBody');
+                $body.empty();
+                
+                orders.forEach(order => {
+                    const date = order.timeCreate ? new Date(order.timeCreate).toLocaleDateString('vi-VN') : '';
+                    const total = formatCurrency(order.totalAmount || 0);
+                    const row = `
+                        <tr data-order-id="${order.saleInvoiceId}">
+                            <td>#${order.saleInvoiceId}</td>
+                            <td>${date}</td>
+                            <td>${getStatusBadge(order.status || '')}</td>
+                            <td>${total}</td>
+                            <td><button class="btn btn-sm btn-outline-primary view-order">Chi tiết</button></td>
+                        </tr>
+                    `;
+                    $body.append(row);
+                });
+            }
+        } catch (e) {
+            console.error('Error loading orders:', e);
+        }
+    }
+
+    async function loadCustomerHistory(customerId) {
+        try {
+            const res = await fetch(`${CUSTOMER_API_BASE}/${customerId}/history`, {
+                method: 'GET',
+                credentials: 'same-origin'
+            });
+            
+            if (res.ok) {
+                const orders = await res.json();
+                const $body = $('#orderHistoryBody');
+                $body.empty();
+                
+                orders.forEach(order => {
+                    const date = order.timeCreate ? new Date(order.timeCreate).toLocaleDateString('vi-VN') : '';
+                    const total = formatCurrency(order.totalAmount || 0);
+                    const row = `
+                        <tr data-order-id="${order.saleInvoiceId}">
+                            <td>#${order.saleInvoiceId}</td>
+                            <td>${date}</td>
+                            <td>${getStatusBadge(order.status || '')}</td>
+                            <td>${total}</td>
+                            <td><button class="btn btn-sm btn-outline-primary view-order">Xem</button></td>
+                        </tr>
+                    `;
+                    $body.append(row);
+                });
+            }
+        } catch (e) {
+            console.error('Error loading order history:', e);
+        }
+    }
+
+    /* ===========================
        Binding events
        =========================== */
 
     $(document).ready(function () {
+        // Get customer ID - you may need to adjust this based on your authentication
+        // For now, try to get from URL or a global variable
+        const urlParams = new URLSearchParams(window.location.search);
+        currentCustomerId = urlParams.get('customerId') || window.currentCustomerId || 'C001'; // Default for testing
+        
+        // Load customer data
+        if (currentCustomerId) {
+            loadCustomerData(currentCustomerId);
+        }
+        
         // on load segregate
         segregateOrdersOnLoad();
 
@@ -430,28 +618,118 @@
         });
 
         // profile submit
-        $('#profileForm').on('submit', function (e) {
+        $('#profileForm').on('submit', async function (e) {
             e.preventDefault();
-            if (!validateProfile()) return;
+            if (!validateProfile() || !currentCustomerId) return;
+            
             const provinceName = $('#province option:selected').text();
             const wardName = $('#ward option:selected').text();
             const detail = $('#detailAddress').val();
-            const dob = `${$('#birthDay').val()}/${$('#birthMonth').val()}/${$('#birthYear').val()}`;
-            alert(`Địa chỉ đầy đủ: ${detail}, ${wardName}, ${provinceName}\nNgày sinh: ${dob}`);
+            const day = $('#birthDay').val();
+            const month = $('#birthMonth').val();
+            const year = $('#birthYear').val();
+            
+            // Build full address
+            let fullAddress = detail || '';
+            if (wardName && wardName !== '-- Chọn xã/phường --') {
+                fullAddress += (fullAddress ? ', ' : '') + wardName;
+            }
+            if (provinceName && provinceName !== '-- Chọn tỉnh/thành phố --') {
+                fullAddress += (fullAddress ? ', ' : '') + provinceName;
+            }
+            
+            // Build date of birth
+            let dateOfBirth = null;
+            if (day && month && year) {
+                dateOfBirth = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
+            
+            const updateData = {
+                customerName: $('input[name=fullname]').val().trim(),
+                email: $('input[name=email]').val().trim(),
+                phoneNumber: $('input[name=phone]').val().trim(),
+                address: fullAddress,
+                dateOfBirthString: dateOfBirth // Send as string for API
+            };
+            
+            try {
+                const res = await fetch(`${CUSTOMER_API_BASE}/${currentCustomerId}/profile`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(updateData)
+                });
+                
+                const result = await res.json();
+                
+                if (res.ok) {
+                    alert('Cập nhật thông tin thành công!');
+                    // Reload customer data
+                    await loadCustomerData(currentCustomerId);
+                    // Disable form again
+                    $('input, select, button[type=submit]').prop('disabled', true);
+                    $('#toggleEditProfile').prop('disabled', false);
+                } else {
+                    alert(result.message || 'Có lỗi xảy ra khi cập nhật thông tin');
+                }
+            } catch (error) {
+                console.error('Error updating profile:', error);
+                alert('Có lỗi xảy ra khi cập nhật thông tin');
+            }
         });
 
         // password submit
-        $('#passwordForm').on('submit', function (e) {
+        $('#passwordForm').on('submit', async function (e) {
             e.preventDefault();
+            if (!currentCustomerId) return;
+            
             const current = $('input[name=current]').val() ? $('input[name=current]').val().trim() : '';
             const newPwd = $('input[name=new]').val() ? $('input[name=new]').val().trim() : '';
             const confirm = $('input[name=confirm]').val() ? $('input[name=confirm]').val().trim() : '';
 
             const pwdRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{1,6}$/;
-            if (!pwdRegex.test(newPwd)) { alert("Mật khẩu mới phải tối đa 6 ký tự và gồm cả chữ và số!"); return; }
-            if (newPwd !== confirm) { alert("Xác nhận mật khẩu không khớp!"); return; }
-            if (!current) { alert("Vui lòng nhập mật khẩu hiện tại!"); return; }
-            alert("Mật khẩu đã được cập nhật thành công!");
+            if (!pwdRegex.test(newPwd)) { 
+                alert("Mật khẩu mới phải tối đa 6 ký tự và gồm cả chữ và số!"); 
+                return; 
+            }
+            if (newPwd !== confirm) { 
+                alert("Xác nhận mật khẩu không khớp!"); 
+                return; 
+            }
+            if (!current) { 
+                alert("Vui lòng nhập mật khẩu hiện tại!"); 
+                return; 
+            }
+            
+            try {
+                const res = await fetch(`${CUSTOMER_API_BASE}/${currentCustomerId}/password`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        currentPassword: current,
+                        newPassword: newPwd,
+                        confirmPassword: confirm
+                    })
+                });
+                
+                const result = await res.json();
+                
+                if (res.ok) {
+                    alert('Đổi mật khẩu thành công!');
+                    // Clear form
+                    $('#passwordForm')[0].reset();
+                } else {
+                    alert(result.message || 'Có lỗi xảy ra khi đổi mật khẩu');
+                }
+            } catch (error) {
+                console.error('Error changing password:', error);
+                alert('Có lỗi xảy ra khi đổi mật khẩu');
+            }
         });
 
         // view order

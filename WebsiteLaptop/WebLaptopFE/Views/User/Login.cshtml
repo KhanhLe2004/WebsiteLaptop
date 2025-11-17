@@ -1,0 +1,78 @@
+﻿@{
+    ViewData["Title"] = "Đăng nhập";
+    Layout = "~/Views/Shared/_LayoutLogin.cshtml";
+}
+<div class="container-fluid auth-split px-0">
+    <div class="row g-0">
+      <!-- LEFT: ảnh / trang trí -->
+      <div class="col-12 col-lg-6 auth-left">
+        <!-- optional left content (slogan, logo) -->
+        <img src="../LaptopFe/img/login.png" alt="Fruitables Logo" style="width:100%; height:auto;">
+      </div>
+
+      <!-- RIGHT: form -->
+      <div class="col-12 col-lg-6 d-flex align-items-center justify-content-center py-5">
+        <div class="auth-card">
+
+          <div class="text-center mb-3">
+            <div class="avatar-circle">
+              <!-- simple icon -->
+              <img src="../LaptopFe/img/T-logo.ico" alt="Icon" width="28" height="28">
+            </div>
+
+            <h1 class="h-welcome">Chào mừng trở lại</h1>
+            <div class="sub-muted">Đăng nhập để tiếp tục trải nghiệm mua sắm laptop tiện lợi</div>
+          </div>
+
+          <form id="loginForm" novalidate>
+            <div class="mb-2">
+              <label class="form-label text-muted-small">Email</label>
+              <input id="email" type="email" class="form-control" placeholder="Nhập email của bạn" required>
+              <div id="emailHelp" class="text-danger small mt-1" style="display:none;">Vui lòng nhập email hợp lệ</div>
+            </div>
+
+            <div class="mb-2">
+              <label class="form-label text-muted-small">Mật khẩu</label>
+              <div class="input-group">
+                <input id="password" type="password" class="form-control" placeholder="Mật khẩu" required>
+                <button type="button" id="togglePwd" class="btn btn-light" style="border-radius:12px;">
+                    <i id="eyeIcon" class="bi bi-eye-slash"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-3 mt-2">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" value="" id="remember">
+                <label class="form-check-label text-muted-small" for="remember">Ghi nhớ tôi</label>
+              </div>
+              <a href="#" class="text-decoration-none" style="color:var(--primary); font-size:14px;">Quên mật khẩu?</a>
+            </div>
+
+            <div class="d-grid mb-3">
+              <button type="submit" class="btn btn-sign">Đăng nhập</button>
+            </div>
+
+            <div class="divider my-3">hoặc tiếp tục với</div>
+
+            <div class="d-flex gap-2 justify-content-center mt-3">
+              <button type="button" class="btn btn-social d-flex align-items-center gap-2">
+                <img src="https://www.svgrepo.com/show/355037/google.svg" alt="g" style="width:18px;height:18px;">
+                Google
+              </button>
+              <button type="button" class="btn btn-social d-flex align-items-center gap-2">
+                <img src="../LaptopFe/img/facebook.svg" alt="f" style="width:18px;height:18px;">
+                Facebook
+              </button>
+            </div>
+
+            <div class="small-note mt-4 text-center" style="color:#c2b5a9;">
+              Chưa có tài khoản? <a href="#" style="color:var(--primary); text-decoration:none; font-weight:600;">Đăng ký</a>
+            </div>
+
+          </form>
+
+        </div>
+      </div>
+    </div>
+  </div>
