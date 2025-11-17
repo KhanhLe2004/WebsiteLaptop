@@ -112,9 +112,11 @@
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
                                 <label class="form-label">Nhà cung cấp</label>
-                                <select class="form-control" id="supplierIdInput">
-                                    <option value="">-- Chọn nhà cung cấp --</option>
-                                </select>
+                                <div class="autocomplete-wrapper position-relative" style="width: 100%;">
+                                    <input type="text" id="supplierIdInput" class="form-control" autocomplete="off">
+                                    <input type="hidden" id="supplierIdValue" value="">
+                                    <div id="supplierIdDropdown" class="autocomplete-dropdown"></div>
+                                </div>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -189,6 +191,11 @@
 </div>
 
 @section Scripts {
+    <!-- Select2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <!-- Select2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         const API_URL = 'http://localhost:5068/api/admin/stock-imports';
         let currentPage = 1;
@@ -517,6 +524,7 @@
             $('#formErrorMessage').hide();
             $('#totalAmountInput').val('0');
             $('#supplierIdInput').val('');
+            $('#supplierIdValue').val('');
             
             // Tự động tạo ID khi mở modal
             generateNextStockImportId();
@@ -530,12 +538,12 @@
             modal.show();
             
             // Luôn load lại suppliers khi mở modal để đảm bảo có dữ liệu mới nhất
-            loadSuppliers();
-            
-            // Đợi modal hiển thị xong rồi update lại combobox
-            setTimeout(function() {
-                populateSupplierSelect();
-            }, 500);
+            loadSuppliers(function() {
+                // Đợi modal hiển thị xong rồi update lại combobox
+                setTimeout(function() {
+                    populateSupplierSelect('');
+                }, 300);
+            });
         }
 
         // Sửa phiếu nhập hàng
@@ -548,7 +556,7 @@
                     $('#stockImportId').val(stockImport.stockImportId);
                     $('#stockImportIdInput').val(stockImport.stockImportId);
                     $('#stockImportIdInput').prop('readonly', true);
-                    $('#supplierIdInput').val(stockImport.supplierId || '');
+                    const savedSupplierId = stockImport.supplierId || '';
                     $('#employeeIdInput').val(stockImport.employeeId || '');
                     
                     if (stockImport.time) {
@@ -596,6 +604,15 @@
 
                     const modal = new bootstrap.Modal(document.getElementById('createEditModal'));
                     modal.show();
+                    
+                    // Load lại suppliers và set giá trị sau khi modal hiển thị
+                    loadSuppliers(function() {
+                        // Đợi modal hiển thị xong và populate xong rồi mới set giá trị
+                        setTimeout(function() {
+                            populateSupplierSelect(savedSupplierId);
+                            updateInputLabels();
+                        }, 300);
+                    });
                 },
                 error: function(xhr) {
                     console.error('Error loading stock import:', xhr);
@@ -654,36 +671,196 @@
             });
         }
 
-        // Populate combobox nhà cung cấp
-        function populateSupplierSelect() {
-            const select = $('#supplierIdInput');
-            if (select.length === 0) {
-                console.warn('Supplier select element not found, retrying...');
+        // Populate combobox nhà cung cấp (lưu danh sách để dùng cho autocomplete)
+        function populateSupplierSelect(selectedId = '') {
+            const supplierInput = $('#supplierIdInput');
+            if (supplierInput.length === 0) {
+                console.warn('Supplier input element not found, retrying...');
                 // Retry sau 100ms nếu element chưa có
-                setTimeout(populateSupplierSelect, 100);
+                setTimeout(function() { populateSupplierSelect(selectedId); }, 100);
                 return;
             }
             
-            console.log('Populating supplier select, suppliersList length:', suppliersList ? suppliersList.length : 0);
+            // Lưu danh sách suppliers để dùng cho autocomplete
+            window.allSuppliersForSelect = suppliersList || [];
             
-            select.empty();
-            select.append('<option value=""></option>');
+            const supplierValue = $('#supplierIdValue');
             
-            if (suppliersList && suppliersList.length > 0) {
-                suppliersList.forEach(function(supplier) {
-                    const supplierId = supplier.supplierId || supplier.SupplierId;
-                    const supplierName = supplier.supplierName || supplier.SupplierName || supplierId;
-                    console.log('Adding supplier:', supplierId, supplierName);
-                    select.append(`<option value="${supplierId}">${supplierName}</option>`);
+            // Nếu có selectedId, set giá trị
+            if (selectedId) {
+                const supplier = suppliersList.find(s => {
+                    const id = s.supplierId || s.SupplierId;
+                    return id === selectedId;
                 });
-                console.log('Successfully populated', suppliersList.length, 'suppliers');
+                if (supplier) {
+                    const supplierName = supplier.supplierName || supplier.SupplierName || selectedId;
+                    supplierInput.val(supplierName);
+                    supplierValue.val(selectedId);
+                    supplierInput.closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    supplierInput.val('');
+                    supplierValue.val('');
+                    supplierInput.closest('.input-group-outline').removeClass('is-filled');
+                }
             } else {
-                console.warn('No suppliers found in suppliersList. suppliersList:', suppliersList);
+                supplierInput.val('');
+                supplierValue.val('');
+                supplierInput.closest('.input-group-outline').removeClass('is-filled');
             }
             
-            // Trigger change để Material Dashboard update
-            select.trigger('change');
+            // Khởi tạo autocomplete cho suppliers
+            initializeSupplierAutocomplete();
+            
             updateInputLabels();
+        }
+
+        // Khởi tạo autocomplete cho suppliers
+        function initializeSupplierAutocomplete() {
+            const supplierInput = $('#supplierIdInput');
+            const supplierValue = $('#supplierIdValue');
+            const dropdown = $('#supplierIdDropdown');
+            let selectedIndex = -1;
+            let filteredSuppliers = [];
+
+            function showDropdown(suppliers) {
+                if (!suppliers || suppliers.length === 0) {
+                    dropdown.html('<div class="autocomplete-item" style="color: #6c757d; cursor: default;">Không tìm thấy nhà cung cấp</div>').show();
+                    selectedIndex = -1;
+                    return;
+                }
+
+                let html = '';
+                suppliers.forEach((supplier, index) => {
+                    const supplierId = supplier.supplierId || supplier.SupplierId;
+                    const supplierName = supplier.supplierName || supplier.SupplierName || supplierId;
+                    const supplierNameEscaped = (supplierName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    html += `<div class="autocomplete-item" data-index="${index}" data-supplier-id="${supplierId}" data-supplier-name="${supplierNameEscaped}">${supplierName}</div>`;
+                });
+                dropdown.html(html).show();
+                selectedIndex = -1;
+            }
+
+            function updateSelectedItem() {
+                $('#supplierIdDropdown .autocomplete-item').removeClass('selected');
+                if (selectedIndex >= 0 && selectedIndex < filteredSuppliers.length) {
+                    $('#supplierIdDropdown .autocomplete-item').eq(selectedIndex).addClass('selected');
+                }
+            }
+
+            // Xử lý khi gõ
+            supplierInput.off('input.supplier').on('input.supplier', function() {
+                const searchTerm = $(this).val().toLowerCase().trim();
+                
+                // Cập nhật class is-filled
+                if (searchTerm) {
+                    $(this).closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    $(this).closest('.input-group-outline').removeClass('is-filled');
+                }
+                
+                if (searchTerm === '') {
+                    dropdown.hide();
+                    supplierValue.val('');
+                    return;
+                }
+
+                const allSuppliers = window.allSuppliersForSelect || [];
+                filteredSuppliers = allSuppliers.filter(supplier => {
+                    const supplierName = (supplier.supplierName || supplier.SupplierName || '').toLowerCase();
+                    return supplierName.includes(searchTerm);
+                });
+
+                showDropdown(filteredSuppliers);
+            });
+
+            // Xử lý khi click vào item
+            $(document).off('click.supplier-item').on('click.supplier-item', '#supplierIdDropdown .autocomplete-item', function() {
+                const supplierId = $(this).data('supplier-id');
+                const supplierName = $(this).data('supplier-name');
+                
+                if (supplierId && supplierName) {
+                    supplierInput.val(supplierName);
+                    supplierValue.val(supplierId);
+                    supplierInput.closest('.input-group-outline').addClass('is-filled');
+                    dropdown.hide();
+                }
+            });
+
+            // Xử lý phím tắt
+            supplierInput.off('keydown.supplier').on('keydown.supplier', function(e) {
+                if (dropdown.is(':visible') && filteredSuppliers.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        selectedIndex = Math.min(selectedIndex + 1, filteredSuppliers.length - 1);
+                        updateSelectedItem();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        selectedIndex = Math.max(selectedIndex - 1, -1);
+                        updateSelectedItem();
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (selectedIndex >= 0 && selectedIndex < filteredSuppliers.length) {
+                            const supplier = filteredSuppliers[selectedIndex];
+                            const supplierName = supplier.supplierName || supplier.SupplierName || supplier.supplierId || supplier.SupplierId;
+                            supplierInput.val(supplierName);
+                            supplierValue.val(supplier.supplierId || supplier.SupplierId);
+                            supplierInput.closest('.input-group-outline').addClass('is-filled');
+                            dropdown.hide();
+                        }
+                    } else if (e.key === 'Escape') {
+                        dropdown.hide();
+                        selectedIndex = -1;
+                    }
+                }
+            });
+
+            // Ẩn dropdown khi click ra ngoài
+            $(document).off('click.supplier-close').on('click.supplier-close', function(e) {
+                if (!$(e.target).closest('#supplierIdInput').closest('.autocomplete-wrapper').length) {
+                    dropdown.hide();
+                    selectedIndex = -1;
+                }
+            });
+
+            // Xử lý khi focus vào input
+            supplierInput.off('focus.supplier').on('focus.supplier', function() {
+                $(this).closest('.input-group-outline').addClass('is-filled');
+                
+                const val = $(this).val().trim();
+                if (val) {
+                    $(this).trigger('input.supplier');
+                } else {
+                    const allSuppliers = window.allSuppliersForSelect || [];
+                    if (allSuppliers.length > 0) {
+                        filteredSuppliers = allSuppliers;
+                        showDropdown(filteredSuppliers);
+                    }
+                }
+            });
+
+            // Xử lý khi blur
+            supplierInput.off('blur.supplier').on('blur.supplier', function() {
+                const val = $(this).val().trim();
+                if (!val) {
+                    $(this).closest('.input-group-outline').removeClass('is-filled');
+                }
+            });
+
+            // Xử lý khi click vào input
+            supplierInput.off('click.supplier').on('click.supplier', function() {
+                $(this).closest('.input-group-outline').addClass('is-filled');
+                
+                const val = $(this).val().trim();
+                if (val) {
+                    $(this).trigger('input.supplier');
+                } else {
+                    const allSuppliers = window.allSuppliersForSelect || [];
+                    if (allSuppliers.length > 0) {
+                        filteredSuppliers = allSuppliers;
+                        showDropdown(filteredSuppliers);
+                    }
+                }
+            });
         }
 
         // Load danh sách sản phẩm
@@ -769,6 +946,27 @@
                         selectElement.append('<option value="">Không có thông số</option>');
                     }
                     
+                    // Khởi tạo Select2 nếu chưa có
+                    if (!selectElement.hasClass('select2-hidden-accessible')) {
+                        selectElement.select2({
+                            theme: 'bootstrap-5',
+                            placeholder: '-- Chọn thông số --',
+                            allowClear: true,
+                            minimumResultsForSearch: 0,
+                            dropdownParent: $('#createEditModal'),
+                            language: {
+                                noResults: function() {
+                                    return "Không tìm thấy kết quả";
+                                },
+                                searching: function() {
+                                    return "Đang tìm kiếm...";
+                                }
+                            }
+                        });
+                    } else {
+                        selectElement.trigger('change');
+                    }
+                    
                     if (callback) callback();
                 },
                 error: function(xhr) {
@@ -785,7 +983,7 @@
             const index = detailRowIndex++;
             
             // Tạo select cho sản phẩm
-            let productSelect = '<select class="form-control form-control-sm detail-product" onchange="onProductChange(' + index + ')"><option value="">-- Chọn sản phẩm --</option>';
+            let productSelect = '<select class="form-control form-control-sm detail-product" data-index="' + index + '" onchange="onProductChange(' + index + ')"><option value="">-- Chọn sản phẩm --</option>';
             productsList.forEach(function(product) {
                 const selected = detail && detail.productId === product.productId ? 'selected' : '';
                 productSelect += `<option value="${product.productId}" ${selected}>${product.displayName}</option>`;
@@ -793,7 +991,7 @@
             productSelect += '</select>';
 
             // Tạo select cho thông số
-            let specSelect = '<select class="form-control form-control-sm detail-spec"><option value="">-- Chọn sản phẩm trước --</option></select>';
+            let specSelect = '<select class="form-control form-control-sm detail-spec" data-index="' + index + '"><option value="">-- Chọn sản phẩm trước --</option></select>';
 
             const row = `
                 <tr data-index="${index}">
@@ -826,6 +1024,48 @@
                 </tr>
             `;
             $('#detailTableBody').append(row);
+            
+            // Khởi tạo Select2 cho product select
+            setTimeout(function() {
+                const productSelectElement = $(`tr[data-index="${index}"] .detail-product`);
+                if (productSelectElement.length > 0 && !productSelectElement.hasClass('select2-hidden-accessible')) {
+                    productSelectElement.select2({
+                        theme: 'bootstrap-5',
+                        placeholder: '-- Chọn sản phẩm --',
+                        allowClear: true,
+                        minimumResultsForSearch: 0,
+                        dropdownParent: $('#createEditModal'),
+                        language: {
+                            noResults: function() {
+                                return "Không tìm thấy kết quả";
+                            },
+                            searching: function() {
+                                return "Đang tìm kiếm...";
+                            }
+                        }
+                    });
+                }
+                
+                // Khởi tạo Select2 cho spec select
+                const specSelectElement = $(`tr[data-index="${index}"] .detail-spec`);
+                if (specSelectElement.length > 0 && !specSelectElement.hasClass('select2-hidden-accessible')) {
+                    specSelectElement.select2({
+                        theme: 'bootstrap-5',
+                        placeholder: '-- Chọn sản phẩm trước --',
+                        allowClear: true,
+                        minimumResultsForSearch: 0,
+                        dropdownParent: $('#createEditModal'),
+                        language: {
+                            noResults: function() {
+                                return "Không tìm thấy kết quả";
+                            },
+                            searching: function() {
+                                return "Đang tìm kiếm...";
+                            }
+                        }
+                    });
+                }
+            }, 100);
             
             // Nếu có detail và productId, load lại cấu hình sau khi append và tìm thông số tương ứng
             if (detail && detail.productId) {
@@ -955,7 +1195,11 @@
 
         // Xóa dòng chi tiết
         function removeDetailRow(index) {
-            $(`tr[data-index="${index}"]`).remove();
+            const row = $(`tr[data-index="${index}"]`);
+            // Destroy Select2 trước khi xóa row
+            row.find('.detail-product').select2('destroy');
+            row.find('.detail-spec').select2('destroy');
+            row.remove();
             calculateTotalAmount();
         }
 
@@ -985,7 +1229,7 @@
 
             let stockImportId = $('#stockImportIdInput').val().trim();
             const time = $('#timeInput').val();
-            const supplierId = $('#supplierIdInput').val().trim();
+            const supplierId = $('#supplierIdValue').val().trim();
             const employeeId = $('#employeeIdInput').val().trim();
             const totalAmount = parseFloat($('#totalAmountInput').val()) || 0;
 
@@ -1168,6 +1412,12 @@
             detailRowIndex = 0;
             $('#formErrorMessage').hide();
             $('#totalAmountInput').val('0');
+            
+            // Reset autocomplete dropdowns
+            $('#supplierIdDropdown').hide();
+            $('#supplierIdInput').val('');
+            $('#supplierIdValue').val('');
+            
             $('.input-group-outline').removeClass('is-filled is-focused');
             if (typeof updateInputLabels === 'function') {
                 setTimeout(function() {
@@ -1179,10 +1429,60 @@
 }
 
 <style>
+    /* Bảng chính */
+    .table-responsive {
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .table {
+        margin-bottom: 0;
+        background-color: #fff;
+    }
+
+    .table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .table thead th {
+        color: #fff !important;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 1rem 0.75rem !important;
+        border: none;
+        font-size: 1.3125rem;
+        text-align: center;
+    }
+
+    .table tbody tr {
+        transition: all 0.3s ease;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .table tbody tr:hover {
+        background-color: #f8f9fa;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .table tbody tr:last-child {
+        border-bottom: none;
+    }
+
     .action-btn {
-        padding: 0.25rem 0.5rem;
+        padding: 0.375rem 0.625rem;
         font-size: 0.75rem;
         margin: 0 0.125rem;
+        border-radius: 0.375rem;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
     }
 
     .table-actions {
@@ -1191,13 +1491,31 @@
 
     #stockImportTableBody tr td {
         vertical-align: middle !important;
-        padding: 0.75rem 0.5rem !important;
+        padding: 1rem 0.75rem !important;
+        border: none;
+    }
+
+    /* Badge styling */
+    .badge {
+        padding: 0.5rem 0.75rem;
+        font-weight: 500;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+    }
+
+    /* Empty state */
+    .table tbody tr td[colspan] {
+        padding: 3rem 1rem !important;
+        text-align: center;
+        color: #6c757d;
+        font-style: italic;
     }
 
     /* CSS cho bảng xem chi tiết */
     #viewModal .table-responsive {
         max-height: 500px;
         overflow-y: auto;
+        border-radius: 0.5rem;
     }
 
     #viewModal .spec-cell {
@@ -1215,5 +1533,181 @@
 
     #viewModal table td {
         vertical-align: middle;
+    }
+
+    #viewModal table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    #viewModal table thead th {
+        color: #fff !important;
+        font-weight: 600;
+        font-size: 1.3125rem;
+        text-align: center;
+    }
+
+    /* Style cho bảng chi tiết trong modal thêm/sửa */
+    #createEditModal .table-responsive {
+        max-width: 100%;
+        overflow-x: auto;
+        overflow-y: visible;
+    }
+
+    #createEditModal table {
+        table-layout: fixed;
+        width: 100%;
+        min-width: 800px;
+    }
+
+    #createEditModal table thead th {
+        font-size: 0.875rem;
+        font-weight: 600;
+        padding: 0.5rem;
+        white-space: nowrap;
+    }
+
+    #createEditModal table tbody td {
+        padding: 0.5rem;
+        vertical-align: middle;
+        font-size: 0.875rem;
+    }
+
+    #createEditModal table tbody td .form-control-sm,
+    #createEditModal table tbody td .detail-product,
+    #createEditModal table tbody td .detail-spec {
+        font-size: 0.875rem;
+        padding: 0.25rem 0.5rem;
+    }
+
+    /* Đảm bảo các cột có width hợp lý */
+    #createEditModal table thead th:nth-child(1),
+    #createEditModal table tbody td:nth-child(1) {
+        width: 25%;
+    }
+
+    #createEditModal table thead th:nth-child(2),
+    #createEditModal table tbody td:nth-child(2) {
+        width: 25%;
+    }
+
+    #createEditModal table thead th:nth-child(3),
+    #createEditModal table tbody td:nth-child(3) {
+        width: 12%;
+    }
+
+    #createEditModal table thead th:nth-child(4),
+    #createEditModal table tbody td:nth-child(4) {
+        width: 15%;
+    }
+
+    #createEditModal table thead th:nth-child(5),
+    #createEditModal table tbody td:nth-child(5) {
+        width: 15%;
+    }
+
+    #createEditModal table thead th:nth-child(6),
+    #createEditModal table tbody td:nth-child(6) {
+        width: 8%;
+    }
+
+    /* Đảm bảo select và input không bị tràn */
+    #createEditModal table tbody td select,
+    #createEditModal table tbody td input {
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Autocomplete styling */
+    .autocomplete-wrapper {
+        width: 100%;
+        display: block;
+    }
+
+    /* Đảm bảo input trong autocomplete-wrapper có style giống các input khác */
+    .input-group-outline .autocomplete-wrapper .form-control {
+        border: none;
+        border-bottom: 1px solid #d2d6da;
+        border-left: 1px solid #d2d6da;
+        border-right: 1px solid #d2d6da;
+        border-radius: 0;
+        padding-left: 0;
+        padding-right: 0;
+        background: transparent;
+        background-image: none;
+        box-shadow: none;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+
+    .input-group-outline .autocomplete-wrapper .form-control:focus {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+        box-shadow: none;
+        outline: 0;
+    }
+
+    .input-group-outline.is-filled .autocomplete-wrapper .form-control {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+    }
+
+    .input-group-outline.is-focused .autocomplete-wrapper .form-control {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+        box-shadow: none;
+    }
+
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: #fff;
+        border: 1px solid #d2d6da;
+        border-radius: 0.375rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1000;
+        margin-top: 2px;
+        display: none;
+    }
+
+    .autocomplete-item {
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom: none;
+    }
+
+    .autocomplete-item:hover,
+    .autocomplete-item.selected {
+        background-color: #f8f9fa;
+        color: #667eea;
+    }
+
+    .autocomplete-item:first-child {
+        border-top-left-radius: 0.375rem;
+        border-top-right-radius: 0.375rem;
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom-left-radius: 0.375rem;
+        border-bottom-right-radius: 0.375rem;
+    }
+
+    /* Autocomplete trong modal */
+    .modal .autocomplete-dropdown {
+        z-index: 1055;
+    }
+
+    .modal .autocomplete-wrapper {
+        z-index: 1;
     }
 </style>

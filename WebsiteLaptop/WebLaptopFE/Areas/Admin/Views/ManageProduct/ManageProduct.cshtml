@@ -26,9 +26,11 @@
                             </div>
                         </div>
                         <div class="col-lg-2 col-md-3">
-                            <select id="brandFilter" class="form-select">
-                                <option value="">Tất cả thương hiệu</option>
-                            </select>
+                            <div class="autocomplete-wrapper position-relative">
+                                <input type="text" id="brandFilter" class="form-control" placeholder="Tất cả thương hiệu" autocomplete="off">
+                                <input type="hidden" id="brandFilterValue" value="">
+                                <div id="brandFilterDropdown" class="autocomplete-dropdown"></div>
+                            </div>
                         </div>
                         <div class="col-lg-2 col-md-3">
                             <select id="activeFilter" class="form-select">
@@ -110,10 +112,13 @@
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="mb-3">
-                                <select class="form-select" id="brandId">
-                                    <option value="">-- Chọn thương hiệu --</option>
-                                </select>
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Thương hiệu</label>
+                                <div class="autocomplete-wrapper position-relative" style="width: 100%;">
+                                    <input type="text" id="brandId" class="form-control" autocomplete="off">
+                                    <input type="hidden" id="brandIdValue" value="">
+                                    <div id="brandIdDropdown" class="autocomplete-dropdown"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -259,6 +264,11 @@
     </div>
 </div>
 @section Scripts {
+    <!-- Select2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <!-- Select2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         const API_URL = 'http://localhost:5068/api/admin/products';
         const API_BASE_URL = API_URL.replace(/\/api\/admin\/products$/, '');
@@ -268,6 +278,7 @@
         let deleteProductId = '';
         let searchDebounceTimer = null;
         const SEARCH_DEBOUNCE_DELAY = 300;
+        let allBrandsList = []; // Lưu tất cả brands để sử dụng khi edit
 
         $(document).ready(function() {
             loadBrands();
@@ -278,8 +289,8 @@
                 triggerAutoSearch();
             });
 
-            // Tìm kiếm tự động theo thương hiệu
-            $('#brandFilter').on('change', function() {
+            // Tìm kiếm tự động theo thương hiệu (sử dụng input event cho autocomplete)
+            $(document).on('brandFilterChanged', function() {
                 triggerAutoSearch();
             });
 
@@ -300,24 +311,365 @@
         }
 
         // Load danh sách thương hiệu
-        function loadBrands() {
+        function loadBrands(selectedBrandId = null) {
             $.ajax({
                 url: API_URL + '/brands',
                 type: 'GET',
                 success: function(data) {
+                    // Lưu tất cả brands để sử dụng sau
+                    allBrandsList = data || [];
+                    
                     const brandSelect = $('#brandId');
+                    const brandSelectValue = $('#brandIdValue');
                     const brandFilter = $('#brandFilter');
+                    const brandFilterValue = $('#brandFilterValue');
                     
-                    brandSelect.empty().append('<option value="">-- Chọn thương hiệu --</option>');
-                    brandFilter.empty().append('<option value="">Tất cả thương hiệu</option>');
+                    // Lưu danh sách brands để dùng cho autocomplete
+                    window.allBrandsForFilter = data || [];
+                    window.allActiveBrandsForSelect = (data || []).filter(brand => brand.active !== false);
                     
-                    $.each(data, function(index, brand) {
-                        brandSelect.append(`<option value="${brand.brandId}">${brand.brandName}</option>`);
-                        brandFilter.append(`<option value="${brand.brandId}">${brand.brandName}</option>`);
-                    });
+                    // Nếu có selectedBrandId, set giá trị cho brandSelect
+                    if (selectedBrandId) {
+                        const brand = allBrandsList.find(b => b.brandId === selectedBrandId);
+                        if (brand) {
+                            brandSelect.val(brand.brandName);
+                            brandSelectValue.val(brand.brandId);
+                            brandSelect.closest('.input-group-outline').addClass('is-filled');
+                        } else {
+                            brandSelect.val('');
+                            brandSelectValue.val('');
+                            brandSelect.closest('.input-group-outline').removeClass('is-filled');
+                        }
+                    } else {
+                        brandSelect.val('');
+                        brandSelectValue.val('');
+                        brandSelect.closest('.input-group-outline').removeClass('is-filled');
+                    }
+                    
+                    // Khởi tạo autocomplete cho brandSelect (trong modal)
+                    initializeBrandSelectAutocomplete();
+                    
+                    // Khởi tạo autocomplete cho brandFilter
+                    initializeBrandFilterAutocomplete();
                 },
                 error: function(xhr) {
                     console.error('Lỗi khi tải thương hiệu:', xhr);
+                }
+            });
+        }
+
+        // Khởi tạo autocomplete cho brand select (trong modal)
+        function initializeBrandSelectAutocomplete() {
+            const brandSelect = $('#brandId');
+            const brandSelectValue = $('#brandIdValue');
+            const dropdown = $('#brandIdDropdown');
+            let selectedIndex = -1;
+            let filteredBrands = [];
+
+            function showDropdown(brands) {
+                if (!brands || brands.length === 0) {
+                    dropdown.html('<div class="autocomplete-item" style="color: #6c757d; cursor: default;">Không tìm thấy thương hiệu</div>').show();
+                    selectedIndex = -1;
+                    return;
+                }
+
+                let html = '';
+                brands.forEach((brand, index) => {
+                    const brandNameEscaped = (brand.brandName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    html += `<div class="autocomplete-item" data-index="${index}" data-brand-id="${brand.brandId}" data-brand-name="${brandNameEscaped}">${brand.brandName}</div>`;
+                });
+                dropdown.html(html).show();
+                selectedIndex = -1;
+            }
+
+            function updateSelectedItem() {
+                $('#brandIdDropdown .autocomplete-item').removeClass('selected');
+                if (selectedIndex >= 0 && selectedIndex < filteredBrands.length) {
+                    $('#brandIdDropdown .autocomplete-item').eq(selectedIndex).addClass('selected');
+                }
+            }
+
+            // Xử lý khi gõ
+            brandSelect.off('input.brandselect').on('input.brandselect', function() {
+                const searchTerm = $(this).val().toLowerCase().trim();
+                
+                // Cập nhật class is-filled
+                if (searchTerm) {
+                    $(this).closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    $(this).closest('.input-group-outline').removeClass('is-filled');
+                }
+                
+                if (searchTerm === '') {
+                    dropdown.hide();
+                    brandSelectValue.val('');
+                    return;
+                }
+
+                // Lọc brands - chỉ hiển thị active brands, trừ khi đang edit và brand đã bị xóa
+                let allBrands = window.allActiveBrandsForSelect || [];
+                const currentBrandId = brandSelectValue.val();
+                
+                // Nếu đang có brand được chọn và brand đó không active, thêm vào danh sách
+                if (currentBrandId) {
+                    const currentBrand = (window.allBrandsForFilter || []).find(b => b.brandId === currentBrandId);
+                    if (currentBrand && currentBrand.active === false) {
+                        // Thêm brand đã xóa vào đầu danh sách
+                        allBrands = [currentBrand, ...allBrands];
+                    }
+                }
+                
+                filteredBrands = allBrands.filter(brand => 
+                    (brand.brandName || '').toLowerCase().includes(searchTerm)
+                );
+
+                showDropdown(filteredBrands);
+            });
+
+            // Xử lý khi click vào item
+            $(document).off('click.brandselect-item').on('click.brandselect-item', '#brandIdDropdown .autocomplete-item', function() {
+                const brandId = $(this).data('brand-id');
+                const brandName = $(this).data('brand-name');
+                
+                if (brandId && brandName) {
+                    brandSelect.val(brandName);
+                    brandSelectValue.val(brandId);
+                    // Đảm bảo class is-filled được thêm khi có giá trị
+                    brandSelect.closest('.input-group-outline').addClass('is-filled');
+                    dropdown.hide();
+                }
+            });
+
+            // Xử lý phím tắt
+            brandSelect.off('keydown.brandselect').on('keydown.brandselect', function(e) {
+                if (dropdown.is(':visible') && filteredBrands.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        selectedIndex = Math.min(selectedIndex + 1, filteredBrands.length - 1);
+                        updateSelectedItem();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        selectedIndex = Math.max(selectedIndex - 1, -1);
+                        updateSelectedItem();
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (selectedIndex >= 0 && selectedIndex < filteredBrands.length) {
+                            const brand = filteredBrands[selectedIndex];
+                            brandSelect.val(brand.brandName);
+                            brandSelectValue.val(brand.brandId);
+                            // Đảm bảo class is-filled được thêm khi có giá trị
+                            brandSelect.closest('.input-group-outline').addClass('is-filled');
+                            dropdown.hide();
+                        }
+                    } else if (e.key === 'Escape') {
+                        dropdown.hide();
+                        selectedIndex = -1;
+                    }
+                }
+            });
+
+            // Ẩn dropdown khi click ra ngoài
+            $(document).off('click.brandselect-close').on('click.brandselect-close', function(e) {
+                if (!$(e.target).closest('#brandId').closest('.autocomplete-wrapper').length) {
+                    dropdown.hide();
+                    selectedIndex = -1;
+                }
+            });
+
+            // Xử lý khi focus vào input - hiển thị tất cả active brands nếu chưa có text
+            brandSelect.off('focus.brandselect').on('focus.brandselect', function() {
+                // Thêm class is-filled để label nhảy lên top
+                $(this).closest('.input-group-outline').addClass('is-filled');
+                
+                const val = $(this).val().trim();
+                if (val) {
+                    $(this).trigger('input.brandselect');
+                } else {
+                    // Lọc brands - chỉ hiển thị active brands, trừ khi đang edit và brand đã bị xóa
+                    let allBrands = window.allActiveBrandsForSelect || [];
+                    const currentBrandId = brandSelectValue.val();
+                    
+                    // Nếu đang có brand được chọn và brand đó không active, thêm vào danh sách
+                    if (currentBrandId) {
+                        const currentBrand = (window.allBrandsForFilter || []).find(b => b.brandId === currentBrandId);
+                        if (currentBrand && currentBrand.active === false) {
+                            // Thêm brand đã xóa vào đầu danh sách
+                            allBrands = [currentBrand, ...allBrands];
+                        }
+                    }
+                    
+                    if (allBrands.length > 0) {
+                        filteredBrands = allBrands;
+                        showDropdown(filteredBrands);
+                    }
+                }
+            });
+
+            // Xử lý khi blur - xóa class is-filled nếu không có giá trị
+            brandSelect.off('blur.brandselect').on('blur.brandselect', function() {
+                const val = $(this).val().trim();
+                if (!val) {
+                    $(this).closest('.input-group-outline').removeClass('is-filled');
+                }
+            });
+
+            // Xử lý khi click vào input
+            brandSelect.off('click.brandselect').on('click.brandselect', function() {
+                // Thêm class is-filled để label nhảy lên top
+                $(this).closest('.input-group-outline').addClass('is-filled');
+                
+                const val = $(this).val().trim();
+                if (val) {
+                    $(this).trigger('input.brandselect');
+                } else {
+                    // Lọc brands - chỉ hiển thị active brands, trừ khi đang edit và brand đã bị xóa
+                    let allBrands = window.allActiveBrandsForSelect || [];
+                    const currentBrandId = brandSelectValue.val();
+                    
+                    // Nếu đang có brand được chọn và brand đó không active, thêm vào danh sách
+                    if (currentBrandId) {
+                        const currentBrand = (window.allBrandsForFilter || []).find(b => b.brandId === currentBrandId);
+                        if (currentBrand && currentBrand.active === false) {
+                            // Thêm brand đã xóa vào đầu danh sách
+                            allBrands = [currentBrand, ...allBrands];
+                        }
+                    }
+                    
+                    if (allBrands.length > 0) {
+                        filteredBrands = allBrands;
+                        showDropdown(filteredBrands);
+                    }
+                }
+            });
+        }
+
+        // Khởi tạo autocomplete cho brand filter
+        function initializeBrandFilterAutocomplete() {
+            const brandFilter = $('#brandFilter');
+            const brandFilterValue = $('#brandFilterValue');
+            const dropdown = $('#brandFilterDropdown');
+            let selectedIndex = -1;
+            let filteredBrands = [];
+
+            function showDropdown(brands) {
+                if (!brands || brands.length === 0) {
+                    dropdown.html('<div class="autocomplete-item" style="color: #6c757d; cursor: default;">Không tìm thấy thương hiệu</div>').show();
+                    selectedIndex = -1;
+                    return;
+                }
+
+                let html = '';
+                brands.forEach((brand, index) => {
+                    const brandNameEscaped = (brand.brandName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    html += `<div class="autocomplete-item" data-index="${index}" data-brand-id="${brand.brandId}" data-brand-name="${brandNameEscaped}">${brand.brandName}</div>`;
+                });
+                dropdown.html(html).show();
+                selectedIndex = -1;
+            }
+
+            function updateSelectedItem() {
+                $('.autocomplete-item').removeClass('selected');
+                if (selectedIndex >= 0 && selectedIndex < filteredBrands.length) {
+                    $('.autocomplete-item').eq(selectedIndex).addClass('selected');
+                }
+            }
+
+            // Xử lý khi gõ
+            brandFilter.off('input.autocomplete').on('input.autocomplete', function() {
+                const searchTerm = $(this).val().toLowerCase().trim();
+                
+                if (searchTerm === '') {
+                    dropdown.hide();
+                    brandFilterValue.val('');
+                    brandFilter.attr('placeholder', 'Tất cả thương hiệu');
+                    $(document).trigger('brandFilterChanged');
+                    return;
+                }
+
+                // Lọc brands
+                const allBrands = window.allBrandsForFilter || [];
+                filteredBrands = allBrands.filter(brand => 
+                    (brand.brandName || '').toLowerCase().includes(searchTerm)
+                );
+
+                showDropdown(filteredBrands);
+            });
+
+            // Xử lý khi click vào item
+            $(document).off('click.autocomplete-item').on('click.autocomplete-item', '.autocomplete-item', function() {
+                const brandId = $(this).data('brand-id');
+                const brandName = $(this).data('brand-name');
+                
+                if (brandId && brandName) {
+                    brandFilter.val(brandName);
+                    brandFilterValue.val(brandId);
+                    dropdown.hide();
+                    $(document).trigger('brandFilterChanged');
+                }
+            });
+
+            // Xử lý phím tắt
+            brandFilter.off('keydown.autocomplete').on('keydown.autocomplete', function(e) {
+                if (dropdown.is(':visible') && filteredBrands.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        selectedIndex = Math.min(selectedIndex + 1, filteredBrands.length - 1);
+                        updateSelectedItem();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        selectedIndex = Math.max(selectedIndex - 1, -1);
+                        updateSelectedItem();
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (selectedIndex >= 0 && selectedIndex < filteredBrands.length) {
+                            const brand = filteredBrands[selectedIndex];
+                            brandFilter.val(brand.brandName);
+                            brandFilterValue.val(brand.brandId);
+                            dropdown.hide();
+                            $(document).trigger('brandFilterChanged');
+                        }
+                    } else if (e.key === 'Escape') {
+                        dropdown.hide();
+                        selectedIndex = -1;
+                    }
+                }
+            });
+
+            // Ẩn dropdown khi click ra ngoài
+            $(document).off('click.autocomplete-close').on('click.autocomplete-close', function(e) {
+                if (!$(e.target).closest('.autocomplete-wrapper').length) {
+                    dropdown.hide();
+                    selectedIndex = -1;
+                }
+            });
+
+            // Xử lý khi focus vào input - hiển thị tất cả brands nếu chưa có text
+            brandFilter.off('focus.autocomplete').on('focus.autocomplete', function() {
+                const val = $(this).val().trim();
+                if (val) {
+                    // Trigger input để hiển thị dropdown nếu có text
+                    $(this).trigger('input.autocomplete');
+                } else {
+                    // Hiển thị tất cả brands khi focus lần đầu
+                    const allBrands = window.allBrandsForFilter || [];
+                    if (allBrands.length > 0) {
+                        filteredBrands = allBrands;
+                        showDropdown(filteredBrands);
+                    }
+                }
+            });
+
+            // Xử lý khi click vào input
+            brandFilter.off('click.autocomplete').on('click.autocomplete', function() {
+                const val = $(this).val().trim();
+                if (val) {
+                    $(this).trigger('input.autocomplete');
+                } else {
+                    const allBrands = window.allBrandsForFilter || [];
+                    if (allBrands.length > 0) {
+                        filteredBrands = allBrands;
+                        showDropdown(filteredBrands);
+                    }
                 }
             });
         }
@@ -326,7 +678,7 @@
         function loadProducts(page = currentPage) {
             currentPage = page;
             const searchTerm = $('#searchInput').val().trim();
-            const brandId = $('#brandFilter').val();
+            const brandId = $('#brandFilterValue').val() || ''; // Chỉ lấy từ hidden field
             const activeFilter = $('#activeFilter').val();
 
             const dataParams = {
@@ -524,6 +876,7 @@
             $('#productName').val('');
             $('#productModel').val('');
             $('#brandId').val('');
+            $('#brandIdValue').val('');
             $('#originalSellingPrice').val('');
             $('#sellingPrice').val('');
             $('#warrantyPeriod').val('');
@@ -550,6 +903,9 @@
             newImageFiles = [];
             renderConfigurations();
             renderProductImages();
+            
+            // Load lại brands (chỉ active) khi thêm mới
+            loadBrands(null);
             
             // Remove is-filled class from all input groups
             $('.input-group-outline').removeClass('is-filled');
@@ -593,6 +949,8 @@
                 
                 // Disable tất cả inputs và selects trong form chính
                 $('#productForm input:not([type="hidden"]):not([type="file"]), #productForm select').prop('disabled', true);
+                // Ẩn dropdown autocomplete
+                $('#brandIdDropdown').hide();
                 $('#productForm input[type="file"]').prop('disabled', true).css('pointer-events', 'none');
                 
                 // Ẩn nút thêm cấu hình
@@ -631,6 +989,11 @@
                     }
                     $(this).prop('disabled', false);
                 });
+                
+                // Enable Select2
+                if ($('#brandId').hasClass('select2-hidden-accessible')) {
+                    $('#brandId').prop('disabled', false).trigger('change');
+                }
                 
                 $('#productForm input[type="file"]').prop('disabled', false).css('pointer-events', 'auto');
                 
@@ -699,26 +1062,33 @@
                     imagesToDelete = [];
                     newImageFiles = [];
                     
-                    // Fill form với dữ liệu
-                    fillFormWithProduct(product, false);
+                    // Load lại brands với brandId của product (để hiển thị hãng đã xóa nếu có)
+                    // Sau khi loadBrands xong mới fill form
+                    loadBrands(product.brandId || null);
                     
-                    // Disable productId (không cho sửa mã) - set readonly
-                    $('#productId').prop('disabled', false).prop('readonly', true);
-                    
-                    // Enable edit mode (không phải view mode) - gọi sau khi fill form
+                    // Đợi một chút để loadBrands hoàn thành rồi mới fill form
                     setTimeout(function() {
-                        setViewMode(false);
+                        // Fill form với dữ liệu
+                        fillFormWithProduct(product, false);
                         
-                        // Đảm bảo nút "Thêm cấu hình" hiển thị
-                        $('#btnAddConfiguration').show().prop('disabled', false);
+                        // Disable productId (không cho sửa mã) - set readonly
+                        $('#productId').prop('disabled', false).prop('readonly', true);
                         
-                        // Đảm bảo file input enabled
-                        $('#productImageFiles').prop('disabled', false).css('pointer-events', 'auto');
-                        
-                        // Re-render để đảm bảo controls hiển thị đúng
-                        renderConfigurations();
-                        renderProductImages();
-                    }, 150);
+                        // Enable edit mode (không phải view mode) - gọi sau khi fill form
+                        setTimeout(function() {
+                            setViewMode(false);
+                            
+                            // Đảm bảo nút "Thêm cấu hình" hiển thị
+                            $('#btnAddConfiguration').show().prop('disabled', false);
+                            
+                            // Đảm bảo file input enabled
+                            $('#productImageFiles').prop('disabled', false).css('pointer-events', 'auto');
+                            
+                            // Re-render để đảm bảo controls hiển thị đúng
+                            renderConfigurations();
+                            renderProductImages();
+                        }, 150);
+                    }, 300);
                     
                     const modal = new bootstrap.Modal(document.getElementById('productModal'));
                     modal.show();
@@ -739,7 +1109,26 @@
             $('#productId').val(product.productId || '');
             $('#productName').val(product.productName || '');
             $('#productModel').val(product.productModel || '');
-            $('#brandId').val(product.brandId || '');
+            
+            // Set brandId và brandName
+            const brandId = product.brandId || '';
+            $('#brandIdValue').val(brandId);
+            if (brandId) {
+                // Tìm brand name từ allBrandsList
+                const brand = allBrandsList.find(b => b.brandId === brandId);
+                if (brand) {
+                    $('#brandId').val(brand.brandName);
+                    // Thêm class is-filled để label nhảy lên top
+                    $('#brandId').closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    $('#brandId').val('');
+                    $('#brandId').closest('.input-group-outline').removeClass('is-filled');
+                }
+            } else {
+                $('#brandId').val('');
+                $('#brandId').closest('.input-group-outline').removeClass('is-filled');
+            }
+            
             $('#originalSellingPrice').val(product.originalSellingPrice || '');
             $('#sellingPrice').val(product.sellingPrice || '');
             $('#warrantyPeriod').val(product.warrantyPeriod || '');
@@ -748,9 +1137,6 @@
             $('#connect').val(product.connect || '');
             $('#weight').val(product.weight || '');
             $('#pin').val(product.pin || '');
-            
-            // Trigger change để update is-filled class
-            $('#brandId').trigger('change');
 
             // Add is-filled class to input groups with values
             setTimeout(function() {
@@ -807,6 +1193,10 @@
                 // Disable form inputs
                 $('#productForm input:not([type="hidden"]):not([type="file"]), #productForm select').prop('disabled', true);
                 $('#productForm input[type="file"]').prop('disabled', true).css('pointer-events', 'none');
+                // Disable Select2
+                if ($('#brandId').hasClass('select2-hidden-accessible')) {
+                    $('#brandId').prop('disabled', true).trigger('change');
+                }
                 $('#btnAddConfiguration').hide();
                 $('.modal-footer .btn-primary').hide();
                 // Clear file inputs khi view
@@ -859,7 +1249,7 @@
             const formData = new FormData();
             formData.append('ProductName', productName);
             formData.append('ProductModel', $('#productModel').val() || '');
-            formData.append('BrandId', $('#brandId').val() || '');
+            formData.append('BrandId', $('#brandIdValue').val() || '');
             formData.append('OriginalSellingPrice', $('#originalSellingPrice').val() || '0');
             formData.append('SellingPrice', $('#sellingPrice').val() || '0');
             formData.append('WarrantyPeriod', $('#warrantyPeriod').val() || '0');
@@ -1549,6 +1939,9 @@
             $('#imagePreview').hide();
             $('#productImagesPreview').empty();
             
+            // Reset autocomplete dropdowns
+            $('#brandIdDropdown').hide();
+            
             // Reset data
             configurations = [];
             configurationsToDelete = [];
@@ -1558,6 +1951,8 @@
             
             // Reset form
             $('#productForm')[0].reset();
+            $('#brandId').val('');
+            $('#brandIdValue').val('');
             $('#errorMessage').hide();
             
             // Remove is-filled classes
@@ -1581,17 +1976,78 @@
 }
 
 <style>
+    /* Bảng chính */
+    .table-responsive {
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .table {
+        margin-bottom: 0;
+        background-color: #fff;
+    }
+
+    .table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .table thead th {
+        color: #fff !important;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 1rem 0.75rem !important;
+        border: none;
+        font-size: 1.3125rem;
+        text-align: center;
+    }
+
+    .table tbody tr {
+        transition: all 0.3s ease;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .table tbody tr:hover {
+        background-color: #f8f9fa;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .table tbody tr:last-child {
+        border-bottom: none;
+    }
+
+    .table tbody tr.table-secondary {
+        background-color: #f8f9fa;
+        opacity: 0.7;
+    }
+
     .product-image {
         width: 60px;
         height: 60px;
         object-fit: cover;
         border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s ease;
+    }
+
+    .product-image:hover {
+        transform: scale(1.05);
     }
 
     .action-btn {
-        padding: 0.25rem 0.5rem;
+        padding: 0.375rem 0.625rem;
         font-size: 0.75rem;
         margin: 0 0.125rem;
+        border-radius: 0.375rem;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
     }
 
     .modal-lg {
@@ -1612,41 +2068,61 @@
     .badge-price {
         font-size: 0.875rem;
         padding: 0.5rem 0.75rem;
+        border-radius: 0.375rem;
     }
+
     /* Fix lỗi cột bị lệch khi đổi trang */
     #productTableBody tr {
         height: 80px;
     }
 
-        #productTableBody tr td {
-            vertical-align: middle !important;
-            padding: 0.75rem 0.5rem !important;
-        }
+    #productTableBody tr td {
+        vertical-align: middle !important;
+        padding: 1rem 0.75rem !important;
+        border: none;
+    }
 
-            #productTableBody tr td:first-child {
-                width: 30%;
-                min-width: 250px;
-            }
+    #productTableBody tr td:first-child {
+        width: 30%;
+        min-width: 250px;
+    }
 
-            #productTableBody tr td:nth-child(2) {
-                width: 20%;
-                min-width: 150px;
-            }
+    #productTableBody tr td:nth-child(2) {
+        width: 20%;
+        min-width: 150px;
+    }
 
-            #productTableBody tr td:nth-child(3) {
-                width: 15%;
-                min-width: 120px;
-            }
+    #productTableBody tr td:nth-child(3) {
+        width: 15%;
+        min-width: 120px;
+    }
 
-            #productTableBody tr td:nth-child(4) {
-                width: 15%;
-                min-width: 100px;
-            }
+    #productTableBody tr td:nth-child(4) {
+        width: 15%;
+        min-width: 100px;
+    }
 
-            #productTableBody tr td:nth-child(5) {
-                width: 20%;
-                min-width: 150px;
-            }
+    #productTableBody tr td:nth-child(5) {
+        width: 20%;
+        min-width: 150px;
+    }
+
+    /* Badge styling */
+    .badge {
+        padding: 0.5rem 0.75rem;
+        font-weight: 500;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+    }
+
+    /* Empty state */
+    .table tbody tr td[colspan] {
+        padding: 3rem 1rem !important;
+        text-align: center;
+        color: #6c757d;
+        font-style: italic;
+    }
+
     /* Ẩn nút xóa khi ở chế độ xem */
     .view-mode .configuration-item button,
     .view-mode .existing-image button {
@@ -1657,6 +2133,7 @@
     .view-mode #btnAddConfiguration {
         display: none !important;
     }
+
     /* Fix cho input trong configurations */
     .configuration-item .form-control {
         height: auto;
@@ -1672,5 +2149,139 @@
 
     .configuration-item .mb-3 {
         margin-bottom: 1rem !important;
+    }
+
+    /* Select2 styling */
+    .select2-container--bootstrap-5 .select2-selection {
+        min-height: 40px;
+        border: 1px solid #d2d6da;
+        border-radius: 0.375rem;
+    }
+
+    .select2-container--bootstrap-5 .select2-selection--single {
+        height: 40px;
+    }
+
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+        line-height: 38px;
+        padding-left: 0.75rem;
+    }
+
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
+        height: 38px;
+    }
+
+    .select2-dropdown {
+        border: 1px solid #d2d6da;
+        border-radius: 0.375rem;
+    }
+
+    .select2-search--dropdown .select2-search__field {
+        border: 1px solid #d2d6da;
+        border-radius: 0.375rem;
+        padding: 0.5rem;
+    }
+
+    /* Select2 dropdown trong modal */
+    .modal .select2-container {
+        z-index: 9999;
+    }
+
+    .modal .select2-dropdown {
+        z-index: 10000;
+    }
+
+    /* Autocomplete styling */
+    .autocomplete-wrapper {
+        width: 100%;
+        display: block;
+    }
+
+    /* Đảm bảo input trong autocomplete-wrapper có style giống các input khác */
+    .input-group-outline .autocomplete-wrapper .form-control {
+        border: none;
+        border-bottom: 1px solid #d2d6da;
+        border-left: 1px solid #d2d6da;
+        border-right: 1px solid #d2d6da;
+        border-radius: 0;
+        padding-left: 0;
+        padding-right: 0;
+        background: transparent;
+        background-image: none;
+        box-shadow: none;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+
+    .input-group-outline .autocomplete-wrapper .form-control:focus {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+        box-shadow: none;
+        outline: 0;
+    }
+
+    .input-group-outline.is-filled .autocomplete-wrapper .form-control {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+    }
+
+    .input-group-outline.is-focused .autocomplete-wrapper .form-control {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+        box-shadow: none;
+    }
+
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: #fff;
+        border: 1px solid #d2d6da;
+        border-radius: 0.375rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1000;
+        margin-top: 2px;
+        display: none;
+    }
+
+    .autocomplete-item {
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom: none;
+    }
+
+    .autocomplete-item:hover,
+    .autocomplete-item.selected {
+        background-color: #f8f9fa;
+        color: #667eea;
+    }
+
+    .autocomplete-item:first-child {
+        border-top-left-radius: 0.375rem;
+        border-top-right-radius: 0.375rem;
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom-left-radius: 0.375rem;
+        border-bottom-right-radius: 0.375rem;
+    }
+
+    /* Autocomplete trong modal */
+    .modal .autocomplete-dropdown {
+        z-index: 1055;
+    }
+
+    .modal .autocomplete-wrapper {
+        z-index: 1;
     }
 </style>
