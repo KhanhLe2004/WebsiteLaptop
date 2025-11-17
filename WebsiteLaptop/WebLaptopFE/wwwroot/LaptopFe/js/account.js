@@ -1,493 +1,520 @@
-﻿/* js/account.js */
+/* account.js */
 (function ($) {
     'use strict';
-    console.log('account.js loaded');
 
+    const CUSTOMER_API_BASE = window.CUSTOMER_API_BASE || '/api/CustomerAccount';
+    const ADDRESS_API_BASE = window.ADDRESS_API_BASE || '/api/Address';
 
-    /* ===========================
-       Helpers: status badge/color
-       =========================== */
+    let currentCustomerId = null;
+    let provinces = [];
+    const wardsCache = new Map();
 
-    // Normalize status text (lowercase, trim)
-    function normStatusText(s) {
-        return (s || '').toString().trim().toLowerCase();
+    const $accountAlert = $('#accountAlert');
+
+    /* ------------ Helpers ------------ */
+    function showAlert(type, message) {
+        if (!$accountAlert.length) return;
+        $accountAlert
+            .removeClass('d-none alert-success alert-danger alert-warning alert-info')
+            .addClass(`alert-${type}`)
+            .text(message);
     }
 
-    // Return consistent badge HTML for a given status (one color per status)
-    function getStatusBadge(statusText) {
-        const t = normStatusText(statusText);
+    function clearAlert() {
+        if (!$accountAlert.length) return;
+        $accountAlert.addClass('d-none').text('');
+    }
 
-        // Map known statuses to single color/label
-        if (t.includes('đang xử lý') || t.includes('processing')) {
+    function formatCurrency(value) {
+        return (value ?? 0).toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+    }
+
+    function formatDate(value) {
+        if (!value) return '';
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('vi-VN');
+    }
+
+    function buildStatusBadge(status) {
+        const text = (status || '').toString().trim().toLowerCase();
+        if (text.includes('đang xử lý') || text.includes('processing')) {
             return '<span class="badge bg-warning text-dark">Đang xử lý</span>';
         }
-        if (t.includes('đã gửi') || t.includes('sent') || t.includes('shipped')) {
+        if (text.includes('đã gửi') || text.includes('shipped')) {
             return '<span class="badge bg-info text-dark">Đã gửi</span>';
         }
-        if (t.includes('hoàn thành') || t.includes('completed') || t.includes('completed')) {
+        if (text.includes('hoàn thành') || text.includes('completed')) {
             return '<span class="badge bg-success text-white">Hoàn thành</span>';
         }
-        if (t.includes('đã hủy') || t.includes('hủy') || t.includes('cancelled') || t.includes('canceled')) {
+        if (text.includes('đã hủy') || text.includes('canceled') || text.includes('cancelled')) {
             return '<span class="badge bg-danger text-white">Đã hủy</span>';
         }
-        // default
         return '<span class="badge bg-secondary">Khác</span>';
     }
 
-    function isCancellableStatus(statusText) {
-        const t = normStatusText(statusText);
-        return t.includes('đang xử lý') || t.includes('processing');
+    function loadBirthDropdowns() {
+        const $day = $('#birthDay');
+        const $month = $('#birthMonth');
+        const $year = $('#birthYear');
+        if (!$day.length || !$month.length || !$year.length) return;
+
+        $day.empty().append('<option value="">Ngày</option>');
+        $month.empty().append('<option value="">Tháng</option>');
+        $year.empty().append('<option value="">Năm</option>');
+
+        for (let d = 1; d <= 31; d++) $day.append(new Option(d, d));
+        for (let m = 1; m <= 12; m++) $month.append(new Option(m, m));
+
+        const currentYear = new Date().getFullYear();
+        for (let y = currentYear; y >= 1900; y--) $year.append(new Option(y, y));
     }
 
-    /* ===========================
-       Address, birth, validation
-       =========================== */
-
-    function enableAddressForm() {
-        $('#province, #ward, #detailAddress, #birthDay, #birthMonth, #birthYear').prop('disabled', false);
-        loadProvinces();
-        loadBirthDropdowns();
-    }
-
-    function loadProvinces() {
-        const provinceSel = document.getElementById("province");
-        if (!provinceSel) return;
-        provinceSel.innerHTML = '<option value="">-- Chọn tỉnh/thành phố --</option>';
-        fetch(`${API_BASE}/p/`)
-            .then(res => res.json())
-            .then(data => {
-                if (!Array.isArray(data)) return;
-                data.forEach(p => {
-                    const opt = document.createElement("option");
-                    opt.value = p.code;
-                    opt.text = p.name;
-                    provinceSel.appendChild(opt);
-                });
-            })
-            .catch(err => console.error("Lỗi load tỉnh/thành:", err));
-    }
-
-    async function loadWardsByProvince(provinceCode) {
-        const wardSel = document.getElementById("ward");
-        if (!wardSel) return;
-        wardSel.innerHTML = '<option value="">-- Chọn xã/phường --</option>';
-        if (!provinceCode) {
-            $('#ward').prop('disabled', true);
+    function setDateOfBirth(value) {
+        if (!value) {
+            $('#birthDay, #birthMonth, #birthYear').val('');
             return;
         }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return;
+        $('#birthDay').val(date.getDate());
+        $('#birthMonth').val(date.getMonth() + 1);
+        $('#birthYear').val(date.getFullYear());
+    }
 
-        $('#ward').prop('disabled', true);
+    function collectDateOfBirth() {
+        const day = $('#birthDay').val();
+        const month = $('#birthMonth').val();
+        const year = $('#birthYear').val();
+        if (!day || !month || !year) return null;
+        return `${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    }
+
+    function resolveSessionCustomerId() {
+        const isLoggedIn = sessionStorage.getItem('isLoggedIn');
+        const raw = sessionStorage.getItem('customer');
+        if (isLoggedIn !== 'true' || !raw) return null;
         try {
-            const provinceRes = await fetch(`${API_BASE}/p/${provinceCode}?depth=3`);
-            if (!provinceRes.ok) throw new Error('HTTP ' + provinceRes.status);
-            const province = await provinceRes.json();
-
-            let allWards = [];
-            if (Array.isArray(province.districts)) {
-                province.districts.forEach(district => {
-                    const list = district.wards || district.communes || district.commune || [];
-                    if (Array.isArray(list) && list.length) {
-                        allWards = allWards.concat(list.map(w => ({ ...w, districtName: district.name })));
-                    }
-                });
-            }
-
-            if (allWards.length === 0) {
-                wardSel.innerHTML = '<option value="">(Không có phường/xã)</option>';
-                $('#ward').prop('disabled', false);
-                return;
-            }
-
-            allWards.forEach(w => {
-                const opt = document.createElement("option");
-                opt.value = w.code ?? w.id ?? w.name;
-                opt.text = `${w.name} (${w.districtName})`;
-                wardSel.appendChild(opt);
-            });
+            const parsed = JSON.parse(raw);
+            return parsed.customerId || parsed.CustomerId || null;
         } catch (err) {
-            console.error("Lỗi load xã/phường:", err);
-            wardSel.innerHTML = '<option value="">(Lỗi tải danh sách)</option>';
-        } finally {
-            $('#ward').prop('disabled', false);
-        }
-    }
-
-    function loadBirthDropdowns() {
-        const daySel = document.getElementById("birthDay");
-        const monthSel = document.getElementById("birthMonth");
-        const yearSel = document.getElementById("birthYear");
-        if (!daySel || !monthSel || !yearSel) return;
-
-        const today = new Date();
-        const currentYear = today.getFullYear();
-        const currentMonth = today.getMonth() + 1;
-        const currentDay = today.getDate();
-
-        const prevSelectedYear = yearSel.value || '';
-        const prevSelectedMonth = monthSel.value || '';
-        const prevSelectedDay = daySel.value || '';
-
-        daySel.innerHTML = '<option value="">Ngày</option>';
-        for (let d = 1; d <= 31; d++) daySel.appendChild(new Option(d, d));
-
-        monthSel.innerHTML = '<option value="">Tháng</option>';
-        for (let m = 1; m <= 12; m++) monthSel.appendChild(new Option(m, m));
-
-        if (prevSelectedDay) daySel.value = prevSelectedDay;
-        if (prevSelectedMonth) monthSel.value = prevSelectedMonth;
-
-        function isYearAllowed(y) {
-            const selectedMonth = parseInt(monthSel.value, 10);
-            const selectedDay = parseInt(daySel.value, 10);
-            if (isNaN(selectedMonth) || isNaN(selectedDay)) return y <= currentYear;
-            if (y < currentYear) return true;
-            if (y > currentYear) return false;
-            if (selectedMonth > currentMonth) return false;
-            if (selectedMonth < currentMonth) return true;
-            return !(selectedDay > currentDay);
-        }
-
-        function fillYearsAndRestore(prevYear) {
-            yearSel.innerHTML = '<option value="">Năm</option>';
-            for (let y = currentYear; y >= 1900; y--) {
-                if (!isYearAllowed(y)) continue;
-                yearSel.appendChild(new Option(y, y));
-            }
-            if (prevYear) {
-                const found = Array.from(yearSel.options).some(o => String(o.value) === String(prevYear));
-                if (found) { yearSel.value = prevYear; return; }
-            }
-            yearSel.value = '';
-        }
-
-        function onDayOrMonthChange() {
-            const prev = yearSel.value;
-            fillYearsAndRestore(prev);
-        }
-
-        try {
-            daySel.removeEventListener && daySel.removeEventListener('change', onDayOrMonthChange);
-            monthSel.removeEventListener && monthSel.removeEventListener('change', onDayOrMonthChange);
-        } catch (e) { /* ignore */ }
-
-        daySel.addEventListener('change', onDayOrMonthChange);
-        monthSel.addEventListener('change', onDayOrMonthChange);
-
-        fillYearsAndRestore(prevSelectedYear);
-    }
-
-    function validateProfile() {
-        const fullname = $('input[name=fullname]').val() ? $('input[name=fullname]').val().trim() : '';
-        const email = $('input[name=email]').val() ? $('input[name=email]').val().trim() : '';
-        const phone = $('input[name=phone]').val() ? $('input[name=phone]').val().trim() : '';
-
-        const nameRegex = /^[a-zA-ZÀ-ỹ\s]+$/u;
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        const phoneRegex = /^[0-9]{9,15}$/;
-
-        if (!nameRegex.test(fullname)) { alert("Tên không hợp lệ"); return false; }
-        if (!emailRegex.test(email)) { alert("Email không hợp lệ"); return false; }
-        if (!phoneRegex.test(phone)) { alert("Số điện thoại không hợp lệ"); return false; }
-
-        return true;
-    }
-
-    /* ===========================
-       Order modal, render, fetch, build
-       =========================== */
-
-    function ensureOrderModal() {
-        if (document.getElementById('orderDetailModal')) return;
-        const modalHtml = `
-      <div class="modal fade" id="orderDetailModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title">Chi tiết đơn hàng</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-              <div id="orderDetailContent"></div>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-    }
-
-    function escapeHtml(str) {
-        if (str === null || str === undefined) return '';
-        return String(str)
-            .replaceAll('&', '&amp;')
-            .replaceAll('<', '&lt;')
-            .replaceAll('>', '&gt;')
-            .replaceAll('"', '&quot;')
-            .replaceAll("'", '&#39;');
-    }
-
-    function formatCurrency(n) {
-        n = Number(n || 0);
-        return n.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
-    }
-
-    function parseNumberFromCurrency(text) {
-        if (!text) return 0;
-        const cleaned = text.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(/,/g, '');
-        const n = parseFloat(cleaned);
-        return isNaN(n) ? 0 : n;
-    }
-
-    function renderOrderDetailHtml(order) {
-        const items = (order.items || []).map(it => `
-      <tr>
-        <td>${escapeHtml(it.name)}</td>
-        <td class="text-center">${escapeHtml(String(it.qty))}</td>
-        <td class="text-end">${formatCurrency(it.price)}</td>
-        <td class="text-end">${formatCurrency((it.price || 0) * (it.qty || 1))}</td>
-      </tr>
-    `).join('');
-
-        const itemsTable = `
-      <div class="table-responsive">
-        <table class="table table-sm">
-          <thead class="table-light">
-            <tr><th>Sản phẩm</th><th class="text-center">SL</th><th class="text-end">Đơn giá</th><th class="text-end">Thành tiền</th></tr>
-          </thead>
-          <tbody>${items}</tbody>
-        </table>
-      </div>
-    `;
-
-        return `
-      <div>
-        <p><strong>Mã đơn:</strong> ${escapeHtml(order.code || order.id || '')}</p>
-        <p><strong>Ngày đặt:</strong> ${escapeHtml(order.date || '')}</p>
-        <p><strong>Trạng thái:</strong> ${escapeHtml(order.status || '')}</p>
-        <p><strong>Địa chỉ giao:</strong> ${escapeHtml(order.address || '')}</p>
-        <hr>
-        ${itemsTable}
-        <div class="d-flex justify-content-end">
-          <div>
-            <p class="mb-1">Tạm tính: <strong>${formatCurrency(order.subtotal || order.total || 0)}</strong></p>
-            <p class="mb-1">Phí vận chuyển: <strong>${formatCurrency(order.shipping || 0)}</strong></p>
-            <p class="mb-1">Tổng cộng: <strong>${formatCurrency(order.total || order.subtotal || 0)}</strong></p>
-          </div>
-        </div>
-      </div>
-    `;
-    }
-
-    async function fetchOrderById(orderId) {
-        if (!orderId) return null;
-        try {
-            const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, { method: 'GET', credentials: 'same-origin' });
-            if (!res.ok) return null;
-            return await res.json();
-        } catch (e) {
-            console.warn('fetchOrderById failed', e);
+            console.error('Cannot parse customer info', err);
             return null;
         }
     }
 
-    function buildOrderFromRow($tr) {
-        const code = $tr.find('td').eq(0).text().trim();
-        const date = $tr.find('td').eq(1).text().trim();
-        const status = $tr.find('td').eq(2).text().trim();
-        const totalText = $tr.find('td').eq(3).text().trim();
-        const total = parseNumberFromCurrency(totalText);
-        const dataJson = $tr.attr('data-order-json');
-        let items = [];
-        if (dataJson) {
-            try { const parsed = JSON.parse(dataJson); if (Array.isArray(parsed.items)) items = parsed.items; if (parsed.address) parsed.address; } catch (e) { }
+    /* ------------ Address helpers ------------ */
+    async function loadProvinces(force = false) {
+        if (provinces.length && !force) return provinces;
+        try {
+            const response = await fetch(`${ADDRESS_API_BASE}/new-provinces`, { credentials: 'same-origin' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+            provinces = list.map(item => ({
+                code: item.code || item.provinceCode || item.id,
+                name: item.name || item.provinceName || ''
+            })).filter(p => p.code && p.name);
+
+            const $province = $('#province');
+            if ($province.length) {
+                $province.empty().append('<option value="">-- Chọn tỉnh/thành phố --</option>');
+                provinces.forEach(p => $province.append(new Option(p.name, p.code)));
+            }
+            return provinces;
+        } catch (err) {
+            console.error('loadProvinces error', err);
+            showAlert('danger', 'Không thể tải danh sách tỉnh/thành phố');
+            return [];
         }
-        if (items.length === 0) {
-            items = [{ name: 'Sản phẩm mẫu', qty: 1, price: total || 0 }];
-        }
-        const address = $tr.attr('data-order-address') || '';
-        return { code, date, status, total, subtotal: total, shipping: 0, items, address };
     }
 
-    // Show modal and set footer buttons (cancel next to close)
-    async function showOrderModalForRow($tr) {
+    async function loadWardsByProvince(code) {
+        const $ward = $('#ward');
+        if (!$ward.length) return;
+        $ward.prop('disabled', true).html('<option value="">-- Đang tải... --</option>');
+        if (!code) {
+            $ward.html('<option value="">-- Chọn xã/phường --</option>');
+            return;
+        }
+
+        if (wardsCache.has(code)) {
+            populateWards(wardsCache.get(code));
+            return;
+        }
+
+        try {
+            const response = await fetch(`${ADDRESS_API_BASE}/wards/${code}`, { credentials: 'same-origin' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+            const wards = list.map(w => ({
+                code: w.code || w.id || w.ward_id,
+                name: w.name || w.ward_name || ''
+            })).filter(w => w.code && w.name);
+            wardsCache.set(code, wards);
+            populateWards(wards);
+        } catch (err) {
+            console.error('loadWards error', err);
+            $ward.html('<option value="">-- Không thể tải xã/phường --</option>');
+        }
+    }
+
+    function populateWards(wards) {
+        const $ward = $('#ward');
+        if (!$ward.length) return;
+        $ward.empty().append('<option value="">-- Chọn xã/phường --</option>');
+        wards.forEach(w => $ward.append(new Option(w.name, w.code)));
+        $ward.prop('disabled', false);
+    }
+
+    /* ------------ Customer profile ------------ */
+    async function loadCustomerData() {
+        try {
+            const response = await fetch(`${CUSTOMER_API_BASE}/${currentCustomerId}`, { credentials: 'same-origin' });
+            if (!response.ok) throw new Error('Không thể tải thông tin khách hàng');
+            const data = await response.json();
+            populateProfileForm(data);
+        } catch (err) {
+            console.error(err);
+            showAlert('danger', err.message || 'Không thể tải thông tin khách hàng');
+        }
+    }
+
+    function populateProfileForm(customer) {
+        $('input[name=fullname]').val(customer?.customerName || customer?.CustomerName || '');
+        $('input[name=email]').val(customer?.email || customer?.Email || '');
+        $('input[name=phone]').val(customer?.phoneNumber || customer?.PhoneNumber || '');
+        $('#detailAddress').val(customer?.address || customer?.Address || '');
+        setDateOfBirth(customer?.dateOfBirth || customer?.DateOfBirth);
+
+        const avatar = customer?.avatar || customer?.Avatar || '../LaptopFe/img/avatar.jpg';
+        $('#avatarImg').attr('src', avatar);
+        $('#userName').text(customer?.customerName || customer?.CustomerName || 'Tên khách hàng');
+        $('.text-muted.small').first().text(customer?.username || customer?.Username || 'username');
+
+        disableProfileForm();
+    }
+
+    function disableProfileForm() {
+        $('#profileForm input, #profileForm select, #profileForm button[type=submit]').prop('disabled', true);
+        $('#toggleEditProfile').text('Chỉnh sửa');
+    }
+
+    function enableProfileForm() {
+        $('#profileForm input, #profileForm select, #profileForm button[type=submit]').prop('disabled', false);
+        $('#toggleEditProfile').text('Hủy');
+    }
+
+    function collectProfilePayload() {
+        const fullName = $('input[name=fullname]').val()?.toString().trim();
+        const email = $('input[name=email]').val()?.toString().trim();
+        const phone = $('input[name=phone]').val()?.toString().trim();
+        const detailAddress = $('#detailAddress').val()?.toString().trim();
+        const provinceName = $('#province option:selected').text();
+        const wardName = $('#ward option:selected').text();
+
+        let address = detailAddress || '';
+        if ($('#ward').val() && wardName && !wardName.startsWith('--')) {
+            address = address ? `${address}, ${wardName}` : wardName;
+        }
+        if ($('#province').val() && provinceName && !provinceName.startsWith('--')) {
+            address = address ? `${address}, ${provinceName}` : provinceName;
+        }
+
+        return {
+            customerName: fullName,
+            email,
+            phoneNumber: phone,
+            address,
+            dateOfBirthString: collectDateOfBirth()
+        };
+    }
+
+    async function handleProfileSubmit(e) {
+        e.preventDefault();
+        clearAlert();
+
+        const payload = collectProfilePayload();
+        if (!payload.customerName || !payload.email || !payload.phoneNumber) {
+            showAlert('danger', 'Vui lòng nhập đầy đủ thông tin bắt buộc.');
+            return;
+        }
+
+        const btn = $('#profileForm button[type=submit]');
+        const original = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Đang lưu...');
+
+        try {
+            const response = await fetch(`${CUSTOMER_API_BASE}/${currentCustomerId}/profile`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data?.message || 'Không thể cập nhật thông tin');
+            showAlert('success', data.message || 'Cập nhật thông tin thành công');
+            disableProfileForm();
+            loadCustomerData();
+        } catch (err) {
+            console.error(err);
+            showAlert('danger', err.message || 'Không thể cập nhật thông tin');
+        } finally {
+            btn.prop('disabled', false).html(original);
+        }
+    }
+
+    async function handlePasswordSubmit(e) {
+        e.preventDefault();
+        clearAlert();
+
+        const current = $('input[name=current]').val()?.toString().trim();
+        const newPwd = $('input[name=new]').val()?.toString().trim();
+        const confirm = $('input[name=confirm]').val()?.toString().trim();
+
+        if (!current || !newPwd || !confirm) {
+            showAlert('danger', 'Vui lòng nhập đầy đủ thông tin mật khẩu');
+            return;
+        }
+        if (newPwd !== confirm) {
+            showAlert('danger', 'Mật khẩu mới và xác nhận không khớp');
+            return;
+        }
+        if (newPwd.length > 6 || !/[A-Za-z]/.test(newPwd) || !/\d/.test(newPwd)) {
+            showAlert('danger', 'Mật khẩu mới phải tối đa 6 ký tự và gồm cả chữ và số');
+            return;
+        }
+
+        const btn = $('#passwordForm button[type=submit]');
+        const original = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Đang cập nhật...');
+
+        try {
+            const response = await fetch(`${CUSTOMER_API_BASE}/${currentCustomerId}/password`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    currentPassword: current,
+                    newPassword: newPwd,
+                    confirmPassword: confirm
+                })
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data?.message || 'Không thể đổi mật khẩu');
+            showAlert('success', data.message || 'Đổi mật khẩu thành công');
+            $('#passwordForm')[0].reset();
+        } catch (err) {
+            console.error(err);
+            showAlert('danger', err.message || 'Không thể đổi mật khẩu');
+        } finally {
+            btn.prop('disabled', false).html(original);
+        }
+    }
+
+    /* ------------ Orders ------------ */
+    function renderLoadingState(selector) {
+        const $body = $(selector);
+        if (!$body.length) return;
+        $body.html('<tr><td colspan="5" class="text-center text-muted">Đang tải dữ liệu...</td></tr>');
+    }
+
+    function renderOrders(selector, orders, emptyMessage) {
+        const $body = $(selector);
+        if (!$body.length) return;
+        if (!orders || !orders.length) {
+            $body.html(`<tr><td colspan="5" class="text-center text-muted">${emptyMessage}</td></tr>`);
+            return;
+        }
+
+        const rows = orders.map(order => {
+            const orderId = order.saleInvoiceId || order.SaleInvoiceId || '';
+            const date = formatDate(order.timeCreate || order.TimeCreate);
+            const statusBadge = buildStatusBadge(order.status || order.Status);
+            const total = formatCurrency(order.totalAmount || order.TotalAmount);
+            const payload = {
+                saleInvoiceId: orderId,
+                date,
+                status: order.status || order.Status,
+                deliveryAddress: order.deliveryAddress || order.DeliveryAddress,
+                paymentMethod: order.paymentMethod || order.PaymentMethod,
+                deliveryFee: order.deliveryFee || order.DeliveryFee,
+                totalAmount: order.totalAmount || order.TotalAmount
+            };
+
+            return `
+                <tr data-order-json='${JSON.stringify(payload)}'>
+                    <td>#${orderId}</td>
+                    <td>${date}</td>
+                    <td>${statusBadge}</td>
+                    <td>${total}</td>
+                    <td><button class="btn btn-sm btn-outline-primary view-order" data-order-id="${orderId}">Chi tiết</button></td>
+                </tr>`;
+        });
+
+        $body.html(rows.join(''));
+    }
+
+    async function loadCustomerOrders() {
+        renderLoadingState('#yourOrdersBody');
+        try {
+            const response = await fetch(`${CUSTOMER_API_BASE}/${currentCustomerId}/orders`, { credentials: 'same-origin' });
+            if (!response.ok) throw new Error('Không thể tải đơn hàng');
+            const orders = await response.json();
+            renderOrders('#yourOrdersBody', orders, 'Chưa có đơn hàng nào');
+        } catch (err) {
+            console.error(err);
+            showAlert('danger', err.message || 'Không thể tải đơn hàng');
+            renderOrders('#yourOrdersBody', [], 'Không thể tải đơn hàng');
+        }
+    }
+
+    async function loadCustomerHistory() {
+        renderLoadingState('#orderHistoryBody');
+        try {
+            const response = await fetch(`${CUSTOMER_API_BASE}/${currentCustomerId}/history`, { credentials: 'same-origin' });
+            if (!response.ok) throw new Error('Không thể tải lịch sử mua hàng');
+            const orders = await response.json();
+            renderOrders('#orderHistoryBody', orders, 'Chưa có lịch sử mua hàng');
+        } catch (err) {
+            console.error(err);
+            showAlert('danger', err.message || 'Không thể tải lịch sử');
+            renderOrders('#orderHistoryBody', [], 'Không thể tải lịch sử');
+        }
+    }
+
+    /* ------------ Order detail modal ------------ */
+    function ensureOrderModal() {
+        if (document.getElementById('orderDetailModal')) return;
+        const modalHtml = `
+            <div class="modal fade" id="orderDetailModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Chi tiết đơn hàng</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="orderDetailContent">Đang tải...</div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+
+    function buildOrderDetailHtml(order) {
+        if (!order) return '<p class="text-muted text-center">Không có dữ liệu</p>';
+        const items = Array.isArray(order.items)
+            ? order.items
+            : Array.isArray(order.Items)
+                ? order.Items
+                : [];
+
+        const rows = items.length
+            ? items.map(item => `
+                <tr>
+                    <td>${item.ProductName || item.productName || 'N/A'}</td>
+                    <td>${item.Quantity || item.quantity || 0}</td>
+                    <td>${formatCurrency(item.UnitPrice || item.unitPrice)}</td>
+                    <td>${formatCurrency(item.Subtotal || item.subtotal)}</td>
+                </tr>`).join('')
+            : '<tr><td colspan="4" class="text-center text-muted">Không có sản phẩm</td></tr>';
+
+        return `
+            <div class="mb-3">
+                <p><strong>Mã đơn:</strong> ${order.SaleInvoiceId || order.saleInvoiceId}</p>
+                <p><strong>Trạng thái:</strong> ${buildStatusBadge(order.Status || order.status)}</p>
+                <p><strong>Thời gian:</strong> ${formatDate(order.TimeCreate || order.timeCreate)}</p>
+                <p><strong>Địa chỉ giao:</strong> ${order.DeliveryAddress || order.deliveryAddress || 'Chưa cập nhật'}</p>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Sản phẩm</th>
+                            <th>Số lượng</th>
+                            <th>Đơn giá</th>
+                            <th>Tạm tính</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+            <div class="d-flex justify-content-end">
+                <div class="text-end">
+                    <p class="mb-1"><strong>Phí giao hàng:</strong> ${formatCurrency(order.DeliveryFee || order.deliveryFee)}</p>
+                    <p class="mb-0"><strong>Tổng cộng:</strong> ${formatCurrency(order.TotalAmount || order.totalAmount)}</p>
+                </div>
+            </div>`;
+    }
+
+    async function handleViewOrder(e) {
+        e.preventDefault();
+        const orderId = $(this).data('order-id');
+        if (!orderId) return;
         ensureOrderModal();
         const modalEl = document.getElementById('orderDetailModal');
         const contentEl = document.getElementById('orderDetailContent');
         if (!modalEl || !contentEl) return;
+        contentEl.innerHTML = '<div class="text-center text-muted py-3">Đang tải...</div>';
 
-        const orderId = $tr.attr('data-order-id') || $tr.find('td').eq(0).text().trim();
-        let order = null;
-        if ($tr.attr('data-order-id')) {
-            order = await fetchOrderById($tr.attr('data-order-id'));
-        }
-        if (!order) {
-            order = buildOrderFromRow($tr);
-        }
-
-        // Render modal body
-        contentEl.innerHTML = renderOrderDetailHtml(order);
-
-        // Update modal footer: ensure there's a single Cancel button only if cancellable
-        const footer = modalEl.querySelector('.modal-footer');
-        if (footer) {
-            // remove any existing cancel button we previously inserted
-            const existingCancel = footer.querySelector('#cancelOrderBtn');
-            if (existingCancel) existingCancel.remove();
-
-            // find close button in footer (we keep it) and insert cancel BEFORE it so they appear side-by-side
-            const closeBtn = footer.querySelector('[data-bs-dismiss="modal"]');
-            if (isCancellableStatus(order.status)) {
-                const cancelBtn = document.createElement('button');
-                cancelBtn.id = 'cancelOrderBtn';
-                cancelBtn.type = 'button';
-                cancelBtn.className = 'btn btn-danger';
-                cancelBtn.innerHTML = '<i class="fas fa-times-circle"></i> Hủy đơn hàng';
-                // insert before close button so both are horizontal
-                if (closeBtn) footer.insertBefore(cancelBtn, closeBtn);
-                else footer.appendChild(cancelBtn);
-            }
+        try {
+            const response = await fetch(`${CUSTOMER_API_BASE}/order/${orderId}`, { credentials: 'same-origin' });
+            if (!response.ok) throw new Error('Không thể tải chi tiết đơn hàng');
+            const order = await response.json();
+            contentEl.innerHTML = buildOrderDetailHtml(order);
+        } catch (err) {
+            console.error(err);
+            contentEl.innerHTML = `<div class="text-danger">${err.message || 'Có lỗi xảy ra'}</div>`;
         }
 
-        // store current row reference on modal for cancel handler
-        modalEl.__currentRow = $tr.get(0);
-
-        // show modal
         const modal = new bootstrap.Modal(modalEl);
         modal.show();
-
-        // After showing, also update the status text in body (consistent coloring) if present
-        const statusP = contentEl.querySelector('p strong');
-        // nothing needed; badge in table will be updated separately when needed
     }
 
-    /* ===========================
-       Segregate orders (completed -> history)
-       =========================== */
-
-    function isCompletedStatusText(text) {
-        if (!text) return false;
-        const t = normStatusText(text);
-        return t.includes('hoàn thành');
-    }
-
-    function segregateOrdersOnLoad() {
-        try {
-            const $yourBody = $('#yourOrdersBody');
-            const $historyBody = $('#orderHistoryBody');
-            if (!$yourBody.length || !$historyBody.length) return;
-
-            // collect from both bodies
-            const allRows = $yourBody.find('tr').toArray().concat($historyBody.find('tr').toArray());
-
-            allRows.forEach(row => {
-                const $r = $(row);
-                // determine status
-                let statusText = '';
-                const dataJson = $r.attr('data-order-json');
-                if (dataJson) {
-                    try { const parsed = JSON.parse(dataJson); statusText = parsed.status || ''; } catch (e) { statusText = ''; }
-                }
-                if (!statusText) statusText = $r.find('td').eq(2).text().trim();
-
-                // normalize and set badge cell to consistent color
-                $r.find('td').eq(2).html(getStatusBadge(statusText));
-
-                if (isCompletedStatusText(statusText)) {
-                    if ($r.closest('#orderHistoryBody').length === 0) $historyBody.append($r);
-                } else {
-                    if ($r.closest('#yourOrdersBody').length === 0) $yourBody.append($r);
-                }
-            });
-        } catch (e) {
-            console.error('segregateOrdersOnLoad error', e);
+    /* ------------ Event handlers ------------ */
+    function handleToggleEdit() {
+        const isEditing = $('#profileForm input:enabled').length > 0;
+        if (isEditing) {
+            disableProfileForm();
+            loadCustomerData();
+        } else {
+            enableProfileForm();
+            loadProvinces();
+            $('#ward').prop('disabled', true);
         }
     }
 
-    /* ===========================
-       Binding events
-       =========================== */
+    function handleLogout(e) {
+        e.preventDefault();
+        sessionStorage.removeItem('customer');
+        sessionStorage.removeItem('isLoggedIn');
+        redirectToLogin();
+    }
 
+    /* ------------ Init ------------ */
     $(document).ready(function () {
-        // on load segregate
-        segregateOrdersOnLoad();
+        loadBirthDropdowns();
+        currentCustomerId = resolveSessionCustomerId();
+        if (!currentCustomerId) {
+            redirectToLogin();
+            return;
+        }
 
-        // toggle edit
-        $('#toggleEditProfile').on('click', function () {
-            $('input, select, button[type=submit]').prop('disabled', false);
-            enableAddressForm();
-        });
+        clearAlert();
+        loadCustomerData();
+        loadCustomerOrders();
+        loadCustomerHistory();
 
-        // province -> wards
-        $('#province').on('change', function () {
-            const val = this.value;
-            const ward = document.getElementById('ward');
-            if (ward) ward.innerHTML = '<option value="">Đang tải...</option>';
-            loadWardsByProvince(val);
-        });
-
-        // profile submit
-        $('#profileForm').on('submit', function (e) {
-            e.preventDefault();
-            if (!validateProfile()) return;
-            const provinceName = $('#province option:selected').text();
-            const wardName = $('#ward option:selected').text();
-            const detail = $('#detailAddress').val();
-            const dob = `${$('#birthDay').val()}/${$('#birthMonth').val()}/${$('#birthYear').val()}`;
-            alert(`Địa chỉ đầy đủ: ${detail}, ${wardName}, ${provinceName}\nNgày sinh: ${dob}`);
-        });
-
-        // password submit
-        $('#passwordForm').on('submit', function (e) {
-            e.preventDefault();
-            const current = $('input[name=current]').val() ? $('input[name=current]').val().trim() : '';
-            const newPwd = $('input[name=new]').val() ? $('input[name=new]').val().trim() : '';
-            const confirm = $('input[name=confirm]').val() ? $('input[name=confirm]').val().trim() : '';
-
-            const pwdRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{1,6}$/;
-            if (!pwdRegex.test(newPwd)) { alert("Mật khẩu mới phải tối đa 6 ký tự và gồm cả chữ và số!"); return; }
-            if (newPwd !== confirm) { alert("Xác nhận mật khẩu không khớp!"); return; }
-            if (!current) { alert("Vui lòng nhập mật khẩu hiện tại!"); return; }
-            alert("Mật khẩu đã được cập nhật thành công!");
-        });
-
-        // view order
-        $(document).on('click', '.view-order', function (e) {
-            e.preventDefault();
-            const $btn = $(this);
-            const $tr = $btn.closest('tr');
-            if (!$tr || !$tr.length) return;
-            showOrderModalForRow($tr);
-        });
-
-        // cancel order button in footer (UI-only)
-        $(document).on('click', '#cancelOrderBtn', function (e) {
-            e.preventDefault();
-            if (!confirm('Bạn có chắc muốn hủy đơn hàng này?')) return;
-
-            const modalEl = document.getElementById('orderDetailModal');
-            const rowEl = modalEl && modalEl.__currentRow ? modalEl.__currentRow : null;
-            if (rowEl) {
-                const $row = $(rowEl);
-                // set status in table to "Đã hủy" and apply consistent badge color
-                $row.find('td').eq(2).html(getStatusBadge('Đã hủy'));
-
-                // if it was in history (shouldn't be for cancellable), move back to your orders
-                if ($row.closest('#orderHistoryBody').length) {
-                    $('#yourOrdersBody').append($row);
-                }
-            }
-
-            // optionally: send cancel to server (not implemented) — you can add fetch to /api/orders/{id}/cancel here
-
-            alert('Đơn hàng đã được hủy (UI).');
-
-            // close modal
-            const modalInstance = bootstrap.Modal.getInstance(document.getElementById('orderDetailModal'));
-            if (modalInstance) modalInstance.hide();
-        });
+        $('#toggleEditProfile').on('click', handleToggleEdit);
+        $('#province').on('change', function () { loadWardsByProvince(this.value); });
+        $('#profileForm').on('submit', handleProfileSubmit);
+        $('#passwordForm').on('submit', handlePasswordSubmit);
+        $('#btnLogout').on('click', handleLogout);
+        $(document).on('click', '.view-order', handleViewOrder);
     });
 
 })(jQuery);
+
