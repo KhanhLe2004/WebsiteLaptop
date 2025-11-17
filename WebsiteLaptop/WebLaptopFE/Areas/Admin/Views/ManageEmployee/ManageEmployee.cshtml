@@ -109,25 +109,34 @@
                                 <input type="text" class="form-control" id="employeeId" readonly disabled>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="row">
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
                                 <label class="form-label">Tên nhân viên *</label>
                                 <input type="text" class="form-control" id="employeeName" required>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="row">
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
                                 <label class="form-label">Ngày Sinh</label>
                                 <input type="date" class="form-control" id="dateOfBirth">
                             </div>
                         </div>
+                    </div>
+
+                    <div class="row">
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
                                 <label class="form-label">Số điện thoại</label>
                                 <input type="text" class="form-control" id="phoneNumber">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" id="email">
                             </div>
                         </div>
                     </div>
@@ -135,8 +144,37 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
-                                <label class="form-label">Email</label>
-                                <input type="email" class="form-control" id="email">
+                                <label class="form-label">Chi nhánh</label>
+                                <div class="autocomplete-wrapper position-relative" style="width: 100%;">
+                                    <input type="text" id="branchesId" class="form-control" autocomplete="off">
+                                    <input type="hidden" id="branchesIdValue" value="">
+                                    <div id="branchesIdDropdown" class="autocomplete-dropdown"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Vai trò</label>
+                                <div class="autocomplete-wrapper position-relative" style="width: 100%;">
+                                    <input type="text" id="roleId" class="form-control" autocomplete="off">
+                                    <input type="hidden" id="roleIdValue" value="">
+                                    <div id="roleIdDropdown" class="autocomplete-dropdown"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Tên đăng nhập</label>
+                                <input type="text" class="form-control" id="username">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Mật khẩu</label>
+                                <input type="password" class="form-control" id="password" data-password-length="0" placeholder="">
                             </div>
                         </div>
                     </div>
@@ -169,44 +207,6 @@
                             <div class="input-group input-group-outline mb-3">
                                 <label class="form-label">Địa chỉ cụ thể (Số nhà, tên đường, v.v.)</label>
                                 <input type="text" class="form-control" id="addressDetail">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="input-group input-group-outline mb-3">
-                                <label class="form-label">Tên đăng nhập</label>
-                                <input type="text" class="form-control" id="username">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="input-group input-group-outline mb-3">
-                                <label class="form-label">Mật khẩu</label>
-                                <input type="password" class="form-control" id="password" data-password-length="0" placeholder="">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="input-group input-group-outline mb-3">
-                                <label class="form-label">Chi nhánh</label>
-                                <div class="autocomplete-wrapper position-relative" style="width: 100%;">
-                                    <input type="text" id="branchesId" class="form-control" autocomplete="off">
-                                    <input type="hidden" id="branchesIdValue" value="">
-                                    <div id="branchesIdDropdown" class="autocomplete-dropdown"></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="input-group input-group-outline mb-3">
-                                <label class="form-label">Vai trò</label>
-                                <div class="autocomplete-wrapper position-relative" style="width: 100%;">
-                                    <input type="text" id="roleId" class="form-control" autocomplete="off">
-                                    <input type="hidden" id="roleIdValue" value="">
-                                    <div id="roleIdDropdown" class="autocomplete-dropdown"></div>
-                                </div>
                             </div>
                         </div>
                     </div>
