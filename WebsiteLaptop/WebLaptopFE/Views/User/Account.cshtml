@@ -2,6 +2,20 @@
     ViewData["Title"] = "Thanh toán";
     Layout = "~/Views/Shared/_LayoutAccount.cshtml";
 }
+<script>
+    (function () {
+        try {
+            const isLoggedIn = sessionStorage.getItem('isLoggedIn');
+            const customer = sessionStorage.getItem('customer');
+            if (!isLoggedIn || !customer) {
+                window.location.replace('/User/Login');
+            }
+        } catch (err) {
+            console.error('Session storage check failed:', err);
+            window.location.replace('/User/Login');
+        }
+    })();
+</script>
 <div class="pt-5"></div>
   <div class="container py-5">
     <div class="row g-4">

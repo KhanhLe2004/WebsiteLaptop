@@ -93,7 +93,7 @@
   </div>
 
   <!-- Nút đăng ký -->
-  <button type="button"
+  <button type="submit"
           class="btn w-100 py-2 mt-2"
           style="background:#81C408; color:white; border-radius:8px;">
     Đăng ký
@@ -103,8 +103,10 @@
 
           </form>
 
+          <div id="registerAlert" class="alert d-none mt-3" role="alert"></div>
+
           <div class="small-note">
-            Đã có tài khoản? <a href="login.html" style="color:var(--primary); font-weight:600; text-decoration:none;">Đăng nhập</a>
+            Đã có tài khoản? <a href="@Url.Action("Login","User")" style="color:var(--primary); font-weight:600; text-decoration:none;">Đăng nhập</a>
           </div>
 
         </div>

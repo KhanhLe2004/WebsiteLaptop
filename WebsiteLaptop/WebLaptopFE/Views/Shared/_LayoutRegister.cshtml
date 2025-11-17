@@ -1,4 +1,9 @@
-﻿<!DOCTYPE html>
+﻿@using System.Text.Json
+@{
+    var authApiBase = Environment.GetEnvironmentVariable("AUTH_API_BASE") ?? "http://localhost:5068";
+    var authApiBaseJson = JsonSerializer.Serialize(authApiBase);
+}
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -53,6 +58,9 @@
 
     <!-- Template Javascript -->
     <script src="../LaptopFe/js/main.js"></script>
+    <script>
+        window.AUTH_API_BASE = window.AUTH_API_BASE || @Html.Raw(authApiBaseJson);
+    </script>
     <script src="../LaptopFe/js/access.js"></script>
 
     @RenderSection("Scripts", required: false)
