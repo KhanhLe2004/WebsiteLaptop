@@ -17,6 +17,9 @@ namespace WebLaptopBE.DTOs
         public string? RoleId { get; set; }
         public bool? Active { get; set; }
         public int? PasswordLength { get; set; } // Độ dài mật khẩu (không trả về mật khẩu thực)
+        public string? ProvinceCode { get; set; } // Mã tỉnh/thành
+        public string? CommuneCode { get; set; } // Mã phường/xã
+        public string? AddressDetail { get; set; } // Địa chỉ cụ thể (số nhà, tên đường, v.v.)
     }
 
     // DTO cho tạo mới nhân viên
@@ -36,6 +39,11 @@ namespace WebLaptopBE.DTOs
 
         [StringLength(200, ErrorMessage = "Địa chỉ không được quá 200 ký tự")]
         public string? Address { get; set; }
+
+        public string? ProvinceCode { get; set; } // Mã tỉnh/thành
+        public string? CommuneCode { get; set; } // Mã phường/xã
+        [StringLength(200, ErrorMessage = "Địa chỉ cụ thể không được quá 200 ký tự")]
+        public string? AddressDetail { get; set; } // Địa chỉ cụ thể (số nhà, tên đường, v.v.)
 
         [EmailAddress(ErrorMessage = "Email không hợp lệ")]
         [StringLength(100, ErrorMessage = "Email không được quá 100 ký tự")]
@@ -69,6 +77,11 @@ namespace WebLaptopBE.DTOs
         [StringLength(200, ErrorMessage = "Địa chỉ không được quá 200 ký tự")]
         public string? Address { get; set; }
 
+        public string? ProvinceCode { get; set; } // Mã tỉnh/thành
+        public string? CommuneCode { get; set; } // Mã phường/xã
+        [StringLength(200, ErrorMessage = "Địa chỉ cụ thể không được quá 200 ký tự")]
+        public string? AddressDetail { get; set; } // Địa chỉ cụ thể (số nhà, tên đường, v.v.)
+
         [EmailAddress(ErrorMessage = "Email không hợp lệ")]
         [StringLength(100, ErrorMessage = "Email không được quá 100 ký tự")]
         public string? Email { get; set; }
@@ -101,6 +114,26 @@ namespace WebLaptopBE.DTOs
     {
         public string RoleId { get; set; } = null!;
         public string? RoleName { get; set; }
+    }
+
+    // DTO cho tỉnh/thành
+    public class ProvinceDTO
+    {
+        public string Code { get; set; } = null!;
+        public string? Name { get; set; }
+        public string? EnglishName { get; set; }
+        public string? AdministrativeLevel { get; set; }
+    }
+
+    // DTO cho phường/xã
+    public class CommuneDTO
+    {
+        public string Code { get; set; } = null!;
+        public string? Name { get; set; }
+        public string? EnglishName { get; set; }
+        public string? AdministrativeLevel { get; set; }
+        public string? ProvinceCode { get; set; }
+        public string? ProvinceName { get; set; }
     }
 }
 

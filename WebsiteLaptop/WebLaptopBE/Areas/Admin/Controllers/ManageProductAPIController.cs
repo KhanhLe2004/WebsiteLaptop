@@ -645,10 +645,16 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 {
                     foreach (var imageFile in imageFiles)
                     {
-                        if (imageFile.Length > 0)
+                        if (imageFile != null && imageFile.Length > 0)
                         {
                             try
                             {
+                                // Validate file type
+                                if (string.IsNullOrEmpty(imageFile.ContentType) || !imageFile.ContentType.StartsWith("image/"))
+                                {
+                                    continue;
+                                }
+
                                 var imageFileName = await SaveImageAsync(imageFile);
                                 _context.ProductImages.Add(new ProductImage
                                 {
@@ -659,6 +665,11 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                             catch (Exception ex)
                             {
                                 Console.WriteLine($"Error processing image file {imageFile.FileName}: {ex.Message}");
+                                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                                if (ex.InnerException != null)
+                                {
+                                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                                }
                                 // Tiếp tục xử lý các file khác
                             }
                         }
@@ -924,13 +935,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 var baseName = GenerateRandomBaseName(baseNameMaxLength);
                 var fileName = $"{baseName}{fileExtension}";
                 
-                // Đường dẫn thư mục lưu ảnh
+                // Đường dẫn thư mục lưu ảnh sản phẩm
                 var webRootPath = _environment.WebRootPath;
                 if (string.IsNullOrEmpty(webRootPath))
                 {
                     webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
                 }
-                var uploadsFolder = Path.Combine(webRootPath, "image");
+                var uploadsFolder = Path.Combine(webRootPath, "imageProducts");
                 
                 // Tạo thư mục nếu chưa tồn tại
                 if (!Directory.Exists(uploadsFolder))
@@ -954,12 +965,12 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
         }
 
-        // Hàm hỗ trợ xóa ảnh
+        // Hàm hỗ trợ xóa ảnh sản phẩm
         private void DeleteImage(string fileName)
         {
             try
             {
-                var filePath = Path.Combine(_environment.WebRootPath ?? "wwwroot", "image", fileName);
+                var filePath = Path.Combine(_environment.WebRootPath ?? "wwwroot", "imageProducts", fileName);
                 if (System.IO.File.Exists(filePath))
                 {
                     System.IO.File.Delete(filePath);

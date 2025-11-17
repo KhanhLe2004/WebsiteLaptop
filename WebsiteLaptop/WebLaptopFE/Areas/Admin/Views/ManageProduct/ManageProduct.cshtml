@@ -78,8 +78,26 @@
     </div>
 </div>
 
+<!-- Modal Xem chi tiết -->
+<div class="modal fade" id="viewModal" tabindex="-1" aria-labelledby="viewModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-info">
+                <h5 class="modal-title text-white" id="viewModalLabel">Chi tiết sản phẩm</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="viewModalBody">
+                <!-- Nội dung sẽ được load bằng JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Thêm/Sửa Sản phẩm -->
-<div class="modal fade" id="productModal" tabindex="-1" aria-labelledby="productModalLabel" aria-hidden="true">
+<div class="modal fade" id="productModal" tabindex="-1" aria-labelledby="productModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-gradient-primary">
@@ -1018,28 +1036,155 @@
                 url: `${API_URL}/${productId}`,
                 type: 'GET',
                 success: function(product) {
-                    $('#productModalLabel').text('Chi tiết sản phẩm');
-                    
-                    // Đảm bảo modal được reset trước
-                    $('#productForm')[0].reset();
-                    $('#btnAddConfiguration').show(); // Sẽ bị ẩn trong fillFormWithProduct
-                    
-                    // Load dữ liệu với viewOnly = true
-                    fillFormWithProduct(product, true);
-                    
-                    const modal = new bootstrap.Modal(document.getElementById('productModal'));
+                    const avatar = product.avatar ? `${IMAGE_BASE_URL}/${product.avatar}` : `${IMAGE_BASE_URL}/default-laptop.jpg`;
+                    const originalPrice = product.originalSellingPrice ? 
+                        new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(product.originalSellingPrice) : '-';
+                    const sellingPrice = product.sellingPrice ? 
+                        new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(product.sellingPrice) : '-';
+                    const activeBadge = product.active !== false 
+                        ? '<span class="badge bg-gradient-success">Đang bán</span>' 
+                        : '<span class="badge bg-gradient-danger">Ngừng bán</span>';
+
+                    let html = `
+                        <div class="row mb-3">
+                            <div class="col-md-3 text-center">
+                                <img src="${avatar}" class="img-fluid rounded" style="max-height: 200px;" alt="${product.productName || ''}" onerror="this.src='${IMAGE_BASE_URL}/default-laptop.jpg'">
+                            </div>
+                            <div class="col-md-9">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <strong>Mã sản phẩm:</strong> ${product.productId || '-'}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Tên sản phẩm:</strong> ${product.productName || '-'}
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <strong>Model:</strong> ${product.productModel || '-'}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Thương hiệu:</strong> ${product.brandName || '-'}
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <strong>Giá gốc:</strong> ${originalPrice}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Giá bán:</strong> ${sellingPrice}
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <strong>Bảo hành:</strong> ${product.warrantyPeriod ? product.warrantyPeriod + ' tháng' : '-'}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Trạng thái:</strong> ${activeBadge}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <strong>Màn hình:</strong> ${product.screen || '-'}
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Camera:</strong> ${product.camera || '-'}
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Pin:</strong> ${product.pin || '-'}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <strong>Trọng lượng:</strong> ${product.weight ? product.weight + ' kg' : '-'}
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Kết nối:</strong>
+                                ${product.connect ? 
+                                    product.connect.split(',').map(item => item.trim()).filter(item => item).map(item => `<div>${item}</div>`).join('') 
+                                    : '<div>-</div>'}
+                            </div>
+                            <div class="col-md-4">
+                                <!-- Cột trống để giữ layout -->
+                            </div>
+                        </div>
+                    `;
+
+                    // Hiển thị cấu hình sản phẩm
+                    if (product.configurations && product.configurations.length > 0) {
+                        html += `
+                            <hr>
+                            <h6>Cấu hình sản phẩm:</h6>
+                            <div class="table-responsive">
+                                <table class="table table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 20%;">CPU</th>
+                                            <th style="width: 15%;">RAM</th>
+                                            <th style="width: 15%;">ROM</th>
+                                            <th style="width: 15%;">Card</th>
+                                            <th style="width: 15%; text-align: right;">Giá</th>
+                                            <th style="width: 10%; text-align: center;">Số lượng</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                        `;
+
+                        product.configurations.forEach(function(config) {
+                            const configPrice = config.price ? 
+                                new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(config.price) : '-';
+                            html += `
+                                <tr>
+                                    <td>${config.cpu || '-'}</td>
+                                    <td>${config.ram || '-'}</td>
+                                    <td>${config.rom || '-'}</td>
+                                    <td>${config.card || '-'}</td>
+                                    <td style="text-align: right;">${configPrice}</td>
+                                    <td style="text-align: center;">${config.quantity || 0}</td>
+                                </tr>
+                            `;
+                        });
+
+                        html += `
+                                    </tbody>
+                                </table>
+                            </div>
+                        `;
+                    } else {
+                        html += `
+                            <hr>
+                            <h6>Cấu hình sản phẩm:</h6>
+                            <p class="text-muted">Không có cấu hình nào</p>
+                        `;
+                    }
+
+                    // Hiển thị ảnh sản phẩm nếu có (sau cấu hình)
+                    if (product.images && product.images.length > 0) {
+                        html += `
+                            <hr>
+                            <h6>Ảnh sản phẩm:</h6>
+                            <div class="row mb-3">
+                        `;
+                        product.images.forEach(function(image) {
+                            const imageUrl = image.imageUrl ? `${IMAGE_BASE_URL}/${image.imageUrl}` : `${IMAGE_BASE_URL}/default-laptop.jpg`;
+                            html += `
+                                <div class="col-md-3 mb-2">
+                                    <img src="${imageUrl}" class="img-fluid rounded" style="max-height: 150px; width: 100%; object-fit: cover;" alt="Product Image" onerror="this.src='${IMAGE_BASE_URL}/default-laptop.jpg'">
+                                </div>
+                            `;
+                        });
+                        html += `</div>`;
+                    }
+
+                    $('#viewModalBody').html(html);
+                    const modal = new bootstrap.Modal(document.getElementById('viewModal'));
                     modal.show();
-                    
-                    // Đảm bảo setViewMode được gọi sau khi modal hiển thị
-                    setTimeout(function() {
-                        setViewMode(true);
-                        // Force hide các nút xóa một lần nữa để chắc chắn
-                        $('.configuration-item button').hide();
-                        $('.existing-image button').hide();
-                    }, 300);
                 },
                 error: function(xhr) {
-                    console.error('Error loading product for view:', xhr);
+                    console.error('Error loading product:', xhr);
                     showNotification('Lỗi khi tải thông tin sản phẩm', 'error');
                 }
             });
@@ -1341,13 +1486,15 @@
                     if (imageObj && imageObj.file) {
                         // Validate file type
                         if (!imageObj.file.type || !imageObj.file.type.startsWith('image/')) {
+                            console.warn('Skipping invalid file type:', imageObj.file.name, imageObj.file.type);
                             return;
                         }
-                        // Validate file size (max 5MB)
-                        if (imageObj.file.size > 5 * 1024 * 1024) {
+                        // Validate file size (max 10MB để khớp với backend)
+                        if (imageObj.file.size > 10 * 1024 * 1024) {
+                            console.warn('Skipping file too large:', imageObj.file.name, 'Size:', imageObj.file.size);
                             return;
                         }
-                        formData.append('ImageFiles', imageObj.file);
+                        formData.append('ImageFiles', imageObj.file, imageObj.file.name);
                     }
                 });
             }

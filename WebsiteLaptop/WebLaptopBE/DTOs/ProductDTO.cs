@@ -180,7 +180,7 @@ namespace WebLaptopBE.DTOs
         public int TotalItems { get; set; }
         public int PageNumber { get; set; }
         public int PageSize { get; set; }
-        public int TotalPages => (int)Math.Ceiling(TotalItems / (double)PageSize);
+        public int TotalPages => (int)Math.Ceiling(TotalItems / (double)(PageSize > 0 ? PageSize : 1));
         public bool HasPreviousPage => PageNumber > 1;
         public bool HasNextPage => PageNumber < TotalPages;
     }
