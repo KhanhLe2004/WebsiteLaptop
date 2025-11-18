@@ -53,7 +53,7 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white active bg-gradient-primary" asp-area="Admin" asp-controller="ManageProduct" asp-action="Index">
+                    <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageProduct" asp-action="Index">
                         <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                             <i class="material-icons opacity-10">inventory_2</i>
                         </div>
@@ -101,7 +101,7 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageWarranty" asp-action="Index">
+                    <a class="nav-link text-white active bg-gradient-primary" asp-area="Admin" asp-controller="ManageWarranty" asp-action="Index">
                         <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                             <i class="material-icons opacity-10">build</i>
                         </div>
@@ -133,7 +133,7 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white" asp-area="Admin" asp-controller="StatisticalReport" asp-action="Index">
+                    <a class="nav-link text-white active bg-gradient-primary" asp-area="Admin" asp-controller="StatisticalReport" asp-action="Index">
                         <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                             <i class="material-icons opacity-10">bar_chart</i>
                         </div>
@@ -174,9 +174,10 @@
         <!-- Navbar -->
         <!-- End Navbar -->
         @RenderBody()
-        
+
     </main>
     <div class="fixed-plugin">
+
         <div class="card shadow-lg">
             <div class="card-header pb-0 pt-3">
                 <div class="float-start">
@@ -266,7 +267,7 @@
     <script async defer src="https://buttons.github.io/buttons.js"></script>
     <!-- Control Center for Material Dashboard: parallax effects, scripts for the example pages etc -->
     <script src="/LayoutAdmin/assets/js/material-dashboard.min.js?v=3.1.0"></script>
-    
+
     @RenderSection("Scripts", required: false)
 </body>
 

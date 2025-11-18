@@ -1,0 +1,541 @@
+﻿@{
+    ViewData["Title"] = "Báo cáo thống kê";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutStatisticalReport.cshtml";
+}
+
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h4 class="mb-0">Thống Kê & Báo Cáo</h4>
+            <p class="text-sm text-secondary mb-0">Tổng quan chi tiết về hoạt động kinh doanh của bạn</p>
+        </div>
+    </div>
+
+    <!-- Overview Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body bg-gradient-primary border-radius-lg">
+                    <div class="d-flex align-items-center">
+                        <div class="icon icon-shape bg-white shadow text-center border-radius-md">
+                            <i class="material-icons text-primary text-lg opacity-10">attach_money</i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">TỔNG DOANH THU</p>
+                                <h5 class="font-weight-bolder mb-0 text-white" id="totalRevenue">0 VNĐ</h5>
+                                <p class="text-xs mb-0 text-white opacity-8">Tất cả thời gian</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body bg-gradient-success border-radius-lg">
+                    <div class="d-flex align-items-center">
+                        <div class="icon icon-shape bg-white shadow text-center border-radius-md">
+                            <i class="material-icons text-success text-lg opacity-10">shopping_bag</i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">TỔNG ĐƠN HÀNG</p>
+                                <h5 class="font-weight-bolder mb-0 text-white" id="totalOrders">0</h5>
+                                <p class="text-xs mb-0 text-white opacity-8">Tất cả thời gian</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body bg-gradient-warning border-radius-lg">
+                    <div class="d-flex align-items-center">
+                        <div class="icon icon-shape bg-white shadow text-center border-radius-md">
+                            <i class="material-icons text-warning text-lg opacity-10">list_alt</i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">GIÁ TRỊ TB/ĐƠN</p>
+                                <h5 class="font-weight-bolder mb-0 text-white" id="averageOrderValue">0 VNĐ</h5>
+                                <p class="text-xs mb-0 text-white opacity-8">Trung bình mỗi đơn</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body bg-gradient-info border-radius-lg">
+                    <div class="d-flex align-items-center">
+                        <div class="icon icon-shape bg-white shadow text-center border-radius-md">
+                            <i class="material-icons text-info text-lg opacity-10">inventory_2</i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">SP TB/ĐƠN HÀNG</p>
+                                <h5 class="font-weight-bolder mb-0 text-white" id="averageProductsPerOrder">0</h5>
+                                <p class="text-xs mb-0 text-white opacity-8">Trung bình mỗi đơn</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Revenue by Month Chart -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header pb-0 pt-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Doanh Thu Theo Tháng - Năm <span id="currentYear">2025</span></h6>
+                        <div class="d-flex gap-2">
+                            <select class="form-select form-select-sm" id="yearSelect" style="width: auto;">
+                                <option value="2023">2023</option>
+                                <option value="2024">2024</option>
+                                <option value="2025" selected>2025</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="revenueChart" height="100"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Products Chart -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header pb-0 pt-3">
+                    <h6 class="mb-0">Top 5 Sản Phẩm Bán Chạy</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="topProductsChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Sales Details Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header pb-0 pt-3">
+                    <h6 class="mb-0">Chi Tiết Sản Phẩm Bán Chạy</h6>
+                </div>
+                <div class="card-body px-0 pt-0">
+                    <div class="table-responsive p-0">
+                        <table class="table align-items-center mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 5%;">#</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 30%;">TÊN SẢN PHẨM</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 15%;">DANH MỤC</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 15%;">THƯƠNG HIỆU</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 12%;">GIÁ</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 10%;">ĐÃ BÁN</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 13%;">DOANH THU</th>
+                                </tr>
+                            </thead>
+                            <tbody id="productSalesTableBody">
+                                <tr>
+                                    <td colspan="7" class="text-center py-4">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <script>
+        // API Base URL - Thay đổi theo cấu hình của bạn
+        // Backend chạy ở http://localhost:5068 hoặc https://localhost:7027
+        const API_BASE_URL = 'http://localhost:5068/api/admin/statistical-report';
+        
+        // Hàm thử kết nối với nhiều URL nếu cần
+        async function tryFetch(url) {
+            let lastError = null;
+            
+            // Thử URL đầu tiên
+            try {
+                const response = await fetch(url);
+                if (response.ok) {
+                    return await response.json();
+                } else {
+                    lastError = new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    console.warn(`Response not OK from ${url}:`, lastError.message);
+                }
+            } catch (error) {
+                lastError = error;
+                console.warn(`Failed to fetch from ${url}:`, error.message);
+            }
+            
+            // Thử HTTPS nếu HTTP không hoạt động
+            if (url.startsWith('http://')) {
+                const httpsUrl = url.replace('http://', 'https://').replace(':5068', ':7027');
+                try {
+                    const response = await fetch(httpsUrl);
+                    if (response.ok) {
+                        return await response.json();
+                    } else {
+                        lastError = new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        console.warn(`Response not OK from ${httpsUrl}:`, lastError.message);
+                    }
+                } catch (e) {
+                    lastError = e;
+                    console.warn(`Failed to fetch from ${httpsUrl}:`, e.message);
+                }
+            }
+            
+            throw new Error('Không thể kết nối đến API server. Vui lòng kiểm tra backend đã chạy ở http://localhost:5068 hoặc https://localhost:7027 chưa.');
+        }
+        
+        // Charts instances
+        let revenueChart = null;
+        let topProductsChart = null;
+
+        // Format number with commas
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+
+        // Format currency
+        function formatCurrency(amount) {
+            return formatNumber(Math.round(amount)) + ' VNĐ';
+        }
+
+        // Get badge class based on rank
+        function getRankBadgeClass(rank) {
+            if (rank === 1) return 'badge bg-gradient-warning';
+            if (rank === 2) return 'badge bg-gradient-secondary';
+            if (rank === 3) return 'badge bg-gradient-danger';
+            return 'badge bg-gradient-dark';
+        }
+
+        // Load Overview Statistics
+        async function loadOverviewStatistics() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/overview`);
+                
+                document.getElementById('totalRevenue').textContent = formatCurrency(data.totalRevenue || 0);
+                document.getElementById('totalOrders').textContent = formatNumber(data.totalOrders || 0);
+                document.getElementById('averageOrderValue').textContent = formatCurrency(data.averageOrderValue || 0);
+                document.getElementById('averageProductsPerOrder').textContent = (data.averageProductsPerOrder || 0).toFixed(2);
+            } catch (error) {
+                console.error('Error loading overview statistics:', error);
+                document.getElementById('totalRevenue').textContent = 'Lỗi kết nối';
+                document.getElementById('totalOrders').textContent = 'Lỗi kết nối';
+                document.getElementById('averageOrderValue').textContent = 'Lỗi kết nối';
+                document.getElementById('averageProductsPerOrder').textContent = 'Lỗi kết nối';
+            }
+        }
+
+        // Load Revenue by Month
+        async function loadRevenueByMonth(year = 2025) {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/revenue-by-month?year=${year}`);
+                
+                document.getElementById('currentYear').textContent = year;
+
+                const months = data.map(item => item.monthName);
+                const revenues = data.map(item => item.revenue);
+
+                if (revenueChart) {
+                    revenueChart.destroy();
+                }
+
+                const ctx = document.getElementById('revenueChart').getContext('2d');
+                revenueChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: months,
+                        datasets: [{
+                            label: 'Doanh thu (VNĐ)',
+                            data: revenues,
+                            backgroundColor: 'rgba(25, 118, 210, 0.8)',
+                            borderColor: 'rgba(25, 118, 210, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return 'Doanh thu: ' + formatCurrency(context.parsed.y);
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        if (value >= 1000000000) {
+                                            return (value / 1000000000).toFixed(1) + ' Tỷ';
+                                        } else if (value >= 1000000) {
+                                            return (value / 1000000).toFixed(1) + ' Tr';
+                                        }
+                                        return formatNumber(value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading revenue by month:', error);
+                // Hiển thị thông báo lỗi trên chart
+                const ctx = document.getElementById('revenueChart').getContext('2d');
+                if (revenueChart) {
+                    revenueChart.destroy();
+                }
+                // Tạo chart trống với thông báo lỗi
+                revenueChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'],
+                        datasets: [{
+                            label: 'Không có dữ liệu',
+                            data: []
+                        }]
+                    }
+                });
+            }
+        }
+
+        // Load Top Products
+        async function loadTopProducts() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/top-products?top=5`);
+
+                const productNames = data.map(item => item.productName || 'Chưa có tên');
+                const quantities = data.map(item => item.totalSold || 0);
+
+                if (topProductsChart) {
+                    topProductsChart.destroy();
+                }
+
+                const ctx = document.getElementById('topProductsChart').getContext('2d');
+                topProductsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: productNames,
+                        datasets: [{
+                            label: 'Số lượng',
+                            data: quantities,
+                            backgroundColor: [
+                                'rgba(25, 118, 210, 0.8)',
+                                'rgba(46, 125, 50, 0.8)',
+                                'rgba(237, 108, 2, 0.8)',
+                                'rgba(2, 136, 209, 0.8)',
+                                'rgba(63, 81, 181, 0.8)'
+                            ],
+                            borderColor: [
+                                'rgba(25, 118, 210, 1)',
+                                'rgba(46, 125, 50, 1)',
+                                'rgba(237, 108, 2, 1)',
+                                'rgba(2, 136, 209, 1)',
+                                'rgba(63, 81, 181, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        indexAxis: 'y',
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return 'Số lượng: ' + formatNumber(context.parsed.x);
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return formatNumber(value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading top products:', error);
+                const ctx = document.getElementById('topProductsChart').getContext('2d');
+                if (topProductsChart) {
+                    topProductsChart.destroy();
+                }
+                topProductsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Không có dữ liệu',
+                            data: []
+                        }]
+                    }
+                });
+            }
+        }
+
+        // Load Product Sales Details
+        async function loadProductSalesDetails() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/product-sales-details?top=5`);
+
+                const tbody = document.getElementById('productSalesTableBody');
+                
+                if (data.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="text-center py-4 text-secondary">Không có dữ liệu</td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                tbody.innerHTML = data.map(item => {
+                    const badgeClass = getRankBadgeClass(item.rank);
+                    return `
+                        <tr>
+                            <td>
+                                <div class="text-center">
+                                    <span class="${badgeClass} text-white">${item.rank}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex px-2 py-1">
+                                    <div class="d-flex flex-column justify-content-center">
+                                        <h6 class="mb-0 text-sm">${item.productName || 'Chưa có tên'}</h6>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <p class="text-xs font-weight-bold mb-0">${item.category || 'Chưa phân loại'}</p>
+                            </td>
+                            <td>
+                                <p class="text-xs font-weight-bold mb-0">${item.brandName || 'Không xác định'}</p>
+                            </td>
+                            <td class="align-middle text-center text-sm">
+                                <span class="text-secondary text-xs font-weight-bold">${formatCurrency(item.price || 0)}</span>
+                            </td>
+                            <td class="align-middle text-center text-sm">
+                                <span class="text-secondary text-xs font-weight-bold">${formatNumber(item.totalSold || 0)}</span>
+                            </td>
+                            <td class="align-middle text-center text-sm">
+                                <span class="text-success text-xs font-weight-bold">${formatCurrency(item.totalRevenue || 0)}</span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error('Error loading product sales details:', error);
+                document.getElementById('productSalesTableBody').innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center py-4">
+                            <p class="text-danger mb-1">Không thể kết nối đến API server</p>
+                            <p class="text-xs text-secondary mb-0">Vui lòng đảm bảo backend đang chạy ở http://localhost:5068 hoặc https://localhost:7027</p>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Year select change handler
+        document.getElementById('yearSelect').addEventListener('change', function() {
+            loadRevenueByMonth(parseInt(this.value));
+        });
+
+        // Initialize all data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadOverviewStatistics();
+            loadRevenueByMonth(2025);
+            loadTopProducts();
+            loadProductSalesDetails();
+        });
+    </script>
+
+    <style>
+        .icon {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .numbers h5 {
+            font-size: 1.5rem;
+        }
+
+        .card {
+            border-radius: 1rem;
+        }
+
+        .card-header {
+            background-color: transparent;
+            border-bottom: 1px solid rgba(0,0,0,.125);
+        }
+
+        .table thead th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .table tbody tr {
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+    </style>
+}
