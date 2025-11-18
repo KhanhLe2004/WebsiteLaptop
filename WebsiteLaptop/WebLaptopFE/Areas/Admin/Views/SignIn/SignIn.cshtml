@@ -2,3 +2,91 @@
     ViewData["Title"] = "Đăng nhập";
     Layout = "~/Areas/Admin/Views/Shared/_LayoutSignIn.cshtml";
 }
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+        @TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+        @TempData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div id="errorMessage" class="alert alert-danger" style="display: none; margin: 10px 0;"></div>
+
+<form role="form" class="text-start" method="post" action="@Url.Action("SignIn", "SignIn", new { area = "Admin" })">
+    @Html.AntiForgeryToken()
+    <div class="input-group input-group-outline my-3">
+        <label class="form-label">Email hoặc tên đăng nhập</label>
+        <input type="text" name="usernameOrEmail" class="form-control" required>
+    </div>
+    <div class="input-group input-group-outline mb-3">
+        <label class="form-label">Password</label>
+        <input type="password" name="password" class="form-control" required>
+    </div>
+    <div>
+        <a href="" class="text-primary text-gradient font-weight-bold">Quên mật khẩu?</a>
+    </div>
+    <div class="text-center">
+        <button type="submit" class="btn bg-gradient-primary w-100 my-4 mb-2">Đăng nhập</button>
+    </div>
+</form>
+
+<script>
+    // Ẩn thông báo sau 5 giây
+    setTimeout(function() {
+        var alerts = document.querySelectorAll('.alert');
+        alerts.forEach(function(alert) {
+            var bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        });
+    }, 5000);
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var form = document.querySelector('form[role="form"]');
+        var submitButton = form.querySelector('button[type="submit"]');
+
+        // Xử lý submit form để hiển thị loading
+        if (form && submitButton) {
+            form.addEventListener('submit', function(e) {
+                // Validate trước khi submit
+                var usernameInput = form.querySelector('input[name="usernameOrEmail"]');
+                var passwordInput = form.querySelector('input[name="password"]');
+                
+                if (usernameInput && !usernameInput.value.trim()) {
+                    e.preventDefault();
+                    showError('Vui lòng nhập email hoặc tên đăng nhập');
+                    return false;
+                }
+
+                if (passwordInput && !passwordInput.value) {
+                    e.preventDefault();
+                    showError('Vui lòng nhập mật khẩu');
+                    return false;
+                }
+
+                // Disable button và hiển thị loading
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Đang xử lý...';
+            });
+        }
+
+        function showError(message) {
+            var errorMessageDiv = document.getElementById('errorMessage');
+            if (errorMessageDiv) {
+                errorMessageDiv.textContent = message;
+                errorMessageDiv.style.display = 'block';
+                errorMessageDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+    });
+</script>

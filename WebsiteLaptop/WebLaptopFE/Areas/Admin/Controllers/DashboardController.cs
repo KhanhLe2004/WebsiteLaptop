@@ -3,12 +3,12 @@
 namespace WebLaptopFE.Areas.Admin.Controllers
 {
     [Area("Admin")]
-    public class DashboardController : Controller
+    public class DashboardController : BaseAdminController
     {
         // GET: Admin/Dashboard
-        public IActionResult Dashboard()
+        public IActionResult Index()
         {
-            return View();
+            return View("Dashboard");
         }
     }
 }

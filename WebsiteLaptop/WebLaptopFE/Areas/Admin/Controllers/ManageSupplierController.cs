@@ -3,7 +3,7 @@
 namespace WebLaptopFE.Areas.Admin.Controllers
 {
     [Area("Admin")]
-    public class ManageSupplierController : Controller
+    public class ManageSupplierController : BaseAdminController
     {
         public IActionResult Index()
         {

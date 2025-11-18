@@ -3,7 +3,7 @@
 namespace WebLaptopFE.Areas.Admin.Controllers
 {
     [Area("Admin")]
-    public class StatisticalReportController : Controller
+    public class StatisticalReportController : BaseAdminController
     {
         public IActionResult Index()
         {

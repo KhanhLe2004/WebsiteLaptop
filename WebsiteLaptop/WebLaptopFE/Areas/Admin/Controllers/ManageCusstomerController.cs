@@ -3,9 +3,9 @@
 namespace WebLaptopFE.Areas.Admin.Controllers
 {
     [Area("Admin")]
-    public class ManageCustomerController : Controller
+    public class ManageCustomerController : BaseAdminController
     {
-        // GET: Admin/Customer
+        // GET: Admin/ManageCustomer
         public IActionResult Index()
         {
             return View("ManageCustomer");

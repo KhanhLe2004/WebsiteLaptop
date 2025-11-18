@@ -3,7 +3,7 @@
 namespace WebLaptopFE.Areas.Admin.Controllers
 {
     [Area("Admin")]
-    public class ManageStockExportController : Controller
+    public class ManageStockExportController : BaseAdminController
     {
         // GET: Admin/ManageStockExport
         public IActionResult Index()
