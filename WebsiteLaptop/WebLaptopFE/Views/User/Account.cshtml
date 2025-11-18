@@ -111,6 +111,7 @@
               <hr class="my-4">
 
               <h5>Đổi mật khẩu</h5>
+              <div id="passwordAlert" class="alert d-none" role="alert"></div>
               <form id="passwordForm" class="row g-3 mt-2">
                 <div class="col-md-6">
                   <label class="form-label small">Mật khẩu hiện tại</label>
@@ -120,7 +121,7 @@
                 <div class="col-md-6">
                   <label class="form-label small">Mật khẩu mới</label>
                   <input type="password" name="new" class="form-control" placeholder="Nhập mật khẩu mới" required>
-                  <small class="text-muted">Tối đa 6 ký tự, gồm chữ và số</small>
+                  <small class="text-muted">Tối thiểu 6 ký tự, gồm chữ và số</small>
                 </div>
                 <div class="col-md-6">
                   <label class="form-label small">Xác nhận mật khẩu mới</label>
@@ -249,6 +250,7 @@
         let provinces = [];
         const wardsCache = new Map();
         const $accountAlert = $('#accountAlert');
+        const $passwordAlert = $('#passwordAlert');
 
         // Helper functions
         function showAlert(type, message) {
@@ -262,6 +264,19 @@
         function clearAlert() {
             if (!$accountAlert.length) return;
             $accountAlert.addClass('d-none').text('');
+        }
+
+        function showPasswordAlert(type, message) {
+            if (!$passwordAlert.length) return;
+            $passwordAlert
+                .removeClass('d-none alert-success alert-danger alert-warning alert-info')
+                .addClass(`alert-${type}`)
+                .text(message);
+        }
+
+        function clearPasswordAlert() {
+            if (!$passwordAlert.length) return;
+            $passwordAlert.addClass('d-none').text('');
         }
 
         // Date of birth helpers
@@ -517,22 +532,22 @@
 
         async function handlePasswordSubmit(e) {
             e.preventDefault();
-            clearAlert();
+            clearPasswordAlert();
 
             const current = $('input[name=current]').val()?.toString().trim();
             const newPwd = $('input[name=new]').val()?.toString().trim();
             const confirm = $('input[name=confirm]').val()?.toString().trim();
 
             if (!current || !newPwd || !confirm) {
-                showAlert('danger', 'Vui lòng nhập đầy đủ thông tin mật khẩu');
+                showPasswordAlert('danger', 'Vui lòng nhập đầy đủ thông tin mật khẩu');
                 return;
             }
             if (newPwd !== confirm) {
-                showAlert('danger', 'Mật khẩu mới và xác nhận không khớp');
+                showPasswordAlert('danger', 'Mật khẩu mới và xác nhận không khớp');
                 return;
             }
-            if (newPwd.length > 6 || !/[A-Za-z]/.test(newPwd) || !/\d/.test(newPwd)) {
-                showAlert('danger', 'Mật khẩu mới phải tối đa 6 ký tự và gồm cả chữ và số');
+            if (newPwd.length < 6 || !/[A-Za-z]/.test(newPwd) || !/\d/.test(newPwd)) {
+                showPasswordAlert('danger', 'Mật khẩu mới phải tối thiểu 6 ký tự và gồm cả chữ và số');
                 return;
             }
 
@@ -552,11 +567,11 @@
                 });
                 const data = await response.json();
                 if (!response.ok) throw new Error(data?.message || 'Không thể đổi mật khẩu');
-                showAlert('success', data.message || 'Đổi mật khẩu thành công');
+                showPasswordAlert('success', data.message || 'Đổi mật khẩu thành công');
                 $('#passwordForm')[0].reset();
             } catch (err) {
                 console.error(err);
-                showAlert('danger', err.message || 'Không thể đổi mật khẩu');
+                showPasswordAlert('danger', err.message || 'Không thể đổi mật khẩu');
             } finally {
                 btn.prop('disabled', false).html(original);
             }
@@ -593,20 +608,35 @@
         }
 
         function buildStatusBadge(status) {
-            const text = (status || '').toString().trim().toLowerCase();
-            if (text.includes('đang xử lý') || text.includes('processing')) {
+            if (!status) {
+                return '<span class="badge bg-secondary">Chưa xác định</span>';
+            }
+            
+            const text = status.toString().trim().toLowerCase();
+            console.log('Building status badge for:', status, '-> normalized:', text);
+            
+            // Kiểm tra các trạng thái phổ biến
+            if (text.includes('đang xử lý') || text.includes('processing') || text.includes('pending') || text.includes('chờ xử lý')) {
                 return '<span class="badge bg-warning text-dark">Đang xử lý</span>';
             }
-            if (text.includes('đã gửi') || text.includes('shipped')) {
+            if (text.includes('đã gửi') || text.includes('shipped') || text.includes('đang giao') || text.includes('delivering')) {
                 return '<span class="badge bg-info text-dark">Đã gửi</span>';
             }
-            if (text.includes('hoàn thành') || text.includes('completed')) {
+            if (text.includes('hoàn thành') || text.includes('completed') || text.includes('done') || text.includes('finished')) {
                 return '<span class="badge bg-success text-white">Hoàn thành</span>';
             }
-            if (text.includes('đã hủy') || text.includes('canceled') || text.includes('cancelled')) {
+            if (text.includes('đã hủy') || text.includes('canceled') || text.includes('cancelled') || text.includes('hủy')) {
                 return '<span class="badge bg-danger text-white">Đã hủy</span>';
             }
-            return '<span class="badge bg-secondary">Khác</span>';
+            if (text.includes('chờ thanh toán') || text.includes('pending payment') || text.includes('waiting payment')) {
+                return '<span class="badge bg-warning text-dark">Chờ thanh toán</span>';
+            }
+            if (text.includes('đã xác nhận') || text.includes('confirmed')) {
+                return '<span class="badge bg-primary text-white">Đã xác nhận</span>';
+            }
+            
+            // Nếu không khớp, trả về trạng thái gốc với badge secondary
+            return `<span class="badge bg-secondary">${status}</span>`;
         }
 
         /* ------------ Orders ------------ */
@@ -627,12 +657,14 @@
             const rows = orders.map(order => {
                 const orderId = order.saleInvoiceId || order.SaleInvoiceId || '';
                 const date = formatDate(order.timeCreate || order.TimeCreate);
-                const statusBadge = buildStatusBadge(order.status || order.Status);
+                const statusValue = order.status || order.Status || '';
+                console.log('Order status for', orderId, ':', statusValue);
+                const statusBadge = buildStatusBadge(statusValue);
                 const total = formatCurrency(order.totalAmount || order.TotalAmount);
                 const payload = {
                     saleInvoiceId: orderId,
                     date,
-                    status: order.status || order.Status,
+                    status: statusValue,
                     deliveryAddress: order.deliveryAddress || order.DeliveryAddress,
                     paymentMethod: order.paymentMethod || order.PaymentMethod,
                     deliveryFee: order.deliveryFee || order.DeliveryFee,

@@ -305,11 +305,11 @@ namespace WebLaptopBE.Controllers
                     return BadRequest(new { message = "Mật khẩu mới và xác nhận không khớp" });
                 }
 
-                if (newPassword.Length > 6 ||
+                if (newPassword.Length < 6 ||
                     !newPassword.Any(char.IsLetter) ||
                     !newPassword.Any(char.IsDigit))
                 {
-                    return BadRequest(new { message = "Mật khẩu mới phải tối đa 6 ký tự và gồm cả chữ và số" });
+                    return BadRequest(new { message = "Mật khẩu mới phải tối thiểu 6 ký tự và gồm cả chữ và số" });
                 }
 
                 customer.Password = newPassword;
