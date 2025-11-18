@@ -8,9 +8,9 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class ListProductAPIController : ControllerBase
     {
-        private readonly Testlaptop30Context _context;
+        private readonly Testlaptop33Context _context;
 
-        public ListProductAPIController(Testlaptop30Context context)
+        public ListProductAPIController(Testlaptop33Context context)
         {
             _context = context;
         }

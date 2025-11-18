@@ -1,6 +1,6 @@
 ﻿@{
-    ViewData["Title"] = "Quản lý nhập hàng";
-    Layout = "~/Areas/Admin/Views/Shared/_LayoutManageStockImport.cshtml";
+    ViewData["Title"] = "Quản lý xuất hàng";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutManageStockExport.cshtml";
 }
 
 <div class="container-fluid py-4">
@@ -10,7 +10,7 @@
                 <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
                     <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
                         <div class="d-flex justify-content-between align-items-center">
-                            <h6 class="text-white text-capitalize ps-3 mb-0">Quản lý nhập hàng</h6>
+                            <h6 class="text-white text-capitalize ps-3 mb-0">Quản lý xuất hàng</h6>
                             <button class="btn btn-light btn-sm me-3" onclick="showCreateModal()">
                                 <i class="material-icons text-sm">add</i> Thêm mới
                             </button>
@@ -22,25 +22,26 @@
                     <div class="row mb-3 g-2 align-items-end">
                         <div class="col-lg-4 col-md-6">
                             <div class="input-group input-group-outline">
-                                <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm phiếu nhập hàng...">
+                                <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm phiếu xuất hàng...">
                             </div>
                         </div>
                     </div>
 
-                    <!-- Bảng phiếu nhập hàng -->
+                    <!-- Bảng phiếu xuất hàng -->
                     <div class="table-responsive p-0">
                         <table class="table align-items-center mb-0" style="table-layout: fixed; width: 100%;">
                             <thead>
                                 <tr>
-                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Mã phiếu nhập</th>
-                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 20%;">Nhà cung cấp</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 12%;">Mã phiếu xuất</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 18%;">Mã hóa đơn bán</th>
                                     <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Nhân viên</th>
-                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 12%;">Tổng tiền</th>
-                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 12%;">Ngày nhập</th>
-                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 11%;">Thao tác</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 12%;">Tổng số lượng</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Trạng thái</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 13%;">Ngày xuất</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Thao tác</th>
                                 </tr>
                             </thead>
-                            <tbody id="stockImportTableBody">
+                            <tbody id="stockExportTableBody">
                                 <!-- Dữ liệu sẽ được load bằng AJAX -->
                             </tbody>
                         </table>
@@ -70,7 +71,7 @@
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header bg-gradient-info">
-                <h5 class="modal-title text-white" id="viewModalLabel">Chi tiết phiếu nhập hàng</h5>
+                <h5 class="modal-title text-white" id="viewModalLabel">Chi tiết phiếu xuất hàng</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="viewModalBody">
@@ -88,22 +89,22 @@
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header bg-gradient-primary">
-                <h5 class="modal-title text-white" id="createEditModalLabel">Thêm phiếu nhập hàng</h5>
+                <h5 class="modal-title text-white" id="createEditModalLabel">Thêm phiếu xuất hàng</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="stockImportForm">
-                    <input type="hidden" id="stockImportId" value="">
+                <form id="StockExportForm">
+                    <input type="hidden" id="StockExportId" value="">
                     <div class="row">
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
-                                <label class="form-label">Mã phiếu nhập</label>
-                                <input type="text" class="form-control" id="stockImportIdInput" readonly>
+                                <label class="form-label">Mã phiếu xuất</label>
+                                <input type="text" class="form-control" id="StockExportIdInput" readonly>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
-                                <label class="form-label">Ngày nhập *</label>
+                                <label class="form-label">Ngày xuất *</label>
                                 <input type="datetime-local" class="form-control" id="timeInput" required>
                             </div>
                         </div>
@@ -111,11 +112,11 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
-                                <label class="form-label">Nhà cung cấp</label>
+                                <label class="form-label">Mã hóa đơn bán</label>
                                 <div class="autocomplete-wrapper position-relative" style="width: 100%;">
-                                    <input type="text" id="supplierIdInput" class="form-control" autocomplete="off">
-                                    <input type="hidden" id="supplierIdValue" value="">
-                                    <div id="supplierIdDropdown" class="autocomplete-dropdown"></div>
+                                    <input type="text" id="SaleInvoiceIdInput" class="form-control" autocomplete="off">
+                                    <input type="hidden" id="SaleInvoiceIdValue" value="">
+                                    <div id="SaleInvoiceIdDropdown" class="autocomplete-dropdown"></div>
                                 </div>
                             </div>
                         </div>
@@ -129,8 +130,11 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
-                                <label class="form-label">Tổng tiền</label>
-                                <input type="number" step="0.01" class="form-control" id="totalAmountInput" readonly>
+                                <label class="form-label">Trạng thái</label>
+                                <select class="form-control" id="statusInput">
+                                    <option value="Chờ xử lý">Chờ xử lý</option>
+                                    <option value="Hoàn thành">Hoàn thành</option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -148,8 +152,6 @@
                                     <th>Sản phẩm</th>
                                     <th>Thông số</th>
                                     <th>Số lượng</th>
-                                    <th>Đơn giá</th>
-                                    <th>Thành tiền</th>
                                     <th>Thao tác</th>
                                 </tr>
                             </thead>
@@ -163,7 +165,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                <button type="button" class="btn btn-primary" onclick="saveStockImport()">
+                <button type="button" class="btn btn-primary" onclick="saveStockExport()">
                     <i class="material-icons text-sm">save</i> Lưu
                 </button>
             </div>
@@ -180,7 +182,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p>Bạn có chắc chắn muốn xóa phiếu nhập hàng <strong id="deleteStockImportId"></strong>?</p>
+                <p>Bạn có chắc chắn muốn xóa phiếu xuất hàng <strong id="deleteStockExportId"></strong>?</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
@@ -197,20 +199,21 @@
     <!-- Select2 JS -->
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
-        const API_URL = 'http://localhost:5068/api/admin/stock-imports';
+        const API_URL = 'http://localhost:5068/api/admin/stock-exports';
         let currentPage = 1;
         let pageSize = 10;
         let searchDebounceTimer = null;
         const SEARCH_DEBOUNCE_DELAY = 300;
-        let deleteStockImportId = null;
-        let detailRowIndex = 0;
-        let suppliersList = [];
-        let productsList = [];
+         let deleteStockExportId = null;
+         let detailRowIndex = 0;
+         let SaleInvoicesList = [];
+         let productsList = [];
+         let originalDetails = null; // Lưu chi tiết ban đầu khi edit để so sánh
 
-        $(document).ready(function() {
-            loadStockImports();
-            loadSuppliers();
-            loadProducts();
+         $(document).ready(function() {
+             loadStockExports();
+             loadSaleInvoices();
+             loadProducts();
 
             // Tìm kiếm tự động
             $('#searchInput').on('input', function() {
@@ -255,6 +258,61 @@
                     $group.removeClass('is-filled');
                 }
             });
+
+            // Event delegation cho các nút thao tác
+            $(document).on('click', '.action-btn[data-action="view"]', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const stockExportId = $(this).attr('data-id');
+                console.log('View button clicked, ID:', stockExportId);
+                if (stockExportId && typeof viewStockExport === 'function') {
+                    viewStockExport(stockExportId);
+                } else {
+                    console.error('viewStockExport function not found or ID is empty');
+                }
+            });
+
+            $(document).on('click', '.action-btn[data-action="edit"]', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const $btn = $(this);
+                const stockExportId = $btn.attr('data-id');
+                console.log('Edit button clicked');
+                console.log('Button element:', $btn);
+                console.log('StockExportId from data-id:', stockExportId);
+                console.log('editStockExport function exists:', typeof editStockExport === 'function');
+                
+                if (!stockExportId) {
+                    console.error('StockExportId is empty or undefined');
+                    showNotification('Không tìm thấy mã phiếu xuất hàng', 'error');
+                    return;
+                }
+                
+                if (typeof editStockExport !== 'function') {
+                    console.error('editStockExport function is not defined');
+                    showNotification('Lỗi: Hàm sửa không được định nghĩa', 'error');
+                    return;
+                }
+                
+                try {
+                    editStockExport(stockExportId);
+                } catch (error) {
+                    console.error('Error in editStockExport:', error);
+                    showNotification('Lỗi khi mở form sửa: ' + (error.message || error), 'error');
+                }
+            });
+
+            $(document).on('click', '.action-btn[data-action="delete"]', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const stockExportId = $(this).attr('data-id');
+                console.log('Delete button clicked, ID:', stockExportId);
+                if (stockExportId && typeof deleteStockExport === 'function') {
+                    deleteStockExport(stockExportId);
+                } else {
+                    console.error('deleteStockExport function not found or ID is empty');
+                }
+            });
         });
 
         function triggerAutoSearch() {
@@ -263,12 +321,12 @@
                 clearTimeout(searchDebounceTimer);
             }
             searchDebounceTimer = setTimeout(() => {
-                loadStockImports();
+                loadStockExports();
             }, SEARCH_DEBOUNCE_DELAY);
         }
 
-        // Load danh sách phiếu nhập hàng
-        function loadStockImports(page = currentPage) {
+        // Load danh sách phiếu xuất hàng
+        function loadStockExports(page = currentPage) {
             currentPage = page;
             const searchTerm = $('#searchInput').val().trim();
 
@@ -283,62 +341,68 @@
                 type: 'GET',
                 data: dataParams,
                 success: function(response) {
-                    displayStockImports(response.items);
+                    displayStockExports(response.items);
                     displayPagination(response);
                     updatePageInfo(response);
                 },
                 error: function(xhr) {
-                    console.error('Lỗi khi tải phiếu nhập hàng:', xhr);
-                    showNotification('Lỗi khi tải dữ liệu phiếu nhập hàng', 'error');
+                    console.error('Lỗi khi tải phiếu xuất hàng:', xhr);
+                    showNotification('Lỗi khi tải dữ liệu phiếu xuất hàng', 'error');
                 }
             });
         }
 
-        // Hiển thị phiếu nhập hàng
-        function displayStockImports(stockImports) {
-            const tbody = $('#stockImportTableBody');
+        // Hiển thị phiếu xuất hàng
+        function displayStockExports(stockExports) {
+            const tbody = $('#stockExportTableBody');
             tbody.empty();
 
-            if (stockImports.length === 0) {
+            if (stockExports.length === 0) {
                 tbody.append(`
                     <tr>
-                        <td colspan="6" class="text-center text-secondary py-4">
-                            Không có phiếu nhập hàng nào
+                        <td colspan="7" class="text-center text-secondary py-4">
+                            Không có phiếu xuất hàng nào
                         </td>
                     </tr>
                 `);
                 return;
             }
 
-            $.each(stockImports, function(index, stockImport) {
-                const time = stockImport.time ? new Date(stockImport.time).toLocaleString('vi-VN') : '-';
-                const totalAmount = stockImport.totalAmount ? formatCurrency(stockImport.totalAmount) : '0';
+            $.each(stockExports, function(index, stockExport) {
+                const time = stockExport.time ? new Date(stockExport.time).toLocaleString('vi-VN') : '-';
+                const totalQuantity = stockExport.totalQuantity || 0;
+                const status = stockExport.status || 'Chờ xử lý';
+                const statusClass = status === 'Hoàn thành' ? 'badge bg-gradient-success' : 'badge bg-gradient-warning';
+                const statusText = status === 'Hoàn thành' ? 'Hoàn thành' : 'Chờ xử lý';
 
                 tbody.append(`
                     <tr>
                         <td style="vertical-align: middle;">
-                            <span class="text-xs font-weight-bold">${stockImport.stockImportId}</span>
+                            <span class="text-xs font-weight-bold">${stockExport.stockExportId}</span>
                         </td>
-                        <td style="vertical-align: middle;">
-                            <span class="text-xs font-weight-bold">${stockImport.supplierName || '-'}</span>
+                         <td style="vertical-align: middle;">
+                             <span class="text-xs font-weight-bold">${stockExport.saleInvoiceId || '-'}</span>
+                         </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold">${stockExport.employeeName || '-'}</span>
                         </td>
                         <td style="vertical-align: middle; text-align: center;">
-                            <span class="text-xs font-weight-bold">${stockImport.employeeName || '-'}</span>
+                            <span class="text-xs font-weight-bold">${totalQuantity}</span>
                         </td>
                         <td style="vertical-align: middle; text-align: center;">
-                            <span class="text-xs font-weight-bold">${totalAmount}</span>
+                            <span class="${statusClass}">${statusText}</span>
                         </td>
                         <td style="vertical-align: middle; text-align: center;">
                             <span class="text-xs font-weight-bold">${time}</span>
                         </td>
                         <td style="vertical-align: middle; text-align: center;" class="table-actions">
-                            <button class="btn btn-info action-btn" onclick='viewStockImport("${stockImport.stockImportId}")' title="Xem">
+                            <button type="button" class="btn btn-info action-btn" data-action="view" data-id="${String(stockExport.stockExportId || '').replace(/"/g, '&quot;')}" title="Xem">
                                 <i class="material-icons text-sm">visibility</i>
                             </button>
-                            <button class="btn btn-warning action-btn" onclick='editStockImport("${stockImport.stockImportId}")' title="Sửa">
+                            <button type="button" class="btn btn-warning action-btn" data-action="edit" data-id="${String(stockExport.stockExportId || '').replace(/"/g, '&quot;')}" title="Sửa">
                                 <i class="material-icons text-sm">edit</i>
                             </button>
-                            <button class="btn btn-danger action-btn" onclick='deleteStockImport("${stockImport.stockImportId}")' title="Xóa">
+                            <button type="button" class="btn btn-danger action-btn" data-action="delete" data-id="${String(stockExport.stockExportId || '').replace(/"/g, '&quot;')}" title="Xóa">
                                 <i class="material-icons text-sm">delete</i>
                             </button>
                         </td>
@@ -356,7 +420,7 @@
 
             pagination.append(`
                 <li class="page-item ${response.hasPreviousPage ? '' : 'disabled'}">
-                    <a class="page-link" href="javascript:void(0)" onclick="loadStockImports(${currentPage - 1})">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadStockExports(${currentPage - 1})">
                         <i class="material-icons text-sm">chevron_left</i>
                     </a>
                 </li>
@@ -366,7 +430,7 @@
             let endPage = Math.min(response.totalPages, currentPage + 2);
 
             if (startPage > 1) {
-                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadStockImports(1)">1</a></li>`);
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadStockExports(1)">1</a></li>`);
                 if (startPage > 2) {
                     pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
                 }
@@ -375,7 +439,7 @@
             for (let i = startPage; i <= endPage; i++) {
                 pagination.append(`
                     <li class="page-item ${i === currentPage ? 'active' : ''}">
-                        <a class="page-link" href="javascript:void(0)" onclick="loadStockImports(${i})">${i}</a>
+                        <a class="page-link" href="javascript:void(0)" onclick="loadStockExports(${i})">${i}</a>
                     </li>
                 `);
             }
@@ -384,12 +448,12 @@
                 if (endPage < response.totalPages - 1) {
                     pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
                 }
-                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadStockImports(${response.totalPages})">${response.totalPages}</a></li>`);
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadStockExports(${response.totalPages})">${response.totalPages}</a></li>`);
             }
 
             pagination.append(`
                 <li class="page-item ${response.hasNextPage ? '' : 'disabled'}">
-                    <a class="page-link" href="javascript:void(0)" onclick="loadStockImports(${currentPage + 1})">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadStockExports(${currentPage + 1})">
                         <i class="material-icons text-sm">chevron_right</i>
                     </a>
                 </li>
@@ -400,68 +464,69 @@
         function updatePageInfo(response) {
             const start = (response.pageNumber - 1) * response.pageSize + 1;
             const end = Math.min(response.pageNumber * response.pageSize, response.totalItems);
-            $('#pageInfo').text(`Hiển thị ${start} - ${end} trong tổng số ${response.totalItems} phiếu nhập hàng`);
+            $('#pageInfo').text(`Hiển thị ${start} - ${end} trong tổng số ${response.totalItems} phiếu xuất hàng`);
         }
 
-        // Xem chi tiết phiếu nhập hàng
-        function viewStockImport(stockImportId) {
+        // Xem chi tiết phiếu xuất hàng
+        function viewStockExport(stockExportId) {
             $.ajax({
-                url: `${API_URL}/${stockImportId}`,
+                url: `${API_URL}/${stockExportId}`,
                 type: 'GET',
-                success: function(stockImport) {
+                success: function(stockExport) {
                     let html = `
                         <div class="row mb-3">
                             <div class="col-md-6">
-                                <strong>Mã phiếu nhập:</strong> ${stockImport.stockImportId}
+                                <strong>Mã phiếu xuất:</strong> ${stockExport.stockExportId}
                             </div>
                             <div class="col-md-6">
-                                <strong>Ngày nhập:</strong> ${stockImport.time ? new Date(stockImport.time).toLocaleString('vi-VN') : '-'}
+                                <strong>Ngày xuất:</strong> ${stockExport.time ? new Date(stockExport.time).toLocaleString('vi-VN') : '-'}
+                            </div>
+                        </div>
+                         <div class="row mb-3">
+                             <div class="col-md-6">
+                                 <strong>Mã hóa đơn bán:</strong> ${stockExport.saleInvoiceId || '-'}
+                             </div>
+                            <div class="col-md-6">
+                                <strong>Nhân viên:</strong> ${stockExport.employeeName || '-'}
                             </div>
                         </div>
                         <div class="row mb-3">
                             <div class="col-md-6">
-                                <strong>Nhà cung cấp:</strong> ${stockImport.supplierName || '-'}
+                                <strong>Tổng số lượng:</strong> ${stockExport.totalQuantity || 0}
                             </div>
                             <div class="col-md-6">
-                                <strong>Nhân viên:</strong> ${stockImport.employeeName || '-'}
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <strong>Tổng tiền:</strong> ${formatCurrency(stockImport.totalAmount || 0)}
+                                <strong>Trạng thái:</strong> 
+                                <span class="${stockExport.status === 'Hoàn thành' ? 'badge bg-gradient-success' : 'badge bg-gradient-warning'}">
+                                    ${stockExport.status || 'Chờ xử lý'}
+                                </span>
                             </div>
                         </div>
                         <hr>
-                        <h6>Chi tiết phiếu nhập hàng:</h6>
+                        <h6>Chi tiết phiếu xuất hàng:</h6>
                         <div class="table-responsive">
                             <table class="table table-bordered">
                                 <thead>
                                     <tr>
-                                        <th style="width: 20%;">Sản phẩm</th>
-                                        <th style="width: 40%;">Thông số</th>
-                                        <th style="width: 10%; text-align: center;">Số lượng</th>
-                                        <th style="width: 15%; text-align: right;">Đơn giá</th>
-                                        <th style="width: 15%; text-align: right;">Thành tiền</th>
+                                        <th style="width: 30%;">Sản phẩm</th>
+                                        <th style="width: 50%;">Thông số</th>
+                                        <th style="width: 20%; text-align: center;">Số lượng</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                     `;
 
-                    if (stockImport.details && stockImport.details.length > 0) {
-                        stockImport.details.forEach(function(detail) {
-                            const subtotal = (detail.quantity || 0) * (detail.price || 0);
+                    if (stockExport.details && stockExport.details.length > 0) {
+                        stockExport.details.forEach(function(detail) {
                             html += `
                                 <tr>
                                     <td>${detail.productName || detail.productId || '-'}</td>
                                     <td class="spec-cell">${detail.specifications || '-'}</td>
                                     <td style="text-align: center;">${detail.quantity || 0}</td>
-                                    <td style="text-align: right;">${formatCurrency(detail.price || 0)}</td>
-                                    <td style="text-align: right;">${formatCurrency(subtotal)}</td>
                                 </tr>
                             `;
                         });
                     } else {
-                        html += '<tr><td colspan="5" class="text-center">Không có chi tiết</td></tr>';
+                        html += '<tr><td colspan="3" class="text-center">Không có chi tiết</td></tr>';
                     }
 
                     html += `
@@ -475,38 +540,38 @@
                     modal.show();
                 },
                 error: function(xhr) {
-                    console.error('Error loading stock import:', xhr);
-                    showNotification('Lỗi khi tải thông tin phiếu nhập hàng', 'error');
+                    console.error('Error loading stock export:', xhr);
+                    showNotification('Lỗi khi tải thông tin phiếu xuất hàng', 'error');
                 }
             });
         }
 
         // Tạo ID tự động
-        function generateNextStockImportId() {
+        function generateNextStockExportId() {
             // Lấy tất cả ID để tìm số lớn nhất
             $.ajax({
                 url: API_URL,
                 type: 'GET',
                 data: { pageNumber: 1, pageSize: 1000 }, // Lấy nhiều để tìm max
                 success: function(response) {
-                    let nextId = 'SI001';
+                    let nextId = 'SE001';
                     if (response.items && response.items.length > 0) {
                         let maxNumber = 0;
                         response.items.forEach(function(item) {
-                            const id = item.stockImportId;
-                            if (id && id.startsWith('SI') && id.length === 5) {
+                            const id = item.stockExportId;
+                            if (id && id.startsWith('SE') && id.length === 5) {
                                 const number = parseInt(id.substring(2)) || 0;
                                 maxNumber = Math.max(maxNumber, number);
                             }
                         });
-                        nextId = 'SI' + String(maxNumber + 1).padStart(3, '0');
+                        nextId = 'SE' + String(maxNumber + 1).padStart(3, '0');
                     }
-                    $('#stockImportIdInput').val(nextId);
+                    $('#StockExportIdInput').val(nextId);
                     updateInputLabels();
                 },
                 error: function() {
                     // Nếu lỗi, tạo ID mặc định
-                    $('#stockImportIdInput').val('SI001');
+                    $('#StockExportIdInput').val('SE001');
                     updateInputLabels();
                 }
             });
@@ -514,54 +579,63 @@
 
         // Hiển thị modal thêm mới
         function showCreateModal() {
-            $('#createEditModalLabel').text('Thêm phiếu nhập hàng');
-            $('#stockImportForm')[0].reset();
-            $('#stockImportId').val('');
-            $('#stockImportIdInput').val('');
-            $('#stockImportIdInput').prop('readonly', true); // Không cho phép chỉnh sửa ID khi thêm mới
+            $('#createEditModalLabel').text('Thêm phiếu xuất hàng');
+            $('#StockExportForm')[0].reset();
+            $('#StockExportId').val('');
+            $('#StockExportIdInput').val('');
+            $('#StockExportIdInput').prop('readonly', true); // Không cho phép chỉnh sửa ID khi thêm mới
             $('#detailTableBody').empty();
             detailRowIndex = 0;
-            $('#formErrorMessage').hide();
-            $('#totalAmountInput').val('0');
-            $('#supplierIdInput').val('');
-            $('#supplierIdValue').val('');
-            
-            // Tự động tạo ID khi mở modal
-            generateNextStockImportId();
-            
-            // Set ngày hiện tại
-            const now = new Date();
-            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-            $('#timeInput').val(now.toISOString().slice(0, 16));
+             $('#formErrorMessage').hide();
+             $('#SaleInvoiceIdInput').val('');
+             $('#SaleInvoiceIdValue').val('');
+             $('#statusInput').val('Chờ xử lý');
+             originalDetails = null; // Reset chi tiết ban đầu
+             
+             // Tự động tạo ID khi mở modal
+             generateNextStockExportId();
+             
+             // Set ngày hiện tại
+             const now = new Date();
+             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+             $('#timeInput').val(now.toISOString().slice(0, 16));
 
-            const modal = new bootstrap.Modal(document.getElementById('createEditModal'));
-            modal.show();
-            
-            // Luôn load lại suppliers khi mở modal để đảm bảo có dữ liệu mới nhất
-            loadSuppliers(function() {
-                // Đợi modal hiển thị xong rồi update lại combobox
-                setTimeout(function() {
-                    populateSupplierSelect('');
-                }, 300);
-            });
+             const modal = new bootstrap.Modal(document.getElementById('createEditModal'));
+             modal.show();
+             
+             // Luôn load lại SaleInvoices khi mở modal để đảm bảo có dữ liệu mới nhất
+             loadSaleInvoices(function() {
+                 // Đợi modal hiển thị xong rồi update lại combobox
+                 setTimeout(function() {
+                     populateSaleInvoiceSelect('');
+                 }, 300);
+             });
         }
 
-        // Sửa phiếu nhập hàng
-        function editStockImport(stockImportId) {
+        // Sửa phiếu xuất hàng
+        function editStockExport(stockExportId) {
+            console.log('editStockExport called with ID:', stockExportId);
+            if (!stockExportId) {
+                showNotification('Không tìm thấy mã phiếu xuất hàng', 'error');
+                return;
+            }
+            
             $.ajax({
-                url: `${API_URL}/${stockImportId}`,
+                url: `${API_URL}/${stockExportId}`,
                 type: 'GET',
-                success: function(stockImport) {
-                    $('#createEditModalLabel').text('Sửa phiếu nhập hàng');
-                    $('#stockImportId').val(stockImport.stockImportId);
-                    $('#stockImportIdInput').val(stockImport.stockImportId);
-                    $('#stockImportIdInput').prop('readonly', true);
-                    const savedSupplierId = stockImport.supplierId || '';
-                    $('#employeeIdInput').val(stockImport.employeeId || '');
+                success: function(stockExport) {
+                    console.log('Stock export data loaded:', stockExport);
+                    $('#createEditModalLabel').text('Sửa phiếu xuất hàng');
+                     $('#StockExportId').val(stockExport.stockExportId);
+                     $('#StockExportIdInput').val(stockExport.stockExportId);
+                     $('#StockExportIdInput').prop('readonly', true);
+                     const savedSaleInvoiceId = stockExport.saleInvoiceId || '';
+                     $('#employeeIdInput').val(stockExport.employeeId || '');
+                     $('#statusInput').val(stockExport.status || 'Chờ xử lý');
                     
-                    if (stockImport.time) {
+                    if (stockExport.time) {
                         // Parse time từ server (có thể là UTC hoặc local time string)
-                        const time = new Date(stockImport.time);
+                        const time = new Date(stockExport.time);
                         // Convert về local time để hiển thị trong datetime-local input
                         // datetime-local input cần format "YYYY-MM-DDTHH:mm" (local time)
                         const year = time.getFullYear();
@@ -572,17 +646,19 @@
                         $('#timeInput').val(`${year}-${month}-${day}T${hours}:${minutes}`);
                     }
                     
-                    $('#totalAmountInput').val(stockImport.totalAmount || 0);
+                    // Lưu chi tiết ban đầu để so sánh khi save
+                    originalDetails = stockExport.details ? JSON.parse(JSON.stringify(stockExport.details)) : [];
+                    console.log('Saved original details:', originalDetails);
                     
                     // Load chi tiết
                     $('#detailTableBody').empty();
                     detailRowIndex = 0;
-                    if (stockImport.details && stockImport.details.length > 0) {
+                    if (stockExport.details && stockExport.details.length > 0) {
                         // Load từng detail một cách tuần tự để đảm bảo combobox được load đúng
                         let detailIndex = 0;
                         function loadNextDetail() {
-                            if (detailIndex < stockImport.details.length) {
-                                const detail = stockImport.details[detailIndex];
+                            if (detailIndex < stockExport.details.length) {
+                                const detail = stockExport.details[detailIndex];
                                 addDetailRow(detail);
                                 detailIndex++;
                                 // Đợi một chút để DOM được cập nhật
@@ -602,266 +678,280 @@
                     
                     $('#formErrorMessage').hide();
 
-                    const modal = new bootstrap.Modal(document.getElementById('createEditModal'));
-                    modal.show();
-                    
-                    // Load lại suppliers và set giá trị sau khi modal hiển thị
-                    loadSuppliers(function() {
-                        // Đợi modal hiển thị xong và populate xong rồi mới set giá trị
-                        setTimeout(function() {
-                            populateSupplierSelect(savedSupplierId);
-                            updateInputLabels();
-                        }, 300);
-                    });
-                },
-                error: function(xhr) {
-                    console.error('Error loading stock import:', xhr);
-                    showNotification('Lỗi khi tải thông tin phiếu nhập hàng', 'error');
-                }
-            });
-        }
-
-        // Load danh sách nhà cung cấp
-        function loadSuppliers(callback) {
-            $.ajax({
-                url: `${API_URL}/suppliers`,
-                type: 'GET',
-                dataType: 'json',
-                success: function(response) {
-                    console.log('Suppliers response:', response);
-                    
-                    // Kiểm tra nếu response là object có chứa data
-                    let suppliers = response;
-                    if (response && response.data) {
-                        suppliers = response.data;
-                    } else if (Array.isArray(response)) {
-                        suppliers = response;
-                    } else if (response && response.value) {
-                        // Có thể response được wrap trong value
-                        suppliers = response.value;
-                    }
-                    
-                    suppliersList = suppliers || [];
-                    console.log('Suppliers list:', suppliersList);
-                    console.log('Suppliers count:', suppliersList.length);
-                    
-                    // Luôn populate sau khi load xong
-                    populateSupplierSelect();
-                    
-                    // Gọi callback nếu có
-                    if (callback && typeof callback === 'function') {
-                        callback();
-                    }
+                     const modal = new bootstrap.Modal(document.getElementById('createEditModal'));
+                     modal.show();
+                     
+                     // Load lại SaleInvoices và set giá trị sau khi modal hiển thị
+                     loadSaleInvoices(function() {
+                         // Đợi modal hiển thị xong và populate xong rồi mới set giá trị
+                         setTimeout(function() {
+                             populateSaleInvoiceSelect(savedSaleInvoiceId);
+                             updateInputLabels();
+                         }, 300);
+                     });
                 },
                 error: function(xhr, status, error) {
-                    console.error('Error loading suppliers:', {
+                    console.error('Error loading stock export:', {
                         status: status,
                         error: error,
                         response: xhr.responseText,
                         statusCode: xhr.status,
                         responseJSON: xhr.responseJSON
                     });
-                    showNotification('Lỗi khi tải danh sách nhà cung cấp: ' + (xhr.responseJSON?.message || error), 'error');
-                    
-                    // Gọi callback ngay cả khi lỗi
-                    if (callback && typeof callback === 'function') {
-                        callback();
+                    let errorMessage = 'Lỗi khi tải thông tin phiếu xuất hàng';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMessage = xhr.responseJSON.message;
+                    } else if (xhr.status === 404) {
+                        errorMessage = 'Không tìm thấy phiếu xuất hàng';
+                    } else if (xhr.status === 0) {
+                        errorMessage = 'Không thể kết nối đến server. Vui lòng kiểm tra lại kết nối.';
                     }
+                    showNotification(errorMessage, 'error');
                 }
             });
         }
 
-        // Populate combobox nhà cung cấp (lưu danh sách để dùng cho autocomplete)
-        function populateSupplierSelect(selectedId = '') {
-            const supplierInput = $('#supplierIdInput');
-            if (supplierInput.length === 0) {
-                console.warn('Supplier input element not found, retrying...');
-                // Retry sau 100ms nếu element chưa có
-                setTimeout(function() { populateSupplierSelect(selectedId); }, 100);
-                return;
-            }
-            
-            // Lưu danh sách suppliers để dùng cho autocomplete
-            window.allSuppliersForSelect = suppliersList || [];
-            
-            const supplierValue = $('#supplierIdValue');
-            
-            // Nếu có selectedId, set giá trị
-            if (selectedId) {
-                const supplier = suppliersList.find(s => {
-                    const id = s.supplierId || s.SupplierId;
-                    return id === selectedId;
-                });
-                if (supplier) {
-                    const supplierName = supplier.supplierName || supplier.SupplierName || selectedId;
-                    supplierInput.val(supplierName);
-                    supplierValue.val(selectedId);
-                    supplierInput.closest('.input-group-outline').addClass('is-filled');
-                } else {
-                    supplierInput.val('');
-                    supplierValue.val('');
-                    supplierInput.closest('.input-group-outline').removeClass('is-filled');
-                }
-            } else {
-                supplierInput.val('');
-                supplierValue.val('');
-                supplierInput.closest('.input-group-outline').removeClass('is-filled');
-            }
-            
-            // Khởi tạo autocomplete cho suppliers
-            initializeSupplierAutocomplete();
-            
-            updateInputLabels();
-        }
+         // Load danh sách hóa đơn bán
+         function loadSaleInvoices(callback) {
+             $.ajax({
+                 url: `${API_URL}/sale-invoices`,
+                 type: 'GET',
+                 dataType: 'json',
+                 success: function(response) {
+                     console.log('SaleInvoices response:', response);
+                     
+                     // Kiểm tra nếu response là object có chứa data
+                     let saleInvoices = response;
+                     if (response && response.data) {
+                         saleInvoices = response.data;
+                     } else if (Array.isArray(response)) {
+                         saleInvoices = response;
+                     } else if (response && response.value) {
+                         // Có thể response được wrap trong value
+                         saleInvoices = response.value;
+                     }
+                     
+                     SaleInvoicesList = saleInvoices || [];
+                     console.log('SaleInvoices list:', SaleInvoicesList);
+                     console.log('SaleInvoices count:', SaleInvoicesList.length);
+                     
+                     // Luôn populate sau khi load xong
+                     populateSaleInvoiceSelect();
+                     
+                     // Gọi callback nếu có
+                     if (callback && typeof callback === 'function') {
+                         callback();
+                     }
+                 },
+                 error: function(xhr, status, error) {
+                     console.error('Error loading sale invoices:', {
+                         status: status,
+                         error: error,
+                         response: xhr.responseText,
+                         statusCode: xhr.status,
+                         responseJSON: xhr.responseJSON
+                     });
+                     showNotification('Lỗi khi tải danh sách hóa đơn bán: ' + (xhr.responseJSON?.message || error), 'error');
+                     
+                     // Gọi callback ngay cả khi lỗi
+                     if (callback && typeof callback === 'function') {
+                         callback();
+                     }
+                 }
+             });
+         }
 
-        // Khởi tạo autocomplete cho suppliers
-        function initializeSupplierAutocomplete() {
-            const supplierInput = $('#supplierIdInput');
-            const supplierValue = $('#supplierIdValue');
-            const dropdown = $('#supplierIdDropdown');
-            let selectedIndex = -1;
-            let filteredSuppliers = [];
+         // Populate combobox hóa đơn bán (lưu danh sách để dùng cho autocomplete)
+         function populateSaleInvoiceSelect(selectedId = '') {
+             const saleInvoiceInput = $('#SaleInvoiceIdInput');
+             if (saleInvoiceInput.length === 0) {
+                 console.warn('SaleInvoice input element not found, retrying...');
+                 // Retry sau 100ms nếu element chưa có
+                 setTimeout(function() { populateSaleInvoiceSelect(selectedId); }, 100);
+                 return;
+             }
+             
+             // Lưu danh sách SaleInvoices để dùng cho autocomplete
+             window.allSaleInvoicesForSelect = SaleInvoicesList || [];
+             
+             const saleInvoiceValue = $('#SaleInvoiceIdValue');
+             
+             // Nếu có selectedId, set giá trị
+             if (selectedId) {
+                 const saleInvoice = SaleInvoicesList.find(si => {
+                     const id = si.saleInvoiceId || si.SaleInvoiceId;
+                     return id === selectedId;
+                 });
+                 if (saleInvoice) {
+                     const displayName = saleInvoice.displayName || saleInvoice.DisplayName || saleInvoice.saleInvoiceId || saleInvoice.SaleInvoiceId || selectedId;
+                     saleInvoiceInput.val(displayName);
+                     saleInvoiceValue.val(selectedId);
+                     saleInvoiceInput.closest('.input-group-outline').addClass('is-filled');
+                 } else {
+                     saleInvoiceInput.val('');
+                     saleInvoiceValue.val('');
+                     saleInvoiceInput.closest('.input-group-outline').removeClass('is-filled');
+                 }
+             } else {
+                 saleInvoiceInput.val('');
+                 saleInvoiceValue.val('');
+                 saleInvoiceInput.closest('.input-group-outline').removeClass('is-filled');
+             }
+             
+             // Khởi tạo autocomplete cho SaleInvoices
+             initializeSaleInvoiceAutocomplete();
+             
+             updateInputLabels();
+         }
 
-            function showDropdown(suppliers) {
-                if (!suppliers || suppliers.length === 0) {
-                    dropdown.html('<div class="autocomplete-item" style="color: #6c757d; cursor: default;">Không tìm thấy nhà cung cấp</div>').show();
-                    selectedIndex = -1;
-                    return;
-                }
+         // Khởi tạo autocomplete cho SaleInvoices
+         function initializeSaleInvoiceAutocomplete() {
+             const saleInvoiceInput = $('#SaleInvoiceIdInput');
+             const saleInvoiceValue = $('#SaleInvoiceIdValue');
+             const dropdown = $('#SaleInvoiceIdDropdown');
+             let selectedIndex = -1;
+             let filteredSaleInvoices = [];
 
-                let html = '';
-                suppliers.forEach((supplier, index) => {
-                    const supplierId = supplier.supplierId || supplier.SupplierId;
-                    const supplierName = supplier.supplierName || supplier.SupplierName || supplierId;
-                    const supplierNameEscaped = (supplierName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                    html += `<div class="autocomplete-item" data-index="${index}" data-supplier-id="${supplierId}" data-supplier-name="${supplierNameEscaped}">${supplierName}</div>`;
-                });
-                dropdown.html(html).show();
-                selectedIndex = -1;
-            }
+             function showDropdown(saleInvoices) {
+                 if (!saleInvoices || saleInvoices.length === 0) {
+                     dropdown.html('<div class="autocomplete-item" style="color: #6c757d; cursor: default;">Không tìm thấy hóa đơn bán</div>').show();
+                     selectedIndex = -1;
+                     return;
+                 }
 
-            function updateSelectedItem() {
-                $('#supplierIdDropdown .autocomplete-item').removeClass('selected');
-                if (selectedIndex >= 0 && selectedIndex < filteredSuppliers.length) {
-                    $('#supplierIdDropdown .autocomplete-item').eq(selectedIndex).addClass('selected');
-                }
-            }
+                 let html = '';
+                 saleInvoices.forEach((saleInvoice, index) => {
+                     const saleInvoiceId = saleInvoice.saleInvoiceId || saleInvoice.SaleInvoiceId;
+                     const displayName = saleInvoice.displayName || saleInvoice.DisplayName || saleInvoiceId;
+                     const displayNameEscaped = (displayName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                     html += `<div class="autocomplete-item" data-index="${index}" data-sale-invoice-id="${saleInvoiceId}" data-display-name="${displayNameEscaped}">${displayName}</div>`;
+                 });
+                 dropdown.html(html).show();
+                 selectedIndex = -1;
+             }
 
-            // Xử lý khi gõ
-            supplierInput.off('input.supplier').on('input.supplier', function() {
-                const searchTerm = $(this).val().toLowerCase().trim();
-                
-                // Cập nhật class is-filled
-                if (searchTerm) {
-                    $(this).closest('.input-group-outline').addClass('is-filled');
-                } else {
-                    $(this).closest('.input-group-outline').removeClass('is-filled');
-                }
-                
-                if (searchTerm === '') {
-                    dropdown.hide();
-                    supplierValue.val('');
-                    return;
-                }
+             function updateSelectedItem() {
+                 $('#SaleInvoiceIdDropdown .autocomplete-item').removeClass('selected');
+                 if (selectedIndex >= 0 && selectedIndex < filteredSaleInvoices.length) {
+                     $('#SaleInvoiceIdDropdown .autocomplete-item').eq(selectedIndex).addClass('selected');
+                 }
+             }
 
-                const allSuppliers = window.allSuppliersForSelect || [];
-                filteredSuppliers = allSuppliers.filter(supplier => {
-                    const supplierName = (supplier.supplierName || supplier.SupplierName || '').toLowerCase();
-                    return supplierName.includes(searchTerm);
-                });
+             // Xử lý khi gõ
+             saleInvoiceInput.off('input.saleinvoice').on('input.saleinvoice', function() {
+                 const searchTerm = $(this).val().toLowerCase().trim();
+                 
+                 // Cập nhật class is-filled
+                 if (searchTerm) {
+                     $(this).closest('.input-group-outline').addClass('is-filled');
+                 } else {
+                     $(this).closest('.input-group-outline').removeClass('is-filled');
+                 }
+                 
+                 if (searchTerm === '') {
+                     dropdown.hide();
+                     saleInvoiceValue.val('');
+                     return;
+                 }
 
-                showDropdown(filteredSuppliers);
-            });
+                 const allSaleInvoices = window.allSaleInvoicesForSelect || [];
+                 filteredSaleInvoices = allSaleInvoices.filter(saleInvoice => {
+                     const displayName = (saleInvoice.displayName || saleInvoice.DisplayName || saleInvoice.saleInvoiceId || saleInvoice.SaleInvoiceId || '').toLowerCase();
+                     return displayName.includes(searchTerm);
+                 });
 
-            // Xử lý khi click vào item
-            $(document).off('click.supplier-item').on('click.supplier-item', '#supplierIdDropdown .autocomplete-item', function() {
-                const supplierId = $(this).data('supplier-id');
-                const supplierName = $(this).data('supplier-name');
-                
-                if (supplierId && supplierName) {
-                    supplierInput.val(supplierName);
-                    supplierValue.val(supplierId);
-                    supplierInput.closest('.input-group-outline').addClass('is-filled');
-                    dropdown.hide();
-                }
-            });
+                 showDropdown(filteredSaleInvoices);
+             });
 
-            // Xử lý phím tắt
-            supplierInput.off('keydown.supplier').on('keydown.supplier', function(e) {
-                if (dropdown.is(':visible') && filteredSuppliers.length > 0) {
-                    if (e.key === 'ArrowDown') {
-                        e.preventDefault();
-                        selectedIndex = Math.min(selectedIndex + 1, filteredSuppliers.length - 1);
-                        updateSelectedItem();
-                    } else if (e.key === 'ArrowUp') {
-                        e.preventDefault();
-                        selectedIndex = Math.max(selectedIndex - 1, -1);
-                        updateSelectedItem();
-                    } else if (e.key === 'Enter') {
-                        e.preventDefault();
-                        if (selectedIndex >= 0 && selectedIndex < filteredSuppliers.length) {
-                            const supplier = filteredSuppliers[selectedIndex];
-                            const supplierName = supplier.supplierName || supplier.SupplierName || supplier.supplierId || supplier.SupplierId;
-                            supplierInput.val(supplierName);
-                            supplierValue.val(supplier.supplierId || supplier.SupplierId);
-                            supplierInput.closest('.input-group-outline').addClass('is-filled');
-                            dropdown.hide();
-                        }
-                    } else if (e.key === 'Escape') {
-                        dropdown.hide();
-                        selectedIndex = -1;
-                    }
-                }
-            });
+             // Xử lý khi click vào item
+             $(document).off('click.saleinvoice-item').on('click.saleinvoice-item', '#SaleInvoiceIdDropdown .autocomplete-item', function() {
+                 const saleInvoiceId = $(this).data('sale-invoice-id');
+                 const displayName = $(this).data('display-name');
+                 
+                 if (saleInvoiceId && displayName) {
+                     saleInvoiceInput.val(displayName);
+                     saleInvoiceValue.val(saleInvoiceId);
+                     saleInvoiceInput.closest('.input-group-outline').addClass('is-filled');
+                     dropdown.hide();
+                 }
+             });
 
-            // Ẩn dropdown khi click ra ngoài
-            $(document).off('click.supplier-close').on('click.supplier-close', function(e) {
-                if (!$(e.target).closest('#supplierIdInput').closest('.autocomplete-wrapper').length) {
-                    dropdown.hide();
-                    selectedIndex = -1;
-                }
-            });
+             // Xử lý phím tắt
+             saleInvoiceInput.off('keydown.saleinvoice').on('keydown.saleinvoice', function(e) {
+                 if (dropdown.is(':visible') && filteredSaleInvoices.length > 0) {
+                     if (e.key === 'ArrowDown') {
+                         e.preventDefault();
+                         selectedIndex = Math.min(selectedIndex + 1, filteredSaleInvoices.length - 1);
+                         updateSelectedItem();
+                     } else if (e.key === 'ArrowUp') {
+                         e.preventDefault();
+                         selectedIndex = Math.max(selectedIndex - 1, -1);
+                         updateSelectedItem();
+                     } else if (e.key === 'Enter') {
+                         e.preventDefault();
+                         if (selectedIndex >= 0 && selectedIndex < filteredSaleInvoices.length) {
+                             const saleInvoice = filteredSaleInvoices[selectedIndex];
+                             const displayName = saleInvoice.displayName || saleInvoice.DisplayName || saleInvoice.saleInvoiceId || saleInvoice.SaleInvoiceId;
+                             saleInvoiceInput.val(displayName);
+                             saleInvoiceValue.val(saleInvoice.saleInvoiceId || saleInvoice.SaleInvoiceId);
+                             saleInvoiceInput.closest('.input-group-outline').addClass('is-filled');
+                             dropdown.hide();
+                         }
+                     } else if (e.key === 'Escape') {
+                         dropdown.hide();
+                         selectedIndex = -1;
+                     }
+                 }
+             });
 
-            // Xử lý khi focus vào input
-            supplierInput.off('focus.supplier').on('focus.supplier', function() {
-                $(this).closest('.input-group-outline').addClass('is-filled');
-                
-                const val = $(this).val().trim();
-                if (val) {
-                    $(this).trigger('input.supplier');
-                } else {
-                    const allSuppliers = window.allSuppliersForSelect || [];
-                    if (allSuppliers.length > 0) {
-                        filteredSuppliers = allSuppliers;
-                        showDropdown(filteredSuppliers);
-                    }
-                }
-            });
+             // Ẩn dropdown khi click ra ngoài
+             $(document).off('click.saleinvoice-close').on('click.saleinvoice-close', function(e) {
+                 if (!$(e.target).closest('#SaleInvoiceIdInput').closest('.autocomplete-wrapper').length) {
+                     dropdown.hide();
+                     selectedIndex = -1;
+                 }
+             });
 
-            // Xử lý khi blur
-            supplierInput.off('blur.supplier').on('blur.supplier', function() {
-                const val = $(this).val().trim();
-                if (!val) {
-                    $(this).closest('.input-group-outline').removeClass('is-filled');
-                }
-            });
+             // Xử lý khi focus vào input
+             saleInvoiceInput.off('focus.saleinvoice').on('focus.saleinvoice', function() {
+                 $(this).closest('.input-group-outline').addClass('is-filled');
+                 
+                 const val = $(this).val().trim();
+                 if (val) {
+                     $(this).trigger('input.saleinvoice');
+                 } else {
+                     const allSaleInvoices = window.allSaleInvoicesForSelect || [];
+                     if (allSaleInvoices.length > 0) {
+                         filteredSaleInvoices = allSaleInvoices;
+                         showDropdown(filteredSaleInvoices);
+                     }
+                 }
+             });
 
-            // Xử lý khi click vào input
-            supplierInput.off('click.supplier').on('click.supplier', function() {
-                $(this).closest('.input-group-outline').addClass('is-filled');
-                
-                const val = $(this).val().trim();
-                if (val) {
-                    $(this).trigger('input.supplier');
-                } else {
-                    const allSuppliers = window.allSuppliersForSelect || [];
-                    if (allSuppliers.length > 0) {
-                        filteredSuppliers = allSuppliers;
-                        showDropdown(filteredSuppliers);
-                    }
-                }
-            });
-        }
+             // Xử lý khi blur
+             saleInvoiceInput.off('blur.saleinvoice').on('blur.saleinvoice', function() {
+                 const val = $(this).val().trim();
+                 if (!val) {
+                     $(this).closest('.input-group-outline').removeClass('is-filled');
+                 }
+             });
+
+             // Xử lý khi click vào input
+             saleInvoiceInput.off('click.saleinvoice').on('click.saleinvoice', function() {
+                 $(this).closest('.input-group-outline').addClass('is-filled');
+                 
+                 const val = $(this).val().trim();
+                 if (val) {
+                     $(this).trigger('input.saleinvoice');
+                 } else {
+                     const allSaleInvoices = window.allSaleInvoicesForSelect || [];
+                     if (allSaleInvoices.length > 0) {
+                         filteredSaleInvoices = allSaleInvoices;
+                         showDropdown(filteredSaleInvoices);
+                     }
+                 }
+             });
+         }
 
         // Load danh sách sản phẩm
         function loadProducts() {
@@ -910,7 +1000,7 @@
                     
                     if (configurations && configurations.length > 0) {
                         configurations.forEach(function(config) {
-                            // Tạo chuỗi hiển thị thông số theo format: Core i7-10750H / 16GB / 1TB SSD / NVIDIA® GeForce RTX™ 3060 6GB GDDR6
+                            // Tạo chuỗi hiển thị thông số (format: Core i5-1335U / 8GB / 512GB SSD / Iris Xe)
                             const specParts = [];
                             if (config.cpu) specParts.push(config.cpu);
                             if (config.ram) specParts.push(config.ram);
@@ -1004,17 +1094,7 @@
                     <td>
                         <input type="number" class="form-control form-control-sm detail-quantity" 
                                value="${detail ? (detail.quantity || '') : ''}" 
-                               min="1" placeholder="Số lượng" onchange="calculateDetailTotal(${index})">
-                    </td>
-                    <td>
-                        <input type="number" step="0.01" class="form-control form-control-sm detail-price" 
-                               value="${detail ? (detail.price || '') : ''}" 
-                               min="0" placeholder="Đơn giá" onchange="calculateDetailTotal(${index})">
-                    </td>
-                    <td>
-                        <input type="text" class="form-control form-control-sm detail-total" 
-                               value="${detail ? formatCurrency((detail.quantity || 0) * (detail.price || 0)) : '0'}" 
-                               readonly>
+                               min="1" placeholder="Số lượng">
                     </td>
                     <td>
                         <button type="button" class="btn btn-sm btn-danger" onclick="removeDetailRow(${index})">
@@ -1117,9 +1197,18 @@
                                 if (specObj.card) specParts.push(specObj.card);
                                 const specText = specParts.length > 0 ? specParts.join(' / ') : '';
                                 
-                                // Normalize để so sánh (loại bỏ khoảng trắng thừa, chuyển về lowercase)
+                                // Normalize để so sánh (loại bỏ khoảng trắng thừa, chuyển về lowercase, loại bỏ prefix và normalize dấu phân cách)
                                 const normalizeString = (str) => {
-                                    return str.trim().toLowerCase().replace(/\s+/g, ' ');
+                                    if (!str) return '';
+                                    // Loại bỏ prefix "CPU:", "RAM:", "ROM:", "Card:" nếu có
+                                    let normalized = str.replace(/CPU:\s*/gi, '')
+                                                       .replace(/RAM:\s*/gi, '')
+                                                       .replace(/ROM:\s*/gi, '')
+                                                       .replace(/Card:\s*/gi, '');
+                                    // Normalize dấu phân cách (cả "," và "/" thành " / ")
+                                    normalized = normalized.replace(/,\s*/g, ' / ').replace(/\s*\/\s*/g, ' / ');
+                                    // Loại bỏ khoảng trắng thừa và chuyển về lowercase
+                                    return normalized.trim().toLowerCase().replace(/\s+/g, ' ');
                                 };
                                 
                                 const normalizedSpecText = normalizeString(specText);
@@ -1182,8 +1271,6 @@
                     });
                 }, 50); // Delay 50ms để đảm bảo DOM đã render
             }
-            
-            calculateTotalAmount();
         }
 
         // Xử lý khi chọn sản phẩm
@@ -1200,48 +1287,28 @@
             row.find('.detail-product').select2('destroy');
             row.find('.detail-spec').select2('destroy');
             row.remove();
-            calculateTotalAmount();
         }
 
-        // Tính tổng tiền cho một dòng chi tiết
-        function calculateDetailTotal(index) {
-            const quantity = parseFloat($(`tr[data-index="${index}"] .detail-quantity`).val()) || 0;
-            const price = parseFloat($(`tr[data-index="${index}"] .detail-price`).val()) || 0;
-            const total = quantity * price;
-            $(`tr[data-index="${index}"] .detail-total`).val(formatCurrency(total));
-            calculateTotalAmount();
-        }
 
-        // Tính tổng tiền
-        function calculateTotalAmount() {
-            let total = 0;
-            $('#detailTableBody tr').each(function() {
-                const quantity = parseFloat($(this).find('.detail-quantity').val()) || 0;
-                const price = parseFloat($(this).find('.detail-price').val()) || 0;
-                total += quantity * price;
-            });
-            $('#totalAmountInput').val(total.toFixed(2));
-        }
-
-        // Lưu phiếu nhập hàng
-        function saveStockImport() {
+        // Lưu phiếu xuất hàng
+        function saveStockExport() {
             $('#formErrorMessage').hide();
 
-            let stockImportId = $('#stockImportIdInput').val().trim();
-            const time = $('#timeInput').val();
-            const supplierId = $('#supplierIdValue').val().trim();
-            const employeeId = $('#employeeIdInput').val().trim();
-            const totalAmount = parseFloat($('#totalAmountInput').val()) || 0;
+             let stockExportId = $('#StockExportIdInput').val().trim();
+             const time = $('#timeInput').val();
+             const saleInvoiceId = $('#SaleInvoiceIdValue').val().trim();
+             const employeeId = $('#employeeIdInput').val().trim();
+             const status = $('#statusInput').val();
 
-            const isEdit = $('#stockImportId').val() !== '';
+            const isEdit = $('#StockExportId').val() !== '';
             
             // Khi thêm mới, nếu không có ID thì để null để backend tự động tạo
-            if (!isEdit && !stockImportId) {
-                stockImportId = null;
+            if (!isEdit && !stockExportId) {
+                stockExportId = null;
             }
 
             if (!time) {
-                showFormError('Vui lòng chọn ngày nhập');
+                showFormError('Vui lòng chọn ngày xuất');
                 return;
             }
 
@@ -1250,7 +1317,6 @@
             $('#detailTableBody tr').each(function() {
                 const productId = $(this).find('.detail-product').val().trim();
                 const quantity = parseInt($(this).find('.detail-quantity').val()) || 0;
-                const price = parseFloat($(this).find('.detail-price').val()) || 0;
                 let specifications = $(this).find('.detail-spec').val().trim();
 
                 // Nếu specifications là JSON string, parse nó và lấy thông tin
@@ -1276,17 +1342,73 @@
                     }
                 }
 
-                if (productId && quantity > 0 && price > 0) {
+                if (productId && quantity > 0) {
                     details.push({
                         productId: productId,
                         quantity: quantity,
-                        price: price,
                         specifications: specifications || null
                     });
                 }
             });
 
-            const url = isEdit ? `${API_URL}/${stockImportId}` : API_URL;
+            // So sánh chi tiết hiện tại với chi tiết ban đầu (chỉ khi edit)
+            let detailsChanged = false;
+            if (isEdit && originalDetails) {
+                // Normalize để so sánh (sắp xếp và so sánh)
+                const normalizeDetail = (detail) => {
+                    return {
+                        productId: (detail.productId || '').trim(),
+                        quantity: detail.quantity || 0,
+                        specifications: (detail.specifications || '').trim()
+                    };
+                };
+                
+                const normalizedCurrent = details.map(normalizeDetail).sort((a, b) => {
+                    if (a.productId !== b.productId) return a.productId.localeCompare(b.productId);
+                    if (a.specifications !== b.specifications) return a.specifications.localeCompare(b.specifications);
+                    return a.quantity - b.quantity;
+                });
+                
+                const normalizedOriginal = originalDetails.map(normalizeDetail).sort((a, b) => {
+                    if (a.productId !== b.productId) return a.productId.localeCompare(b.productId);
+                    if (a.specifications !== b.specifications) return a.specifications.localeCompare(b.specifications);
+                    return a.quantity - b.quantity;
+                });
+                
+                console.log('Comparing details:', {
+                    originalCount: normalizedOriginal.length,
+                    currentCount: normalizedCurrent.length,
+                    original: normalizedOriginal,
+                    current: normalizedCurrent
+                });
+                
+                // So sánh số lượng và nội dung
+                if (normalizedCurrent.length !== normalizedOriginal.length) {
+                    detailsChanged = true;
+                    console.log('Details changed: different count');
+                } else {
+                    for (let i = 0; i < normalizedCurrent.length; i++) {
+                        if (normalizedCurrent[i].productId !== normalizedOriginal[i].productId ||
+                            normalizedCurrent[i].quantity !== normalizedOriginal[i].quantity ||
+                            normalizedCurrent[i].specifications !== normalizedOriginal[i].specifications) {
+                            detailsChanged = true;
+                            console.log('Details changed: different content at index', i);
+                            break;
+                        }
+                    }
+                    if (!detailsChanged) {
+                        console.log('Details unchanged');
+                    }
+                }
+            } else {
+                // Khi thêm mới, luôn có thay đổi nếu có details
+                detailsChanged = details.length > 0;
+                console.log('Not editing or no original details, detailsChanged:', detailsChanged);
+            }
+            
+            console.log('Final detailsChanged:', detailsChanged, 'isEdit:', isEdit);
+
+            const url = isEdit ? `${API_URL}/${stockExportId}` : API_URL;
             const method = isEdit ? 'PUT' : 'POST';
 
             // Xử lý time để tránh lỗi timezone
@@ -1311,14 +1433,38 @@
                 timeValue = `${year}-${month}-${day}T${hours}:${minutes}:00`;
             }
 
-            const data = {
-                stockImportId: stockImportId || null, // null để backend tự động tạo khi thêm mới
-                supplierId: supplierId || null,
-                employeeId: employeeId || null,
-                time: timeValue,
-                totalAmount: totalAmount,
-                details: details
-            };
+             // Xác định details để gửi
+             let detailsToSend = null;
+             if (isEdit && !detailsChanged) {
+                 // Chỉ cập nhật thông tin chung, không gửi details
+                 detailsToSend = null;
+                 console.log('Sending null details (only updating general info)');
+             } else if (details.length > 0) {
+                 // Có details để gửi
+                 detailsToSend = details;
+                 console.log('Sending details:', detailsToSend);
+             } else if (isEdit) {
+                 // Edit nhưng không có details (có thể đã xóa hết)
+                 detailsToSend = null;
+                 console.log('Edit mode but no details, sending null');
+             } else {
+                 // Thêm mới nhưng không có details
+                 detailsToSend = [];
+                 console.log('Create mode but no details, sending empty array');
+             }
+
+             const data = {
+                 stockExportId: stockExportId || null, // null để backend tự động tạo khi thêm mới
+                 saleInvoiceId: saleInvoiceId || null,
+                 employeeId: employeeId || null,
+                 time: timeValue,
+                 status: status || 'Chờ xử lý',
+                 // Chỉ gửi details nếu có thay đổi về chi tiết
+                 // Nếu chỉ cập nhật thông tin chung (mã hóa đơn, mã nhân viên, trạng thái), gửi null để backend giữ nguyên chi tiết cũ
+                 details: detailsToSend
+             };
+             
+             console.log('Sending data:', data);
 
             $.ajax({
                 url: url,
@@ -1326,51 +1472,69 @@
                 contentType: 'application/json',
                 data: JSON.stringify(data),
                 success: function(response) {
-                    showNotification(isEdit ? 'Cập nhật phiếu nhập hàng thành công' : 'Thêm phiếu nhập hàng thành công', 'success');
+                    showNotification(isEdit ? 'Cập nhật phiếu xuất hàng thành công' : 'Thêm phiếu xuất hàng thành công', 'success');
                     const modalInstance = bootstrap.Modal.getInstance(document.getElementById('createEditModal'));
                     if (modalInstance) {
                         modalInstance.hide();
                     }
-                    loadStockImports();
+                    loadStockExports();
                 },
-                error: function(xhr) {
-                    console.error('Error saving stock import:', xhr);
-                    let message = 'Có lỗi xảy ra khi lưu phiếu nhập hàng';
+                error: function(xhr, status, error) {
+                    console.error('Error saving stock export:', {
+                        status: status,
+                        error: error,
+                        statusCode: xhr.status,
+                        responseText: xhr.responseText,
+                        responseJSON: xhr.responseJSON
+                    });
+                    let message = 'Có lỗi xảy ra khi lưu phiếu xuất hàng';
                     if (xhr.responseJSON && xhr.responseJSON.message) {
                         message = xhr.responseJSON.message;
+                    } else if (xhr.responseText) {
+                        try {
+                            const errorObj = JSON.parse(xhr.responseText);
+                            if (errorObj.message) {
+                                message = errorObj.message;
+                            }
+                        } catch (e) {
+                            // Nếu không parse được JSON, dùng responseText
+                            if (xhr.responseText && xhr.responseText.length < 200) {
+                                message = xhr.responseText;
+                            }
+                        }
                     }
                     showFormError(message);
                 }
             });
         }
 
-        // Xóa phiếu nhập hàng
-        function deleteStockImport(stockImportId) {
-            deleteStockImportId = stockImportId;
-            $('#deleteStockImportId').text(stockImportId);
+        // Xóa phiếu xuất hàng
+        function deleteStockExport(stockExportId) {
+            deleteStockExportId = stockExportId;
+            $('#deleteStockExportId').text(stockExportId);
             const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
             modal.show();
         }
 
         // Xác nhận xóa
         function confirmDelete() {
-            if (!deleteStockImportId) return;
+            if (!deleteStockExportId) return;
 
             $.ajax({
-                url: `${API_URL}/${deleteStockImportId}`,
+                url: `${API_URL}/${deleteStockExportId}`,
                 type: 'DELETE',
                 success: function(response) {
-                    showNotification('Xóa phiếu nhập hàng thành công', 'success');
+                    showNotification('Xóa phiếu xuất hàng thành công', 'success');
                     const modalInstance = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
                     if (modalInstance) {
                         modalInstance.hide();
                     }
-                    loadStockImports();
-                    deleteStockImportId = null;
+                    loadStockExports();
+                    deleteStockExportId = null;
                 },
                 error: function(xhr) {
-                    console.error('Error deleting stock import:', xhr);
-                    let message = 'Có lỗi xảy ra khi xóa phiếu nhập hàng';
+                    console.error('Error deleting stock export:', xhr);
+                    let message = 'Có lỗi xảy ra khi xóa phiếu xuất hàng';
                     if (xhr.responseJSON && xhr.responseJSON.message) {
                         message = xhr.responseJSON.message;
                     }
@@ -1405,18 +1569,18 @@
 
         // Reset khi đóng modal
         $(document).on('hidden.bs.modal', '#createEditModal', function() {
-            $('#stockImportForm')[0].reset();
-            $('#stockImportId').val('');
-            $('#stockImportIdInput').prop('readonly', false);
+            $('#StockExportForm')[0].reset();
+            $('#StockExportId').val('');
+            $('#StockExportIdInput').prop('readonly', false);
             $('#detailTableBody').empty();
             detailRowIndex = 0;
             $('#formErrorMessage').hide();
-            $('#totalAmountInput').val('0');
+            originalDetails = null; // Reset chi tiết ban đầu
             
-            // Reset autocomplete dropdowns
-            $('#supplierIdDropdown').hide();
-            $('#supplierIdInput').val('');
-            $('#supplierIdValue').val('');
+             // Reset autocomplete dropdowns
+             $('#SaleInvoiceIdDropdown').hide();
+             $('#SaleInvoiceIdInput').val('');
+             $('#SaleInvoiceIdValue').val('');
             
             $('.input-group-outline').removeClass('is-filled is-focused');
             if (typeof updateInputLabels === 'function') {
@@ -1489,7 +1653,7 @@
         white-space: nowrap;
     }
 
-    #stockImportTableBody tr td {
+    #stockExportTableBody tr td {
         vertical-align: middle !important;
         padding: 1rem 0.75rem !important;
         border: none;

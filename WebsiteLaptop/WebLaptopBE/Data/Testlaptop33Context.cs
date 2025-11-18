@@ -5,13 +5,13 @@ using WebLaptopBE.Models;
 
 namespace WebLaptopBE.Data;
 
-public partial class Testlaptop30Context : DbContext
+public partial class Testlaptop33Context : DbContext
 {
-    public Testlaptop30Context()
+    public Testlaptop33Context()
     {
     }
 
-    public Testlaptop30Context(DbContextOptions<Testlaptop30Context> options)
+    public Testlaptop33Context(DbContextOptions<Testlaptop33Context> options)
         : base(options)
     {
     }
@@ -64,7 +64,7 @@ public partial class Testlaptop30Context : DbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseSqlServer("Data Source=DESKTOP-GDN4V8P;Initial Catalog=testlaptop30;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False");
+        => optionsBuilder.UseSqlServer("Data Source=DESKTOP-GDN4V8P;Initial Catalog=testlaptop33;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -201,7 +201,7 @@ public partial class Testlaptop30Context : DbContext
                 .HasMaxLength(20)
                 .HasColumnName("phone_number");
             entity.Property(e => e.Username)
-                .HasMaxLength(20)
+                .HasMaxLength(100)
                 .HasColumnName("username");
         });
 
@@ -239,7 +239,7 @@ public partial class Testlaptop30Context : DbContext
                 .HasMaxLength(20)
                 .HasColumnName("role_id");
             entity.Property(e => e.Username)
-                .HasMaxLength(20)
+                .HasMaxLength(100)
                 .HasColumnName("username");
 
             entity.HasOne(d => d.Branches).WithMany(p => p.Employees)
@@ -427,7 +427,6 @@ public partial class Testlaptop30Context : DbContext
                 .HasColumnName("specifications");
             entity.Property(e => e.Status)
                 .HasMaxLength(20)
-                .HasDefaultValue("InStock")
                 .HasColumnName("status");
             entity.Property(e => e.StockExportDetailId)
                 .HasMaxLength(20)
