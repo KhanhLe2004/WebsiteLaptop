@@ -15,6 +15,9 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Add HttpClientFactory for API calls
+builder.Services.AddHttpClient();
+
 // Add CORS
 builder.Services.AddCors(options =>
 {
