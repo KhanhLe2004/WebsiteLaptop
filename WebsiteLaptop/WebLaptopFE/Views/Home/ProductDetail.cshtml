@@ -720,7 +720,104 @@
                 });
             }
             function submitReview() { alert('Tính năng gửi đánh giá đang được phát triển!'); }
-            function addToCart() { alert('Tính năng thêm vào giỏ hàng đang được phát triển!'); }
+            async function addToCart() {
+                // Kiểm tra đăng nhập
+                try {
+                    const isLoggedIn = sessionStorage.getItem('isLoggedIn');
+                    const customer = sessionStorage.getItem('customer');
+                    if (!isLoggedIn || !customer) {
+                        if (confirm('Bạn cần đăng nhập để thêm sản phẩm vào giỏ hàng. Bạn có muốn chuyển đến trang đăng nhập không?')) {
+                            window.location.href = '/User/Login';
+                        }
+                        return;
+                    }
+
+                    const parsed = JSON.parse(customer);
+                    const customerId = parsed.customerId || parsed.CustomerId;
+                    if (!customerId) {
+                        alert('Không tìm thấy thông tin khách hàng. Vui lòng đăng nhập lại.');
+                        return;
+                    }
+
+                    const quantity = parseInt($('#productQuantity').val()) || 1;
+                    if (quantity <= 0) {
+                        alert('Số lượng phải lớn hơn 0');
+                        return;
+                    }
+
+                    // Kiểm tra số lượng có sẵn
+                    if (selectedConfiguration && selectedConfiguration.quantity != null) {
+                        if (quantity > selectedConfiguration.quantity) {
+                            alert(`Số lượng tối đa có sẵn: ${selectedConfiguration.quantity}`);
+                            return;
+                        }
+                    }
+
+                    // API base
+                    const getDefaultApiBase = () => {
+                        if (window.CART_API_BASE && window.CART_API_BASE.trim()) {
+                            return window.CART_API_BASE.trim();
+                        }
+                        if (window.location && window.location.origin) {
+                            const origin = window.location.origin;
+                            if (!origin.includes('localhost')) {
+                                return origin;
+                            }
+                        }
+                        return 'http://localhost:5068';
+                    };
+                    const apiBase = getDefaultApiBase();
+                    const cartApiBase = `${apiBase}/api/Cart`;
+
+                    // Hiển thị loading
+                    const btn = $('a[onclick*="addToCart"]');
+                    const originalHtml = btn.html();
+                    btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-2"></i>Đang thêm...');
+
+                    try {
+                        const response = await fetch(`${cartApiBase}/add`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                customerId: customerId,
+                                productId: productId,
+                                quantity: quantity,
+                                configurationId: selectedConfiguration?.configurationId || null
+                            })
+                        });
+
+                        // Đọc response text trước
+                        const responseText = await response.text();
+                        console.log('Add to cart response:', response.status, responseText);
+
+                        let data;
+                        try {
+                            data = responseText ? JSON.parse(responseText) : {};
+                        } catch (parseErr) {
+                            console.error('JSON parse error:', parseErr, 'Response text:', responseText);
+                            throw new Error('Server trả về dữ liệu không hợp lệ');
+                        }
+
+                        if (!response.ok) {
+                            throw new Error(data?.message || `HTTP ${response.status}: Không thể thêm vào giỏ hàng`);
+                        }
+
+                        // Hiển thị thông báo thành công
+                        alert('Đã thêm sản phẩm vào giỏ hàng!');
+                        
+                        // Có thể redirect đến giỏ hàng hoặc reload
+                        // window.location.href = '/Cart/Cart';
+                    } catch (err) {
+                        console.error('addToCart error:', err);
+                        alert('Lỗi: ' + (err.message || 'Không thể thêm vào giỏ hàng'));
+                    } finally {
+                        btn.prop('disabled', false).html(originalHtml);
+                    }
+                } catch (err) {
+                    console.error('addToCart error:', err);
+                    alert('Có lỗi xảy ra. Vui lòng thử lại.');
+                }
+            }
 
             // Load featured products
             function loadFeaturedProducts() {
