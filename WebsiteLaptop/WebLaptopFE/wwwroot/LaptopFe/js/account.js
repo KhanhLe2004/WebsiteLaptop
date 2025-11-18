@@ -2,8 +2,22 @@
 (function ($) {
     'use strict';
 
-    const CUSTOMER_API_BASE = window.CUSTOMER_API_BASE || '/api/CustomerAccount';
-    const ADDRESS_API_BASE = window.ADDRESS_API_BASE || '/api/Address';
+    const getDefaultApiBase = () => {
+        if (window.CUSTOMER_API_BASE && window.CUSTOMER_API_BASE.trim()) {
+            return window.CUSTOMER_API_BASE.trim();
+        }
+        if (window.location && window.location.origin) {
+            const origin = window.location.origin;
+            if (!origin.includes('localhost')) {
+                return origin;
+            }
+        }
+        return 'http://localhost:5068';
+    };
+
+    const API_BASE = getDefaultApiBase();
+    const CUSTOMER_API_BASE = `${API_BASE}/api/CustomerAccount`;
+    const ADDRESS_API_BASE = window.ADDRESS_API_BASE || `${API_BASE}/api/Address`;
 
     let currentCustomerId = null;
     let provinces = [];
@@ -92,14 +106,25 @@
     function resolveSessionCustomerId() {
         const isLoggedIn = sessionStorage.getItem('isLoggedIn');
         const raw = sessionStorage.getItem('customer');
-        if (isLoggedIn !== 'true' || !raw) return null;
-        try {
-            const parsed = JSON.parse(raw);
-            return parsed.customerId || parsed.CustomerId || null;
-        } catch (err) {
-            console.error('Cannot parse customer info', err);
+        console.log('resolveSessionCustomerId - isLoggedIn:', isLoggedIn, 'raw:', raw);
+        if (isLoggedIn !== 'true' || !raw) {
+            console.warn('Session check failed: isLoggedIn=', isLoggedIn, 'raw=', raw);
             return null;
         }
+        try {
+            const parsed = JSON.parse(raw);
+            console.log('Parsed customer:', parsed);
+            const customerId = parsed.customerId || parsed.CustomerId || null;
+            console.log('Resolved customerId:', customerId);
+            return customerId;
+        } catch (err) {
+            console.error('Cannot parse customer info', err, 'raw:', raw);
+            return null;
+        }
+    }
+
+    function redirectToLogin() {
+        window.location.replace('/User/Login');
     }
 
     /* ------------ Address helpers ------------ */
@@ -169,13 +194,34 @@
 
     /* ------------ Customer profile ------------ */
     async function loadCustomerData() {
+        if (!currentCustomerId) {
+            console.error('loadCustomerData: currentCustomerId is null or undefined');
+            showAlert('danger', 'Không tìm thấy thông tin khách hàng. Vui lòng đăng nhập lại.');
+            return;
+        }
+        console.log('loadCustomerData: fetching customer data for', currentCustomerId);
         try {
-            const response = await fetch(`${CUSTOMER_API_BASE}/${currentCustomerId}`, { credentials: 'same-origin' });
-            if (!response.ok) throw new Error('Không thể tải thông tin khách hàng');
+            const url = `${CUSTOMER_API_BASE}/${currentCustomerId}`;
+            console.log('Fetching from URL:', url);
+            const response = await fetch(url, { credentials: 'same-origin' });
+            console.log('Response status:', response.status, response.statusText);
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('API error response:', errorText);
+                let errorMessage = 'Không thể tải thông tin khách hàng';
+                try {
+                    const errorData = JSON.parse(errorText);
+                    errorMessage = errorData.message || errorMessage;
+                } catch (e) {
+                    errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                }
+                throw new Error(errorMessage);
+            }
             const data = await response.json();
+            console.log('Customer data received:', data);
             populateProfileForm(data);
         } catch (err) {
-            console.error(err);
+            console.error('loadCustomerData error:', err);
             showAlert('danger', err.message || 'Không thể tải thông tin khách hàng');
         }
     }
@@ -496,10 +542,16 @@
 
     /* ------------ Init ------------ */
     $(document).ready(function () {
+        console.log('account.js: Document ready');
         loadBirthDropdowns();
         currentCustomerId = resolveSessionCustomerId();
+        console.log('account.js: currentCustomerId =', currentCustomerId);
         if (!currentCustomerId) {
-            redirectToLogin();
+            console.warn('account.js: No customerId found, redirecting to login');
+            showAlert('danger', 'Vui lòng đăng nhập để xem thông tin cá nhân');
+            setTimeout(() => {
+                redirectToLogin();
+            }, 2000);
             return;
         }
 
