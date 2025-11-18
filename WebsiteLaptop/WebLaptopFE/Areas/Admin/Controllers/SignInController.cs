@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
-using WebLaptopFE.Areas.Admin.Models;
 
 namespace WebLaptopFE.Areas.Admin.Controllers
 {
@@ -57,40 +56,50 @@ namespace WebLaptopFE.Areas.Admin.Controllers
                 // Gọi API đăng nhập
                 var response = await client.PostAsync("/api/SignInAPI", content);
 
-                if (response.IsSuccessStatusCode)
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var jsonDoc = JsonDocument.Parse(responseContent);
+                var root = jsonDoc.RootElement;
+
+                var success = root.TryGetProperty("success", out var successElement) ? successElement.GetBoolean() : false;
+                var message = root.TryGetProperty("message", out var messageElement) ? messageElement.GetString() : null;
+
+                if (response.IsSuccessStatusCode && success && root.TryGetProperty("employee", out var employeeElement))
                 {
-                    var responseContent = await response.Content.ReadAsStringAsync();
-                    var signInResponse = JsonSerializer.Deserialize<SignInResponse>(responseContent, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
+                    var employee = employeeElement;
+                    
+                    // Lưu thông tin vào session
+                    if (employee.TryGetProperty("employeeId", out var employeeIdElement))
+                        HttpContext.Session.SetString("EmployeeId", employeeIdElement.GetString() ?? "");
+                    
+                    if (employee.TryGetProperty("employeeName", out var employeeNameElement))
+                        HttpContext.Session.SetString("EmployeeName", employeeNameElement.GetString() ?? "");
+                    
+                    if (employee.TryGetProperty("email", out var emailElement))
+                        HttpContext.Session.SetString("Email", emailElement.GetString() ?? "");
+                    
+                    if (employee.TryGetProperty("username", out var usernameElement))
+                        HttpContext.Session.SetString("Username", usernameElement.GetString() ?? "");
+                    
+                    if (employee.TryGetProperty("avatar", out var avatarElement))
+                        HttpContext.Session.SetString("Avatar", avatarElement.GetString() ?? "");
+                    
+                    if (employee.TryGetProperty("roleId", out var roleIdElement))
+                        HttpContext.Session.SetString("RoleId", roleIdElement.GetString() ?? "");
+                    
+                    if (employee.TryGetProperty("roleName", out var roleNameElement))
+                        HttpContext.Session.SetString("RoleName", roleNameElement.GetString() ?? "");
+                    
+                    if (employee.TryGetProperty("branchesId", out var branchesIdElement))
+                        HttpContext.Session.SetString("BranchesId", branchesIdElement.GetString() ?? "");
+                    
+                    if (employee.TryGetProperty("branchesName", out var branchesNameElement))
+                        HttpContext.Session.SetString("BranchesName", branchesNameElement.GetString() ?? "");
 
-                    if (signInResponse != null && signInResponse.Success && signInResponse.Employee != null)
-                    {
-                        // Lưu thông tin vào session
-                        HttpContext.Session.SetString("EmployeeId", signInResponse.Employee.EmployeeId);
-                        HttpContext.Session.SetString("EmployeeName", signInResponse.Employee.EmployeeName ?? "");
-                        HttpContext.Session.SetString("Email", signInResponse.Employee.Email ?? "");
-                        HttpContext.Session.SetString("Username", signInResponse.Employee.Username ?? "");
-                        HttpContext.Session.SetString("Avatar", signInResponse.Employee.Avatar ?? "");
-                        HttpContext.Session.SetString("RoleId", signInResponse.Employee.RoleId ?? "");
-                        HttpContext.Session.SetString("RoleName", signInResponse.Employee.RoleName ?? "");
-                        HttpContext.Session.SetString("BranchesId", signInResponse.Employee.BranchesId ?? "");
-                        HttpContext.Session.SetString("BranchesName", signInResponse.Employee.BranchesName ?? "");
-
-                        TempData["SuccessMessage"] = "Đăng nhập thành công";
-                        return RedirectToAction("Index", "Home", new { area = "Admin" });
-                    }
+                    TempData["SuccessMessage"] = "Đăng nhập thành công";
+                    return RedirectToAction("Index", "Home", new { area = "Admin" });
                 }
 
-                // Đọc error message từ response
-                var errorContent = await response.Content.ReadAsStringAsync();
-                var errorResponse = JsonSerializer.Deserialize<SignInResponse>(errorContent, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-
-                TempData["ErrorMessage"] = errorResponse?.Message ?? "Đăng nhập thất bại. Vui lòng thử lại.";
+                TempData["ErrorMessage"] = message ?? "Đăng nhập thất bại. Vui lòng thử lại.";
                 return View("SignIn");
             }
             catch (Exception ex)
