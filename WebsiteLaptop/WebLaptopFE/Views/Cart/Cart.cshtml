@@ -1,0 +1,534 @@
+﻿@{
+    ViewData["Title"] = "Giỏ hàng";
+    Layout = "~/Views/Shared/_LayoutCart.cshtml";
+}
+
+@section Scripts {
+<script>
+    (function ($) {
+        'use strict';
+
+        // Cấu hình API
+        const getDefaultApiBase = () => {
+            if (window.CART_API_BASE && window.CART_API_BASE.trim()) {
+                return window.CART_API_BASE.trim();
+            }
+            if (window.location && window.location.origin) {
+                const origin = window.location.origin;
+                if (!origin.includes('localhost')) {
+                    return origin;
+                }
+            }
+            return 'http://localhost:5068';
+        };
+
+        const API_BASE = getDefaultApiBase();
+        const CART_API_BASE = `${API_BASE}/api/Cart`;
+        const backendImageBase = `${API_BASE}/image/`;
+        const defaultProductImage = "/image/default-laptop.jpg";
+
+        // Helper function để lấy URL ảnh từ backend
+        function getBackendImageUrl(fileName) {
+            if (!fileName || typeof fileName !== "string" || !fileName.trim()) {
+                return defaultProductImage;
+            }
+            return backendImageBase + encodeURIComponent(fileName.trim());
+        }
+
+        // Lấy customerId từ session
+        function getCustomerId() {
+            try {
+                const isLoggedIn = sessionStorage.getItem('isLoggedIn');
+                const customer = sessionStorage.getItem('customer');
+                if (!isLoggedIn || !customer) return null;
+                const parsed = JSON.parse(customer);
+                return parsed.customerId || parsed.CustomerId || null;
+            } catch (err) {
+                console.error('Cannot get customerId:', err);
+                return null;
+            }
+        }
+
+        // Helper functions
+        function formatCurrency(value) {
+            return (value ?? 0).toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+        }
+
+        function showAlert(type, message) {
+            const alertHtml = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>`;
+            $('body').prepend(alertHtml);
+            setTimeout(() => $('.alert').fadeOut(), 3000);
+        }
+
+        // Load giỏ hàng
+        async function loadCart() {
+            const customerId = getCustomerId();
+            if (!customerId) {
+                $('#cartTableBody').html('<tr><td colspan="6" class="text-center text-muted">Vui lòng đăng nhập để xem giỏ hàng</td></tr>');
+                return;
+            }
+
+            try {
+                const apiUrl = `${CART_API_BASE}/${customerId}`;
+                console.log('Loading cart for customer:', customerId);
+                console.log('API URL:', apiUrl);
+                
+                const response = await fetch(apiUrl, { 
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'same-origin' 
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+
+                // Đọc response text trước
+                const responseText = await response.text();
+                console.log('Cart response text:', responseText);
+
+                if (!response.ok) {
+                    let errorMessage = `HTTP ${response.status}: Không thể tải giỏ hàng`;
+                    if (response.status === 404) {
+                        errorMessage = 'Không tìm thấy API endpoint. Vui lòng kiểm tra lại cấu hình.';
+                    }
+                    try {
+                        const errorData = responseText ? JSON.parse(responseText) : {};
+                        errorMessage = errorData?.message || errorMessage;
+                    } catch (e) {
+                        if (responseText) {
+                            errorMessage = responseText;
+                        }
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                let data;
+                try {
+                    data = responseText ? JSON.parse(responseText) : { items: [], totalAmount: 0 };
+                } catch (parseErr) {
+                    console.error('JSON parse error:', parseErr, 'Response text:', responseText);
+                    throw new Error('Server trả về dữ liệu không hợp lệ');
+                }
+
+                await renderCart(data.items || [], data.totalAmount || 0);
+            } catch (err) {
+                console.error('loadCart error:', err);
+                const errorMsg = err.message || 'Không thể tải giỏ hàng';
+                $('#cartTableBody').html(`<tr><td colspan="6" class="text-center text-danger">${errorMsg}</td></tr>`);
+                showAlert('danger', errorMsg);
+            }
+        }
+
+        // Cache configurations by productId
+        const productConfigsCache = new Map();
+
+        // Load configurations for a product
+        async function loadProductConfigurations(productId) {
+            if (productConfigsCache.has(productId)) {
+                return productConfigsCache.get(productId);
+            }
+
+            try {
+                const listProductApiBase = window.LIST_PRODUCT_API_BASE || `${API_BASE}/api/ListProductAPI`;
+                const response = await fetch(`${listProductApiBase}/detail/${productId}`, { credentials: 'same-origin' });
+                if (!response.ok) return [];
+                const data = await response.json();
+                const configs = data.configurations || [];
+                productConfigsCache.set(productId, configs);
+                return configs;
+            } catch (err) {
+                console.error('loadProductConfigurations error:', err);
+                return [];
+            }
+        }
+
+        // Render giỏ hàng
+        async function renderCart(items, totalAmount) {
+            const $body = $('#cartTableBody');
+            if (!items || items.length === 0) {
+                $body.html('<tr><td colspan="6" class="text-center text-muted">Giỏ hàng trống</td></tr>');
+                $('.number-text').text('0 ₫');
+                return;
+            }
+
+            // Load configurations cho tất cả sản phẩm
+            const productIds = [...new Set(items.map(item => item.productId))];
+            await Promise.all(productIds.map(id => loadProductConfigurations(id)));
+
+            const rows = await Promise.all(items.map(async (item) => {
+                const imageUrl = getBackendImageUrl(item.productImage);
+                const configs = productConfigsCache.get(item.productId) || [];
+                const currentConfigId = item.configurationId || null;
+                const basePrice = item.basePrice || item.price;
+                
+                // Tìm cấu hình hiện tại để hiển thị
+                const currentConfig = currentConfigId ? configs.find(c => c.configurationId === currentConfigId) : null;
+                const currentConfigPrice = currentConfig?.price || 0;
+                const currentPrice = basePrice + currentConfigPrice;
+                
+                // Tạo dropdown cấu hình
+                let configSelectHtml = '';
+                const maxQuantity = currentConfig?.quantity || 999;
+                
+                if (configs.length > 0) {
+                    configSelectHtml = `
+                        <select class="form-select form-select-sm config-select" 
+                                data-cart-detail-id="${item.cartDetailId}" 
+                                data-product-id="${item.productId}"
+                                data-base-price="${basePrice}"
+                                style="font-size: 0.9rem; min-width: 200px;">
+                            ${configs.map(config => {
+                                const configId = config.configurationId || '';
+                                const configText = [
+                                    config.cpu, 
+                                    config.ram, 
+                                    config.rom || config.storage, 
+                                    config.card || config.gpu
+                                ].filter(Boolean).join(' / ') || 'Cấu hình';
+                                const selected = configId === currentConfigId ? 'selected' : '';
+                                const configQuantity = config.quantity || 999;
+                                return `<option value="${configId}" data-config-price="${config.price || 0}" data-config-quantity="${configQuantity}" ${selected}>${configText}</option>`;
+                            }).join('')}
+                        </select>`;
+                } else {
+                    configSelectHtml = '<span class="text-muted">Không có cấu hình</span>';
+                }
+                
+                const productNameDisplay = item.productModel 
+                    ? `${item.productName || 'N/A'} ${item.productModel}` 
+                    : (item.productName || 'N/A');
+                const productDetailUrl = `/Home/ProductDetail?id=${encodeURIComponent(item.productId)}`;
+                
+                return `
+                    <tr data-cart-detail-id="${item.cartDetailId}" data-product-id="${item.productId}" data-base-price="${basePrice}" data-max-quantity="${maxQuantity}">
+                        <td>
+                            <a href="${productDetailUrl}" style="text-decoration: none;">
+                                <img src="${imageUrl}" class="img-fluid rounded" style="width: 100px; height: 100px; object-fit: cover; cursor: pointer;" alt="${item.productName}" onerror="this.src='${defaultProductImage}'">
+                            </a>
+                        </td>
+                        <td>
+                            <p class="mb-0"><strong>${productNameDisplay}</strong></p>
+                        </td>
+                        <td>
+                            ${configSelectHtml}
+                        </td>
+                        <td>
+                            <p class="mb-0 item-price" data-cart-detail-id="${item.cartDetailId}">${formatCurrency(currentPrice)}</p>
+                        </td>
+                        <td>
+                            <div class="input-group quantity" style="width: 120px;">
+                                <div class="input-group-btn">
+                                    <button class="btn btn-sm btn-minus rounded-circle bg-light border" data-cart-detail-id="${item.cartDetailId}">
+                                        <i class="fa fa-minus"></i>
+                                    </button>
+                                </div>
+                                <input type="text" class="form-control form-control-sm text-center border-0 quantity-input" 
+                                       value="${item.quantity}" 
+                                       data-cart-detail-id="${item.cartDetailId}" 
+                                       data-max-quantity="${maxQuantity}"
+                                       readonly>
+                                <div class="input-group-btn">
+                                    <button class="btn btn-sm btn-plus rounded-circle bg-light border" data-cart-detail-id="${item.cartDetailId}">
+                                        <i class="fa fa-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <small class="text-muted max-quantity-note" data-cart-detail-id="${item.cartDetailId}" style="font-size: 0.75rem; display: block; margin-top: 4px;">
+                                ${maxQuantity < 999 ? `Số lượng tối đa: ${maxQuantity}` : ''}
+                            </small>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm rounded-circle bg-light border btn-remove" data-cart-detail-id="${item.cartDetailId}" title="Xóa sản phẩm">
+                                <i class="fa fa-times text-danger"></i>
+                            </button>
+                        </td>
+                    </tr>`;
+            }));
+
+            $body.html(rows.join(''));
+            $('.number-text').text(formatCurrency(totalAmount));
+        }
+
+        // Cập nhật số lượng và thành tiền ngay lập tức
+        async function updateQuantity(cartDetailId, newQuantity) {
+            // Kiểm tra min = 1
+            if (newQuantity < 1) {
+                return;
+            }
+
+            // Kiểm tra max quantity từ cấu hình
+            const $input = $(`.quantity-input[data-cart-detail-id="${cartDetailId}"]`);
+            const maxQuantity = parseInt($input.data('max-quantity')) || 999;
+            
+            if (newQuantity > maxQuantity) {
+                $input.val(maxQuantity);
+                newQuantity = maxQuantity;
+            }
+
+            // Cập nhật ghi chú số lượng tối đa (nếu cần)
+            const $note = $(`.max-quantity-note[data-cart-detail-id="${cartDetailId}"]`);
+            if (maxQuantity < 999) {
+                $note.text(`Số lượng tối đa: ${maxQuantity}`).show();
+            } else {
+                $note.hide();
+            }
+
+            // Cập nhật tổng tiền
+            updateTotalAmount();
+
+            // Gửi request cập nhật lên server
+            try {
+                const response = await fetch(`${CART_API_BASE}/update`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        cartDetailId: cartDetailId,
+                        quantity: newQuantity
+                    })
+                });
+                
+                const responseText = await response.text();
+                let data = {};
+                if (responseText && responseText.trim()) {
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (parseErr) {
+                        console.error('JSON parse error:', parseErr);
+                    }
+                }
+                
+                if (!response.ok) {
+                    throw new Error(data?.message || 'Không thể cập nhật');
+                }
+                // Reload để đảm bảo đồng bộ
+                loadCart();
+            } catch (err) {
+                console.error('updateQuantity error:', err);
+                showAlert('danger', err.message || 'Không thể cập nhật số lượng');
+                // Reload lại nếu có lỗi
+                loadCart();
+            }
+        }
+
+        // Cập nhật cấu hình và giá ngay lập tức
+        async function updateConfiguration(cartDetailId, productId, configurationId, configPrice, configQuantity) {
+            const $row = $(`tr[data-cart-detail-id="${cartDetailId}"]`);
+            const basePrice = parseFloat($row.data('base-price')) || 0;
+            const $input = $(`.quantity-input[data-cart-detail-id="${cartDetailId}"]`);
+            let quantity = parseInt($input.val()) || 1;
+            const newPrice = basePrice + (configPrice || 0);
+            const maxQuantity = configQuantity || 999;
+
+            // Cập nhật max quantity
+            $row.data('max-quantity', maxQuantity);
+            $input.data('max-quantity', maxQuantity);
+
+            // Cập nhật ghi chú số lượng tối đa
+            const $note = $(`.max-quantity-note[data-cart-detail-id="${cartDetailId}"]`);
+            if (maxQuantity < 999) {
+                $note.text(`Số lượng tối đa: ${maxQuantity}`).show();
+            } else {
+                $note.hide();
+            }
+
+            // Kiểm tra và điều chỉnh số lượng nếu vượt quá max
+            if (quantity > maxQuantity) {
+                quantity = maxQuantity;
+                $input.val(quantity);
+            }
+
+            // Cập nhật giá ngay lập tức
+            $(`.item-price[data-cart-detail-id="${cartDetailId}"]`).text(formatCurrency(newPrice));
+
+            // Cập nhật tổng tiền
+            updateTotalAmount();
+
+            // Gửi request cập nhật lên server
+            try {
+                const response = await fetch(`${CART_API_BASE}/update`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        cartDetailId: cartDetailId,
+                        configurationId: configurationId || null,
+                        quantity: parseInt($input.val()) || 1
+                    })
+                });
+                
+                const responseText = await response.text();
+                let data = {};
+                if (responseText && responseText.trim()) {
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (parseErr) {
+                        console.error('JSON parse error:', parseErr);
+                    }
+                }
+                
+                if (!response.ok) {
+                    // Nếu lỗi, reload lại giỏ hàng
+                    throw new Error(data?.message || 'Không thể cập nhật cấu hình');
+                }
+                // Reload để đảm bảo đồng bộ
+                loadCart();
+            } catch (err) {
+                console.error('updateConfiguration error:', err);
+                showAlert('danger', err.message || 'Không thể cập nhật cấu hình');
+                // Reload lại nếu có lỗi
+                loadCart();
+            }
+        }
+
+        // Cập nhật tổng tiền
+        function updateTotalAmount() {
+            let total = 0;
+            $('tr[data-cart-detail-id]').each(function() {
+                const $row = $(this);
+                const priceText = $row.find('.item-price').text().replace(/[^\d]/g, '');
+                const price = parseInt(priceText) || 0;
+                const quantity = parseInt($row.find('.quantity-input').val()) || 0;
+                total += price * quantity;
+            });
+            $('.number-text').text(formatCurrency(total));
+        }
+
+        // Xóa sản phẩm
+        async function removeItem(cartDetailId) {
+            if (!confirm('Bạn có chắc muốn xóa sản phẩm này khỏi giỏ hàng?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${CART_API_BASE}/remove/${cartDetailId}`, {
+                    method: 'DELETE'
+                });
+                
+                const responseText = await response.text();
+                let data = {};
+                if (responseText && responseText.trim()) {
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (parseErr) {
+                        console.error('JSON parse error:', parseErr);
+                    }
+                }
+                
+                if (!response.ok) throw new Error(data?.message || 'Không thể xóa');
+                showAlert('success', 'Đã xóa sản phẩm khỏi giỏ hàng');
+                loadCart();
+            } catch (err) {
+                console.error('removeItem error:', err);
+                showAlert('danger', err.message || 'Không thể xóa sản phẩm');
+            }
+        }
+
+        // Event handlers
+        $(document).on('click', '.btn-minus', async function () {
+            const cartDetailId = $(this).data('cart-detail-id');
+            const $input = $(`.quantity-input[data-cart-detail-id="${cartDetailId}"]`);
+            const currentQty = parseInt($input.val()) || 1;
+            if (currentQty > 1) {
+                await updateQuantity(cartDetailId, currentQty - 1);
+            }
+        });
+
+        $(document).on('click', '.btn-plus', async function () {
+            const cartDetailId = $(this).data('cart-detail-id');
+            const $input = $(`.quantity-input[data-cart-detail-id="${cartDetailId}"]`);
+            const currentQty = parseInt($input.val()) || 1;
+            const maxQuantity = parseInt($input.data('max-quantity')) || 999;
+            
+            if (currentQty < maxQuantity) {
+                await updateQuantity(cartDetailId, currentQty + 1);
+            }
+        });
+
+        $(document).on('click', '.btn-remove', function () {
+            const cartDetailId = $(this).data('cart-detail-id');
+            removeItem(cartDetailId);
+        });
+
+        $(document).on('change', '.config-select', function () {
+            const cartDetailId = $(this).data('cart-detail-id');
+            const productId = $(this).data('product-id');
+            const configurationId = $(this).val() || null;
+            const selectedOption = $(this).find('option:selected');
+            const configPrice = parseFloat(selectedOption.data('config-price')) || 0;
+            const configQuantity = parseInt(selectedOption.data('config-quantity')) || 999;
+            updateConfiguration(cartDetailId, productId, configurationId, configPrice, configQuantity);
+        });
+
+        // Initialize
+        $(document).ready(function () {
+            loadCart();
+        });
+    })(jQuery);
+</script>
+}
+
+<!-- Cart Page Start -->
+        <div class="container-fluid py-5">
+            <div class="container py-5">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                          <tr>
+                            <th scope="col">Ảnh sản phẩm</th>
+                            <th scope="col">Tên sản phẩm</th>
+                            <th scope="col">Cấu hình</th>
+                            <th scope="col">Giá</th>
+                            <th scope="col">Số lượng</th>
+                            <th scope="col">Thao tác</th>
+                          </tr>
+                        </thead>
+                        <tbody id="cartTableBody">
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">Đang tải giỏ hàng...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="row g-4 align-items-center mt-5">
+                <!-- cột trái 4/12 -->
+                <div class="col-12 col-md-6">
+                    <div class="d-flex align-items-center w-100 px-5">
+                        <div class="col-8 pe-3">
+                            <input type="text"
+                                class="form-control border-0 border-bottom rounded py-3"
+                                placeholder="Mã giảm giá" style="box-shadow:none;">
+                        </div>
+
+                        <div class="col-4">
+                            <button class="btn w-100 border-secondary rounded-pill px-4 py-3 text-primary">
+                                Áp dụng mã
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- cột phải 8/12 -->
+                <div class="col-12 col-md-6">
+                    <div class="bg-light rounded">
+                    <div class="p-4">
+                        <div class="d-flex justify-content-between mb-4">
+                        <h3 class="mb-0 me-4">Tạm tính: </h3>
+                        <p class="mb-0 number-text" style="font-size: x-large">0 ₫</p>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-center">
+                        <button class="btn border-secondary rounded-pill px-5 py-3 text-primary text-uppercase mb-4" type="button" onclick="window.location.href='/Cart/Checkout'">
+                        Thanh toán
+                    </button>
+                    </div>
+                    </div>
+                </div>
+                </div>
+            </div>
+        </div>
+        <!-- Cart Page End -->
