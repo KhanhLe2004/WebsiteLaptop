@@ -26,6 +26,16 @@
         const CHECKOUT_API_BASE = `${API_BASE}/api/Checkout`;
         const CART_API_BASE = `${API_BASE}/api/Cart`;
         const ADDRESS_API_BASE = window.ADDRESS_API_BASE || `${API_BASE}/api/Address`;
+        const backendImageBase = `${API_BASE}/image/`;
+        const defaultProductImage = "/image/default-laptop.jpg";
+
+        // Helper function để lấy URL ảnh từ backend
+        function getBackendImageUrl(fileName) {
+            if (!fileName || typeof fileName !== "string" || !fileName.trim()) {
+                return defaultProductImage;
+            }
+            return backendImageBase + encodeURIComponent(fileName.trim());
+        }
 
         // Lấy customerId từ session
         function getCustomerId() {
@@ -156,15 +166,18 @@
             }
 
             const rows = items.map(item => {
-                const imageUrl = item.productImage || '../LaptopFe/img/product-default.jpg';
+                const imageUrl = getBackendImageUrl(item.productImage);
+                const productNameDisplay = item.productModel 
+                    ? `${item.productName || 'N/A'} ${item.productModel}` 
+                    : (item.productName || 'N/A');
                 return `
                     <tr>
                         <th scope="row">
                             <div class="d-flex align-items-center mt-2">
-                                <img src="${imageUrl}" class="img-fluid rounded-circle" style="width: 90px; height: 90px; object-fit: cover;" alt="${item.productName}" onerror="this.src='../LaptopFe/img/product-default.jpg'">
+                                <img src="${imageUrl}" class="img-fluid" style="width: 90px; height: 90px; object-fit: cover;" alt="${item.productName}" onerror="this.src='${defaultProductImage}'">
                             </div>
                         </th>
-                        <td class="py-5">${item.productName || 'N/A'}</td>
+                        <td class="py-5">${productNameDisplay}</td>
                         <td class="py-5 number-text">${formatCurrency(item.price)}</td>
                         <td class="py-5">${item.quantity}</td>
                         <td class="py-5 number-text">${formatCurrency(item.subtotal)}</td>
@@ -216,29 +229,121 @@
             }
         }
 
+        // Hiển thị lỗi validation dưới từng ô
+        function showFieldError(fieldId, message) {
+            const $field = $(fieldId);
+            const errorId = fieldId.substring(1) + '-error';
+            const $error = $('#' + errorId);
+            if ($error.length) {
+                $error.remove();
+            }
+            if (message) {
+                $field.after(`<div class="text-danger small mt-1" id="${errorId}">${message}</div>`);
+                $field.addClass('is-invalid');
+            } else {
+                $field.removeClass('is-invalid');
+            }
+        }
+
+        // Hiển thị lỗi cho phương thức thanh toán
+        function showPaymentMethodError(message) {
+            const errorId = 'payment-method-error';
+            const $error = $('#' + errorId);
+            if ($error.length) {
+                $error.remove();
+            }
+            if (message) {
+                $('.form-check').last().after(`<div class="text-danger small mt-1" id="${errorId}">${message}</div>`);
+            }
+        }
+
+        // Xóa tất cả lỗi validation
+        function clearAllErrors() {
+            $('.is-invalid').removeClass('is-invalid');
+            $('[id$="-error"]').remove();
+            showPaymentMethodError('');
+        }
+
         // Xử lý submit form
         async function handleCheckout(e) {
             e.preventDefault();
             
-            const fullName = ($('#checkoutLastName').val() + ' ' + $('#checkoutFirstName').val()).trim();
+            // Xóa tất cả lỗi cũ
+            clearAllErrors();
+            
+            const lastName = $('#checkoutLastName').val()?.toString().trim();
+            const firstName = $('#checkoutFirstName').val()?.toString().trim();
+            const fullName = (lastName + ' ' + firstName).trim();
             const phone = $('#checkoutPhone').val()?.toString().trim();
             const email = $('#checkoutEmail').val()?.toString().trim();
             const detailAddress = $('#checkoutAddress').val()?.toString().trim();
-            const provinceName = $('#checkoutProvince option:selected').text();
-            const wardName = $('#checkoutWard option:selected').text();
+            const province = $('#checkoutProvince').val();
+            const ward = $('#checkoutWard').val();
             const paymentMethod = $('input[name="PaymentMethod"]:checked').val();
             const note = $('#checkoutNote').val()?.toString().trim();
 
-            // Validate
-            if (!fullName || !phone || !email || !detailAddress) {
-                showAlert('danger', 'Vui lòng nhập đầy đủ thông tin bắt buộc');
-                return;
+            let hasError = false;
+
+            // Validate từng trường
+            if (!lastName) {
+                showFieldError('#checkoutLastName', 'Vui lòng nhập họ');
+                hasError = true;
+            }
+            
+            if (!firstName) {
+                showFieldError('#checkoutFirstName', 'Vui lòng nhập tên');
+                hasError = true;
+            }
+
+            if (!phone) {
+                showFieldError('#checkoutPhone', 'Vui lòng nhập số điện thoại');
+                hasError = true;
+            } else if (!new RegExp('^\\d{9,15}$').test(phone)) {
+                showFieldError('#checkoutPhone', 'Số điện thoại không hợp lệ (9-15 chữ số)');
+                hasError = true;
+            }
+
+            if (!email) {
+                showFieldError('#checkoutEmail', 'Vui lòng nhập email');
+                hasError = true;
+            } else {
+                const atSymbol = String.fromCharCode(64);
+                const atIndex = email.indexOf(atSymbol);
+                const dotIndex = email.lastIndexOf('.');
+                if (atIndex <= 0 || dotIndex <= atIndex + 1 || dotIndex >= email.length - 1) {
+                    showFieldError('#checkoutEmail', 'Email không hợp lệ');
+                    hasError = true;
+                }
+            }
+
+            if (!detailAddress) {
+                showFieldError('#checkoutAddress', 'Vui lòng nhập địa chỉ chi tiết');
+                hasError = true;
+            }
+
+            if (!province) {
+                showFieldError('#checkoutProvince', 'Vui lòng chọn tỉnh/thành phố');
+                hasError = true;
+            }
+
+            if (!ward) {
+                showFieldError('#checkoutWard', 'Vui lòng chọn xã/phường');
+                hasError = true;
             }
 
             if (!paymentMethod) {
-                showAlert('danger', 'Vui lòng chọn phương thức thanh toán');
+                showPaymentMethodError('Vui lòng chọn phương thức thanh toán');
+                hasError = true;
+            } else {
+                showPaymentMethodError('');
+            }
+
+            if (hasError) {
                 return;
             }
+
+            const provinceName = $('#checkoutProvince option:selected').text();
+            const wardName = $('#checkoutWard option:selected').text();
 
             // Ghép địa chỉ
             let deliveryAddress = detailAddress;
@@ -271,10 +376,10 @@
                 const data = await response.json();
                 if (!response.ok) throw new Error(data?.message || 'Không thể đặt hàng');
                 
-                showAlert('success', 'Đặt hàng thành công! Mã đơn hàng: ' + (data.orderId || ''));
+                alert('Đặt hàng thành công!');
                 setTimeout(() => {
-                    window.location.href = '/User/Account';
-                }, 2000);
+                    window.location.href = '/User/Account#tab-your-orders';
+                }, 500);
             } catch (err) {
                 console.error('handleCheckout error:', err);
                 showAlert('danger', err.message || 'Không thể đặt hàng');
@@ -289,9 +394,36 @@
             loadCart();
             loadCustomerInfo();
 
+            // Xóa lỗi khi người dùng nhập
+            $('#checkoutLastName, #checkoutFirstName').on('input', function() {
+                showFieldError('#' + this.id, '');
+            });
+            
+            $('#checkoutPhone').on('input', function() {
+                showFieldError('#checkoutPhone', '');
+            });
+            
+            $('#checkoutEmail').on('input', function() {
+                showFieldError('#checkoutEmail', '');
+            });
+            
+            $('#checkoutAddress').on('input', function() {
+                showFieldError('#checkoutAddress', '');
+            });
+            
             $('#checkoutProvince').on('change', function () {
                 loadWardsByProvince(this.value);
+                showFieldError('#checkoutProvince', '');
             });
+            
+            $('#checkoutWard').on('change', function() {
+                showFieldError('#checkoutWard', '');
+            });
+            
+            $('input[name="PaymentMethod"]').on('change', function() {
+                showPaymentMethodError('');
+            });
+
 
             $('#btnPlaceOrder').on('click', handleCheckout);
         });
@@ -428,6 +560,7 @@
                                         <input type="radio" class="form-check-input bg-primary border-0" id="Payment-COD" name="PaymentMethod" value="COD">
                                         <label class="form-check-label" for="Payment-COD">Thanh toán khi nhận hàng</label>
                                     </div>
+                                    <div id="payment-method-error"></div>
                                 </div>
                             </div>
 

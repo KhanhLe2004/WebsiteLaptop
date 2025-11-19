@@ -105,6 +105,7 @@ namespace WebLaptopBE.Controllers
                         cartDetailId = cd.CartDetailId,
                         productId = cd.ProductId,
                         productName = cd.Product?.ProductName ?? "",
+                        productModel = cd.Product?.ProductModel ?? "",
                         productImage = cd.Product?.Avatar ?? "",
                         brandName = cd.Product?.Brand?.BrandName ?? "",
                         basePrice = cd.Product?.SellingPrice ?? 0,

@@ -200,13 +200,20 @@
                     configSelectHtml = '<span class="text-muted">Không có cấu hình</span>';
                 }
                 
+                const productNameDisplay = item.productModel 
+                    ? `${item.productName || 'N/A'} ${item.productModel}` 
+                    : (item.productName || 'N/A');
+                const productDetailUrl = `/Home/ProductDetail?id=${encodeURIComponent(item.productId)}`;
+                
                 return `
                     <tr data-cart-detail-id="${item.cartDetailId}" data-product-id="${item.productId}" data-base-price="${basePrice}" data-max-quantity="${maxQuantity}">
                         <td>
-                            <img src="${imageUrl}" class="img-fluid rounded" style="width: 100px; height: 100px; object-fit: cover;" alt="${item.productName}" onerror="this.src='${defaultProductImage}'">
+                            <a href="${productDetailUrl}" style="text-decoration: none;">
+                                <img src="${imageUrl}" class="img-fluid rounded" style="width: 100px; height: 100px; object-fit: cover; cursor: pointer;" alt="${item.productName}" onerror="this.src='${defaultProductImage}'">
+                            </a>
                         </td>
                         <td>
-                            <p class="mb-0"><strong>${item.productName || 'N/A'}</strong></p>
+                            <p class="mb-0"><strong>${productNameDisplay}</strong></p>
                         </td>
                         <td>
                             ${configSelectHtml}
@@ -232,6 +239,9 @@
                                     </button>
                                 </div>
                             </div>
+                            <small class="text-muted max-quantity-note" data-cart-detail-id="${item.cartDetailId}" style="font-size: 0.75rem; display: block; margin-top: 4px;">
+                                ${maxQuantity < 999 ? `Số lượng tối đa: ${maxQuantity}` : ''}
+                            </small>
                         </td>
                         <td>
                             <button class="btn btn-sm rounded-circle bg-light border btn-remove" data-cart-detail-id="${item.cartDetailId}" title="Xóa sản phẩm">
@@ -249,7 +259,6 @@
         async function updateQuantity(cartDetailId, newQuantity) {
             // Kiểm tra min = 1
             if (newQuantity < 1) {
-                showAlert('warning', 'Số lượng tối thiểu là 1');
                 return;
             }
 
@@ -258,9 +267,16 @@
             const maxQuantity = parseInt($input.data('max-quantity')) || 999;
             
             if (newQuantity > maxQuantity) {
-                showAlert('warning', `Số lượng tối đa là ${maxQuantity}`);
                 $input.val(maxQuantity);
                 newQuantity = maxQuantity;
+            }
+
+            // Cập nhật ghi chú số lượng tối đa (nếu cần)
+            const $note = $(`.max-quantity-note[data-cart-detail-id="${cartDetailId}"]`);
+            if (maxQuantity < 999) {
+                $note.text(`Số lượng tối đa: ${maxQuantity}`).show();
+            } else {
+                $note.hide();
             }
 
             // Cập nhật tổng tiền
@@ -276,7 +292,17 @@
                         quantity: newQuantity
                     })
                 });
-                const data = await response.json();
+                
+                const responseText = await response.text();
+                let data = {};
+                if (responseText && responseText.trim()) {
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (parseErr) {
+                        console.error('JSON parse error:', parseErr);
+                    }
+                }
+                
                 if (!response.ok) {
                     throw new Error(data?.message || 'Không thể cập nhật');
                 }
@@ -303,11 +329,18 @@
             $row.data('max-quantity', maxQuantity);
             $input.data('max-quantity', maxQuantity);
 
+            // Cập nhật ghi chú số lượng tối đa
+            const $note = $(`.max-quantity-note[data-cart-detail-id="${cartDetailId}"]`);
+            if (maxQuantity < 999) {
+                $note.text(`Số lượng tối đa: ${maxQuantity}`).show();
+            } else {
+                $note.hide();
+            }
+
             // Kiểm tra và điều chỉnh số lượng nếu vượt quá max
             if (quantity > maxQuantity) {
                 quantity = maxQuantity;
                 $input.val(quantity);
-                showAlert('info', `Số lượng đã được điều chỉnh về ${maxQuantity} (tối đa của cấu hình này)`);
             }
 
             // Cập nhật giá ngay lập tức
@@ -327,7 +360,17 @@
                         quantity: parseInt($input.val()) || 1
                     })
                 });
-                const data = await response.json();
+                
+                const responseText = await response.text();
+                let data = {};
+                if (responseText && responseText.trim()) {
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (parseErr) {
+                        console.error('JSON parse error:', parseErr);
+                    }
+                }
+                
                 if (!response.ok) {
                     // Nếu lỗi, reload lại giỏ hàng
                     throw new Error(data?.message || 'Không thể cập nhật cấu hình');
@@ -365,7 +408,17 @@
                 const response = await fetch(`${CART_API_BASE}/remove/${cartDetailId}`, {
                     method: 'DELETE'
                 });
-                const data = await response.json();
+                
+                const responseText = await response.text();
+                let data = {};
+                if (responseText && responseText.trim()) {
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (parseErr) {
+                        console.error('JSON parse error:', parseErr);
+                    }
+                }
+                
                 if (!response.ok) throw new Error(data?.message || 'Không thể xóa');
                 showAlert('success', 'Đã xóa sản phẩm khỏi giỏ hàng');
                 loadCart();
@@ -382,8 +435,6 @@
             const currentQty = parseInt($input.val()) || 1;
             if (currentQty > 1) {
                 await updateQuantity(cartDetailId, currentQty - 1);
-            } else {
-                showAlert('warning', 'Số lượng tối thiểu là 1');
             }
         });
 
@@ -395,8 +446,6 @@
             
             if (currentQty < maxQuantity) {
                 await updateQuantity(cartDetailId, currentQty + 1);
-            } else {
-                showAlert('warning', `Số lượng tối đa là ${maxQuantity}`);
             }
         });
 
