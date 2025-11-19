@@ -25,7 +25,72 @@ namespace WebLaptopFE.Areas.Admin.Controllers
                 return;
             }
 
+            // Lấy RoleId từ session
+            var roleId = HttpContext.Session.GetString("RoleId");
+
+            // Lưu RoleId vào ViewBag để sử dụng trong view
+            ViewBag.RoleId = roleId;
+
+            // Kiểm tra quyền truy cập
+            if (!PermissionHelper.HasPermission(roleId, controllerName))
+            {
+                TempData["ErrorMessage"] = "Bạn không có quyền truy cập trang này.";
+                context.Result = RedirectToAction("Index", "Dashboard", new { area = "Admin" });
+                return;
+            }
+
             base.OnActionExecuting(context);
+        }
+    }
+
+    /// <summary>
+    /// Helper class để kiểm tra quyền truy cập
+    /// </summary>
+    public static class PermissionHelper
+    {
+        /// <summary>
+        /// Kiểm tra quyền truy cập dựa trên RoleId và Controller name
+        /// </summary>
+        public static bool HasPermission(string? roleId, string? controllerName)
+        {
+            // Nếu không có RoleId, từ chối truy cập
+            if (string.IsNullOrEmpty(roleId) || string.IsNullOrEmpty(controllerName))
+            {
+                return false;
+            }
+
+            // Dashboard và ManageProfile: Tất cả nhân viên đều có quyền truy cập
+            if (controllerName == "Dashboard" || controllerName == "ManageProfile")
+            {
+                return true;
+            }
+
+            // ADM và CCH: Quyền truy cập tất cả các trang
+            if (roleId == "ADM" || roleId == "CCH")
+            {
+                return true;
+            }
+
+            // ST (Nhân viên kho): Quyền truy cập Quản lý nhập hàng và Quản lý xuất hàng
+            if (roleId == "ST")
+            {
+                return controllerName == "ManageStockImport" || controllerName == "ManageStockExport";
+            }
+
+            // TE (Kỹ thuật viên): Quyền truy cập Quản lý bảo hành
+            if (roleId == "TE")
+            {
+                return controllerName == "ManageWarranty";
+            }
+
+            // SL (Nhân viên bán hàng): Quyền truy cập Quản lý hóa đơn
+            if (roleId == "SL")
+            {
+                return controllerName == "ManageSaleInvoice";
+            }
+
+            // Các RoleId khác không có quyền truy cập
+            return false;
         }
     }
 }

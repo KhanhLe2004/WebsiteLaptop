@@ -27,7 +27,8 @@
                         @Html.AntiForgeryToken()
                         
                         <div class="row">
-                            <div class="col-md-12 text-center mb-4">
+                            <!-- Avatar bên trái -->
+                            <div class="col-md-3 mb-4 d-flex justify-content-center align-items-start">
                                 <div class="position-relative d-inline-block">
                                     <img id="avatarPreview" src="/LayoutAdmin/assets/img/default-avatar.png" 
                                          alt="Avatar" 
@@ -39,92 +40,109 @@
                                     <input type="file" id="avatarFile" name="avatarFile" accept="image/*" style="display: none;">
                                 </div>
                             </div>
+                            
+                            <!-- Thông tin bên phải - 2 cột -->
+                            <div class="col-md-9">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="input-group input-group-outline mb-3">
+                                            <label class="form-label">Mã nhân viên</label>
+                                            <input type="text" id="employeeIdDisplay" class="form-control" value="@ViewBag.EmployeeId" readonly disabled>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="input-group input-group-outline mb-3">
+                                            <label class="form-label">Tên nhân viên *</label>
+                                            <input type="text" class="form-control" id="employeeName" name="employeeName" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="input-group input-group-outline mb-3">
+                                            <label class="form-label">Ngày sinh</label>
+                                            <input type="date" class="form-control" id="dateOfBirth" name="dateOfBirth">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="input-group input-group-outline mb-3">
+                                            <label class="form-label">Số điện thoại</label>
+                                            <input type="text" class="form-control" id="phoneNumber" name="phoneNumber">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="input-group input-group-outline mb-3">
+                                            <label class="form-label">Email</label>
+                                            <input type="email" class="form-control" id="email" name="email">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="input-group input-group-outline mb-3">
+                                            <label class="form-label">Vai trò</label>
+                                            <input type="text" id="roleIdDisplay" class="form-control" readonly disabled>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="input-group input-group-outline mb-3">
+                                            <label class="form-label">Tên đăng nhập</label>
+                                            <input type="text" class="form-control" id="username" readonly disabled>
+                                            <input type="hidden" id="usernameValue" name="username">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="input-group input-group-outline mb-3 autocomplete-wrapper position-relative w-100">
+                                            <label class="form-label">Tỉnh/Thành</label>
+                                            <input type="text" id="provinceCode" class="form-control" autocomplete="off">
+                                            <input type="hidden" id="provinceCodeValue" name="provinceCode">
+                                            <div id="provinceCodeDropdown" class="autocomplete-dropdown"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="input-group input-group-outline mb-3 autocomplete-wrapper position-relative w-100">
+                                            <label class="form-label">Phường/Xã</label>
+                                            <input type="text" id="communeCode" class="form-control" autocomplete="off" disabled>
+                                            <input type="hidden" id="communeCodeValue" name="communeCode">
+                                            <div id="communeCodeDropdown" class="autocomplete-dropdown"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <div class="input-group input-group-outline mb-3">
+                                            <label class="form-label">Địa chỉ cụ thể</label>
+                                            <input type="text" class="form-control" id="addressDetail" name="addressDetail"
+                                                   placeholder="Số nhà, tên đường, v.v.">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row mt-4">
+                                    <div class="col-md-12 text-center">
+                                        <button type="submit" class="btn bg-gradient-primary">
+                                            <i class="material-icons text-sm">save</i> Lưu thông tin
+                                        </button>
+                                        <button type="button" class="btn bg-gradient-secondary ms-2" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+                                            <i class="material-icons text-sm">lock</i> Đổi mật khẩu
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="input-group input-group-outline mb-3">
-                                    <label class="form-label">Mã nhân viên</label>
-                                    <input type="text" id="employeeIdDisplay" class="form-control" value="@ViewBag.EmployeeId" readonly disabled>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="input-group input-group-outline mb-3">
-                                    <label class="form-label">Tên nhân viên *</label>
-                                    <input type="text" class="form-control" id="employeeName" name="employeeName" required>
-                                </div>
-                            </div>
-                        </div>
+                        
 
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="input-group input-group-outline mb-3">
-                                    <label class="form-label">Ngày sinh</label>
-                                    <input type="date" class="form-control" id="dateOfBirth" name="dateOfBirth">
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="input-group input-group-outline mb-3">
-                                    <label class="form-label">Số điện thoại</label>
-                                    <input type="text" class="form-control" id="phoneNumber" name="phoneNumber">
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="input-group input-group-outline mb-3">
-                                    <label class="form-label">Email</label>
-                                    <input type="email" class="form-control" id="email" name="email">
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="input-group input-group-outline mb-3">
-                                    <label class="form-label">Tên đăng nhập</label>
-                                    <input type="text" class="form-control" id="username" name="username">
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="input-group input-group-outline mb-3 autocomplete-wrapper position-relative w-100">
-                                    <label class="form-label">Tỉnh/Thành</label>
-                                        <input type="text" id="provinceCode" class="form-control" autocomplete="off">
-                                        <input type="hidden" id="provinceCodeValue" name="provinceCode">
-                                        <div id="provinceCodeDropdown" class="autocomplete-dropdown"></div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="input-group input-group-outline mb-3 autocomplete-wrapper position-relative w-100">
-                                    <label class="form-label">Phường/Xã</label>
-                                    <input type="text" id="communeCode" class="form-control" autocomplete="off" disabled>
-                                    <input type="hidden" id="communeCodeValue" name="communeCode">
-                                    <div id="communeCodeDropdown" class="autocomplete-dropdown"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-12">
-                                <div class="input-group input-group-outline mb-3">
-                                    <label class="form-label">Địa chỉ cụ thể</label>
-                                    <input type="text" class="form-control" id="addressDetail" name="addressDetail" 
-                                           placeholder="Số nhà, tên đường, v.v.">
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row mt-4">
-                            <div class="col-md-12 text-center">
-                                <button type="submit" class="btn bg-gradient-primary">
-                                    <i class="material-icons text-sm">save</i> Lưu thông tin
-                                </button>
-                                <button type="button" class="btn bg-gradient-secondary ms-2" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
-                                    <i class="material-icons text-sm">lock</i> Đổi mật khẩu
-                                </button>
-                            </div>
-                        </div>
+                        
                     </form>
                 </div>
             </div>
@@ -368,6 +386,20 @@
         const communesCache = {};
         var employeeData = @Html.Raw(ViewBag.EmployeeJson ?? "{}");
         var currentEmployeeId = '@ViewBag.EmployeeId' || (employeeData && employeeData.employeeId) || (employeeData && employeeData.id) || '';
+        var sessionRoleId = '@Context.Session.GetString("RoleId")' || '';
+
+        // Hàm map roleId thành tên vai trò
+        function getRoleName(roleId) {
+            if (!roleId) return '';
+            var roleMap = {
+                'ADM': 'Quản trị viên',
+                'CCH': 'Quản lý cửa hàng',
+                'ST': 'Nhân viên kho',
+                'TE': 'Kỹ thuật viên',
+                'SL': 'Nhân viên bán hàng'
+            };
+            return roleMap[roleId] || roleId;
+        }
 
         // Hàm normalize text để so sánh (bỏ dấu)
         function normalizeText(text) {
@@ -466,9 +498,24 @@
             
             if (employeeData.username) {
                 var usernameInput = document.getElementById('username');
+                var usernameValueInput = document.getElementById('usernameValue');
                 if (usernameInput) {
                     usernameInput.value = employeeData.username;
                     inputsToUpdate.push(usernameInput);
+                }
+                if (usernameValueInput) {
+                    usernameValueInput.value = employeeData.username;
+                }
+            }
+            
+            // Hiển thị vai trò
+            var roleDisplayInput = document.getElementById('roleIdDisplay');
+            if (roleDisplayInput) {
+                var roleId = employeeData.roleId || sessionRoleId;
+                if (roleId && roleId.trim() !== '') {
+                    var roleName = getRoleName(roleId);
+                    roleDisplayInput.value = roleName;
+                    inputsToUpdate.push(roleDisplayInput);
                 }
             }
             

@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace WebLaptopFE.Areas.Admin.Controllers
 {
     [Area("Admin")]
-    public class ManageProfileController : Controller
+    public class ManageProfileController : BaseAdminController
     {
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IConfiguration _configuration;
@@ -19,7 +19,7 @@ namespace WebLaptopFE.Areas.Admin.Controllers
         {
             try
             {
-                // Lấy EmployeeId từ session
+                // Lấy EmployeeId từ session (đã được kiểm tra bởi BaseAdminController)
                 var employeeId = HttpContext.Session.GetString("EmployeeId");
                 if (string.IsNullOrEmpty(employeeId))
                 {
@@ -75,7 +75,7 @@ namespace WebLaptopFE.Areas.Admin.Controllers
         {
             try
             {
-                // Lấy EmployeeId từ session
+                // Lấy EmployeeId từ session (đã được kiểm tra bởi BaseAdminController)
                 var employeeId = HttpContext.Session.GetString("EmployeeId");
                 if (string.IsNullOrEmpty(employeeId))
                 {

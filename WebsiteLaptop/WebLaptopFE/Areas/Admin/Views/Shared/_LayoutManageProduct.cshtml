@@ -43,6 +43,32 @@
     <aside class="sidenav navbar navbar-vertical navbar-expand-xs border-0 border-radius-xl my-3 fixed-start ms-3   bg-gradient-dark" id="sidenav-main">
         <hr class="horizontal light mt-0 mb-2">
         <div class="collapse navbar-collapse  w-auto " id="sidenav-collapse-main">
+            @{
+                var roleIdMenu = Context.Session.GetString("RoleId");
+                // Helper function để kiểm tra quyền
+                Func<string, bool> HasPermissionMenu = (controllerName) =>
+                {
+                    if (string.IsNullOrEmpty(roleIdMenu) || string.IsNullOrEmpty(controllerName))
+                        return false;
+                    
+                    if (controllerName == "Dashboard" || controllerName == "ManageProfile")
+                        return true;
+                    
+                    if (roleIdMenu == "ADM" || roleIdMenu == "CCH")
+                        return true;
+                    
+                    if (roleIdMenu == "ST")
+                        return controllerName == "ManageStockImport" || controllerName == "ManageStockExport";
+                    
+                    if (roleIdMenu == "TE")
+                        return controllerName == "ManageWarranty";
+                    
+                    if (roleIdMenu == "SL")
+                        return controllerName == "ManageSaleInvoice";
+                    
+                    return false;
+                };
+            }
             <ul class="navbar-nav">
                 <li class="nav-item">
                     <a class="nav-link text-white" asp-area="Admin" asp-controller="Dashboard" asp-action="Index">
@@ -53,92 +79,235 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white active bg-gradient-primary" asp-area="Admin" asp-controller="ManageProduct" asp-action="Index">
-                        <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
-                            <i class="material-icons opacity-10">inventory_2</i>
-                        </div>
-                        <span class="nav-link-text ms-1">Quản lí sản phẩm</span>
-                    </a>
+                    @if (HasPermissionMenu("ManageProduct"))
+                    {
+                        <a class="nav-link text-white active bg-gradient-primary" asp-area="Admin" asp-controller="ManageProduct" asp-action="Index">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">inventory_2</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí sản phẩm</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="nav-link text-white" style="opacity: 0.5; cursor: not-allowed;">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">inventory_2</i>
+                                <i class="material-icons opacity-10 ms-1" style="font-size: 16px;">lock</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí sản phẩm</span>
+                        </span>
+                    }
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageCustomer" asp-action="Index">
-                        <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
-                            <i class="material-icons opacity-10">people</i>
-                        </div>
-                        <span class="nav-link-text ms-1">Quản lí khách hàng</span>
-                    </a>
+                    @if (HasPermissionMenu("ManageCustomer"))
+                    {
+                        <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageCustomer" asp-action="Index">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">people</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí khách hàng</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="nav-link text-white" style="opacity: 0.5; cursor: not-allowed;">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">people</i>
+                                <i class="material-icons opacity-10 ms-1" style="font-size: 16px;">lock</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí khách hàng</span>
+                        </span>
+                    }
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageEmployee" asp-action="Index">
-                        <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
-                            <i class="material-icons opacity-10">badge</i>
-                        </div>
-                        <span class="nav-link-text ms-1">Quản lí nhân viên</span>
-                    </a>
+                    @if (HasPermissionMenu("ManageEmployee"))
+                    {
+                        <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageEmployee" asp-action="Index">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">badge</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí nhân viên</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="nav-link text-white" style="opacity: 0.5; cursor: not-allowed;">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">badge</i>
+                                <i class="material-icons opacity-10 ms-1" style="font-size: 16px;">lock</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí nhân viên</span>
+                        </span>
+                    }
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageSaleInvoice" asp-action="Index">
-                        <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
-                            <i class="material-icons opacity-10">receipt</i>
-                        </div>
-                        <span class="nav-link-text ms-1">Quản lí hóa đơn</span>
-                    </a>
+                    @if (HasPermissionMenu("ManageSaleInvoice"))
+                    {
+                        <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageSaleInvoice" asp-action="Index">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">receipt</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí hóa đơn</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="nav-link text-white" style="opacity: 0.5; cursor: not-allowed;">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">receipt</i>
+                                <i class="material-icons opacity-10 ms-1" style="font-size: 16px;">lock</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí hóa đơn</span>
+                        </span>
+                    }
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageStockImport" asp-action="Index">
-                        <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
-                            <i class="material-icons opacity-10">inventory</i>
-                        </div>
-                        <span class="nav-link-text ms-1">Quản lí nhập hàng</span>
-                    </a>
+                    @if (HasPermissionMenu("ManageStockImport"))
+                    {
+                        <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageStockImport" asp-action="Index">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">inventory</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí nhập hàng</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="nav-link text-white" style="opacity: 0.5; cursor: not-allowed;">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">inventory</i>
+                                <i class="material-icons opacity-10 ms-1" style="font-size: 16px;">lock</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí nhập hàng</span>
+                        </span>
+                    }
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageStockExport" asp-action="Index">
-                        <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
-                            <i class="material-icons opacity-10">inventory_2</i>
-                        </div>
-                        <span class="nav-link-text ms-1">Quản lí xuất hàng</span>
-                    </a>
+                    @if (HasPermissionMenu("ManageStockExport"))
+                    {
+                        <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageStockExport" asp-action="Index">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">inventory_2</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí xuất hàng</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="nav-link text-white" style="opacity: 0.5; cursor: not-allowed;">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">inventory_2</i>
+                                <i class="material-icons opacity-10 ms-1" style="font-size: 16px;">lock</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí xuất hàng</span>
+                        </span>
+                    }
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageWarranty" asp-action="Index">
-                        <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
-                            <i class="material-icons opacity-10">build</i>
-                        </div>
-                        <span class="nav-link-text ms-1">Quản lí bảo hành</span>
-                    </a>
+                    @if (HasPermissionMenu("ManageWarranty"))
+                    {
+                        <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageWarranty" asp-action="Index">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">build</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí bảo hành</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="nav-link text-white" style="opacity: 0.5; cursor: not-allowed;">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">build</i>
+                                <i class="material-icons opacity-10 ms-1" style="font-size: 16px;">lock</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí bảo hành</span>
+                        </span>
+                    }
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageBrand" asp-action="Index">
-                        <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
-                            <i class="material-icons opacity-10">branding_watermark</i>
-                        </div>
-                        <span class="nav-link-text ms-1">Quản lí thương hiệu</span>
-                    </a>
+                    @if (HasPermissionMenu("ManageBrand"))
+                    {
+                        <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageBrand" asp-action="Index">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">branding_watermark</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí thương hiệu</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="nav-link text-white" style="opacity: 0.5; cursor: not-allowed;">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">branding_watermark</i>
+                                <i class="material-icons opacity-10 ms-1" style="font-size: 16px;">lock</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí thương hiệu</span>
+                        </span>
+                    }
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageSupplier" asp-action="Index">
-                        <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
-                            <i class="material-icons opacity-10">local_shipping</i>
-                        </div>
-                        <span class="nav-link-text ms-1">Quản lí nhà cung cấp</span>
-                    </a>
+                    @if (HasPermissionMenu("ManageSupplier"))
+                    {
+                        <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageSupplier" asp-action="Index">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">local_shipping</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí nhà cung cấp</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="nav-link text-white" style="opacity: 0.5; cursor: not-allowed;">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">local_shipping</i>
+                                <i class="material-icons opacity-10 ms-1" style="font-size: 16px;">lock</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí nhà cung cấp</span>
+                        </span>
+                    }
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white" asp-area="Admin" asp-controller="ManagePromotion" asp-action="Index">
-                        <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
-                            <i class="material-icons opacity-10">local_offer</i>
-                        </div>
-                        <span class="nav-link-text ms-1">Quản lí khuyến mại</span>
-                    </a>
+                    @if (HasPermissionMenu("ManagePromotion"))
+                    {
+                        <a class="nav-link text-white" asp-area="Admin" asp-controller="ManagePromotion" asp-action="Index">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">local_offer</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí khuyến mại</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="nav-link text-white" style="opacity: 0.5; cursor: not-allowed;">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">local_offer</i>
+                                <i class="material-icons opacity-10 ms-1" style="font-size: 16px;">lock</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí khuyến mại</span>
+                        </span>
+                    }
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white" asp-area="Admin" asp-controller="StatisticalReport" asp-action="Index">
-                        <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
-                            <i class="material-icons opacity-10">bar_chart</i>
-                        </div>
-                        <span class="nav-link-text ms-1">Báo cáo thống kê</span>
-                    </a>
+                    @if (HasPermissionMenu("StatisticalReport"))
+                    {
+                        <a class="nav-link text-white" asp-area="Admin" asp-controller="StatisticalReport" asp-action="Index">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">bar_chart</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Báo cáo thống kê</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="nav-link text-white" style="opacity: 0.5; cursor: not-allowed;">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">bar_chart</i>
+                                <i class="material-icons opacity-10 ms-1" style="font-size: 16px;">lock</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Báo cáo thống kê</span>
+                        </span>
+                    }
                 </li>
                 <li class="nav-item mt-3">
                     <h6 class="ps-4 ms-2 text-uppercase text-xs text-white font-weight-bolder opacity-8">Account pages</h6>
@@ -176,10 +345,7 @@
         </div>
     </aside>
     <main class="main-content position-relative max-height-vh-100 h-100 border-radius-lg ">
-        <!-- Navbar -->
-        <!-- End Navbar -->
         @RenderBody()
-        
     </main>
     <div class="fixed-plugin">
         <div class="card shadow-lg">
