@@ -18,7 +18,28 @@ namespace WebLaptopFE.Controllers
             return View();
         }
 
+        public IActionResult ProductDetail(string id)
+        {
+            ViewBag.ProductId = id;
+            return View();
+        }
+
+        public IActionResult Shop()
+        {
+            return View();
+        }
+
         public IActionResult Privacy()
+        {
+            return View();
+        }
+
+        public IActionResult Warranty()
+        {
+            return View();
+        }
+
+        public IActionResult Payment()
         {
             return View();
         }

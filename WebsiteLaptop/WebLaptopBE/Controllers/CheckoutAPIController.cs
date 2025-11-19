@@ -2,14 +2,14 @@
 using Microsoft.EntityFrameworkCore;
 using WebLaptopBE.Models;
 using System.Text.RegularExpressions;
-
+using WebLaptopBE.Data;
 namespace WebLaptopBE.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
     public class CheckoutAPIController : ControllerBase
     {
-        private readonly Testlaptop27Context _db = new();
+        private readonly Testlaptop33Context _db = new();
 
         // POST: api/Checkout/create
         [HttpPost("create")]

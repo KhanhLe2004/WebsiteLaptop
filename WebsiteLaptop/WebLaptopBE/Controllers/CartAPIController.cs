@@ -2,14 +2,14 @@
 using Microsoft.EntityFrameworkCore;
 using WebLaptopBE.Models;
 using System.Text.RegularExpressions;
-
+using WebLaptopBE.Data;
 namespace WebLaptopBE.Controllers
 {
     [Route("api/Cart")]
     [ApiController]
     public class CartAPIController : ControllerBase
     {
-        private readonly Testlaptop27Context _db = new();
+        private readonly Testlaptop33Context _db = new();
 
         // GET: api/Cart/{customerId}
         [HttpGet("{customerId}")]

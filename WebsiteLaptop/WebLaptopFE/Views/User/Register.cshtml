@@ -1,0 +1,115 @@
+﻿@{
+    ViewData["Title"] = "Đăng ký";
+    Layout = "~/Views/Shared/_LayoutRegister.cshtml";
+}
+
+<div class="container-fluid auth-split px-0">
+    <div class="row g-0">
+      <!-- LEFT -->
+      <div class="col-12 col-lg-6 auth-left">
+        <!-- optional left content (slogan, logo) -->
+        <img src="../LaptopFe/img/login.png" alt="Fruitables Logo" style="width:100%; height:auto;">
+      </div>
+
+      <!-- RIGHT: register form -->
+      <div class="col-12 col-lg-6 d-flex align-items-center justify-content-center py-4">
+        <div class="auth-card">
+
+          <div class="text-center mb-3">
+            <div class="avatar-circle"><i class="bi bi-person-plus" style="font-size:22px; color:var(--primary-dark)"></i></div>
+            <h1 class="h-welcome">Tạo tài khoản mới</h1>
+          </div>
+
+          <form id="registerForm" novalidate>
+            <div class="register-form">
+
+  <!-- Họ và tên -->
+  <div class="form-item d-flex align-items-center mb-3">
+    <label class="form-label small me-3 mb-0" style="width:140px;">
+      Họ và tên <sup>*</sup>
+    </label>
+    <input id="fullname" type="text" class="form-control flex-grow-1" required>
+  </div>
+
+  <!-- Email -->
+  <div class="form-item d-flex align-items-center mb-3">
+    <label class="form-label small me-3 mb-0" style="width:140px;">
+      Email <sup>*</sup>
+    </label>
+    <input id="email" type="email" class="form-control flex-grow-1" required>
+  </div>
+
+  <!-- Số điện thoại -->
+  <div class="form-item d-flex align-items-center mb-3">
+    <label class="form-label small me-3 mb-0" style="width:140px;">
+      Số điện thoại <sup>*</sup>
+    </label>
+    <input id="phone" type="tel" class="form-control flex-grow-1" required>
+  </div>
+
+  <!-- Địa chỉ -->
+  <div class="form-item d-flex align-items-center mb-3">
+    <label class="form-label small me-3 mb-0" style="width:140px;">
+      Địa chỉ
+    </label>
+    <input id="address" type="text" class="form-control flex-grow-1">
+  </div>
+
+  <!-- Mật khẩu -->
+  <div class="form-item d-flex align-items-center mb-3">
+    <label class="form-label small me-3 mb-0" style="width:140px;">
+      Mật khẩu <sup>*</sup>
+    </label>
+
+    <div class="d-flex flex-grow-1 position-relative">
+      <input id="password" type="password" class="form-control" required>
+      <button type="button" class="eye-btn ms-2" id="togglePwd" style="background:none;border:none;">
+        <i id="eyeIcon" class="bi bi-eye-slash fs-5"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Nhập lại mật khẩu -->
+  <div class="form-item d-flex align-items-center mb-3">
+    <label class="form-label small me-3 mb-0" style="width:140px;">
+      Nhập lại mật khẩu <sup>*</sup>
+    </label>
+
+    <div class="d-flex flex-grow-1 position-relative">
+      <input id="confirmPwd" type="password" class="form-control" required>
+      <button type="button" class="eye-btn ms-2" id="togglePwd2" style="background:none;border:none;">
+        <i id="eyeIcon2" class="bi bi-eye-slash fs-5"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Điều khoản (checkbox) -->
+  <div class="form-item d-flex align-items-center mb-3">
+    <label class="form-label small me-3 mb-0" style="width:140px;"></label>
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" id="agree">
+      <label class="form-check-label small" for="agree">Tôi đồng ý với điều khoản dịch vụ</label>
+    </div>
+  </div>
+
+  <!-- Nút đăng ký -->
+  <button type="submit"
+          class="btn w-100 py-2 mt-2"
+          style="background:#81C408; color:white; border-radius:8px;">
+    Đăng ký
+  </button>
+
+</div>
+
+          </form>
+
+          <div id="registerAlert" class="alert d-none mt-3" role="alert"></div>
+
+          <div class="small-note">
+            Đã có tài khoản? <a href="@Url.Action("Login","User")" style="color:var(--primary); font-weight:600; text-decoration:none;">Đăng nhập</a>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
