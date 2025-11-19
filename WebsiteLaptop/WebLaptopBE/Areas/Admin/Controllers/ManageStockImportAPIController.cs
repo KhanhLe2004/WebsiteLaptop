@@ -221,6 +221,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         StockImportId = detail.StockImportId,
                         ProductId = detail.ProductId,
                         ProductName = detail.Product?.ProductName,
+                        ProductModel = detail.Product?.ProductModel,
                         Specifications = detail.Specifications,
                         Quantity = detail.Quantity,
                         Price = detail.Price
@@ -245,6 +246,17 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 if (dto == null)
                 {
                     return BadRequest(new { message = "Dữ liệu không hợp lệ" });
+                }
+
+                // Tự động lấy EmployeeId từ request header nếu không có trong DTO
+                // Frontend có thể gửi EmployeeId trong header hoặc trong body
+                if (string.IsNullOrWhiteSpace(dto.EmployeeId))
+                {
+                    // Có thể lấy từ header nếu frontend gửi
+                    if (Request.Headers.ContainsKey("X-Employee-Id"))
+                    {
+                        dto.EmployeeId = Request.Headers["X-Employee-Id"].ToString();
+                    }
                 }
 
                 // Tạo mã phiếu nhập nếu chưa có
@@ -365,6 +377,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         StockImportId = detail.StockImportId,
                         ProductId = detail.ProductId,
                         ProductName = detail.Product?.ProductName,
+                        ProductModel = detail.Product?.ProductModel,
                         Specifications = detail.Specifications,
                         Quantity = detail.Quantity,
                         Price = detail.Price
@@ -528,6 +541,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         StockImportId = detail.StockImportId,
                         ProductId = detail.ProductId,
                         ProductName = detail.Product?.ProductName,
+                        ProductModel = detail.Product?.ProductModel,
                         Specifications = detail.Specifications,
                         Quantity = detail.Quantity,
                         Price = detail.Price

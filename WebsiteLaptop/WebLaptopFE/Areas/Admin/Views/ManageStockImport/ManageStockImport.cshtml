@@ -122,7 +122,8 @@
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
                                 <label class="form-label">Nhân viên</label>
-                                <input type="text" class="form-control" id="employeeIdInput">
+                                <input type="text" class="form-control" id="employeeIdInput" readonly>
+                                <input type="hidden" id="employeeIdValue" value="@ViewBag.EmployeeId">
                             </div>
                         </div>
                     </div>
@@ -206,6 +207,10 @@
         let detailRowIndex = 0;
         let suppliersList = [];
         let productsList = [];
+        
+        // Lấy thông tin nhân viên đang đăng nhập (sử dụng Json.Encode để tránh lỗi encoding và escape JavaScript)
+        const currentEmployeeId = @Html.Raw(Json.Serialize(ViewBag.EmployeeId ?? ""));
+        const currentEmployeeName = @Html.Raw(Json.Serialize(ViewBag.EmployeeName ?? ""));
 
         $(document).ready(function() {
             loadStockImports();
@@ -437,11 +442,11 @@
                             <table class="table table-bordered">
                                 <thead>
                                     <tr>
-                                        <th style="width: 20%;">Sản phẩm</th>
-                                        <th style="width: 40%;">Thông số</th>
-                                        <th style="width: 10%; text-align: center;">Số lượng</th>
-                                        <th style="width: 15%; text-align: right;">Đơn giá</th>
-                                        <th style="width: 15%; text-align: right;">Thành tiền</th>
+                                        <th>Sản phẩm</th>
+                                        <th>Thông số</th>
+                                        <th style="text-align: center;">Số lượng</th>
+                                        <th style="text-align: right;">Đơn giá</th>
+                                        <th style="text-align: right;">Thành tiền</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -450,9 +455,14 @@
                     if (stockImport.details && stockImport.details.length > 0) {
                         stockImport.details.forEach(function(detail) {
                             const subtotal = (detail.quantity || 0) * (detail.price || 0);
+                            // Hiển thị productName - productModel hoặc chỉ productName nếu không có model
+                            let productDisplay = detail.productName || detail.productId || '-';
+                            if (detail.productModel) {
+                                productDisplay = `${detail.productName || detail.productId} - ${detail.productModel}`;
+                            }
                             html += `
                                 <tr>
-                                    <td>${detail.productName || detail.productId || '-'}</td>
+                                    <td style="word-wrap: break-word; overflow-wrap: break-word;">${productDisplay}</td>
                                     <td class="spec-cell">${detail.specifications || '-'}</td>
                                     <td style="text-align: center;">${detail.quantity || 0}</td>
                                     <td style="text-align: right;">${formatCurrency(detail.price || 0)}</td>
@@ -526,6 +536,15 @@
             $('#supplierIdInput').val('');
             $('#supplierIdValue').val('');
             
+            // Tự động set nhân viên đang đăng nhập
+            const employeeId = currentEmployeeId || $('#employeeIdValue').val();
+            const employeeName = currentEmployeeName || '';
+            if (employeeId) {
+                $('#employeeIdInput').val(employeeName || employeeId);
+                $('#employeeIdValue').val(employeeId);
+                $('#employeeIdInput').closest('.input-group-outline').addClass('is-filled');
+            }
+            
             // Tự động tạo ID khi mở modal
             generateNextStockImportId();
             
@@ -557,7 +576,14 @@
                     $('#stockImportIdInput').val(stockImport.stockImportId);
                     $('#stockImportIdInput').prop('readonly', true);
                     const savedSupplierId = stockImport.supplierId || '';
-                    $('#employeeIdInput').val(stockImport.employeeId || '');
+                    // Set EmployeeId từ dữ liệu phiếu nhập hàng (giữ nguyên nhân viên đã tạo)
+                    const savedEmployeeId = stockImport.employeeId || '';
+                    const savedEmployeeName = stockImport.employeeName || savedEmployeeId;
+                    $('#employeeIdInput').val(savedEmployeeName);
+                    $('#employeeIdValue').val(savedEmployeeId);
+                    if (savedEmployeeId) {
+                        $('#employeeIdInput').closest('.input-group-outline').addClass('is-filled');
+                    }
                     
                     if (stockImport.time) {
                         // Parse time từ server (có thể là UTC hoặc local time string)
@@ -1230,7 +1256,8 @@
             let stockImportId = $('#stockImportIdInput').val().trim();
             const time = $('#timeInput').val();
             const supplierId = $('#supplierIdValue').val().trim();
-            const employeeId = $('#employeeIdInput').val().trim();
+            // Lấy EmployeeId từ hidden input hoặc từ biến global
+            const employeeId = $('#employeeIdValue').val().trim() || currentEmployeeId || '';
             const totalAmount = parseFloat($('#totalAmountInput').val()) || 0;
 
             const isEdit = $('#stockImportId').val() !== '';
@@ -1407,7 +1434,7 @@
         $(document).on('hidden.bs.modal', '#createEditModal', function() {
             $('#stockImportForm')[0].reset();
             $('#stockImportId').val('');
-            $('#stockImportIdInput').prop('readonly', false);
+                    $('#stockImportIdInput').prop('readonly', false);
             $('#detailTableBody').empty();
             detailRowIndex = 0;
             $('#formErrorMessage').hide();
@@ -1417,6 +1444,15 @@
             $('#supplierIdDropdown').hide();
             $('#supplierIdInput').val('');
             $('#supplierIdValue').val('');
+            
+            // Reset employee input nhưng giữ lại giá trị từ biến global
+            if (currentEmployeeId) {
+                $('#employeeIdInput').val(currentEmployeeName || currentEmployeeId);
+                $('#employeeIdValue').val(currentEmployeeId);
+            } else {
+                $('#employeeIdInput').val('');
+                $('#employeeIdValue').val('');
+            }
             
             $('.input-group-outline').removeClass('is-filled is-focused');
             if (typeof updateInputLabels === 'function') {
@@ -1515,6 +1551,7 @@
     #viewModal .table-responsive {
         max-height: 500px;
         overflow-y: auto;
+        overflow-x: auto;
         border-radius: 0.5rem;
     }
 
@@ -1529,10 +1566,14 @@
     #viewModal table {
         table-layout: fixed;
         width: 100%;
+        min-width: 800px;
     }
 
     #viewModal table td {
         vertical-align: middle;
+        padding: 0.75rem !important;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
     }
 
     #viewModal table thead {
@@ -1542,8 +1583,41 @@
     #viewModal table thead th {
         color: #fff !important;
         font-weight: 600;
-        font-size: 1.3125rem;
+        font-size: 0.875rem;
         text-align: center;
+        padding: 0.75rem !important;
+        white-space: nowrap;
+    }
+
+    /* Đảm bảo các cột có width cố định */
+    #viewModal table thead th:nth-child(1),
+    #viewModal table tbody td:nth-child(1) {
+        width: 25%;
+        min-width: 200px;
+    }
+
+    #viewModal table thead th:nth-child(2),
+    #viewModal table tbody td:nth-child(2) {
+        width: 35%;
+        min-width: 250px;
+    }
+
+    #viewModal table thead th:nth-child(3),
+    #viewModal table tbody td:nth-child(3) {
+        width: 10%;
+        min-width: 80px;
+    }
+
+    #viewModal table thead th:nth-child(4),
+    #viewModal table tbody td:nth-child(4) {
+        width: 15%;
+        min-width: 120px;
+    }
+
+    #viewModal table thead th:nth-child(5),
+    #viewModal table tbody td:nth-child(5) {
+        width: 15%;
+        min-width: 120px;
     }
 
     /* Style cho bảng chi tiết trong modal thêm/sửa */

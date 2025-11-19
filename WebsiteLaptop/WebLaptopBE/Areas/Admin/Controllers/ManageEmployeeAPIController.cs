@@ -750,31 +750,33 @@ namespace WebLaptopBE.Areas.Admin.Controllers
         // Helper method để tạo mã nhân viên mới
         private async Task<string> GenerateEmployeeIdAsync()
         {
-            // Lấy mã nhân viên lớn nhất hiện có
+            // Lấy mã nhân viên lớn nhất hiện có theo format E
             var lastEmployee = await _context.Employees
+                .Where(e => e.EmployeeId.StartsWith("E") && e.EmployeeId.Length == 4)
                 .OrderByDescending(e => e.EmployeeId)
                 .FirstOrDefaultAsync();
 
             if (lastEmployee == null)
             {
-                return "NV001";
+                return "E001";
             }
 
-            // Tách số từ mã nhân viên (ví dụ: NV001 -> 001)
+            // Tách số từ mã nhân viên (ví dụ: E001 -> 001)
             string lastId = lastEmployee.EmployeeId;
-            if (lastId.StartsWith("NV") && lastId.Length > 2)
+            if (lastId.StartsWith("E") && lastId.Length > 1)
             {
-                string numberPart = lastId.Substring(2);
+                string numberPart = lastId.Substring(1);
                 if (int.TryParse(numberPart, out int number))
                 {
                     number++;
-                    return $"NV{number:D3}";
+                    return $"E{number:D3}";
                 }
             }
 
-            // Nếu không parse được, tạo mã mới dựa trên số lượng
-            int count = await _context.Employees.CountAsync();
-            return $"NV{(count + 1):D3}";
+            // Nếu không parse được, tạo mã mới dựa trên số lượng nhân viên có format E
+            int count = await _context.Employees
+                .CountAsync(e => e.EmployeeId.StartsWith("E") && e.EmployeeId.Length == 4);
+            return $"E{(count + 1):D3}";
         }
 
         // Hàm hỗ trợ lưu ảnh

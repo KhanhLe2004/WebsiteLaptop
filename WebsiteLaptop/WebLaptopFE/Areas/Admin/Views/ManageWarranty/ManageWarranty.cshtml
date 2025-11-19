@@ -236,6 +236,10 @@
         let customersList = [];
         let employeesList = [];
         let serialsList = [];
+        
+        // Lấy thông tin nhân viên đang đăng nhập (sử dụng Json.Encode để tránh lỗi encoding và escape JavaScript)
+        const currentEmployeeId = @Html.Raw(Json.Serialize(ViewBag.EmployeeId ?? ""));
+        const currentEmployeeName = @Html.Raw(Json.Serialize(ViewBag.EmployeeName ?? ""));
 
         $(document).ready(function() {
             loadWarranties();
@@ -363,7 +367,13 @@
                             <span class="text-xs font-weight-bold">${warranty.serialId || '-'}</span>
                         </td>
                         <td style="vertical-align: middle;">
-                            <span class="text-xs font-weight-bold">${warranty.productName || '-'}</span>
+                            <span class="text-xs font-weight-bold">${(() => {
+                                let productDisplay = warranty.productName || '-';
+                                if (warranty.productModel) {
+                                    productDisplay = `${warranty.productName || ''} - ${warranty.productModel}`;
+                                }
+                                return productDisplay;
+                            })()}</span>
                         </td>
                         <td style="vertical-align: middle; text-align: center;">
                             <span class="text-xs font-weight-bold">${warranty.type || '-'}</span>
@@ -492,7 +502,18 @@
                                 <strong>Serial:</strong> ${warranty.serialId || '-'}
                             </div>
                             <div class="col-md-6">
-                                <strong>Sản phẩm:</strong> ${warranty.productName || '-'}
+                                <strong>Sản phẩm:</strong> ${(() => {
+                                    let productDisplay = warranty.productName || '-';
+                                    if (warranty.productModel) {
+                                        productDisplay = `${warranty.productName || ''} - ${warranty.productModel}`;
+                                    }
+                                    return productDisplay;
+                                })()}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <strong>Cấu hình:</strong> ${warranty.specifications || '-'}
                             </div>
                         </div>
                         <div class="row mb-3">
@@ -630,7 +651,8 @@
             $('#formErrorMessage').hide();
             
             generateNextWarrantyId();
-            populateEmployeeSelect();
+            // Tự động set nhân viên đang đăng nhập khi thêm mới
+            populateEmployeeSelect(currentEmployeeId || '');
             populateSerialSelect();
 
             const modal = new bootstrap.Modal(document.getElementById('createEditModal'));
@@ -657,15 +679,14 @@
                     const savedTotalAmount = warranty.totalAmount || '';
                     const savedSerialId = warranty.serialId || '';
                     
-                    // Populate employee select trước
-                    populateEmployeeSelect();
+                    // Populate employee select với EmployeeId từ dữ liệu (giữ nguyên nhân viên đã tạo)
+                    populateEmployeeSelect(savedEmployeeId);
                     
                     // Load thông tin khách hàng và serial nếu có customerId
                     if (warranty.customerId) {
                         loadCustomerInfoForEdit(warranty.customerId, savedSerialId, function() {
                             // Set lại các giá trị sau khi load customer info xong
                             setTimeout(function() {
-                                $('#employeeIdInput').val(savedEmployeeId);
                                 $('#typeInput').val(savedType);
                                 $('#statusInput').val(savedStatus);
                                 $('#contentDetailInput').val(savedContentDetail);
@@ -681,7 +702,6 @@
                         
                         // Set lại các giá trị sau khi populate xong
                         setTimeout(function() {
-                            $('#employeeIdInput').val(savedEmployeeId);
                             $('#typeInput').val(savedType);
                             $('#statusInput').val(savedStatus);
                             $('#contentDetailInput').val(savedContentDetail);
@@ -812,7 +832,7 @@
         }
 
         // Populate combobox nhân viên
-        function populateEmployeeSelect() {
+        function populateEmployeeSelect(selectedId = '') {
             const select = $('#employeeIdInput');
             select.empty();
             select.append('<option value=""></option>');
@@ -821,11 +841,19 @@
                 employeesList.forEach(function(employee) {
                     const employeeId = employee.employeeId || employee.EmployeeId;
                     const employeeName = employee.employeeName || employee.EmployeeName || employeeId;
-                    select.append(`<option value="${employeeId}">${employeeName}</option>`);
+                    const selected = (selectedId && employeeId === selectedId) ? 'selected' : '';
+                    select.append(`<option value="${employeeId}" ${selected}>${employeeName}</option>`);
                 });
             }
             
-            select.trigger('change');
+            // Nếu không có selectedId và đang thêm mới, tự động chọn nhân viên đang đăng nhập
+            if (!selectedId && currentEmployeeId) {
+                select.val(currentEmployeeId).trigger('change');
+            } else if (selectedId) {
+                select.val(selectedId).trigger('change');
+            } else {
+                select.trigger('change');
+            }
         }
 
         // Load danh sách serial
@@ -867,7 +895,11 @@
             let warrantyId = $('#warrantyIdInput').val().trim();
             const customerId = $('#customerIdInput').val().trim();
             const serialId = $('#serialIdInput').val().trim();
-            const employeeId = $('#employeeIdInput').val().trim();
+            // Lấy EmployeeId từ select hoặc từ biến global nếu không có
+            let employeeId = $('#employeeIdInput').val().trim();
+            if (!employeeId && currentEmployeeId) {
+                employeeId = currentEmployeeId;
+            }
             const type = $('#typeInput').val().trim();
             const contentDetail = $('#contentDetailInput').val().trim();
             const status = $('#statusInput').val().trim();

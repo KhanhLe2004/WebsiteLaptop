@@ -241,6 +241,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                             StockExportId = detail.StockExportId,
                             ProductId = detail.ProductId,
                             ProductName = product?.ProductName,
+                            ProductModel = product?.ProductModel,
                             Specifications = detail.Specifications,
                             Quantity = detail.Quantity,
                             Price = price
@@ -424,6 +425,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                             StockExportId = detail.StockExportId,
                             ProductId = detail.ProductId,
                             ProductName = product?.ProductName,
+                            ProductModel = product?.ProductModel,
                             Specifications = detail.Specifications,
                             Quantity = detail.Quantity,
                             Price = price
@@ -705,6 +707,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                             StockExportId = detail.StockExportId,
                             ProductId = detail.ProductId,
                             ProductName = product?.ProductName,
+                            ProductModel = product?.ProductModel,
                             Specifications = detail.Specifications,
                             Quantity = detail.Quantity,
                             Price = price

@@ -79,6 +79,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     PhoneNumber = w.Customer?.PhoneNumber,
                     SerialId = w.SerialId,
                     ProductName = w.Serial?.Product?.ProductName,
+                    ProductModel = w.Serial?.Product?.ProductModel,
+                    Specifications = w.Serial?.Specifications,
                     EmployeeId = w.EmployeeId,
                     EmployeeName = w.Employee?.EmployeeName,
                     Type = w.Type,
@@ -163,7 +165,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     {
                         SerialId = ps.SerialId,
                         ProductName = ps.Product != null ? ps.Product.ProductName : null,
-                        DisplayName = ps.SerialId + (ps.Product != null ? " - " + ps.Product.ProductName : "")
+                        ProductModel = ps.Product != null ? ps.Product.ProductModel : null,
+                        DisplayName = ps.SerialId + (ps.Product != null ? " - " + ps.Product.ProductName + (ps.Product.ProductModel != null ? " - " + ps.Product.ProductModel : "") : "")
                     })
                     .ToListAsync();
 
@@ -220,7 +223,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     {
                         SerialId = ps.SerialId,
                         ProductName = ps.Product != null ? ps.Product.ProductName : null,
-                        DisplayName = ps.SerialId + (ps.Product != null ? " - " + ps.Product.ProductName : "")
+                        ProductModel = ps.Product != null ? ps.Product.ProductModel : null,
+                        DisplayName = ps.SerialId + (ps.Product != null ? " - " + ps.Product.ProductName + (ps.Product.ProductModel != null ? " - " + ps.Product.ProductModel : "") : "")
                     })
                     .ToListAsync();
 
@@ -280,7 +284,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     {
                         SerialId = s.SerialId,
                         ProductName = s.Product != null ? s.Product.ProductName : null,
-                        DisplayName = s.SerialId + (s.Product != null ? " - " + s.Product.ProductName : "")
+                        ProductModel = s.Product != null ? s.Product.ProductModel : null,
+                        DisplayName = s.SerialId + (s.Product != null ? " - " + s.Product.ProductName + (s.Product.ProductModel != null ? " - " + s.Product.ProductModel : "") : "")
                     })
                     .ToListAsync();
 
@@ -319,6 +324,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     PhoneNumber = warranty.Customer?.PhoneNumber,
                     SerialId = warranty.SerialId,
                     ProductName = warranty.Serial?.Product?.ProductName,
+                    ProductModel = warranty.Serial?.Product?.ProductModel,
+                    Specifications = warranty.Serial?.Specifications,
                     EmployeeId = warranty.EmployeeId,
                     EmployeeName = warranty.Employee?.EmployeeName,
                     Type = warranty.Type,
@@ -398,6 +405,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     PhoneNumber = warranty.Customer?.PhoneNumber,
                     SerialId = warranty.SerialId,
                     ProductName = warranty.Serial?.Product?.ProductName,
+                    ProductModel = warranty.Serial?.Product?.ProductModel,
                     EmployeeId = warranty.EmployeeId,
                     EmployeeName = warranty.Employee?.EmployeeName,
                     Type = warranty.Type,
@@ -470,6 +478,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     PhoneNumber = warranty.Customer?.PhoneNumber,
                     SerialId = warranty.SerialId,
                     ProductName = warranty.Serial?.Product?.ProductName,
+                    ProductModel = warranty.Serial?.Product?.ProductModel,
                     EmployeeId = warranty.EmployeeId,
                     EmployeeName = warranty.Employee?.EmployeeName,
                     Type = warranty.Type,

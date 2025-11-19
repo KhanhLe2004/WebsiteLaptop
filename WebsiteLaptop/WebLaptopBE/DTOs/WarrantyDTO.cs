@@ -11,6 +11,8 @@ namespace WebLaptopBE.DTOs
         public string? PhoneNumber { get; set; }
         public string? SerialId { get; set; }
         public string? ProductName { get; set; }
+        public string? ProductModel { get; set; }
+        public string? Specifications { get; set; }
         public string? EmployeeId { get; set; }
         public string? EmployeeName { get; set; }
         public string? Type { get; set; }
@@ -78,6 +80,7 @@ namespace WebLaptopBE.DTOs
     {
         public string SerialId { get; set; } = null!;
         public string? ProductName { get; set; }
+        public string? ProductModel { get; set; }
         public string DisplayName { get; set; } = null!;
     }
 
