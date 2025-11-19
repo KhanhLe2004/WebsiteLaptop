@@ -135,5 +135,41 @@ namespace WebLaptopBE.DTOs
         public string? ProvinceCode { get; set; }
         public string? ProvinceName { get; set; }
     }
+
+    // DTO cho cập nhật profile nhân viên (chỉ cho phép cập nhật thông tin cá nhân)
+    public class EmployeeProfileUpdateDTO
+    {
+        [Required(ErrorMessage = "Tên nhân viên là bắt buộc")]
+        [StringLength(100, ErrorMessage = "Tên nhân viên không được quá 100 ký tự")]
+        public string EmployeeName { get; set; } = null!;
+
+        public DateOnly? DateOfBirth { get; set; }
+
+        [StringLength(20, ErrorMessage = "Số điện thoại không được quá 20 ký tự")]
+        public string? PhoneNumber { get; set; }
+
+        [StringLength(200, ErrorMessage = "Địa chỉ không được quá 200 ký tự")]
+        public string? Address { get; set; }
+
+        public string? ProvinceCode { get; set; } // Mã tỉnh/thành
+        public string? CommuneCode { get; set; } // Mã phường/xã
+        [StringLength(200, ErrorMessage = "Địa chỉ cụ thể không được quá 200 ký tự")]
+        public string? AddressDetail { get; set; } // Địa chỉ cụ thể (số nhà, tên đường, v.v.)
+
+        [EmailAddress(ErrorMessage = "Email không hợp lệ")]
+        [StringLength(100, ErrorMessage = "Email không được quá 100 ký tự")]
+        public string? Email { get; set; }
+
+        [StringLength(50, ErrorMessage = "Tên đăng nhập không được quá 50 ký tự")]
+        public string? Username { get; set; }
+
+        [StringLength(100, ErrorMessage = "Mật khẩu không được quá 100 ký tự")]
+        public string? Password { get; set; }
+
+        public IFormFile? AvatarFile { get; set; }
+
+        // Flag để xóa avatar (true nếu muốn xóa avatar hiện có)
+        public bool? AvatarToDelete { get; set; }
+    }
 }
 

@@ -104,16 +104,36 @@ namespace WebLaptopBE.Areas.Admin.Controllers
         // Hàm tạo mật khẩu ngẫu nhiên (6 ký tự)
         private string GenerateRandomPassword(int length = 6)
         {
-            const string validChars = "ABCDEFGHJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+            const string uppercaseChars = "ABCDEFGHJKLMNOPQRSTUVWXYZ";
+            const string lowercaseChars = "abcdefghijklmnopqrstuvwxyz";
+            const string numberChars = "0123456789";
+            const string specialChars = "!@#$%^&*";
+            const string allChars = uppercaseChars + lowercaseChars + numberChars + specialChars;
+            
             var random = new Random();
             var password = new StringBuilder(length);
 
-            for (int i = 0; i < length; i++)
+            // Đảm bảo có ít nhất 1 chữ hoa, 1 chữ thường, 1 số và 1 ký tự đặc biệt
+            password.Append(uppercaseChars[random.Next(uppercaseChars.Length)]);
+            password.Append(lowercaseChars[random.Next(lowercaseChars.Length)]);
+            password.Append(numberChars[random.Next(numberChars.Length)]);
+            password.Append(specialChars[random.Next(specialChars.Length)]);
+
+            // Điền các ký tự còn lại ngẫu nhiên
+            for (int i = 4; i < length; i++)
             {
-                password.Append(validChars[random.Next(validChars.Length)]);
+                password.Append(allChars[random.Next(allChars.Length)]);
             }
 
-            return password.ToString();
+            // Trộn ngẫu nhiên các ký tự trong mật khẩu
+            var passwordArray = password.ToString().ToCharArray();
+            for (int i = passwordArray.Length - 1; i > 0; i--)
+            {
+                int j = random.Next(i + 1);
+                (passwordArray[i], passwordArray[j]) = (passwordArray[j], passwordArray[i]);
+            }
+
+            return new string(passwordArray);
         }
 
         // Hàm gửi email
@@ -127,7 +147,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 var smtpUsername = _configuration["EmailSettings:Username"] ?? "";
                 var smtpPassword = _configuration["EmailSettings:Password"] ?? "";
                 var fromEmail = _configuration["EmailSettings:FromEmail"] ?? smtpUsername;
-                var fromName = _configuration["EmailSettings:FromName"] ?? "Hệ thống quản lý laptop";
+                var fromName = _configuration["EmailSettings:FromName"] ?? "TenTech";
 
                 // Nếu không có cấu hình email, chỉ log và trả về false
                 if (string.IsNullOrEmpty(smtpUsername) || string.IsNullOrEmpty(smtpPassword))
@@ -154,7 +174,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     emailBodyBuilder.AppendLine("Nếu bạn không yêu cầu khôi phục mật khẩu, vui lòng liên hệ với quản trị viên ngay lập tức.");
                     emailBodyBuilder.AppendLine("");
                     emailBodyBuilder.AppendLine("Trân trọng,");
-                    emailBodyBuilder.AppendLine("Hệ thống quản lý laptop");
+                    emailBodyBuilder.AppendLine("TenTech");
                     var emailBody = emailBodyBuilder.ToString();
 
                     var mailMessage = new MailMessage

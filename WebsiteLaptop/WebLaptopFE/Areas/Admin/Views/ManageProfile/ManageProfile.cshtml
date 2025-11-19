@@ -1,0 +1,1618 @@
+﻿@{
+    ViewData["Title"] = "Quản lý thông tin cá nhân";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutManageProfile.cshtml";
+}
+
+
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+        @TempData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card my-4">
+                <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                    <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
+                        <h6 class="text-white text-capitalize ps-3 mb-0">Quản lý thông tin cá nhân</h6>
+                    </div>
+                </div>
+                <div class="card-body px-3 pb-2">
+                    <form id="profileForm" method="post" action="@Url.Action("UpdateProfile", "ManageProfile", new { area = "Admin" })" enctype="multipart/form-data">
+                        @Html.AntiForgeryToken()
+                        
+                        <div class="row">
+                            <div class="col-md-12 text-center mb-4">
+                                <div class="position-relative d-inline-block">
+                                    <img id="avatarPreview" src="/LayoutAdmin/assets/img/default-avatar.png" 
+                                         alt="Avatar" 
+                                         class="rounded-circle" 
+                                         style="width: 150px; height: 150px; object-fit: cover; border: 3px solid #e0e0e0;">
+                                    <label for="avatarFile" class="position-absolute bottom-0 end-0 bg-primary text-white rounded-circle p-2" style="cursor: pointer; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                                        <i class="material-icons" style="font-size: 20px;">camera_alt</i>
+                                    </label>
+                                    <input type="file" id="avatarFile" name="avatarFile" accept="image/*" style="display: none;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="input-group input-group-outline mb-3">
+                                    <label class="form-label">Mã nhân viên</label>
+                                    <input type="text" id="employeeIdDisplay" class="form-control" value="@ViewBag.EmployeeId" readonly disabled>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="input-group input-group-outline mb-3">
+                                    <label class="form-label">Tên nhân viên *</label>
+                                    <input type="text" class="form-control" id="employeeName" name="employeeName" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="input-group input-group-outline mb-3">
+                                    <label class="form-label">Ngày sinh</label>
+                                    <input type="date" class="form-control" id="dateOfBirth" name="dateOfBirth">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="input-group input-group-outline mb-3">
+                                    <label class="form-label">Số điện thoại</label>
+                                    <input type="text" class="form-control" id="phoneNumber" name="phoneNumber">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="input-group input-group-outline mb-3">
+                                    <label class="form-label">Email</label>
+                                    <input type="email" class="form-control" id="email" name="email">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="input-group input-group-outline mb-3">
+                                    <label class="form-label">Tên đăng nhập</label>
+                                    <input type="text" class="form-control" id="username" name="username">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="input-group input-group-outline mb-3 autocomplete-wrapper position-relative w-100">
+                                    <label class="form-label">Tỉnh/Thành</label>
+                                        <input type="text" id="provinceCode" class="form-control" autocomplete="off">
+                                        <input type="hidden" id="provinceCodeValue" name="provinceCode">
+                                        <div id="provinceCodeDropdown" class="autocomplete-dropdown"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="input-group input-group-outline mb-3 autocomplete-wrapper position-relative w-100">
+                                    <label class="form-label">Phường/Xã</label>
+                                    <input type="text" id="communeCode" class="form-control" autocomplete="off" disabled>
+                                    <input type="hidden" id="communeCodeValue" name="communeCode">
+                                    <div id="communeCodeDropdown" class="autocomplete-dropdown"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="input-group input-group-outline mb-3">
+                                    <label class="form-label">Địa chỉ cụ thể</label>
+                                    <input type="text" class="form-control" id="addressDetail" name="addressDetail" 
+                                           placeholder="Số nhà, tên đường, v.v.">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mt-4">
+                            <div class="col-md-12 text-center">
+                                <button type="submit" class="btn bg-gradient-primary">
+                                    <i class="material-icons text-sm">save</i> Lưu thông tin
+                                </button>
+                                <button type="button" class="btn bg-gradient-secondary ms-2" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+                                    <i class="material-icons text-sm">lock</i> Đổi mật khẩu
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Modal Đổi mật khẩu -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1" aria-labelledby="changePasswordModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-primary">
+                <h5 class="modal-title text-white" id="changePasswordModalLabel">Đổi mật khẩu</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="changePasswordForm">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Mật khẩu hiện tại *</label>
+                                <input type="password" class="form-control" id="currentPassword" name="currentPassword" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Mật khẩu mới *</label>
+                                <input type="password" class="form-control" id="newPassword" name="newPassword" required minlength="6">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Xác nhận mật khẩu mới *</label>
+                                <input type="password" class="form-control" id="confirmPassword" name="confirmPassword" required minlength="6">
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" id="changePasswordBtn" class="btn bg-gradient-primary">
+                    <i class="material-icons text-sm">lock</i> Đổi mật khẩu
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Đảm bảo tất cả viền đều là nét liền */
+    .input-group-outline .form-control,
+    .input-group-outline input,
+    .input-group-outline textarea,
+    .input-group-outline select {
+        border-style: solid !important;
+    }
+    
+    .input-group-outline.is-focused .form-control,
+    .input-group-outline.is-focused input,
+    .input-group-outline.is-focused textarea,
+    .input-group-outline.is-focused select {
+        border-style: solid !important;
+    }
+    
+    /* Autocomplete styling */
+    .autocomplete-wrapper {
+        width: 100%;
+        display: block;
+    }
+
+    /* Đảm bảo input-group-outline có autocomplete-wrapper có độ rộng đúng */
+    .input-group.input-group-outline.autocomplete-wrapper {
+        width: 100% !important;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+    }
+
+    /* Đảm bảo input trong input-group-outline.autocomplete-wrapper có style giống các input khác */
+    .input-group.input-group-outline.autocomplete-wrapper .form-control {
+        width: 100% !important;
+        max-width: 100% !important;
+        border: none;
+        border-bottom: 1px solid #d2d6da;
+        border-left: 1px solid #d2d6da;
+        border-right: 1px solid #d2d6da;
+        border-radius: 0;
+        padding-left: 0;
+        padding-right: 0;
+        background: transparent;
+        background-image: none;
+        box-shadow: none;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        flex: 1 1 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .input-group.input-group-outline.autocomplete-wrapper .form-control:focus {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+        box-shadow: none;
+        outline: 0;
+    }
+
+    .input-group.input-group-outline.autocomplete-wrapper.is-filled .form-control {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+    }
+
+    .input-group.input-group-outline.autocomplete-wrapper.is-focused .form-control {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+        box-shadow: none;
+    }
+
+    /* Đảm bảo input trong autocomplete-wrapper con (nếu có cấu trúc khác) */
+    .input-group-outline .autocomplete-wrapper {
+        width: 100%;
+        display: block;
+    }
+
+    /* Đảm bảo input trong autocomplete-wrapper có style giống các input khác */
+    .input-group-outline .autocomplete-wrapper .form-control {
+        width: 100% !important;
+        max-width: 100% !important;
+        border: none;
+        border-bottom: 1px solid #d2d6da;
+        border-left: 1px solid #d2d6da;
+        border-right: 1px solid #d2d6da;
+        border-radius: 0;
+        padding-left: 0;
+        padding-right: 0;
+        background: transparent;
+        background-image: none;
+        box-shadow: none;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        box-sizing: border-box;
+    }
+
+    .input-group-outline .autocomplete-wrapper .form-control:focus {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+        box-shadow: none;
+        outline: 0;
+    }
+
+    .input-group-outline.is-filled .autocomplete-wrapper .form-control {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+    }
+
+    .input-group-outline.is-focused .autocomplete-wrapper .form-control {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+        box-shadow: none;
+    }
+
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #ddd;
+        border-top: none;
+        border-style: solid !important;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+        display: none;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-radius: 0.375rem;
+        margin-top: 2px;
+    }
+
+    .autocomplete-dropdown.show {
+        display: block;
+    }
+
+    /* Autocomplete trong modal */
+    .modal .autocomplete-dropdown {
+        z-index: 1055;
+    }
+
+    .autocomplete-item {
+        padding: 10px;
+        cursor: pointer;
+        border-bottom: 1px solid #eee;
+        border-style: solid !important;
+    }
+
+    .autocomplete-item:hover,
+    .autocomplete-item.selected {
+        background-color: #f8f9fa;
+        color: #667eea;
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom: none;
+    }
+    
+    /* Đảm bảo avatar có viền nét liền */
+    #avatarPreview {
+        border-style: solid !important;
+    }
+</style>
+
+<script>
+    // Ẩn thông báo sau 5 giây
+    setTimeout(function() {
+        var alerts = document.querySelectorAll('.alert');
+        alerts.forEach(function(alert) {
+            var bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        });
+    }, 5000);
+
+    document.addEventListener('DOMContentLoaded', function() {
+        @{
+            var config = ViewContext.HttpContext.RequestServices.GetService(typeof(IConfiguration)) as IConfiguration;
+            var apiBaseUrl = config?.GetValue<string>("ApiSettings:BaseUrl") ?? "http://localhost:5068";
+        }
+        const API_URL = '@apiBaseUrl/api/admin/employees';
+        const API_BASE_URL = API_URL.replace(/\/api\/admin\/employees$/, '');
+        const IMAGE_BASE_URL = API_BASE_URL + '/imageEmployees';
+        var provinces = [];
+        var communes = [];
+        var provincesPromise = null;
+        const communesCache = {};
+        var employeeData = @Html.Raw(ViewBag.EmployeeJson ?? "{}");
+        var currentEmployeeId = '@ViewBag.EmployeeId' || (employeeData && employeeData.employeeId) || (employeeData && employeeData.id) || '';
+
+        // Hàm normalize text để so sánh (bỏ dấu)
+        function normalizeText(text) {
+            if (!text) return '';
+            return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        }
+
+        // Hàm cắt chuỗi địa chỉ thành các phần
+        function extractAddressParts(address) {
+            if (!address) return {};
+            var parts = address.split(',')
+                .map(function(part) { return part.trim(); })
+                .filter(function(part) { return part.length > 0; });
+
+            if (parts.length >= 3) {
+                return {
+                    detail: parts[0],
+                    communeName: parts[parts.length - 2],
+                    provinceName: parts[parts.length - 1]
+                };
+            }
+
+            if (parts.length === 2) {
+                return {
+                    detail: parts[0],
+                    provinceName: parts[1]
+                };
+            }
+
+            return {
+                detail: parts[0] || address
+            };
+        }
+
+        // Hàm helper để update Material Dashboard labels
+        function updateMaterialLabel(input) {
+            if (!input) return;
+            var inputGroup = input.closest('.input-group-outline');
+            if (inputGroup) {
+                if (input.value && input.value.trim() !== '') {
+                    inputGroup.classList.add('is-filled');
+                } else {
+                    inputGroup.classList.remove('is-filled');
+                }
+                // Trigger events để Material Dashboard nhận biết (chỉ nếu input không disabled)
+                if (!input.disabled && !input.readOnly) {
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }
+        }
+        
+        // Update label cho input mã nhân viên ngay khi page load
+        setTimeout(function() {
+            var employeeIdInput = document.getElementById('employeeIdDisplay');
+            if (employeeIdInput && employeeIdInput.value) {
+                updateMaterialLabel(employeeIdInput);
+            }
+        }, 50);
+
+        // Load dữ liệu nhân viên vào form
+        if (employeeData && Object.keys(employeeData).length > 0) {
+            var inputsToUpdate = [];
+            
+            if (employeeData.employeeName) {
+                var empNameInput = document.getElementById('employeeName');
+                if (empNameInput) {
+                    empNameInput.value = employeeData.employeeName;
+                    inputsToUpdate.push(empNameInput);
+                }
+            }
+            
+            if (employeeData.dateOfBirth) {
+                var dobInput = document.getElementById('dateOfBirth');
+                if (dobInput) {
+                    var dob = new Date(employeeData.dateOfBirth);
+                    dobInput.value = dob.toISOString().split('T')[0];
+                    inputsToUpdate.push(dobInput);
+                }
+            }
+            
+            if (employeeData.phoneNumber) {
+                var phoneInput = document.getElementById('phoneNumber');
+                if (phoneInput) {
+                    phoneInput.value = employeeData.phoneNumber;
+                    inputsToUpdate.push(phoneInput);
+                }
+            }
+            
+            if (employeeData.email) {
+                var emailInput = document.getElementById('email');
+                if (emailInput) {
+                    emailInput.value = employeeData.email;
+                    inputsToUpdate.push(emailInput);
+                }
+            }
+            
+            if (employeeData.username) {
+                var usernameInput = document.getElementById('username');
+                if (usernameInput) {
+                    usernameInput.value = employeeData.username;
+                    inputsToUpdate.push(usernameInput);
+                }
+            }
+            
+            // Xử lý địa chỉ - ưu tiên addressDetail, nếu không có thì parse từ address
+            var fallbackAddress = extractAddressParts(employeeData.address);
+            
+            if (employeeData.addressDetail) {
+                var addressDetailInput = document.getElementById('addressDetail');
+                if (addressDetailInput) {
+                    addressDetailInput.value = employeeData.addressDetail;
+                    inputsToUpdate.push(addressDetailInput);
+                }
+            } else if (fallbackAddress.detail) {
+                // Nếu không có addressDetail, lấy từ address đã parse
+                var addressDetailInput = document.getElementById('addressDetail');
+                if (addressDetailInput) {
+                    addressDetailInput.value = fallbackAddress.detail;
+                    inputsToUpdate.push(addressDetailInput);
+                }
+            }
+            
+            // Set mã tỉnh/thành và phường/xã nếu có
+            if (employeeData.provinceCode) {
+                document.getElementById('provinceCodeValue').value = employeeData.provinceCode;
+            }
+            
+            if (employeeData.communeCode) {
+                document.getElementById('communeCodeValue').value = employeeData.communeCode;
+            }
+            
+            // Load avatar (sử dụng đường dẫn từ backend giống ManageEmployee)
+            if (employeeData.avatar) {
+                var avatarPreview = document.getElementById('avatarPreview');
+                if (avatarPreview) {
+                    // Sử dụng đường dẫn từ backend: IMAGE_BASE_URL/
+                    var avatarUrl = IMAGE_BASE_URL + '/' + employeeData.avatar;
+                    avatarPreview.src = avatarUrl;
+                    // Thêm error handler để fallback về default nếu ảnh không tồn tại
+                    avatarPreview.onerror = function() {
+                        console.log('Avatar image failed to load:', avatarUrl);
+                        this.src = IMAGE_BASE_URL + '/default-avatar.jpg';
+                        // Nếu default-avatar.jpg cũng không tồn tại, dùng placeholder
+                        this.onerror = function() {
+                            this.src = '/LayoutAdmin/assets/img/default-avatar.png';
+                        };
+                    };
+                }
+            }
+            
+            // Update labels sau khi set giá trị
+            setTimeout(function() {
+                inputsToUpdate.forEach(function(input) {
+                    updateMaterialLabel(input);
+                });
+            }, 100);
+        }
+
+        // Xử lý avatar
+        var avatarFile = document.getElementById('avatarFile');
+        var avatarPreview = document.getElementById('avatarPreview');
+
+        if (avatarFile && avatarPreview) {
+            avatarFile.addEventListener('change', function(e) {
+                var file = e.target.files[0];
+                if (file) {
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        avatarPreview.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        // Load danh sách tỉnh/thành
+        function loadProvinces(force = false) {
+            if (provincesPromise && !force) {
+                return provincesPromise;
+            }
+
+            provincesPromise = new Promise(function(resolve, reject) {
+                fetch(API_URL + '/provinces')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('HTTP error! status: ' + response.status);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        provinces = data || [];
+                        console.log('Loaded provinces:', provinces.length);
+                        setupProvinceAutocomplete();
+                        
+                        // Đợi một chút để đảm bảo setupProvinceAutocomplete đã hoàn tất
+                        setTimeout(function() {
+                            // Sau khi load provinces xong, set giá trị cho province nếu có
+                            var fallbackAddress = extractAddressParts(employeeData.address);
+                            var selectedProvinceCode = employeeData.provinceCode || '';
+                            var selectedCommuneCode = employeeData.communeCode || '';
+                            var provinceInput = document.getElementById('provinceCode');
+                            var provinceValue = document.getElementById('provinceCodeValue');
+                            var communeInput = document.getElementById('communeCode');
+                            var communeValue = document.getElementById('communeCodeValue');
+                            var provinceDropdown = document.getElementById('provinceCodeDropdown');
+                        
+                        if (provinces.length > 0) {
+                            var provinceDisplay = '';
+                            var foundProvince = false;
+                            
+                            // Ưu tiên tìm theo mã nếu có
+                            if (selectedProvinceCode) {
+                                var province = provinces.find(function(p) { return p.code === selectedProvinceCode; });
+                                if (province) {
+                                    provinceDisplay = province.name || province.code;
+                                    foundProvince = true;
+                                } else {
+                                    // Nếu có mã nhưng không tìm thấy, thử tìm theo tên từ address
+                                    if (fallbackAddress.provinceName) {
+                                        var normalizedFallback = normalizeText(fallbackAddress.provinceName);
+                                        var matchByName = provinces.find(function(p) {
+                                            var normalizedName = normalizeText(p.name || '');
+                                            return normalizedName === normalizedFallback || 
+                                                   normalizedName.indexOf(normalizedFallback) !== -1 ||
+                                                   normalizedFallback.indexOf(normalizedName) !== -1;
+                                        });
+                                        if (matchByName) {
+                                            selectedProvinceCode = matchByName.code;
+                                            if (provinceValue) {
+                                                provinceValue.value = selectedProvinceCode;
+                                            }
+                                            provinceDisplay = matchByName.name || matchByName.code;
+                                            foundProvince = true;
+                                        } else {
+                                            // Nếu vẫn không tìm thấy, hiển thị tên từ address
+                                            provinceDisplay = fallbackAddress.provinceName || selectedProvinceCode;
+                                        }
+                                    } else {
+                                        // Nếu không có tên từ address, hiển thị mã
+                                        provinceDisplay = selectedProvinceCode;
+                                    }
+                                }
+                            }
+                            
+                            // Nếu chưa tìm được, thử tìm theo tên từ address
+                            if (!foundProvince && fallbackAddress.provinceName) {
+                                var normalizedFallback = normalizeText(fallbackAddress.provinceName);
+                                var matchByName = provinces.find(function(p) {
+                                    var normalizedName = normalizeText(p.name || '');
+                                    return normalizedName === normalizedFallback || 
+                                           normalizedName.indexOf(normalizedFallback) !== -1 ||
+                                           normalizedFallback.indexOf(normalizedName) !== -1;
+                                });
+                                if (matchByName) {
+                                    selectedProvinceCode = matchByName.code;
+                                    if (provinceValue) {
+                                        provinceValue.value = selectedProvinceCode;
+                                    }
+                                    provinceDisplay = matchByName.name || matchByName.code;
+                                    foundProvince = true;
+                                } else {
+                                    // Nếu không tìm thấy, hiển thị tên từ address
+                                    provinceDisplay = fallbackAddress.provinceName;
+                                }
+                            }
+                            
+                            // Set giá trị hiển thị cho province (sử dụng hàm an toàn để không trigger dropdown)
+                            if (provinceDisplay && provinceInput) {
+                                // Đảm bảo dropdown bị ẩn trước khi set giá trị
+                                if (provinceDropdown) {
+                                    provinceDropdown.style.display = 'none';
+                                }
+                                
+                                if (window.setProvinceValueSafely) {
+                                    window.setProvinceValueSafely(selectedProvinceCode, provinceDisplay);
+                                } else {
+                                    // Fallback nếu hàm chưa được khởi tạo
+                                    provinceInput.value = provinceDisplay;
+                                    updateMaterialLabel(provinceInput);
+                                    if (provinceValue) {
+                                        provinceValue.value = selectedProvinceCode || '';
+                                    }
+                                    // Đảm bảo dropdown bị ẩn
+                                    if (provinceDropdown) {
+                                        provinceDropdown.style.display = 'none';
+                                    }
+                                }
+                            }
+                            
+                            // Load communes nếu có mã tỉnh/thành
+                            if (selectedProvinceCode) {
+                                loadCommunes(selectedProvinceCode).then(function() {
+                                    // Set giá trị cho commune nếu có
+                                    var communeDisplay = '';
+                                    var foundCommune = false;
+                                    
+                                    // Ưu tiên tìm theo mã nếu có
+                                    if (selectedCommuneCode && communes.length > 0) {
+                                        var commune = communes.find(function(c) { return c.code === selectedCommuneCode; });
+                                        if (commune) {
+                                            communeDisplay = commune.name || commune.code;
+                                            foundCommune = true;
+                                        } else {
+                                            // Nếu có mã nhưng không tìm thấy, thử tìm theo tên từ address
+                                            if (fallbackAddress.communeName) {
+                                                var normalizedFallback = normalizeText(fallbackAddress.communeName);
+                                                var matchByName = communes.find(function(c) {
+                                                    var normalizedName = normalizeText(c.name || '');
+                                                    return normalizedName === normalizedFallback || 
+                                                           normalizedName.indexOf(normalizedFallback) !== -1 ||
+                                                           normalizedFallback.indexOf(normalizedName) !== -1;
+                                                });
+                                                if (matchByName) {
+                                                    selectedCommuneCode = matchByName.code;
+                                                    if (communeValue) {
+                                                        communeValue.value = selectedCommuneCode;
+                                                    }
+                                                    communeDisplay = matchByName.name || matchByName.code;
+                                                    foundCommune = true;
+                                                } else {
+                                                    // Nếu vẫn không tìm thấy, hiển thị tên từ address
+                                                    communeDisplay = fallbackAddress.communeName || selectedCommuneCode;
+                                                }
+                                            } else {
+                                                // Nếu không có tên từ address, hiển thị mã
+                                                communeDisplay = selectedCommuneCode;
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Nếu chưa tìm được, thử tìm theo tên từ address
+                                    if (!foundCommune && fallbackAddress.communeName && communes.length > 0) {
+                                        var normalizedFallback = normalizeText(fallbackAddress.communeName);
+                                        var matchByName = communes.find(function(c) {
+                                            var normalizedName = normalizeText(c.name || '');
+                                            return normalizedName === normalizedFallback || 
+                                                   normalizedName.indexOf(normalizedFallback) !== -1 ||
+                                                   normalizedFallback.indexOf(normalizedName) !== -1;
+                                        });
+                                        if (matchByName) {
+                                            selectedCommuneCode = matchByName.code;
+                                            if (communeValue) {
+                                                communeValue.value = selectedCommuneCode;
+                                            }
+                                            communeDisplay = matchByName.name || matchByName.code;
+                                            foundCommune = true;
+                                        } else {
+                                            // Nếu không tìm thấy, hiển thị tên từ address
+                                            communeDisplay = fallbackAddress.communeName;
+                                        }
+                                    }
+                                    
+                                    // Set giá trị hiển thị cho commune (đảm bảo dropdown bị ẩn)
+                                    if (communeDisplay && communeInput) {
+                                        var communeDropdown = document.getElementById('communeCodeDropdown');
+                                        if (communeDropdown) {
+                                            communeDropdown.style.display = 'none';
+                                        }
+                                        communeInput.value = communeDisplay;
+                                        communeInput.disabled = false;
+                                        updateMaterialLabel(communeInput);
+                                    }
+                                    
+                                    resolve();
+                                }).catch(function(error) {
+                                    console.error('Error loading communes:', error);
+                                    resolve(); // Vẫn resolve để không block
+                                });
+                            } else {
+                                resolve();
+                            }
+                        } else {
+                            resolve();
+                        }
+                        }, 50); // Đợi 50ms để đảm bảo setupProvinceAutocomplete đã hoàn tất
+                    })
+                    .catch(error => {
+                        console.error('Error loading provinces:', error);
+                        provinces = [];
+                        setupProvinceAutocomplete();
+                        resolve(provinces);
+                    });
+            });
+
+            return provincesPromise;
+        }
+
+        // Load danh sách phường/xã theo tỉnh/thành
+        function loadCommunes(provinceCode, force = false) {
+            if (!provinceCode) {
+                communes = [];
+                var communeInput = document.getElementById('communeCode');
+                if (communeInput) {
+                    communeInput.disabled = true;
+                    communeInput.value = '';
+                    var communeValue = document.getElementById('communeCodeValue');
+                    if (communeValue) {
+                        communeValue.value = '';
+                    }
+                    var inputGroup = communeInput.closest('.input-group-outline');
+                    if (inputGroup) {
+                        inputGroup.classList.remove('is-filled');
+                    }
+                }
+                return Promise.resolve([]);
+            }
+
+            if (communesCache[provinceCode] && !force) {
+                var cached = communesCache[provinceCode];
+                if (cached && cached.then) {
+                    cached.then(function(list) {
+                        communes = list || [];
+                    });
+                }
+                return cached;
+            }
+
+            var request = fetch(API_URL + '/provinces/' + provinceCode + '/communes')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('HTTP error! status: ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    communes = data || [];
+                    console.log('Loaded communes:', communes.length);
+                    var communeInput = document.getElementById('communeCode');
+                    if (communeInput) {
+                        communeInput.disabled = false;
+                    }
+                    communesCache[provinceCode] = Promise.resolve(communes);
+                    return communes;
+                })
+                .catch(error => {
+                    console.error('Error loading communes:', error);
+                    communes = [];
+                    var communeInput = document.getElementById('communeCode');
+                    if (communeInput) {
+                        communeInput.disabled = true;
+                    }
+                    communesCache[provinceCode] = Promise.resolve([]);
+                    return [];
+                });
+
+            communesCache[provinceCode] = request;
+            return request;
+        }
+
+        // Khởi tạo autocomplete cho tỉnh/thành
+        function setupProvinceAutocomplete() {
+            var provinceInput = document.getElementById('provinceCode');
+            var provinceValue = document.getElementById('provinceCodeValue');
+            var provinceDropdown = document.getElementById('provinceCodeDropdown');
+            var selectedIndex = -1;
+            var filteredProvinces = [];
+            var isUserInteraction = false; // Flag để kiểm tra user interaction
+            var isSettingValue = false; // Flag để bỏ qua dropdown khi set giá trị programmatically
+
+            if (!provinceInput || !provinceValue || !provinceDropdown) return;
+
+            // Đảm bảo dropdown bị ẩn khi khởi tạo
+            provinceDropdown.style.display = 'none';
+
+            function showDropdown(provincesList) {
+                // Không hiển thị dropdown khi đang set giá trị programmatically
+                if (isSettingValue) {
+                    return;
+                }
+
+                if (!provincesList || provincesList.length === 0) {
+                    provinceDropdown.innerHTML = '<div class="autocomplete-item" style="color: #6c757d; cursor: default;">Không tìm thấy tỉnh/thành</div>';
+                    provinceDropdown.style.display = 'block';
+                    selectedIndex = -1;
+                    return;
+                }
+
+                var html = '';
+                provincesList.forEach(function(province, index) {
+                    var provinceName = province.name || province.code;
+                    var provinceNameEscaped = (provinceName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    html += '<div class="autocomplete-item" tabindex="0" data-index="' + index + '" data-province-code="' + province.code + '" data-province-name="' + provinceNameEscaped + '">' + provinceName + '</div>';
+                });
+                provinceDropdown.innerHTML = html;
+                provinceDropdown.style.display = 'block';
+                selectedIndex = -1;
+            }
+
+            function updateSelectedItem() {
+                var items = provinceDropdown.querySelectorAll('.autocomplete-item');
+                items.forEach(function(item) {
+                    item.classList.remove('selected');
+                });
+                if (selectedIndex >= 0 && selectedIndex < filteredProvinces.length) {
+                    if (items[selectedIndex]) {
+                        items[selectedIndex].classList.add('selected');
+                    }
+                }
+            }
+
+            // Xử lý khi gõ
+            provinceInput.addEventListener('input', function() {
+                // Bỏ qua khi đang set giá trị programmatically
+                if (isSettingValue) {
+                    return;
+                }
+
+                isUserInteraction = true; // Đánh dấu là user interaction
+                var searchTerm = this.value.toLowerCase().trim();
+                var inputGroup = this.closest('.input-group-outline');
+                
+                if (searchTerm) {
+                    if (inputGroup) inputGroup.classList.add('is-filled');
+                } else {
+                    if (inputGroup) inputGroup.classList.remove('is-filled');
+                }
+                
+                if (searchTerm === '') {
+                    provinceDropdown.style.display = 'none';
+                    provinceValue.value = '';
+                    loadCommunes(''); // Clear communes khi xóa tỉnh/thành
+                    return;
+                }
+
+                filteredProvinces = provinces.filter(function(province) {
+                    var provinceName = (province.name || province.code || '').toLowerCase();
+                    return provinceName.indexOf(searchTerm) !== -1;
+                });
+
+                showDropdown(filteredProvinces);
+            });
+
+            // Hàm helper để set giá trị an toàn (không trigger dropdown)
+            function setProvinceValueSafely(provinceCode, provinceName) {
+                isSettingValue = true;
+                try {
+                    if (provinceName && provinceInput) {
+                        provinceInput.value = provinceName;
+                        updateMaterialLabel(provinceInput);
+                        var inputGroup = provinceInput.closest('.input-group-outline');
+                        if (inputGroup && provinceName) {
+                            inputGroup.classList.add('is-filled');
+                        }
+                    }
+                    if (provinceCode && provinceValue) {
+                        provinceValue.value = provinceCode;
+                    }
+                    // Đảm bảo dropdown bị ẩn
+                    if (provinceDropdown) {
+                        provinceDropdown.style.display = 'none';
+                    }
+                } finally {
+                    // Reset flag sau một khoảng thời gian ngắn để đảm bảo các event đã được xử lý
+                    setTimeout(function() {
+                        isSettingValue = false;
+                    }, 100);
+                }
+            }
+
+            // Hàm xử lý chọn province
+            function selectProvince(provinceCode, provinceName) {
+                if (provinceCode && provinceName) {
+                    provinceInput.value = provinceName;
+                    provinceValue.value = provinceCode;
+                    var inputGroup = provinceInput.closest('.input-group-outline');
+                    if (inputGroup) inputGroup.classList.add('is-filled');
+                    updateMaterialLabel(provinceInput);
+                    provinceDropdown.style.display = 'none';
+                    
+                    // Load communes khi chọn tỉnh/thành
+                    loadCommunes(provinceCode);
+                }
+            }
+
+            // Expose hàm setProvinceValueSafely để có thể gọi từ bên ngoài
+            window.setProvinceValueSafely = setProvinceValueSafely;
+
+            // Xử lý khi click vào item (dùng mousedown để tránh conflict với blur)
+            provinceDropdown.addEventListener('mousedown', function(e) {
+                e.preventDefault(); // Ngăn blur event
+                e.stopPropagation(); // Ngăn event bubble lên document
+                var item = e.target.closest('.autocomplete-item');
+                if (!item) return;
+                
+                var provinceCode = item.getAttribute('data-province-code');
+                var provinceName = item.getAttribute('data-province-name');
+                selectProvince(provinceCode, provinceName);
+            });
+
+            // Xử lý click event (backup)
+            provinceDropdown.addEventListener('click', function(e) {
+                e.stopPropagation(); // Ngăn event bubble lên document
+                var item = e.target.closest('.autocomplete-item');
+                if (!item) return;
+                
+                var provinceCode = item.getAttribute('data-province-code');
+                var provinceName = item.getAttribute('data-province-name');
+                if (provinceCode && provinceName) {
+                    selectProvince(provinceCode, provinceName);
+                }
+            });
+
+            // Xử lý Enter key trên dropdown items
+            provinceDropdown.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    var item = e.target.closest('.autocomplete-item');
+                    if (item) {
+                        var provinceCode = item.getAttribute('data-province-code');
+                        var provinceName = item.getAttribute('data-province-name');
+                        selectProvince(provinceCode, provinceName);
+                    }
+                }
+            });
+
+            // Xử lý phím tắt
+            provinceInput.addEventListener('keydown', function(e) {
+                // Đánh dấu user interaction cho các phím navigation
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
+                    isUserInteraction = true;
+                }
+                // Đánh dấu cho các phím nhập liệu
+                if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+                    isUserInteraction = true;
+                }
+
+                if (provinceDropdown.style.display === 'block' && filteredProvinces.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        selectedIndex = Math.min(selectedIndex + 1, filteredProvinces.length - 1);
+                        updateSelectedItem();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        selectedIndex = Math.max(selectedIndex - 1, -1);
+                        updateSelectedItem();
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (selectedIndex >= 0 && selectedIndex < filteredProvinces.length) {
+                            var province = filteredProvinces[selectedIndex];
+                            provinceInput.value = province.name || province.code;
+                            provinceValue.value = province.code;
+                            var inputGroup = provinceInput.closest('.input-group-outline');
+                            if (inputGroup) inputGroup.classList.add('is-filled');
+                            updateMaterialLabel(provinceInput);
+                            provinceDropdown.style.display = 'none';
+                            loadCommunes(province.code);
+                        }
+                    } else if (e.key === 'Escape') {
+                        provinceDropdown.style.display = 'none';
+                        selectedIndex = -1;
+                    }
+                }
+            });
+
+            // Ẩn dropdown khi click ra ngoài (dùng capture phase để chạy sau mousedown)
+            document.addEventListener('click', function(e) {
+                // Kiểm tra xem click có phải vào dropdown item không
+                var clickedItem = e.target.closest('.autocomplete-item');
+                if (clickedItem && provinceDropdown.contains(clickedItem)) {
+                    return; // Không ẩn nếu click vào item
+                }
+                
+                if (!provinceInput.contains(e.target) && !provinceDropdown.contains(e.target)) {
+                    provinceDropdown.style.display = 'none';
+                    selectedIndex = -1;
+                }
+            }, true);
+
+            // Xử lý khi click vào input (đánh dấu là user interaction)
+            provinceInput.addEventListener('mousedown', function() {
+                isUserInteraction = true;
+            });
+
+            // Xử lý khi focus vào input
+            provinceInput.addEventListener('focus', function() {
+                // Bỏ qua khi đang set giá trị programmatically
+                if (isSettingValue) {
+                    return;
+                }
+
+                var inputGroup = this.closest('.input-group-outline');
+                if (inputGroup) inputGroup.classList.add('is-filled');
+                
+                var val = this.value.trim();
+                if (val) {
+                    // Chỉ dispatch input event nếu không phải đang set giá trị
+                    if (!isSettingValue) {
+                        this.dispatchEvent(new Event('input'));
+                    }
+                } else {
+                    // Chỉ hiển thị dropdown khi user thực sự tương tác (click hoặc nhập)
+                    if (provinces.length > 0 && isUserInteraction && !isSettingValue) {
+                        filteredProvinces = provinces;
+                        showDropdown(filteredProvinces);
+                    }
+                }
+                // Reset flag sau khi xử lý
+                setTimeout(function() {
+                    isUserInteraction = false;
+                }, 100);
+            });
+
+            // Xử lý khi blur (delay để cho phép click vào dropdown item)
+            provinceInput.addEventListener('blur', function() {
+                var self = this;
+                setTimeout(function() {
+                    var val = self.value.trim();
+                    var inputGroup = self.closest('.input-group-outline');
+                    if (!val && inputGroup) {
+                        inputGroup.classList.remove('is-filled');
+                    }
+                    // Chỉ ẩn dropdown nếu không phải đang click vào dropdown
+                    if (document.activeElement !== provinceDropdown && !provinceDropdown.contains(document.activeElement)) {
+                        provinceDropdown.style.display = 'none';
+                    }
+                }, 200);
+            });
+        }
+
+        // Khởi tạo autocomplete cho phường/xã
+        function setupCommuneAutocomplete() {
+            var communeInput = document.getElementById('communeCode');
+            var communeValue = document.getElementById('communeCodeValue');
+            var communeDropdown = document.getElementById('communeCodeDropdown');
+            var selectedIndex = -1;
+            var filteredCommunes = [];
+            var isUserInteraction = false; // Flag để kiểm tra user interaction
+            var isSettingValue = false; // Flag để bỏ qua dropdown khi set giá trị programmatically
+
+            if (!communeInput || !communeValue || !communeDropdown) return;
+
+            // Đảm bảo dropdown bị ẩn khi khởi tạo
+            communeDropdown.style.display = 'none';
+
+            function showDropdown(communesList) {
+                // Không hiển thị dropdown khi đang set giá trị programmatically
+                if (isSettingValue) {
+                    return;
+                }
+
+                if (!communesList || communesList.length === 0) {
+                    communeDropdown.innerHTML = '<div class="autocomplete-item" style="color: #6c757d; cursor: default;">Không tìm thấy phường/xã</div>';
+                    communeDropdown.style.display = 'block';
+                    selectedIndex = -1;
+                    return;
+                }
+
+                var html = '';
+                communesList.forEach(function(commune, index) {
+                    var communeName = commune.name || commune.code;
+                    var communeNameEscaped = (communeName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    html += '<div class="autocomplete-item" tabindex="0" data-index="' + index + '" data-commune-code="' + commune.code + '" data-commune-name="' + communeNameEscaped + '">' + communeName + '</div>';
+                });
+                communeDropdown.innerHTML = html;
+                communeDropdown.style.display = 'block';
+                selectedIndex = -1;
+            }
+
+            function updateSelectedItem() {
+                var items = communeDropdown.querySelectorAll('.autocomplete-item');
+                items.forEach(function(item) {
+                    item.classList.remove('selected');
+                });
+                if (selectedIndex >= 0 && selectedIndex < filteredCommunes.length) {
+                    if (items[selectedIndex]) {
+                        items[selectedIndex].classList.add('selected');
+                    }
+                }
+            }
+
+            // Xử lý khi gõ
+            communeInput.addEventListener('input', function() {
+                // Bỏ qua khi đang set giá trị programmatically
+                if (isSettingValue) {
+                    return;
+                }
+
+                isUserInteraction = true; // Đánh dấu là user interaction
+                var searchTerm = this.value.toLowerCase().trim();
+                var inputGroup = this.closest('.input-group-outline');
+                
+                if (searchTerm) {
+                    if (inputGroup) inputGroup.classList.add('is-filled');
+                } else {
+                    if (inputGroup) inputGroup.classList.remove('is-filled');
+                }
+                
+                if (searchTerm === '') {
+                    communeDropdown.style.display = 'none';
+                    communeValue.value = '';
+                    return;
+                }
+
+                filteredCommunes = communes.filter(function(commune) {
+                    var communeName = (commune.name || commune.code || '').toLowerCase();
+                    return communeName.indexOf(searchTerm) !== -1;
+                });
+
+                showDropdown(filteredCommunes);
+            });
+
+            // Hàm xử lý chọn commune
+            function selectCommune(communeCode, communeName) {
+                if (communeCode && communeName) {
+                    communeInput.value = communeName;
+                    communeValue.value = communeCode;
+                    var inputGroup = communeInput.closest('.input-group-outline');
+                    if (inputGroup) inputGroup.classList.add('is-filled');
+                    updateMaterialLabel(communeInput);
+                    communeDropdown.style.display = 'none';
+                }
+            }
+
+            // Xử lý khi click vào item (dùng mousedown để tránh conflict với blur)
+            communeDropdown.addEventListener('mousedown', function(e) {
+                e.preventDefault(); // Ngăn blur event
+                e.stopPropagation(); // Ngăn event bubble lên document
+                var item = e.target.closest('.autocomplete-item');
+                if (!item) return;
+                
+                var communeCode = item.getAttribute('data-commune-code');
+                var communeName = item.getAttribute('data-commune-name');
+                selectCommune(communeCode, communeName);
+            });
+
+            // Xử lý click event (backup)
+            communeDropdown.addEventListener('click', function(e) {
+                e.stopPropagation(); // Ngăn event bubble lên document
+                var item = e.target.closest('.autocomplete-item');
+                if (!item) return;
+                
+                var communeCode = item.getAttribute('data-commune-code');
+                var communeName = item.getAttribute('data-commune-name');
+                if (communeCode && communeName) {
+                    selectCommune(communeCode, communeName);
+                }
+            });
+
+            // Xử lý Enter key trên dropdown items
+            communeDropdown.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    var item = e.target.closest('.autocomplete-item');
+                    if (item) {
+                        var communeCode = item.getAttribute('data-commune-code');
+                        var communeName = item.getAttribute('data-commune-name');
+                        selectCommune(communeCode, communeName);
+                    }
+                }
+            });
+
+            // Xử lý khi click vào input (đánh dấu là user interaction)
+            communeInput.addEventListener('mousedown', function() {
+                isUserInteraction = true;
+            });
+
+            // Xử lý khi focus vào input
+            communeInput.addEventListener('focus', function() {
+                // Bỏ qua khi đang set giá trị programmatically
+                if (isSettingValue) {
+                    return;
+                }
+
+                var inputGroup = this.closest('.input-group-outline');
+                if (inputGroup) inputGroup.classList.add('is-filled');
+                
+                var val = this.value.trim();
+                if (val) {
+                    // Chỉ dispatch input event nếu không phải đang set giá trị
+                    if (!isSettingValue) {
+                        this.dispatchEvent(new Event('input'));
+                    }
+                } else {
+                    // Chỉ hiển thị dropdown khi user thực sự tương tác (click hoặc nhập)
+                    if (communes.length > 0 && isUserInteraction && !isSettingValue) {
+                        filteredCommunes = communes;
+                        showDropdown(filteredCommunes);
+                    }
+                }
+                // Reset flag sau khi xử lý
+                setTimeout(function() {
+                    isUserInteraction = false;
+                }, 100);
+            });
+
+            // Xử lý phím tắt
+            communeInput.addEventListener('keydown', function(e) {
+                // Đánh dấu user interaction cho các phím navigation
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
+                    isUserInteraction = true;
+                }
+                // Đánh dấu cho các phím nhập liệu
+                if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+                    isUserInteraction = true;
+                }
+
+                if (communeDropdown.style.display === 'block' && filteredCommunes.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        selectedIndex = Math.min(selectedIndex + 1, filteredCommunes.length - 1);
+                        updateSelectedItem();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        selectedIndex = Math.max(selectedIndex - 1, -1);
+                        updateSelectedItem();
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (selectedIndex >= 0 && selectedIndex < filteredCommunes.length) {
+                            var commune = filteredCommunes[selectedIndex];
+                            communeInput.value = commune.name || commune.code;
+                            communeValue.value = commune.code;
+                            var inputGroup = communeInput.closest('.input-group-outline');
+                            if (inputGroup) inputGroup.classList.add('is-filled');
+                            updateMaterialLabel(communeInput);
+                            communeDropdown.style.display = 'none';
+                        }
+                    } else if (e.key === 'Escape') {
+                        communeDropdown.style.display = 'none';
+                        selectedIndex = -1;
+                    }
+                }
+            });
+
+            // Ẩn dropdown khi click ra ngoài (dùng capture phase để chạy sau mousedown)
+            document.addEventListener('click', function(e) {
+                // Kiểm tra xem click có phải vào dropdown item không
+                var clickedItem = e.target.closest('.autocomplete-item');
+                if (clickedItem && communeDropdown.contains(clickedItem)) {
+                    return; // Không ẩn nếu click vào item
+                }
+                
+                if (!communeInput.contains(e.target) && !communeDropdown.contains(e.target)) {
+                    communeDropdown.style.display = 'none';
+                    selectedIndex = -1;
+                }
+            }, true);
+
+            // Xử lý khi focus vào input
+            communeInput.addEventListener('focus', function() {
+                var inputGroup = this.closest('.input-group-outline');
+                if (inputGroup) inputGroup.classList.add('is-filled');
+                
+                var val = this.value.trim();
+                if (val) {
+                    this.dispatchEvent(new Event('input'));
+                } else {
+                    if (communes.length > 0) {
+                        filteredCommunes = communes;
+                        showDropdown(filteredCommunes);
+                    }
+                }
+            });
+
+            // Xử lý khi blur (delay để cho phép click vào dropdown item)
+            communeInput.addEventListener('blur', function() {
+                var self = this;
+                setTimeout(function() {
+                    var val = self.value.trim();
+                    var inputGroup = self.closest('.input-group-outline');
+                    if (!val && inputGroup) {
+                        inputGroup.classList.remove('is-filled');
+                    }
+                    // Chỉ ẩn dropdown nếu không phải đang click vào dropdown
+                    if (document.activeElement !== communeDropdown && !communeDropdown.contains(document.activeElement)) {
+                        communeDropdown.style.display = 'none';
+                    }
+                }, 200);
+            });
+        }
+
+        // Lắng nghe thay đổi tỉnh/thành
+        var provinceInput = document.getElementById('provinceCode');
+        if (provinceInput) {
+            provinceInput.addEventListener('change', function() {
+                var provinceValue = document.getElementById('provinceCodeValue');
+                if (provinceValue && provinceValue.value) {
+                    loadCommunes(provinceValue.value);
+                }
+            });
+        }
+
+        // Xử lý submit form
+        var profileForm = document.getElementById('profileForm');
+        if (profileForm) {
+            profileForm.addEventListener('submit', function(e) {
+                var submitButton = profileForm.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Đang lưu...';
+                }
+            });
+        }
+
+        // Xử lý modal đổi mật khẩu
+        var changePasswordModal = document.getElementById('changePasswordModal');
+        if (changePasswordModal) {
+            // Reset form khi modal đóng
+            changePasswordModal.addEventListener('hidden.bs.modal', function() {
+                var changePasswordForm = document.getElementById('changePasswordForm');
+                if (changePasswordForm) {
+                    changePasswordForm.reset();
+                    // Reset validation
+                    var confirmPasswordInput = document.getElementById('confirmPassword');
+                    if (confirmPasswordInput) {
+                        confirmPasswordInput.setCustomValidity('');
+                    }
+                    // Reset labels
+                    var passwordInputs = changePasswordForm.querySelectorAll('.input-group-outline input');
+                    passwordInputs.forEach(function(input) {
+                        var inputGroup = input.closest('.input-group-outline');
+                        if (inputGroup) {
+                            inputGroup.classList.remove('is-filled');
+                        }
+                    });
+                }
+            });
+        }
+
+        // Hàm validate mật khẩu khớp
+        function validatePasswordMatch() {
+            var newPasswordInput = document.getElementById('newPassword');
+            var confirmPasswordInput = document.getElementById('confirmPassword');
+            
+            if (!newPasswordInput || !confirmPasswordInput) {
+                return true;
+            }
+            
+            var newPassword = newPasswordInput.value;
+            var confirmPassword = confirmPasswordInput.value;
+            
+            if (confirmPassword && newPassword !== confirmPassword) {
+                confirmPasswordInput.setCustomValidity('Mật khẩu xác nhận không khớp');
+                confirmPasswordInput.reportValidity();
+                return false;
+            } else {
+                confirmPasswordInput.setCustomValidity('');
+                return true;
+            }
+        }
+
+        // Xử lý form đổi mật khẩu
+        var changePasswordForm = document.getElementById('changePasswordForm');
+        if (changePasswordForm) {
+            // Validate mật khẩu mới và xác nhận
+            var newPasswordInput = document.getElementById('newPassword');
+            var confirmPasswordInput = document.getElementById('confirmPassword');
+            
+            if (newPasswordInput && confirmPasswordInput) {
+                newPasswordInput.addEventListener('input', validatePasswordMatch);
+                confirmPasswordInput.addEventListener('input', validatePasswordMatch);
+            }
+        }
+
+        // Xử lý nút đổi mật khẩu - gọi API
+        var changePasswordBtn = document.getElementById('changePasswordBtn');
+        if (changePasswordBtn) {
+            changePasswordBtn.addEventListener('click', function() {
+                var currentPassword = document.getElementById('currentPassword').value;
+                var newPassword = document.getElementById('newPassword').value;
+                var confirmPassword = document.getElementById('confirmPassword').value;
+                
+                // Validate form
+                if (!changePasswordForm.checkValidity()) {
+                    changePasswordForm.reportValidity();
+                    return;
+                }
+                
+                // Validate mật khẩu khớp
+                if (!validatePasswordMatch()) {
+                    return;
+                }
+                
+                // Disable nút và hiển thị loading
+                changePasswordBtn.disabled = true;
+                var originalText = changePasswordBtn.innerHTML;
+                changePasswordBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Đang đổi mật khẩu...';
+                
+                // Gọi API để đổi mật khẩu
+                // Lấy EmployeeId từ biến đã định nghĩa
+                if (!currentEmployeeId) {
+                    showAlert('Không tìm thấy mã nhân viên. Vui lòng đăng nhập lại.', 'danger');
+                    changePasswordBtn.disabled = false;
+                    changePasswordBtn.innerHTML = originalText;
+                    return;
+                }
+                
+                var changePasswordUrl = API_BASE_URL + '/api/ManageProfileAPI/change-password';
+                
+                console.log('Calling API:', changePasswordUrl);
+                console.log('EmployeeId:', currentEmployeeId);
+                
+                fetch(changePasswordUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        employeeId: currentEmployeeId,
+                        currentPassword: currentPassword,
+                        newPassword: newPassword,
+                        confirmPassword: confirmPassword
+                    })
+                })
+                .then(async response => {
+                    var data;
+                    try {
+                        data = await response.json();
+                    } catch (e) {
+                        data = { message: 'Đổi mật khẩu thất bại' };
+                    }
+                    
+                    if (!response.ok) {
+                        var errorMsg = data.message || data.error || 'Đổi mật khẩu thất bại';
+                        if (response.status === 405) {
+                            errorMsg = 'Endpoint không hỗ trợ method này. Vui lòng kiểm tra lại API endpoint: ' + changePasswordUrl;
+                        } else if (response.status === 404) {
+                            errorMsg = 'Không tìm thấy endpoint. Vui lòng kiểm tra lại API endpoint: ' + changePasswordUrl;
+                        }
+                        throw new Error(errorMsg);
+                    }
+                    return data;
+                })
+                .then(data => {
+                    // Thành công
+                    var modal = bootstrap.Modal.getInstance(document.getElementById('changePasswordModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    
+                    // Hiển thị thông báo thành công
+                    showAlert('Đổi mật khẩu thành công!', 'success');
+                    
+                    // Reset form
+                    changePasswordForm.reset();
+                    // Reset validation
+                    if (confirmPasswordInput) {
+                        confirmPasswordInput.setCustomValidity('');
+                    }
+                    // Reset labels
+                    var passwordInputs = changePasswordForm.querySelectorAll('.input-group-outline input');
+                    passwordInputs.forEach(function(input) {
+                        var inputGroup = input.closest('.input-group-outline');
+                        if (inputGroup) {
+                            inputGroup.classList.remove('is-filled');
+                        }
+                    });
+                })
+                .catch(error => {
+                    // Thất bại
+                    var errorMessage = error.message || 'Đổi mật khẩu thất bại. Vui lòng thử lại.';
+                    showAlert(errorMessage, 'danger');
+                })
+                .finally(() => {
+                    // Enable lại nút
+                    changePasswordBtn.disabled = false;
+                    changePasswordBtn.innerHTML = originalText;
+                });
+            });
+        }
+        
+        // Hàm hiển thị thông báo
+        function showAlert(message, type) {
+            var alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+            
+            // Xóa alert cũ nếu có (an toàn hơn)
+            var existingAlerts = document.querySelectorAll('.alert[role="alert"]');
+            existingAlerts.forEach(function(alert) {
+                try {
+                    if (alert && alert.parentNode) {
+                        alert.remove();
+                    }
+                } catch (e) {
+                    console.warn('Error removing alert:', e);
+                }
+            });
+            
+            // Tạo alert mới
+            var alertDiv = document.createElement('div');
+            alertDiv.className = 'alert ' + alertClass + ' alert-dismissible fade show';
+            alertDiv.setAttribute('role', 'alert');
+            alertDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+            alertDiv.innerHTML = message +
+                '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+            
+            // Thêm alert mới vào body
+            document.body.appendChild(alertDiv);
+            
+            // Tự động ẩn sau 5 giây
+            setTimeout(function() {
+                try {
+                    if (alertDiv && alertDiv.parentNode) {
+                        var bsAlert = bootstrap.Alert.getOrCreateInstance(alertDiv);
+                        bsAlert.close();
+                    }
+                } catch (e) {
+                    console.warn('Error closing alert:', e);
+                    if (alertDiv && alertDiv.parentNode) {
+                        alertDiv.remove();
+                    }
+                }
+            }, 5000);
+        }
+
+        // Khởi tạo
+        loadProvinces().then(function() {
+            // Setup commune autocomplete sau khi provinces đã load
+            setupCommuneAutocomplete();
+        }).catch(function(error) {
+            console.error('Error initializing provinces:', error);
+            // Vẫn setup commune autocomplete dù có lỗi
+            setupCommuneAutocomplete();
+        });
+        
+        // Thêm event listeners cho tất cả inputs để tự động update labels
+        document.querySelectorAll('.input-group-outline input').forEach(function(input) {
+            // Update label ngay lập tức nếu input đã có giá trị
+            if (input.value && input.value.trim() !== '') {
+                updateMaterialLabel(input);
+            }
+            
+            input.addEventListener('input', function() {
+                updateMaterialLabel(this);
+            });
+            input.addEventListener('focus', function() {
+                var inputGroup = this.closest('.input-group-outline');
+                if (inputGroup) {
+                    inputGroup.classList.add('is-focused');
+                }
+            });
+            input.addEventListener('blur', function() {
+                var inputGroup = this.closest('.input-group-outline');
+                if (inputGroup) {
+                    inputGroup.classList.remove('is-focused');
+                    updateMaterialLabel(this);
+                }
+            });
+        });
+        
+        // Đảm bảo tất cả inputs có giá trị đều được update label sau khi DOM ready
+        setTimeout(function() {
+            document.querySelectorAll('.input-group-outline input').forEach(function(input) {
+                if (input.value && input.value.trim() !== '') {
+                    updateMaterialLabel(input);
+                }
+            });
+        }, 200);
+    });
+</script>

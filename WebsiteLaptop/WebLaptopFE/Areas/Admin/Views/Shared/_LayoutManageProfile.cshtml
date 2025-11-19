@@ -125,7 +125,7 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white active bg-gradient-primary" asp-area="Admin" asp-controller="ManagePromotion" asp-action="Index">
+                    <a class="nav-link text-white" asp-area="Admin" asp-controller="ManagePromotion" asp-action="Index">
                         <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                             <i class="material-icons opacity-10">local_offer</i>
                         </div>
@@ -144,7 +144,7 @@
                     <h6 class="ps-4 ms-2 text-uppercase text-xs text-white font-weight-bolder opacity-8">Account pages</h6>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageProfile" asp-action="Index">
+                    <a class="nav-link text-white active bg-gradient-primary" asp-area="Admin" asp-controller="ManageProfile" asp-action="Index">
                         <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                             @{
                                 var avatar = Context.Session.GetString("Avatar");
@@ -152,9 +152,9 @@
                                 var config = Context.RequestServices.GetService(typeof(IConfiguration)) as IConfiguration;
                                 var apiBaseUrl = config?.GetValue<string>("ApiSettings:BaseUrl") ?? "http://localhost:5068";
                                 var imageBaseUrl = apiBaseUrl + "/imageEmployees";
-                                var avatarUrl = !string.IsNullOrEmpty(avatar)
-                                ? $"{imageBaseUrl}/{avatar}"
-                                : "/LayoutAdmin/assets/img/default-avatar.png";
+                                var avatarUrl = !string.IsNullOrEmpty(avatar) 
+                                    ? $"{imageBaseUrl}/{avatar}" 
+                                    : "/LayoutAdmin/assets/img/default-avatar.png";
                             }
                             <img src="@avatarUrl" alt="@employeeName" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover; border: 2px solid rgba(255, 255, 255, 0.3);">
                         </div>
@@ -277,3 +277,4 @@
 </body>
 
 </html>
+

@@ -151,23 +151,19 @@
                     </div>
                     <div class="row">
                         <div class="col-md-6">
-                            <div class="input-group input-group-outline mb-3">
-                                <label class="form-label">Tỉnh/Thành</label>
-                                <div class="autocomplete-wrapper position-relative" style="width: 100%;">
+                            <div class="input-group input-group-outline mb-3 autocomplete-wrapper position-relative w-100">
+                                <label class="form-label">Tỉnh/Thành</label>                          
                                     <input type="text" id="provinceCode" class="form-control" autocomplete="off">
                                     <input type="hidden" id="provinceCodeValue" value="">
                                     <div id="provinceCodeDropdown" class="autocomplete-dropdown"></div>
-                                </div>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="input-group input-group-outline mb-3">
+                            <div class="input-group input-group-outline mb-3 autocomplete-wrapper position-relative w-100">
                                 <label class="form-label">Phường/Xã</label>
-                                <div class="autocomplete-wrapper position-relative" style="width: 100%;">
                                     <input type="text" id="communeCode" class="form-control" autocomplete="off" disabled>
                                     <input type="hidden" id="communeCodeValue" value="">
                                     <div id="communeCodeDropdown" class="autocomplete-dropdown"></div>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -1775,8 +1771,63 @@
         display: block;
     }
 
-    /* Đảm bảo input trong autocomplete-wrapper có style giống các input khác */
+    /* Đảm bảo input-group-outline có autocomplete-wrapper có độ rộng đúng */
+    .input-group.input-group-outline.autocomplete-wrapper {
+        width: 100% !important;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+    }
+
+    /* Đảm bảo input trong input-group-outline.autocomplete-wrapper có style giống các input khác */
+    .input-group.input-group-outline.autocomplete-wrapper .form-control {
+        width: 100% !important;
+        max-width: 100% !important;
+        border: none;
+        border-bottom: 1px solid #d2d6da;
+        border-left: 1px solid #d2d6da;
+        border-right: 1px solid #d2d6da;
+        border-radius: 0;
+        padding-left: 0;
+        padding-right: 0;
+        background: transparent;
+        background-image: none;
+        box-shadow: none;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        flex: 1 1 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .input-group.input-group-outline.autocomplete-wrapper .form-control:focus {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+        box-shadow: none;
+        outline: 0;
+    }
+
+    .input-group.input-group-outline.autocomplete-wrapper.is-filled .form-control {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+    }
+
+    .input-group.input-group-outline.autocomplete-wrapper.is-focused .form-control {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+        box-shadow: none;
+    }
+
+    /* Đảm bảo input trong autocomplete-wrapper con (nếu có cấu trúc khác) */
+    .input-group-outline .autocomplete-wrapper {
+        width: 100%;
+        display: block;
+    }
+
     .input-group-outline .autocomplete-wrapper .form-control {
+        width: 100%;
         border: none;
         border-bottom: 1px solid #d2d6da;
         border-left: 1px solid #d2d6da;
