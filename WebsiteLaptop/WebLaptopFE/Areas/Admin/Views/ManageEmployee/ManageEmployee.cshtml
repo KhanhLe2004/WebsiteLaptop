@@ -436,6 +436,8 @@
             $('#password').on('input', function() {
                 const length = $(this).val().length;
                 $(this).data('password-length', length);
+                // Đánh dấu password đã được thay đổi
+                $(this).data('password-changed', true);
                 // Nếu đang edit và người dùng bắt đầu nhập, đổi về type="password"
                 const isEditMode = $('#isEditMode').val() === 'true';
                 if (isEditMode && $(this).attr('type') === 'text' && length > 0) {
@@ -456,7 +458,7 @@
                     if (value && value.match(/^\*+$/)) {
                         // Đang hiển thị dấu *, clear và đổi về password để người dùng nhập mới
                         const savedLength = value.length; // Lưu độ dài dấu * hiện tại
-                        $(this).attr('type', 'password').val('').data('password-length', 0).data('saved-star-length', savedLength);
+                        $(this).attr('type', 'password').val('').data('password-length', 0).data('saved-star-length', savedLength).data('password-changed', false);
                     }
                 }
             });
@@ -466,11 +468,13 @@
                 const isEditMode = $('#isEditMode').val() === 'true';
                 if (isEditMode && $(this).attr('type') === 'password') {
                     const value = $(this).val();
+                    const passwordChanged = $(this).data('password-changed');
+                    // Nếu không có giá trị hoặc giá trị rỗng, hiển thị lại dấu * và đánh dấu chưa thay đổi
                     if (!value || value.trim() === '') {
-                        // Không có giá trị mới, hiển thị lại dấu *
-                        const savedLength = parseInt($(this).data('saved-star-length')) || 8;
-                        $(this).attr('type', 'text').val('*'.repeat(savedLength)).data('password-length', savedLength);
+                        const savedLength = parseInt($(this).data('saved-star-length')) || parseInt($(this).data('password-length')) || 8;
+                        $(this).attr('type', 'text').val('*'.repeat(savedLength)).data('password-length', savedLength).data('password-changed', false);
                     }
+                    // Nếu có giá trị nhưng chưa được đánh dấu là đã thay đổi, vẫn giữ nguyên (trường hợp hiếm)
                 }
             });
         });
@@ -1485,6 +1489,9 @@
             $('#imagePreview').hide();
             $('#errorMessage').hide();
             
+            // Reset password field
+            $('#password').attr('type', 'password').val('').data('password-length', 0).data('password-changed', false).removeData('saved-star-length');
+            
             // Xóa class edit-mode và attribute value, data-has-input khỏi input date (để ẩn dd/mm/yyyy)
             $('#dateOfBirth').closest('.input-group-outline').removeClass('edit-mode');
             $('#dateOfBirth').removeAttr('value').removeAttr('data-has-input');
@@ -1936,7 +1943,7 @@
             // Không fill password vì lý do bảo mật
             // Sử dụng độ dài mật khẩu từ API (passwordLength) hoặc mặc định 8
             const passwordLength = employee.passwordLength || 8;
-            $('#password').val('').data('password-length', passwordLength);
+            $('#password').val('').data('password-length', passwordLength).data('password-changed', false).data('saved-star-length', passwordLength);
             
             // Nếu đang ở chế độ xem hoặc sửa và nhân viên có username (có mật khẩu)
             // thì hiển thị dấu * ngay lập tức với độ dài thực
@@ -1945,7 +1952,7 @@
                     // Có username và có độ dài mật khẩu, hiển thị dấu * với độ dài thực
                     setTimeout(function() {
                         const passwordInput = $('#password');
-                        passwordInput.attr('type', 'text').val('*'.repeat(passwordLength));
+                        passwordInput.attr('type', 'text').val('*'.repeat(passwordLength)).data('password-changed', false);
                     }, 100);
                 }
             }
@@ -2031,10 +2038,35 @@
             formData.append('BranchesId', $('#branchesIdValue').val() || '');
             formData.append('RoleId', $('#roleIdValue').val() || '');
             
-            // Chỉ gửi password nếu có giá trị
+            // Chỉ gửi password nếu có giá trị thực sự (không phải dấu *) và đã được thay đổi
             const password = $('#password').val();
-            if (password) {
-                formData.append('Password', password);
+            const passwordChanged = $('#password').data('password-changed');
+            const passwordInput = $('#password');
+            const isPasswordType = passwordInput.attr('type') === 'password';
+            
+            // Chỉ gửi password nếu:
+            // 1. Đang thêm mới (không phải edit) và có giá trị
+            // 2. HOẶC đang edit và:
+            //    - Input đang ở type="password" (người dùng đã nhập mật khẩu mới)
+            //    - HOẶC password đã được thay đổi (passwordChanged = true) và không phải toàn dấu *
+            //    - VÀ có giá trị thực sự
+            if (!isEdit) {
+                // Thêm mới: gửi password nếu có giá trị
+                if (password && password.trim() !== '') {
+                    formData.append('Password', password);
+                }
+            } else {
+                // Sửa: chỉ gửi password nếu:
+                // - Input đang ở type="password" (người dùng đã nhập mật khẩu mới thực sự)
+                // - HOẶC password đã được thay đổi và không phải toàn dấu *
+                if (isPasswordType && password && password.trim() !== '') {
+                    // Input đang ở type="password" nghĩa là người dùng đã nhập mật khẩu mới
+                    formData.append('Password', password);
+                } else if (passwordChanged && password && !password.match(/^\*+$/) && password.trim() !== '') {
+                    // Password đã được thay đổi và không phải dấu *
+                    formData.append('Password', password);
+                }
+                // Nếu không thỏa điều kiện trên, không gửi password -> server sẽ giữ nguyên mật khẩu cũ
             }
 
             const avatarFile = $('#avatarFile')[0].files[0];
@@ -2225,7 +2257,7 @@
             // Reset form
             $('#employeeForm')[0].reset();
             // Reset password về type="password" và clear data
-            $('#password').attr('type', 'password').val('').data('password-length', 0);
+            $('#password').attr('type', 'password').val('').data('password-length', 0).data('password-changed', false).removeData('saved-star-length');
             // Reset input date: xóa attribute value và data-has-input để ẩn dd/mm/yyyy
             $('#dateOfBirth').removeAttr('value').removeAttr('data-has-input');
             $('#errorMessage').hide();
