@@ -14,10 +14,10 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class CustomerAccountAPIController : ControllerBase
     {
-        private readonly Testlaptop33Context _db;
+        private readonly Testlaptop35Context _db;
         private readonly IWebHostEnvironment _environment;
 
-        public CustomerAccountAPIController(Testlaptop33Context db, IWebHostEnvironment environment)
+        public CustomerAccountAPIController(Testlaptop35Context db, IWebHostEnvironment environment)
         {
             _db = db;
             _environment = environment;
@@ -53,7 +53,9 @@ namespace WebLaptopBE.Controllers
                     customer.Username,
                     customer.Avatar,
                     customer.Active,
-                    customer.DateOfBirth
+                    customer.DateOfBirth,
+                    // Thêm password để frontend kiểm tra loại đăng nhập (không trả về password thực)
+                    IsOAuthLogin = customer.Password == "GOOGLE_OAUTH" || customer.Password == "FACEBOOK_OAUTH"
                 });
             }
             catch (Exception ex)
@@ -254,6 +256,11 @@ namespace WebLaptopBE.Controllers
                 if (!string.IsNullOrWhiteSpace(request.Address))
                 {
                     customer.Address = request.Address.Trim();
+                }
+                else
+                {
+                    // Nếu address là null hoặc empty, set về null
+                    customer.Address = null;
                 }
 
                 DateOnly? dob = request.DateOfBirth;

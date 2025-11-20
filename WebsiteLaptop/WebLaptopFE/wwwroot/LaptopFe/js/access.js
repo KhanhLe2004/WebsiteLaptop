@@ -444,7 +444,7 @@
 
             // Sử dụng popup window để đăng nhập Facebook (hoạt động với cả HTTP và HTTPS)
             const redirectUri = encodeURIComponent(window.location.origin + '/User/FacebookCallback');
-            const facebookAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=public_profile&response_type=token&display=popup`;
+            const facebookAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=public_profile,email&response_type=token&display=popup`;
             
             // Mở popup
             const width = 600;

@@ -14,7 +14,7 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class LoginAPIController : ControllerBase
     {
-        private readonly Testlaptop33Context _db = new();
+        private readonly Testlaptop35Context _db = new();
         private readonly IConfiguration _configuration;
 
         public LoginAPIController(IConfiguration configuration)
@@ -188,8 +188,9 @@ namespace WebLaptopBE.Controllers
                         return Unauthorized(new { message = "Tài khoản của bạn đã bị khóa" });
                     }
 
-                    // Cập nhật avatar nếu có
-                    if (!string.IsNullOrEmpty(payload.Picture) && customer.Avatar != payload.Picture)
+                    // Chỉ cập nhật avatar nếu customer chưa có avatar (chưa upload ảnh)
+                    // Không ghi đè avatar mà user đã upload
+                    if (string.IsNullOrEmpty(customer.Avatar) && !string.IsNullOrEmpty(payload.Picture))
                     {
                         var customerToUpdate = _db.Customers.FirstOrDefault(c => c.CustomerId == customer.CustomerId);
                         if (customerToUpdate != null)
@@ -205,6 +206,17 @@ namespace WebLaptopBE.Controllers
                             {
                                 customer.CustomerName = payload.Name;
                             }
+                        }
+                    }
+                    else if (string.IsNullOrEmpty(customer.CustomerName) && !string.IsNullOrEmpty(payload.Name))
+                    {
+                        // Chỉ cập nhật tên nếu chưa có tên
+                        var customerToUpdate = _db.Customers.FirstOrDefault(c => c.CustomerId == customer.CustomerId);
+                        if (customerToUpdate != null)
+                        {
+                            customerToUpdate.CustomerName = payload.Name;
+                            _db.SaveChanges();
+                            customer.CustomerName = payload.Name;
                         }
                     }
                 }
@@ -275,7 +287,7 @@ namespace WebLaptopBE.Controllers
             return username;
         }
 
-        private string? TruncateAvatarUrl(string? url, int maxLength = 100)
+        private string? TruncateAvatarUrl(string? url, int maxLength = 200)
         {
             if (string.IsNullOrEmpty(url))
             {
@@ -321,10 +333,37 @@ namespace WebLaptopBE.Controllers
                 using var httpClient = new HttpClient();
                 try
                 {
-                    // Lấy thông tin user từ Facebook - chỉ lấy public_profile (không yêu cầu email)
+                    // Lấy thông tin user từ Facebook - lấy id, name, email, picture
                     // Request picture với width nhỏ hơn để có URL ngắn hơn
-                    var userInfoResponse = await httpClient.GetAsync($"https://graph.facebook.com/me?fields=id,name,picture.width(200).height(200)&access_token={request.AccessToken}");
+                    var userInfoResponse = await httpClient.GetAsync($"https://graph.facebook.com/me?fields=id,name,email,picture.width(200).height(200)&access_token={request.AccessToken}");
                     var responseContent = await userInfoResponse.Content.ReadAsStringAsync();
+                    
+                    // Nếu không có email trong response, thử request riêng email
+                    string? emailFromSeparateRequest = null;
+                    if (!responseContent.Contains("\"email\""))
+                    {
+                        System.Diagnostics.Debug.WriteLine("Không tìm thấy email trong response đầu tiên, thử request riêng email...");
+                        try
+                        {
+                            var emailResponse = await httpClient.GetAsync($"https://graph.facebook.com/me?fields=email&access_token={request.AccessToken}");
+                            var emailContent = await emailResponse.Content.ReadAsStringAsync();
+                            System.Diagnostics.Debug.WriteLine($"Email response: {emailContent}");
+                            
+                            if (emailResponse.IsSuccessStatusCode)
+                            {
+                                var emailDoc = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(emailContent);
+                                if (emailDoc.TryGetProperty("email", out var emailElement))
+                                {
+                                    emailFromSeparateRequest = emailElement.GetString();
+                                    System.Diagnostics.Debug.WriteLine($"Đã lấy được email từ request riêng: {emailFromSeparateRequest}");
+                                }
+                            }
+                        }
+                        catch (Exception emailEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Lỗi khi request email riêng: {emailEx.Message}");
+                        }
+                    }
                     
                     if (!userInfoResponse.IsSuccessStatusCode)
                     {
@@ -347,9 +386,13 @@ namespace WebLaptopBE.Controllers
                         return Unauthorized(new { message = "Access token Facebook không hợp lệ hoặc đã hết hạn", details = responseContent });
                     }
 
+                    // Log response để debug
+                    System.Diagnostics.Debug.WriteLine($"Facebook API Response: {responseContent}");
+                    
                     // Parse user info - sử dụng JsonElement để linh hoạt hơn
                     string? facebookId = null;
                     string? name = null;
+                    string? email = null;
                     string? pictureUrl = null;
                     
                     try
@@ -360,12 +403,31 @@ namespace WebLaptopBE.Controllers
                         if (jsonDoc.TryGetProperty("id", out var idElement))
                         {
                             facebookId = idElement.GetString();
+                            System.Diagnostics.Debug.WriteLine($"Facebook ID: {facebookId}");
                         }
                         
                         // Lấy name
                         if (jsonDoc.TryGetProperty("name", out var nameElement))
                         {
                             name = nameElement.GetString();
+                            System.Diagnostics.Debug.WriteLine($"Facebook Name: {name}");
+                        }
+                        
+                        // Lấy email
+                        if (jsonDoc.TryGetProperty("email", out var emailElement))
+                        {
+                            email = emailElement.GetString();
+                            System.Diagnostics.Debug.WriteLine($"Facebook Email: {email}");
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine("Facebook không trả về email trong response chính - có thể do chưa được cấp quyền hoặc app chưa được review");
+                            // Sử dụng email từ request riêng nếu có
+                            if (!string.IsNullOrEmpty(emailFromSeparateRequest))
+                            {
+                                email = emailFromSeparateRequest;
+                                System.Diagnostics.Debug.WriteLine($"Sử dụng email từ request riêng: {email}");
+                            }
                         }
                         
                         // Lấy picture - Facebook có thể trả về nhiều format
@@ -403,13 +465,24 @@ namespace WebLaptopBE.Controllers
                         return Unauthorized(new { message = "Không thể lấy thông tin từ Facebook", details = responseContent });
                     }
 
-                    // Tạo email từ Facebook ID (vì không yêu cầu email permission)
-                    var email = $"fb_{facebookId}@facebook.temp";
+                    // Sử dụng email từ Facebook nếu có, nếu không thì để null (không tạo email tạm)
+                    if (string.IsNullOrEmpty(email))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Không lấy được email từ Facebook, để email = null");
+                        email = null;
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Đã lấy được email từ Facebook: {email}");
+                    }
 
-                    // Tìm customer bằng email hoặc username từ Facebook ID
+                    // Tìm customer bằng email (nếu có) hoặc username từ Facebook ID
+                    // Không tìm bằng email tạm (email có dạng fb_*@facebook.temp)
                     var usernameFromId = $"fb_{facebookId}";
                     var existingCustomer = _db.Customers
-                        .FirstOrDefault(c => c.Email == email || c.Username == usernameFromId);
+                        .FirstOrDefault(c => 
+                            (!string.IsNullOrEmpty(email) && c.Email == email && !c.Email.EndsWith("@facebook.temp")) || 
+                            c.Username == usernameFromId);
 
                     Customer? customer = null;
                     
@@ -437,25 +510,25 @@ namespace WebLaptopBE.Controllers
                             }
                         }
                         
-                        // Đảm bảo Email không trùng
+                        // Đảm bảo Email không trùng (chỉ nếu có email)
                         var finalEmail = email;
-                        if (_db.Customers.Any(c => c.Email == finalEmail))
+                        if (!string.IsNullOrEmpty(finalEmail) && _db.Customers.Any(c => c.Email == finalEmail))
                         {
-                            finalEmail = $"fb_{facebookId}_{Guid.NewGuid():N}@facebook.temp";
+                            // Nếu email trùng, để null thay vì tạo email tạm
+                            finalEmail = null;
                         }
                         
                         // Tạo customer mới từ Facebook
-                        // Không lưu avatar URL từ Facebook vì URL thường quá dài (giới hạn database)
-                        // User có thể upload avatar sau khi đăng nhập
-                        // Avatar từ Facebook sẽ được bỏ qua để tránh lỗi database
+                        // Lưu avatar URL từ Facebook (đã được rút ngắn bằng cách request picture nhỏ hơn)
+                        // Nếu URL vẫn quá dài, sẽ được xử lý bởi TruncateAvatarUrl
                         
                         var newCustomer = new Customer
                         {
                             CustomerId = customerId,
                             CustomerName = name ?? $"Facebook User {facebookId}",
-                            Email = finalEmail,
+                            Email = finalEmail, // Có thể là null nếu không lấy được email
                             Username = finalUsername,
-                            Avatar = null, // Không lưu URL từ Facebook (quá dài), user có thể upload sau
+                            Avatar = TruncateAvatarUrl(pictureUrl, 200), // Lưu avatar URL (rút ngắn nếu cần)
                             Active = true,
                             Password = "FACEBOOK_OAUTH", // Đánh dấu đăng nhập bằng Facebook
                             Address = string.Empty // Đảm bảo không null
@@ -542,16 +615,44 @@ namespace WebLaptopBE.Controllers
                             return Unauthorized(new { message = "Tài khoản của bạn đã bị khóa" });
                         }
 
-                        // Cập nhật tên nếu cần
-                        // Không cập nhật avatar từ Facebook URL vì thường quá dài (giới hạn database)
+                        // Cập nhật thông tin nếu cần
                         bool hasChanges = false;
                         
-                        // Bỏ qua avatar từ Facebook (URL quá dài, không lưu được)
-                        
+                        // Cập nhật tên nếu cần
                         if (string.IsNullOrEmpty(customer.CustomerName) && !string.IsNullOrEmpty(name))
                         {
                             customer.CustomerName = name;
                             hasChanges = true;
+                        }
+                        
+                        // Xóa email tạm nếu có (email có dạng fb_*@facebook.temp)
+                        if (!string.IsNullOrEmpty(customer.Email) && customer.Email.EndsWith("@facebook.temp"))
+                        {
+                            customer.Email = null; // Xóa email tạm
+                            hasChanges = true;
+                        }
+                        
+                        // Cập nhật email nếu customer chưa có email và có email từ Facebook
+                        if (!string.IsNullOrEmpty(email) && string.IsNullOrEmpty(customer.Email))
+                        {
+                            // Kiểm tra email mới không trùng với email khác
+                            if (!_db.Customers.Any(c => c.CustomerId != customer.CustomerId && c.Email == email))
+                            {
+                                customer.Email = email;
+                                hasChanges = true;
+                            }
+                        }
+                        
+                        // Chỉ cập nhật avatar nếu customer chưa có avatar (chưa upload ảnh)
+                        // Không ghi đè avatar mà user đã upload
+                        if (string.IsNullOrEmpty(customer.Avatar) && !string.IsNullOrEmpty(pictureUrl))
+                        {
+                            var truncatedAvatar = TruncateAvatarUrl(pictureUrl, 200);
+                            if (truncatedAvatar != null)
+                            {
+                                customer.Avatar = truncatedAvatar;
+                                hasChanges = true;
+                            }
                         }
                         
                         if (hasChanges)

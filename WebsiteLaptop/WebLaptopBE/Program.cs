@@ -6,7 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 
 // Đăng ký DbContext
-builder.Services.AddDbContext<Testlaptop33Context>(options =>
+builder.Services.AddDbContext<Testlaptop35Context>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection") 
         ?? "Data Source=DESKTOP-4SKINCH\\SQLEXPRESS;Initial Catalog=testlaptop33;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False"));
 
