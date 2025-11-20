@@ -38,7 +38,12 @@
 
             <nav class="nav flex-column account-menu">
               <a href="#tab-profile" class="nav-link active" data-bs-toggle="tab"><i class="fas fa-user-edit me-2"></i> Thông tin cá nhân</a>
-              <a href="#tab-your-orders" class="nav-link" data-bs-toggle="tab"><i class="fas fa-shopping-cart me-2"></i> Đơn hàng của bạn</a>
+              <a href="#tab-your-orders" class="nav-link position-relative" data-bs-toggle="tab">
+                <i class="fas fa-shopping-cart me-2 position-relative">
+                  <span id="orderCountBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-circle bg-warning text-dark" style="display: none; font-size: 0.65rem; padding: 2px 5px; min-width: 18px; height: 18px; line-height: 1.2; font-weight: 600;">0</span>
+                </i>
+                Đơn hàng của bạn
+              </a>
               <a href="#tab-history" class="nav-link" data-bs-toggle="tab"><i class="fas fa-box-open me-2"></i> Lịch sử mua hàng</a>
               <a href="#" class="nav-link text-danger" id="btnLogout"><i class="fas fa-sign-out-alt me-2"></i> Đăng xuất</a>
             </nav>
@@ -740,10 +745,64 @@
             $('input[name=phone]').val(customer?.phoneNumber || customer?.PhoneNumber || '');
             setDateOfBirth(customer?.dateOfBirth || customer?.DateOfBirth);
 
-            const avatar = customer?.avatar || customer?.Avatar || '../LaptopFe/img/avatar.jpg';
-            $('#avatarImg').attr('src', avatar).on('error', function() {
-                $(this).attr('src', '../LaptopFe/img/avatar.jpg');
-            });
+            // Xử lý avatar - lấy từ imageCustomers nếu có
+            const defaultAvatar = '../LaptopFe/img/avatar.jpg';
+            const avatarFileName = customer?.avatar || customer?.Avatar;
+            console.log('Avatar from customer data:', avatarFileName);
+            
+            const $avatarImg = $('#avatarImg');
+            $avatarImg.off('error'); // Xóa event handler cũ nếu có
+            
+            // Hàm thử load ảnh với nhiều đường dẫn khác nhau
+            function tryLoadAvatar(paths, index = 0) {
+                if (index >= paths.length) {
+                    console.log('All avatar paths failed, using default');
+                    $avatarImg.attr('src', defaultAvatar);
+                    return;
+                }
+                
+                const currentPath = paths[index];
+                console.log(`Trying avatar path ${index + 1}/${paths.length}:`, currentPath);
+                
+                const img = new Image();
+                img.onload = function() {
+                    console.log('Avatar loaded successfully from:', currentPath);
+                    $avatarImg.attr('src', currentPath);
+                };
+                img.onerror = function() {
+                    console.log('Avatar load failed from:', currentPath);
+                    tryLoadAvatar(paths, index + 1);
+                };
+                img.src = currentPath;
+            }
+            
+            // Tạo danh sách các đường dẫn để thử
+            const avatarPaths = [];
+            
+            if (avatarFileName && avatarFileName.trim()) {
+                // Nếu avatar là tên file (không có đường dẫn)
+                if (!avatarFileName.includes('/') && !avatarFileName.includes('\\') && !avatarFileName.startsWith('http')) {
+                    // Thử các đường dẫn khác nhau theo thứ tự ưu tiên
+                    avatarPaths.push(`/imageCustomers/${avatarFileName}`); // Tuyệt đối từ root (wwwroot)
+                    avatarPaths.push(`../imageCustomers/${avatarFileName}`); // Tương đối
+                    // Nếu có API_BASE và khác với origin hiện tại, thử từ BE
+                    if (API_BASE && window.location && !API_BASE.includes(window.location.origin)) {
+                        avatarPaths.push(`${API_BASE.replace('/api/CustomerAccount', '')}/imageCustomers/${avatarFileName}`);
+                    }
+                } else if (avatarFileName.startsWith('http')) {
+                    // URL đầy đủ
+                    avatarPaths.push(avatarFileName);
+                } else {
+                    // Đường dẫn tương đối hoặc đầy đủ
+                    avatarPaths.push(avatarFileName);
+                }
+            }
+            
+            // Luôn thêm default avatar vào cuối
+            avatarPaths.push(defaultAvatar);
+            
+            // Thử load ảnh
+            tryLoadAvatar(avatarPaths);
             $('#userName').text(customer?.customerName || customer?.CustomerName || 'Tên khách hàng');
             $('.text-muted.small').first().text(customer?.username || customer?.Username || 'username');
 
@@ -937,31 +996,26 @@
                 return '<span class="badge bg-secondary">Chưa xác định</span>';
             }
             
-            const text = status.toString().trim().toLowerCase();
-            console.log('Building status badge for:', status, '-> normalized:', text);
+            // Giữ nguyên status từ database
+            const statusText = status.toString().trim();
+            const text = statusText.toLowerCase();
+            console.log('Building status badge for:', statusText, '-> normalized:', text);
             
-            // Kiểm tra các trạng thái phổ biến
-            if (text.includes('đang xử lý') || text.includes('processing') || text.includes('pending') || text.includes('chờ xử lý')) {
-                return '<span class="badge bg-warning text-dark">Đang xử lý</span>';
-            }
-            if (text.includes('đã gửi') || text.includes('shipped') || text.includes('đang giao') || text.includes('delivering')) {
-                return '<span class="badge bg-info text-dark">Đã gửi</span>';
-            }
-            if (text.includes('hoàn thành') || text.includes('completed') || text.includes('done') || text.includes('finished')) {
-                return '<span class="badge bg-success text-white">Hoàn thành</span>';
-            }
-            if (text.includes('đã hủy') || text.includes('canceled') || text.includes('cancelled') || text.includes('hủy')) {
-                return '<span class="badge bg-danger text-white">Đã hủy</span>';
-            }
-            if (text.includes('chờ thanh toán') || text.includes('pending payment') || text.includes('waiting payment')) {
-                return '<span class="badge bg-warning text-dark">Chờ thanh toán</span>';
-            }
-            if (text.includes('đã xác nhận') || text.includes('confirmed')) {
-                return '<span class="badge bg-primary text-white">Đã xác nhận</span>';
+            // Xác định màu badge dựa trên status (so sánh với text đã lowercase)
+            let badgeClass = 'bg-secondary'; // Mặc định
+            
+            if (text.includes('chờ xử lý')) {
+                badgeClass = 'bg-warning text-dark';
+            } else if (text.includes('đang xử lý')) {
+                badgeClass = 'bg-info text-dark';
+            } else if (text.includes('hoàn thành')) {
+                badgeClass = 'bg-success text-white';
+            } else if (text.includes('đã hủy')) {
+                badgeClass = 'bg-danger text-white';
             }
             
-            // Nếu không khớp, trả về trạng thái gốc với badge secondary
-            return `<span class="badge bg-secondary">${status}</span>`;
+            // Hiển thị đúng status từ database với màu badge tương ứng
+            return `<span class="badge ${badgeClass}">${statusText}</span>`;
         }
 
         /* ------------ Orders ------------ */
@@ -983,6 +1037,7 @@
                 const orderId = order.saleInvoiceId || order.SaleInvoiceId || '';
                 const date = formatDate(order.timeCreate || order.TimeCreate);
                 const statusValue = order.status || order.Status || '';
+                const statusText = statusValue.toString().trim().toLowerCase();
                 console.log('Order status for', orderId, ':', statusValue);
                 const statusBadge = buildStatusBadge(statusValue);
                 const total = formatCurrency(order.totalAmount || order.TotalAmount);
@@ -996,17 +1051,39 @@
                     totalAmount: order.totalAmount || order.TotalAmount
                 };
 
+                // Chỉ hiển thị nút "Hủy đơn hàng" khi trạng thái là "Chờ xử lý"
+                const canCancel = statusText.includes('chờ xử lý');
+                const cancelButton = canCancel 
+                    ? `<button class="btn btn-sm btn-outline-danger ms-2 cancel-order" data-order-id="${orderId}">Hủy đơn hàng</button>`
+                    : '';
+
                 return `
                     <tr data-order-json='${JSON.stringify(payload)}'>
                         <td>#${orderId}</td>
                         <td>${date}</td>
                         <td>${statusBadge}</td>
                         <td>${total}</td>
-                        <td><button class="btn btn-sm btn-outline-primary view-order" data-order-id="${orderId}">Chi tiết</button></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary view-order" data-order-id="${orderId}">Chi tiết</button>
+                            ${cancelButton}
+                        </td>
                     </tr>`;
             });
 
             $body.html(rows.join(''));
+        }
+
+        // Hàm cập nhật số lượng đơn hàng trong menu sidebar
+        function updateOrderCountBadge(orderCount) {
+            const badge = document.getElementById('orderCountBadge');
+            if (badge) {
+                if (orderCount > 0) {
+                    badge.textContent = orderCount;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
         }
 
         async function loadCustomerOrders() {
@@ -1019,10 +1096,31 @@
                 const response = await fetch(`${CUSTOMER_API_BASE}/${currentCustomerId}/orders`, { credentials: 'same-origin' });
                 if (!response.ok) throw new Error('Không thể tải đơn hàng');
                 const orders = await response.json();
+                const orderCount = Array.isArray(orders) ? orders.length : 0;
+                
+                // Cập nhật badge số lượng đơn hàng trong menu
+                updateOrderCountBadge(orderCount);
+                
                 renderOrders('#yourOrdersBody', orders, 'Chưa có đơn hàng nào');
+                
+                // Trigger event để cập nhật số lượng đơn hàng trong header
+                $(document).trigger('orderUpdated');
+                if (typeof window.updateOrderCount === 'function') {
+                    window.updateOrderCount();
+                }
+                document.dispatchEvent(new Event('orderUpdated'));
             } catch (err) {
                 console.error('loadCustomerOrders error:', err);
                 renderOrders('#yourOrdersBody', [], 'Không thể tải đơn hàng');
+                // Cập nhật badge về 0 khi có lỗi
+                updateOrderCountBadge(0);
+                
+                // Vẫn trigger event để cập nhật (có thể không có đơn hàng)
+                $(document).trigger('orderUpdated');
+                if (typeof window.updateOrderCount === 'function') {
+                    window.updateOrderCount();
+                }
+                document.dispatchEvent(new Event('orderUpdated'));
             }
         }
 
@@ -1136,6 +1234,59 @@
             modal.show();
         }
 
+        async function handleCancelOrder(e) {
+            e.preventDefault();
+            const orderId = $(this).data('order-id');
+            if (!orderId) {
+                showAlert('danger', 'Mã đơn hàng không hợp lệ');
+                return;
+            }
+
+            // Xác nhận trước khi hủy
+            if (!confirm('Bạn có chắc chắn muốn hủy đơn hàng này không?')) {
+                return;
+            }
+
+            const $btn = $(this);
+            const originalText = $btn.html();
+            $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...');
+
+            try {
+                const response = await fetch(`${CUSTOMER_API_BASE}/order/${orderId}/cancel`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin'
+                });
+
+                const responseText = await response.text();
+                let data = null;
+                if (responseText) {
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (parseError) {
+                        console.error('Failed to parse response:', responseText);
+                    }
+                }
+
+                if (!response.ok) {
+                    const errorMessage = data?.message || responseText || `Lỗi ${response.status}: ${response.statusText}`;
+                    throw new Error(errorMessage);
+                }
+
+                showAlert('success', data?.message || 'Hủy đơn hàng thành công');
+                
+                // Reload danh sách đơn hàng (sẽ tự động cập nhật badge)
+                setTimeout(() => {
+                    loadCustomerOrders();
+                }, 1000);
+            } catch (err) {
+                console.error('handleCancelOrder error:', err);
+                showAlert('danger', err.message || 'Không thể hủy đơn hàng. Vui lòng thử lại sau.');
+            } finally {
+                $btn.prop('disabled', false).html(originalText);
+            }
+        }
+
         // Initialize - Đảm bảo jQuery đã sẵn sàng
         $(document).ready(function () {
             console.log('Account page initialized');
@@ -1162,12 +1313,100 @@
             loadCustomerData();
             loadCustomerOrders();
             loadCustomerHistory();
+            
+            // Trigger event để cập nhật số lượng đơn hàng trong header sau khi load
+            setTimeout(function() {
+                $(document).trigger('orderUpdated');
+                if (typeof window.updateOrderCount === 'function') {
+                    window.updateOrderCount();
+                }
+                document.dispatchEvent(new Event('orderUpdated'));
+            }, 500);
 
             $('#toggleEditProfile').on('click', handleToggleEdit);
             $('#profileForm').on('submit', handleProfileSubmit);
             $('#passwordForm').on('submit', handlePasswordSubmit);
             $('#btnLogout').on('click', handleLogout);
             $(document).on('click', '.view-order', handleViewOrder);
+            $(document).on('click', '.cancel-order', handleCancelOrder);
+            
+            // Xử lý upload avatar
+            $('#btnUploadAvatar').on('click', function() {
+                $('#avatarInput').click();
+            });
+            
+            $('#avatarInput').on('change', async function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                // Kiểm tra loại file
+                if (!file.type.startsWith('image/')) {
+                    showToast('danger', 'Chỉ chấp nhận file ảnh');
+                    $(this).val('');
+                    return;
+                }
+                
+                // Kiểm tra kích thước (10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    showToast('danger', 'Kích thước file không được vượt quá 10MB');
+                    $(this).val('');
+                    return;
+                }
+                
+                // Hiển thị preview
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    $('#avatarImg').attr('src', e.target.result);
+                };
+                reader.readAsDataURL(file);
+                
+                // Upload lên server
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    
+                    const apiBase = window.CUSTOMER_API_BASE || 'http://localhost:5068/api/CustomerAccount';
+                    const response = await fetch(`${apiBase}/${currentCustomerId}/avatar`, {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'same-origin'
+                    });
+                    
+                    const responseText = await response.text();
+                    let data = {};
+                    if (responseText && responseText.trim()) {
+                        try {
+                            data = JSON.parse(responseText);
+                        } catch (parseErr) {
+                            console.error('JSON parse error:', parseErr);
+                        }
+                    }
+                    
+                    if (response.ok) {
+                        showToast('success', data.message || 'Cập nhật avatar thành công');
+                        // Cập nhật lại avatar trong sessionStorage nếu có
+                        if (data.avatar) {
+                            const customer = JSON.parse(sessionStorage.getItem('customer') || '{}');
+                            customer.avatar = data.avatar;
+                            customer.Avatar = data.avatar;
+                            sessionStorage.setItem('customer', JSON.stringify(customer));
+                        }
+                        // Reload customer info để cập nhật avatar
+                        await loadCustomerData();
+                    } else {
+                        showToast('danger', data.message || 'Không thể cập nhật avatar');
+                        // Khôi phục avatar cũ
+                        await loadCustomerData();
+                    }
+                } catch (err) {
+                    console.error('Upload avatar error:', err);
+                    showToast('danger', 'Lỗi khi upload avatar');
+                    // Khôi phục avatar cũ
+                    await loadCustomerInfo();
+                } finally {
+                    $(this).val('');
+                }
+            });
         });
     })(jQuery);
 </script>
@@ -1220,6 +1459,29 @@
     .autocomplete-item:last-child {
         border-bottom-left-radius: 0.375rem;
         border-bottom-right-radius: 0.375rem;
+    }
+    
+    /* Badge số lượng đơn hàng trong menu */
+    #orderCountBadge {
+        font-weight: 600;
+        min-width: 18px;
+        height: 18px;
+        line-height: 1.2;
+        padding: 2px 5px !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        top: -8px !important;
+        left: 8px !important;
+        transform: translate(0, 0) !important;
+    }
+    
+    .account-menu .nav-link {
+        position: relative;
+    }
+    
+    .account-menu .nav-link i.fa-shopping-cart {
+        position: relative;
     }
 </style>
 }

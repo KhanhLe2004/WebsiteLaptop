@@ -307,6 +307,43 @@
             .config-item { cursor: pointer; transition: all 0.3s; }
             .config-item:hover { border-color: #007bff !important; box-shadow: 0 0 5px rgba(0,123,255,0.3); }
             .config-item.selected-config { border-color: #007bff !important; box-shadow: 0 0 10px rgba(0,123,255,0.5) !important; background-color: #f0f8ff !important; }
+            
+            /* Toast Notification Styles */
+            .toast-container {
+                z-index: 9999;
+            }
+            
+            .toast-notification {
+                min-width: 300px;
+                max-width: 400px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                margin-bottom: 10px;
+            }
+            
+            .toast-notification .toast-header {
+                font-weight: 600;
+            }
+            
+            .toast-notification .toast-body {
+                padding: 0.75rem;
+            }
+            
+            .toast-success .toast-header {
+                background-color: #28a745 !important;
+            }
+            
+            .toast-danger .toast-header {
+                background-color: #dc3545 !important;
+            }
+            
+            .toast-warning .toast-header {
+                background-color: #ffc107 !important;
+                color: #000 !important;
+            }
+            
+            .toast-info .toast-header {
+                background-color: #17a2b8 !important;
+            }
         </style>
 
         <script>
@@ -719,36 +756,139 @@
                     else $(this).removeClass('text-secondary').addClass('text-muted');
                 });
             }
-            function submitReview() { alert('Tính năng gửi đánh giá đang được phát triển!'); }
+            // Hiển thị dialog xác nhận (thay thế confirm)
+            function showConfirmDialog(message, onConfirm, onCancel) {
+                const confirmId = 'confirm-dialog-' + Date.now();
+                const confirmHtml = `
+                    <div class="modal fade" id="${confirmId}" tabindex="-1" aria-labelledby="confirmDialogLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header bg-warning text-dark">
+                                    <h5 class="modal-title" id="confirmDialogLabel">
+                                        <i class="fa fa-exclamation-triangle me-2"></i>Xác nhận
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p class="mb-0">${message}</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                                    <button type="button" class="btn btn-primary" id="confirmBtn">Xác nhận</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // Xóa modal cũ nếu có
+                $('.confirm-dialog-modal').remove();
+                
+                // Thêm modal mới
+                $('body').append(confirmHtml);
+                const $modal = $(`#${confirmId}`).addClass('confirm-dialog-modal');
+                const modal = new bootstrap.Modal($modal[0]);
+                
+                // Xử lý khi click Xác nhận
+                $modal.find('#confirmBtn').on('click', function() {
+                    modal.hide();
+                    if (onConfirm && typeof onConfirm === 'function') {
+                        onConfirm();
+                    }
+                });
+                
+                // Xử lý khi click Hủy hoặc đóng
+                $modal.on('hidden.bs.modal', function() {
+                    if (onCancel && typeof onCancel === 'function') {
+                        onCancel();
+                    }
+                    $(this).remove();
+                });
+                
+                // Hiển thị modal
+                modal.show();
+            }
+
+            // Toast notification function
+            function showToast(type, message) {
+                const toastId = 'toast-' + Date.now();
+                const iconMap = {
+                    'success': '<i class="fa fa-check-circle me-2"></i>',
+                    'danger': '<i class="fa fa-times-circle me-2"></i>',
+                    'warning': '<i class="fa fa-exclamation-triangle me-2"></i>',
+                    'info': '<i class="fa fa-info-circle me-2"></i>'
+                };
+                const icon = iconMap[type] || '';
+                
+                const toastHtml = `
+                    <div id="${toastId}" class="toast-notification toast-${type}" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="toast-header bg-${type === 'danger' ? 'danger' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info'} text-white">
+                            ${icon}
+                            <strong class="me-auto">Thông báo</strong>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-body">
+                            ${message}
+                        </div>
+                    </div>
+                `;
+                
+                // Tạo container nếu chưa có
+                if ($('#toast-container').length === 0) {
+                    $('body').append('<div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>');
+                }
+                
+                $('#toast-container').append(toastHtml);
+                
+                // Khởi tạo và hiển thị toast
+                const toastElement = document.getElementById(toastId);
+                if (toastElement) {
+                    const toast = new bootstrap.Toast(toastElement, {
+                        autohide: true,
+                        delay: 4000
+                    });
+                    toast.show();
+                    
+                    // Xóa toast khỏi DOM sau khi ẩn
+                    toastElement.addEventListener('hidden.bs.toast', function() {
+                        $(this).remove();
+                    });
+                }
+            }
+
+            function submitReview() { showToast('info', 'Tính năng gửi đánh giá đang được phát triển!'); }
             async function addToCart() {
                 // Kiểm tra đăng nhập
                 try {
                     const isLoggedIn = sessionStorage.getItem('isLoggedIn');
                     const customer = sessionStorage.getItem('customer');
                     if (!isLoggedIn || !customer) {
-                        if (confirm('Bạn cần đăng nhập để thêm sản phẩm vào giỏ hàng. Bạn có muốn chuyển đến trang đăng nhập không?')) {
-                            window.location.href = '/User/Login';
-                        }
+                        showConfirmDialog(
+                            'Bạn cần đăng nhập để thêm sản phẩm vào giỏ hàng. Bạn có muốn chuyển đến trang đăng nhập không?',
+                            function() {
+                                window.location.href = '/User/Login';
+                            }
+                        );
                         return;
                     }
 
                     const parsed = JSON.parse(customer);
                     const customerId = parsed.customerId || parsed.CustomerId;
                     if (!customerId) {
-                        alert('Không tìm thấy thông tin khách hàng. Vui lòng đăng nhập lại.');
+                        showToast('warning', 'Không tìm thấy thông tin khách hàng. Vui lòng đăng nhập lại.');
                         return;
                     }
 
                     const quantity = parseInt($('#productQuantity').val()) || 1;
                     if (quantity <= 0) {
-                        alert('Số lượng phải lớn hơn 0');
+                        showToast('warning', 'Số lượng phải lớn hơn 0');
                         return;
                     }
 
                     // Kiểm tra số lượng có sẵn
                     if (selectedConfiguration && selectedConfiguration.quantity != null) {
                         if (quantity > selectedConfiguration.quantity) {
-                            alert(`Số lượng tối đa có sẵn: ${selectedConfiguration.quantity}`);
+                            showToast('warning', `Số lượng tối đa có sẵn: ${selectedConfiguration.quantity}`);
                             return;
                         }
                     }
@@ -803,19 +943,27 @@
                         }
 
                         // Hiển thị thông báo thành công
-                        alert('Đã thêm sản phẩm vào giỏ hàng!');
+                        showToast('success', 'Đã thêm sản phẩm vào giỏ hàng!');
+                        
+                        // Trigger event để cập nhật số lượng trong header
+                        $(document).trigger('cartUpdated');
+                        if (typeof window.updateCartItemCount === 'function') {
+                            window.updateCartItemCount();
+                        }
+                        // Cũng trigger vanilla JS event
+                        document.dispatchEvent(new Event('cartUpdated'));
                         
                         // Có thể redirect đến giỏ hàng hoặc reload
                         // window.location.href = '/Cart/Cart';
                     } catch (err) {
                         console.error('addToCart error:', err);
-                        alert('Lỗi: ' + (err.message || 'Không thể thêm vào giỏ hàng'));
+                        showToast('danger', 'Lỗi: ' + (err.message || 'Không thể thêm vào giỏ hàng'));
                     } finally {
                         btn.prop('disabled', false).html(originalHtml);
                     }
                 } catch (err) {
                     console.error('addToCart error:', err);
-                    alert('Có lỗi xảy ra. Vui lòng thử lại.');
+                    showToast('danger', 'Có lỗi xảy ra. Vui lòng thử lại.');
                 }
             }
 

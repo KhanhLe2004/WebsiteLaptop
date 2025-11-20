@@ -1,8 +1,11 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using WebLaptopBE.Models;
 using WebLaptopBE.Data;
 namespace WebLaptopBE.Controllers
@@ -11,7 +14,14 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class CustomerAccountAPIController : ControllerBase
     {
-        private readonly Testlaptop33Context _db = new();
+        private readonly Testlaptop33Context _db;
+        private readonly IWebHostEnvironment _environment;
+
+        public CustomerAccountAPIController(Testlaptop33Context db, IWebHostEnvironment environment)
+        {
+            _db = db;
+            _environment = environment;
+        }
 
         // GET: api/CustomerAccount/{identifier}
         [HttpGet("{identifier}")]
@@ -63,16 +73,19 @@ namespace WebLaptopBE.Controllers
                     return BadRequest(new { message = "CustomerId không hợp lệ" });
                 }
 
+                // Chỉ lấy đơn hàng có trạng thái "Chờ xử lý" hoặc "Đang xử lý"
                 var orders = _db.SaleInvoices
                     .AsNoTracking()
                     .Where(si => si.CustomerId == customerId &&
-                                 (si.Status == null || !si.Status.ToLower().Contains("hoàn thành")))
+                                 si.Status != null &&
+                                 (si.Status.ToLower().Contains("Chờ xử lý") ||
+                                  si.Status.ToLower().Contains("Đang xử lý")))
                     .OrderByDescending(si => si.TimeCreate)
                     .Select(si => new
                     {
                         si.SaleInvoiceId,
                         si.TimeCreate,
-                        si.Status,
+                        si.Status, // Lấy trực tiếp từ database, không thay đổi
                         si.TotalAmount,
                         si.PaymentMethod,
                         si.DeliveryAddress,
@@ -99,17 +112,19 @@ namespace WebLaptopBE.Controllers
                     return BadRequest(new { message = "CustomerId không hợp lệ" });
                 }
 
+                // Chỉ lấy đơn hàng có trạng thái "Hoàn thành" hoặc "Đã hủy"
                 var orders = _db.SaleInvoices
                     .AsNoTracking()
                     .Where(si => si.CustomerId == customerId &&
                                  si.Status != null &&
-                                 si.Status.ToLower().Contains("hoàn thành"))
+                                 (si.Status.ToLower().Contains("Hoàn thành") ||
+                                  si.Status.ToLower().Contains("Đã hủy")))
                     .OrderByDescending(si => si.TimeCreate)
                     .Select(si => new
                     {
                         si.SaleInvoiceId,
                         si.TimeCreate,
-                        si.Status,
+                        si.Status, // Lấy trực tiếp từ database, không thay đổi
                         si.TotalAmount,
                         si.PaymentMethod,
                         si.DeliveryAddress,
@@ -269,6 +284,97 @@ namespace WebLaptopBE.Controllers
             }
         }
 
+        // PUT: api/CustomerAccount/order/{orderId}/cancel
+        [HttpPut("order/{orderId}/cancel")]
+        public IActionResult CancelOrder(string orderId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(orderId))
+                {
+                    return BadRequest(new { message = "Mã đơn hàng không hợp lệ" });
+                }
+
+                var order = _db.SaleInvoices.FirstOrDefault(si => si.SaleInvoiceId == orderId);
+                if (order == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy đơn hàng" });
+                }
+
+                // Kiểm tra trạng thái hiện tại
+                var currentStatus = order.Status?.Trim() ?? "";
+                var statusLower = currentStatus.ToLower();
+                
+                // Chỉ cho phép hủy khi trạng thái là "Chờ xử lý"
+                if (!statusLower.Contains("chờ xử lý"))
+                {
+                    return BadRequest(new { message = "Chỉ có thể hủy đơn hàng khi trạng thái là 'Chờ xử lý'" });
+                }
+
+                // Cập nhật trạng thái thành "Đã hủy"
+                order.Status = "Đã hủy";
+                _db.SaveChanges();
+
+                return Ok(new { message = "Hủy đơn hàng thành công" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi hủy đơn hàng", error = ex.Message });
+            }
+        }
+
+        // POST: api/CustomerAccount/{customerId}/avatar
+        [HttpPost("{customerId}/avatar")]
+        public async Task<IActionResult> UploadAvatar(string customerId, IFormFile file)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(customerId))
+                {
+                    return BadRequest(new { message = "CustomerId không hợp lệ" });
+                }
+
+                var customer = _db.Customers.FirstOrDefault(c => c.CustomerId == customerId);
+                if (customer == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy khách hàng" });
+                }
+
+                if (file == null || file.Length == 0)
+                {
+                    return BadRequest(new { message = "Vui lòng chọn file ảnh" });
+                }
+
+                if (!file.ContentType.StartsWith("image/"))
+                {
+                    return BadRequest(new { message = "Chỉ chấp nhận file ảnh" });
+                }
+
+                const long maxFileSize = 10 * 1024 * 1024; // 10MB
+                if (file.Length > maxFileSize)
+                {
+                    return BadRequest(new { message = "Kích thước file không được vượt quá 10MB" });
+                }
+
+                // Xóa ảnh cũ nếu có
+                if (!string.IsNullOrEmpty(customer.Avatar))
+                {
+                    DeleteImage(customer.Avatar);
+                }
+
+                // Lưu ảnh mới
+                var fileName = await SaveImageAsync(file);
+                customer.Avatar = fileName;
+                _db.SaveChanges();
+
+                return Ok(new { message = "Cập nhật avatar thành công", avatar = fileName });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi upload avatar", error = ex.Message });
+            }
+        }
+
         // PUT: api/CustomerAccount/{customerId}/password
         [HttpPut("{customerId}/password")]
         public IActionResult ChangePassword(string customerId, [FromBody] ChangePasswordRequest request)
@@ -339,6 +445,91 @@ namespace WebLaptopBE.Controllers
             public string CurrentPassword { get; set; } = string.Empty;
             public string NewPassword { get; set; } = string.Empty;
             public string ConfirmPassword { get; set; } = string.Empty;
+        }
+
+        // Helper methods
+        private async Task<string> SaveImageAsync(IFormFile file)
+        {
+            try
+            {
+                if (file == null || file.Length == 0)
+                {
+                    throw new ArgumentException("File is null or empty");
+                }
+
+                var fileExtension = Path.GetExtension(file.FileName);
+                if (string.IsNullOrEmpty(fileExtension))
+                {
+                    fileExtension = file.ContentType switch
+                    {
+                        "image/jpeg" => ".jpg",
+                        "image/png" => ".png",
+                        "image/gif" => ".gif",
+                        "image/webp" => ".webp",
+                        _ => ".jpg"
+                    };
+                }
+
+                const int maxTotalLength = 20;
+                var extLength = fileExtension.Length;
+                var baseNameMaxLength = Math.Max(1, maxTotalLength - extLength);
+
+                string GenerateRandomBaseName(int length)
+                {
+                    const string chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+                    var rnd = new Random();
+                    var buffer = new char[length];
+                    for (int i = 0; i < length; i++)
+                    {
+                        buffer[i] = chars[rnd.Next(chars.Length)];
+                    }
+                    return new string(buffer);
+                }
+
+                var baseName = GenerateRandomBaseName(baseNameMaxLength);
+                var fileName = $"{baseName}{fileExtension}";
+                
+                var webRootPath = _environment.WebRootPath;
+                if (string.IsNullOrEmpty(webRootPath))
+                {
+                    webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+                }
+                var uploadsFolder = Path.Combine(webRootPath, "imageCustomers");
+                
+                if (!Directory.Exists(uploadsFolder))
+                {
+                    Directory.CreateDirectory(uploadsFolder);
+                }
+                
+                var filePath = Path.Combine(uploadsFolder, fileName);
+                
+                using (var fileStream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(fileStream);
+                }
+                
+                return fileName;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Lỗi khi lưu ảnh: {ex.Message}", ex);
+            }
+        }
+
+        private void DeleteImage(string fileName)
+        {
+            try
+            {
+                var filePath = Path.Combine(_environment.WebRootPath ?? "wwwroot", "imageCustomers", fileName);
+                if (System.IO.File.Exists(filePath))
+                {
+                    System.IO.File.Delete(filePath);
+                }
+            }
+            catch
+            {
+                // Không throw exception nếu xóa file thất bại
+            }
         }
     }
 }

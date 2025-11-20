@@ -35,9 +35,9 @@
                     </button>
                 </div>
                 <div class="d-flex m-3 me-0">
-                    <a href="/Cart/Cart" class="position-relative me-4 my-auto">
+                    <a href="/Cart/Cart" class="position-relative me-4 my-auto" id="cartIconLink">
                         <i class="fa fa-shopping-bag fa-2x"></i>
-                        <span class="position-absolute bg-secondary rounded-circle d-flex align-items-center justify-content-center text-dark px-1" style="top: -5px; left: 15px; height: 20px; min-width: 20px;">3</span>
+                        <span id="cartItemCount" class="position-absolute bg-danger rounded-circle d-flex align-items-center justify-content-center text-white px-1 fw-bold" style="top: -5px; left: 15px; height: 20px; min-width: 20px; font-size: 11px; line-height: 1; padding: 2px 4px !important; display: none;">0</span>
                     </a>
                     <a href="/User/Account" class="my-auto">
                         <i class="fas fa-user fa-2x"></i>
@@ -48,3 +48,140 @@
     </div>
 </div>
 <!-- Navbar End -->
+
+<script>
+    // Hàm cập nhật số lượng sản phẩm trong giỏ hàng
+    async function updateCartItemCount() {
+        try {
+            // Lấy customerId từ sessionStorage
+            const isLoggedIn = sessionStorage.getItem('isLoggedIn');
+            const customer = sessionStorage.getItem('customer');
+            
+            if (!isLoggedIn || !customer) {
+                // Nếu chưa đăng nhập, ẩn badge
+                const badge = document.getElementById('cartItemCount');
+                if (badge) badge.style.display = 'none';
+                return;
+            }
+            
+            let parsed;
+            try {
+                parsed = JSON.parse(customer);
+            } catch (e) {
+                console.error('Error parsing customer:', e);
+                const badge = document.getElementById('cartItemCount');
+                if (badge) badge.style.display = 'none';
+                return;
+            }
+            
+            const customerId = parsed.customerId || parsed.CustomerId;
+            
+            if (!customerId) {
+                const badge = document.getElementById('cartItemCount');
+                if (badge) badge.style.display = 'none';
+                return;
+            }
+            
+            // Lấy API base - kiểm tra nhiều nguồn
+            let apiBase = 'http://localhost:5068';
+            if (window.CART_API_BASE && window.CART_API_BASE.trim()) {
+                apiBase = window.CART_API_BASE.trim();
+            } else if (window.location && window.location.origin) {
+                const origin = window.location.origin;
+                if (origin.includes('localhost')) {
+                    apiBase = 'http://localhost:5068';
+                } else {
+                    apiBase = origin;
+                }
+            }
+            
+            const apiUrl = `${apiBase}/api/Cart/${customerId}`;
+            
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                const badge = document.getElementById('cartItemCount');
+                if (badge) badge.style.display = 'none';
+                return;
+            }
+            
+            const responseText = await response.text();
+            let data = {};
+            if (responseText && responseText.trim()) {
+                try {
+                    data = JSON.parse(responseText);
+                } catch (parseErr) {
+                    console.error('JSON parse error:', parseErr, 'Response:', responseText);
+                    const badge = document.getElementById('cartItemCount');
+                    if (badge) badge.style.display = 'none';
+                    return;
+                }
+            }
+            
+            // Đếm số lượng sản phẩm (items) trong giỏ hàng
+            const items = data.items || [];
+            const itemCount = items.length;
+            
+            // Cập nhật badge
+            const badge = document.getElementById('cartItemCount');
+            if (badge) {
+                if (itemCount > 0) {
+                    badge.textContent = itemCount;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+        } catch (err) {
+            console.error('Error updating cart item count:', err);
+            const badge = document.getElementById('cartItemCount');
+            if (badge) badge.style.display = 'none';
+        }
+    }
+    
+    // Đảm bảo hàm có thể được gọi từ bất kỳ đâu
+    window.updateCartItemCount = updateCartItemCount;
+    
+    // Cập nhật số lượng khi trang load
+    function initCartCounter() {
+        // Đợi DOM ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                updateCartItemCount();
+            });
+        } else {
+            updateCartItemCount();
+        }
+        
+        // Cập nhật lại sau mỗi 5 giây (để đồng bộ khi có thay đổi từ tab khác)
+        setInterval(updateCartItemCount, 5000);
+    }
+    
+    // Khởi tạo ngay lập tức
+    initCartCounter();
+    
+    // Lắng nghe sự kiện storage để cập nhật khi có thay đổi từ tab khác
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'cartUpdated') {
+            updateCartItemCount();
+        }
+    });
+    
+    // Tạo custom event để các trang khác có thể trigger (sử dụng cả jQuery và vanilla JS)
+    document.addEventListener('cartUpdated', function() {
+        updateCartItemCount();
+    });
+    
+    // Hỗ trợ jQuery nếu có
+    if (typeof jQuery !== 'undefined') {
+        jQuery(document).on('cartUpdated', function() {
+            updateCartItemCount();
+        });
+    }    
+</script>
