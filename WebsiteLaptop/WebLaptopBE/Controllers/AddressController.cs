@@ -8,7 +8,7 @@ namespace WebLaptopBE.Controllers
     public class AddressController : ControllerBase
     {
         private readonly IHttpClientFactory _httpClientFactory;
-        private readonly string _baseUrl = "https://provinces.open-api.vn/api";
+        private readonly string _baseUrl = "https://production.cas.so/address-kit/2025-07-01";
 
         public AddressController(IHttpClientFactory httpClientFactory)
         {
@@ -23,8 +23,8 @@ namespace WebLaptopBE.Controllers
                 var client = _httpClientFactory.CreateClient();
                 client.Timeout = TimeSpan.FromSeconds(30);
                 
-                // API provinces.open-api.vn: endpoint đúng là /api/p/
-                var response = await client.GetAsync($"{_baseUrl}/p/");
+                // Sử dụng endpoint giống ManageEmployeeAPIController
+                var response = await client.GetAsync($"{_baseUrl}/provinces");
                 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -32,23 +32,43 @@ namespace WebLaptopBE.Controllers
                     return StatusCode((int)response.StatusCode, new { message = "Không thể tải danh sách tỉnh/thành phố", error = errorContent });
                 }
 
-                var json = await response.Content.ReadAsStringAsync();
+                var jsonString = await response.Content.ReadAsStringAsync();
                 
-                // Kiểm tra nếu response là mảng JSON
-                if (string.IsNullOrWhiteSpace(json))
+                if (string.IsNullOrWhiteSpace(jsonString))
                 {
                     return Ok(new List<object>());
                 }
                 
-                var data = JsonSerializer.Deserialize<JsonElement>(json);
+                // Sử dụng JsonDocument.Parse giống ManageEmployeeAPIController
+                var jsonDoc = JsonDocument.Parse(jsonString);
+                var provinces = new List<object>();
                 
-                // Nếu là mảng, trả về trực tiếp
-                if (data.ValueKind == JsonValueKind.Array)
+                // Kiểm tra property "provinces" trong response
+                if (jsonDoc.RootElement.TryGetProperty("provinces", out var provincesElement) && provincesElement.ValueKind == JsonValueKind.Array)
                 {
-                    return Ok(data);
+                    foreach (var province in provincesElement.EnumerateArray())
+                    {
+                        provinces.Add(new
+                        {
+                            code = province.TryGetProperty("code", out var code) ? code.GetString() ?? "" : "",
+                            name = province.TryGetProperty("name", out var name) ? name.GetString() : null
+                        });
+                    }
+                }
+                // Nếu response là mảng trực tiếp
+                else if (jsonDoc.RootElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var province in jsonDoc.RootElement.EnumerateArray())
+                    {
+                        provinces.Add(new
+                        {
+                            code = province.TryGetProperty("code", out var code) ? code.GetString() ?? "" : "",
+                            name = province.TryGetProperty("name", out var name) ? name.GetString() : null
+                        });
+                    }
                 }
                 
-                return Ok(data);
+                return Ok(provinces);
             }
             catch (Exception ex)
             {
@@ -69,9 +89,8 @@ namespace WebLaptopBE.Controllers
                 var client = _httpClientFactory.CreateClient();
                 client.Timeout = TimeSpan.FromSeconds(30);
                 
-                // API provinces.open-api.vn: lấy thông tin tỉnh với depth=3 để có tất cả wards từ tất cả districts
-                // Sau sáp nhập, chỉ còn 2 cấp: Tỉnh/Thành phố → Phường/Xã
-                var response = await client.GetAsync($"{_baseUrl}/p/{provinceCode}?depth=3");
+                // Sử dụng endpoint giống ManageEmployeeAPIController
+                var response = await client.GetAsync($"{_baseUrl}/provinces/{provinceCode}/communes");
                 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -79,40 +98,42 @@ namespace WebLaptopBE.Controllers
                     return StatusCode((int)response.StatusCode, new { message = "Không thể tải danh sách phường/xã", error = errorContent });
                 }
 
-                var json = await response.Content.ReadAsStringAsync();
-                if (string.IsNullOrWhiteSpace(json))
+                var jsonString = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(jsonString))
                 {
                     return Ok(new List<object>());
                 }
                 
-                var data = JsonSerializer.Deserialize<JsonElement>(json);
+                // Sử dụng JsonDocument.Parse giống ManageEmployeeAPIController
+                var jsonDoc = JsonDocument.Parse(jsonString);
+                var communes = new List<object>();
                 
-                // Thu thập tất cả wards từ tất cả districts
-                var allWards = new List<JsonElement>();
-                
-                if (data.TryGetProperty("districts", out var districts) && districts.ValueKind == JsonValueKind.Array)
+                // Kiểm tra property "communes" trong response
+                if (jsonDoc.RootElement.TryGetProperty("communes", out var communesElement) && communesElement.ValueKind == JsonValueKind.Array)
                 {
-                    foreach (var district in districts.EnumerateArray())
+                    foreach (var commune in communesElement.EnumerateArray())
                     {
-                        if (district.TryGetProperty("wards", out var wards) && wards.ValueKind == JsonValueKind.Array)
+                        communes.Add(new
                         {
-                            foreach (var ward in wards.EnumerateArray())
-                            {
-                                allWards.Add(ward);
-                            }
-                        }
+                            code = commune.TryGetProperty("code", out var code) ? code.GetString() ?? "" : "",
+                            name = commune.TryGetProperty("name", out var name) ? name.GetString() : null
+                        });
+                    }
+                }
+                // Nếu response là mảng trực tiếp
+                else if (jsonDoc.RootElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var commune in jsonDoc.RootElement.EnumerateArray())
+                    {
+                        communes.Add(new
+                        {
+                            code = commune.TryGetProperty("code", out var code) ? code.GetString() ?? "" : "",
+                            name = commune.TryGetProperty("name", out var name) ? name.GetString() : null
+                        });
                     }
                 }
                 
-                // Trả về tất cả wards dưới dạng mảng
-                if (allWards.Count > 0)
-                {
-                    var wardsArray = JsonSerializer.Serialize(allWards);
-                    return Ok(JsonSerializer.Deserialize<JsonElement>(wardsArray));
-                }
-                
-                // Nếu không có wards, trả về mảng rỗng
-                return Ok(new List<object>());
+                return Ok(communes);
             }
             catch (Exception ex)
             {
@@ -121,4 +142,5 @@ namespace WebLaptopBE.Controllers
         }
     }
 }
+
 
