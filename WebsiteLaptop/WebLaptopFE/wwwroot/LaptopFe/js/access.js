@@ -16,7 +16,9 @@
     const ENDPOINTS = {
         login: `${AUTH_API_BASE}/api/Login`,
         register: `${AUTH_API_BASE}/api/Register`,
-        forgot: `${AUTH_API_BASE}/api/FogetPasssword`
+        forgot: `${AUTH_API_BASE}/api/FogetPasssword`,
+        googleLogin: `${AUTH_API_BASE}/api/Login/google`,
+        facebookLogin: `${AUTH_API_BASE}/api/Login/facebook`
     };
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -168,6 +170,339 @@
             } finally {
                 restoreBtn();
             }
+        });
+    }
+
+    // ========== GOOGLE LOGIN ==========
+    const googleSignInBtn = document.getElementById('googleSignInBtn');
+    if (googleSignInBtn) {
+        // Lấy Google Client ID
+        const getGoogleClientId = () => {
+            return window.GOOGLE_CLIENT_ID || '';
+        };
+
+        // Xử lý đăng nhập với access token và user info
+        const handleGoogleLogin = async (accessToken, userInfo) => {
+            const loginAlert = document.getElementById('loginAlert');
+            if (loginAlert) {
+                clearAlert(loginAlert);
+            }
+
+            const submitBtn = googleSignInBtn;
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...';
+
+            try {
+                const response = await fetch(ENDPOINTS.googleLogin, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        accessToken: accessToken,
+                        userInfo: {
+                            email: userInfo.email,
+                            name: userInfo.name,
+                            picture: userInfo.picture
+                        }
+                    })
+                });
+
+                const data = await parseJsonResponse(response);
+                if (!response.ok) {
+                    throw new Error(data?.message || 'Không thể đăng nhập bằng Google');
+                }
+
+                if (data.customer) {
+                    sessionStorage.setItem('customer', JSON.stringify(data.customer));
+                    sessionStorage.setItem('isLoggedIn', 'true');
+                }
+
+                if (loginAlert) {
+                    setAlert(loginAlert, 'success', data.message || 'Đăng nhập bằng Google thành công');
+                }
+                setTimeout(() => {
+                    window.location.href = '/User/Account';
+                }, 600);
+            } catch (error) {
+                console.error('Google login error:', error);
+                if (loginAlert) {
+                    setAlert(loginAlert, 'danger', error.message || 'Đăng nhập bằng Google thất bại');
+                }
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        };
+
+        // Xử lý khi user click nút Google
+        googleSignInBtn.addEventListener('click', async () => {
+            const clientId = getGoogleClientId();
+            
+            if (!clientId) {
+                const loginAlert = document.getElementById('loginAlert');
+                if (loginAlert) {
+                    setAlert(loginAlert, 'warning', 'Google OAuth Client ID chưa được cấu hình. Vui lòng liên hệ quản trị viên.');
+                }
+                return;
+            }
+
+            // Đợi Google script load xong
+            const waitForGoogle = () => {
+                return new Promise((resolve) => {
+                    if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+                        resolve();
+                    } else {
+                        let attempts = 0;
+                        const checkInterval = setInterval(() => {
+                            attempts++;
+                            if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+                                clearInterval(checkInterval);
+                                resolve();
+                            } else if (attempts > 20) { // Đợi tối đa 10 giây
+                                clearInterval(checkInterval);
+                                resolve(); // Vẫn resolve để hiển thị lỗi
+                            }
+                        }, 500);
+                    }
+                });
+            };
+
+            await waitForGoogle();
+
+            if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+                const loginAlert = document.getElementById('loginAlert');
+                if (loginAlert) {
+                    setAlert(loginAlert, 'danger', 'Không thể tải Google Sign-In. Vui lòng kiểm tra kết nối internet và thử lại.');
+                }
+                return;
+            }
+
+            try {
+                // Sử dụng OAuth2 flow để lấy access token
+                let tokenClient = null;
+                
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: clientId,
+                    scope: 'openid email profile',
+                    callback: async (tokenResponse) => {
+                        if (tokenResponse.error) {
+                            console.error('Google OAuth error:', tokenResponse.error);
+                            const loginAlert = document.getElementById('loginAlert');
+                            if (loginAlert) {
+                                setAlert(loginAlert, 'danger', 'Lỗi đăng nhập Google: ' + (tokenResponse.error_description || tokenResponse.error));
+                            }
+                            return;
+                        }
+
+                        if (tokenResponse.access_token) {
+                            try {
+                                // Lấy user info từ Google
+                                const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo?access_token=' + tokenResponse.access_token);
+                                if (!userInfoResponse.ok) {
+                                    const errorText = await userInfoResponse.text();
+                                    throw new Error('Không thể lấy thông tin từ Google: ' + errorText);
+                                }
+                                const userInfo = await userInfoResponse.json();
+                                
+                                // Gửi về backend để xử lý
+                                await handleGoogleLogin(tokenResponse.access_token, userInfo);
+                            } catch (error) {
+                                console.error('Error fetching user info:', error);
+                                const loginAlert = document.getElementById('loginAlert');
+                                if (loginAlert) {
+                                    setAlert(loginAlert, 'danger', 'Không thể lấy thông tin từ Google: ' + error.message);
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Yêu cầu access token
+                tokenClient.requestAccessToken();
+            } catch (error) {
+                console.error('Error initializing Google OAuth:', error);
+                const loginAlert = document.getElementById('loginAlert');
+                if (loginAlert) {
+                    setAlert(loginAlert, 'danger', 'Lỗi khởi tạo Google Sign-In: ' + error.message);
+                }
+            }
+        });
+    }
+
+    // ========== FACEBOOK LOGIN ==========
+    const facebookSignInBtn = document.getElementById('facebookSignInBtn');
+    if (facebookSignInBtn) {
+        // Lấy Facebook App ID
+        const getFacebookAppId = () => {
+            return window.FACEBOOK_APP_ID || '';
+        };
+
+        // Xử lý đăng nhập với access token
+        const handleFacebookLogin = async (accessToken) => {
+            const loginAlert = document.getElementById('loginAlert');
+            if (loginAlert) {
+                clearAlert(loginAlert);
+            }
+
+            const submitBtn = facebookSignInBtn;
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...';
+
+            try {
+                const response = await fetch(ENDPOINTS.facebookLogin, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accessToken })
+                });
+
+                const data = await parseJsonResponse(response);
+                if (!response.ok) {
+                    // Tạo error object với thông tin chi tiết
+                    const error = new Error(data?.message || 'Không thể đăng nhập bằng Facebook');
+                    error.details = data?.details || data?.error || '';
+                    throw error;
+                }
+
+                if (data.customer) {
+                    sessionStorage.setItem('customer', JSON.stringify(data.customer));
+                    sessionStorage.setItem('isLoggedIn', 'true');
+                }
+
+                if (loginAlert) {
+                    setAlert(loginAlert, 'success', data.message || 'Đăng nhập bằng Facebook thành công');
+                }
+                setTimeout(() => {
+                    window.location.href = '/User/Account';
+                }, 600);
+            } catch (error) {
+                console.error('Facebook login error:', error);
+                if (loginAlert) {
+                    // Hiển thị lỗi chi tiết hơn
+                    let errorMessage = error.message || 'Đăng nhập bằng Facebook thất bại';
+                    if (error.details) {
+                        errorMessage += ': ' + error.details;
+                    }
+                    setAlert(loginAlert, 'danger', errorMessage);
+                }
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        };
+
+        // Xử lý token từ query string (fallback nếu popup không hoạt động)
+        const urlParams = new URLSearchParams(window.location.search);
+        const fbToken = urlParams.get('fb_token');
+        const fbError = urlParams.get('fb_error');
+        
+        if (fbToken) {
+            // Xóa token khỏi URL
+            window.history.replaceState(null, null, window.location.pathname);
+            handleFacebookLogin(fbToken);
+        } else if (fbError) {
+            // Xóa error khỏi URL
+            window.history.replaceState(null, null, window.location.pathname);
+            const loginAlert = document.getElementById('loginAlert');
+            if (loginAlert) {
+                setAlert(loginAlert, 'danger', decodeURIComponent(fbError));
+            }
+        }
+
+        // Đợi Facebook SDK load
+        const waitForFacebook = () => {
+            return new Promise((resolve) => {
+                if (typeof FB !== 'undefined') {
+                    resolve();
+                } else {
+                    let attempts = 0;
+                    const checkInterval = setInterval(() => {
+                        attempts++;
+                        if (typeof FB !== 'undefined') {
+                            clearInterval(checkInterval);
+                            resolve();
+                        } else if (attempts > 20) { // Đợi tối đa 10 giây
+                            clearInterval(checkInterval);
+                            resolve(); // Vẫn resolve để hiển thị lỗi
+                        }
+                    }, 500);
+                }
+            });
+        };
+
+        // Xử lý khi user click nút Facebook
+        facebookSignInBtn.addEventListener('click', async () => {
+            const appId = getFacebookAppId();
+            
+            if (!appId) {
+                const loginAlert = document.getElementById('loginAlert');
+                if (loginAlert) {
+                    setAlert(loginAlert, 'warning', 'Facebook App ID chưa được cấu hình. Vui lòng liên hệ quản trị viên.');
+                }
+                return;
+            }
+
+            // Sử dụng popup window để đăng nhập Facebook (hoạt động với cả HTTP và HTTPS)
+            const redirectUri = encodeURIComponent(window.location.origin + '/User/FacebookCallback');
+            const facebookAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=public_profile&response_type=token&display=popup`;
+            
+            // Mở popup
+            const width = 600;
+            const height = 700;
+            const left = (window.screen.width - width) / 2;
+            const top = (window.screen.height - height) / 2;
+            
+            const popup = window.open(
+                facebookAuthUrl,
+                'Facebook Login',
+                `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes,resizable=yes,location=no,directories=no,status=no`
+            );
+            
+            if (!popup) {
+                const loginAlert = document.getElementById('loginAlert');
+                if (loginAlert) {
+                    setAlert(loginAlert, 'warning', 'Popup bị chặn. Vui lòng cho phép popup và thử lại.');
+                }
+                return;
+            }
+            
+            // Lắng nghe message từ popup
+            const messageListener = (event) => {
+                // Kiểm tra origin để đảm bảo an toàn
+                if (event.origin !== window.location.origin) {
+                    return;
+                }
+                
+                if (event.data && event.data.type === 'FACEBOOK_LOGIN_SUCCESS') {
+                    clearInterval(checkPopup);
+                    window.removeEventListener('message', messageListener);
+                    if (popup && !popup.closed) {
+                        popup.close();
+                    }
+                    handleFacebookLogin(event.data.accessToken);
+                } else if (event.data && event.data.type === 'FACEBOOK_LOGIN_ERROR') {
+                    clearInterval(checkPopup);
+                    window.removeEventListener('message', messageListener);
+                    if (popup && !popup.closed) {
+                        popup.close();
+                    }
+                    const loginAlert = document.getElementById('loginAlert');
+                    if (loginAlert) {
+                        setAlert(loginAlert, 'danger', event.data.error || 'Đăng nhập Facebook thất bại');
+                    }
+                }
+            };
+            
+            window.addEventListener('message', messageListener);
+            
+            // Kiểm tra nếu popup bị đóng thủ công hoặc redirect
+            let checkPopup = setInterval(() => {
+                if (popup.closed) {
+                    clearInterval(checkPopup);
+                    window.removeEventListener('message', messageListener);
+                    // Không hiển thị thông báo nếu đã nhận được message
+                }
+            }, 500);
         });
     }
 

@@ -24,5 +24,10 @@ namespace WebLaptopFE.Controllers
         {
             return View();
         }
+        
+        public IActionResult FacebookCallback()
+        {
+            return View();
+        }
     }
 }
