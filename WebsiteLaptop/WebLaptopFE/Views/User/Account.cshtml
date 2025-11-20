@@ -993,7 +993,7 @@
 
         function buildStatusBadge(status) {
             if (!status) {
-                return '<span class="badge bg-secondary">Chưa xác định</span>';
+                return '<span class="badge bg-secondary text-white">Chưa xác định</span>';
             }
             
             // Giữ nguyên status từ database
@@ -1002,12 +1002,14 @@
             console.log('Building status badge for:', statusText, '-> normalized:', text);
             
             // Xác định màu badge dựa trên status (so sánh với text đã lowercase)
-            let badgeClass = 'bg-secondary'; // Mặc định
+            let badgeClass = 'bg-secondary text-white'; // Mặc định
             
             if (text.includes('chờ xử lý')) {
-                badgeClass = 'bg-warning text-dark';
+                badgeClass = 'bg-warning text-white';
             } else if (text.includes('đang xử lý')) {
-                badgeClass = 'bg-info text-dark';
+                badgeClass = 'bg-info text-white';
+            } else if (text.includes('đang vận chuyển')) {
+                badgeClass = 'bg-dark text-white';
             } else if (text.includes('hoàn thành')) {
                 badgeClass = 'bg-success text-white';
             } else if (text.includes('đã hủy')) {
@@ -1052,7 +1054,7 @@
                 };
 
                 // Chỉ hiển thị nút "Hủy đơn hàng" khi trạng thái là "Chờ xử lý"
-                const canCancel = statusText.includes('chờ xử lý');
+                const canCancel = statusText.includes('Chờ xử lý');
                 const cancelButton = canCancel 
                     ? `<button class="btn btn-sm btn-outline-danger ms-2 cancel-order" data-order-id="${orderId}">Hủy đơn hàng</button>`
                     : '';

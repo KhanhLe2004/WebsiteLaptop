@@ -649,12 +649,12 @@
                      $('#StockExportIdInput').val(stockExport.stockExportId);
                      $('#StockExportIdInput').prop('readonly', true);
                      const savedSaleInvoiceId = stockExport.saleInvoiceId || '';
-                     // Set EmployeeId từ dữ liệu phiếu xuất hàng (giữ nguyên nhân viên đã tạo)
-                     const savedEmployeeId = stockExport.employeeId || '';
-                     const savedEmployeeName = stockExport.employeeName || savedEmployeeId;
-                     $('#employeeIdInput').val(savedEmployeeName);
-                     $('#employeeIdValue').val(savedEmployeeId);
-                     if (savedEmployeeId) {
+                     // Tự động lấy nhân viên đang đăng nhập khi sửa phiếu xuất hàng
+                     const employeeIdToUse = currentEmployeeId || stockExport.employeeId || '';
+                     const employeeNameToUse = currentEmployeeName || stockExport.employeeName || employeeIdToUse;
+                     $('#employeeIdInput').val(employeeNameToUse);
+                     $('#employeeIdValue').val(employeeIdToUse);
+                     if (employeeIdToUse) {
                          $('#employeeIdInput').closest('.input-group-outline').addClass('is-filled');
                      }
                      $('#statusInput').val(stockExport.status || 'Chờ xử lý');

@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
     const getDefaultApiBase = () => {
         if (window.AUTH_API_BASE && window.AUTH_API_BASE.trim()) {
             return window.AUTH_API_BASE.trim();
@@ -42,7 +42,7 @@
             try {
                 return await response.json();
             } catch (err) {
-                throw new Error('Dữ liệu JSON không hợp lệ');
+                throw new Error('D? li?u JSON kh�ng h?p l?');
             }
         }
 
@@ -118,7 +118,7 @@
             if (!credential) {
                 emailInput?.classList.add('input-error');
                 if (emailHelp) {
-                    emailHelp.textContent = 'Vui lòng nhập email hoặc tên đăng nhập';
+                    emailHelp.textContent = 'Vui l�ng nh?p email ho?c t�n dang nh?p';
                     emailHelp.style.display = 'block';
                 }
                 return;
@@ -126,12 +126,12 @@
 
             if (!password) {
                 passwordInput?.classList.add('is-invalid');
-                setAlert(loginAlert, 'danger', 'Vui lòng nhập mật khẩu');
+                setAlert(loginAlert, 'danger', 'Vui l�ng nh?p m?t kh?u');
                 return;
             }
 
             const submitBtn = loginForm.querySelector('button[type="submit"]');
-            const restoreBtn = disableButton(submitBtn, '<span class="spinner-border spinner-border-sm me-2"></span>Đang đăng nhập...');
+            const restoreBtn = disableButton(submitBtn, '<span class="spinner-border spinner-border-sm me-2"></span>�ang dang nh?p...');
 
             try {
                 const response = await fetch(ENDPOINTS.login, {
@@ -145,7 +145,7 @@
 
                 const data = await parseJsonResponse(response);
                 if (!response.ok) {
-                    throw new Error(data?.message || 'Không thể đăng nhập, vui lòng thử lại');
+                    throw new Error(data?.message || 'Kh�ng th? dang nh?p, vui l�ng th? l?i');
                 }
 
                 if (data.customer) {
@@ -158,13 +158,13 @@
                     }
                 }
 
-                setAlert(loginAlert, 'success', data.message || 'Đăng nhập thành công');
+                setAlert(loginAlert, 'success', data.message || '�ang nh?p th�nh c�ng');
                 setTimeout(() => {
                     window.location.href = '/User/Account';
                 }, 600);
             } catch (error) {
                 console.error('Login error:', error);
-                setAlert(loginAlert, 'danger', error.message || 'Đăng nhập thất bại');
+                setAlert(loginAlert, 'danger', error.message || '�ang nh?p th?t b?i');
             } finally {
                 restoreBtn();
             }
@@ -178,7 +178,7 @@
         const fullnameInput = document.getElementById('fullname');
         const emailInput = document.getElementById('email');
         const phoneInput = document.getElementById('phone');
-        const addressInput = document.getElementById('address');
+        
         const passwordInput = document.getElementById('password');
         const confirmInput = document.getElementById('confirmPwd');
         const agreeCheckbox = document.getElementById('agree');
@@ -197,7 +197,7 @@
             const fullName = fullnameInput?.value.trim() ?? '';
             const email = emailInput?.value.trim() ?? '';
             const phone = phoneInput?.value.trim() ?? '';
-            const address = addressInput?.value.trim() ?? '';
+            
             const password = passwordInput?.value ?? '';
             const confirmPassword = confirmInput?.value ?? '';
 
@@ -234,12 +234,12 @@
             }
 
             if (!isValid) {
-                setAlert(registerAlert, 'danger', 'Vui lòng kiểm tra lại các trường bắt buộc');
+                setAlert(registerAlert, 'danger', 'Vui l�ng ki?m tra l?i c�c tru?ng b?t bu?c');
                 return;
             }
 
             const submitBtn = registerForm.querySelector('button[type="submit"]');
-            const restoreBtn = disableButton(submitBtn, '<span class="spinner-border spinner-border-sm me-2"></span>Đang đăng ký...');
+            const restoreBtn = disableButton(submitBtn, '<span class="spinner-border spinner-border-sm me-2"></span>�ang dang k�...');
 
             try {
                 const response = await fetch(ENDPOINTS.register, {
@@ -249,24 +249,24 @@
                         fullName,
                         email,
                         phone,
-                        address,
+                        
                         password
                     })
                 });
 
                 const data = await parseJsonResponse(response);
                 if (!response.ok) {
-                    throw new Error(data?.message || 'Không thể đăng ký tài khoản');
+                    throw new Error(data?.message || 'Kh�ng th? dang k� t�i kho?n');
                 }
 
-                setAlert(registerAlert, 'success', data.message || 'Đăng ký thành công');
+                setAlert(registerAlert, 'success', data.message || '�ang k� th�nh c�ng');
                 registerForm.reset();
                 setTimeout(() => {
                     window.location.href = '/User/Login';
                 }, 1000);
             } catch (error) {
                 console.error('Register error:', error);
-                setAlert(registerAlert, 'danger', error.message || 'Đăng ký thất bại');
+                setAlert(registerAlert, 'danger', error.message || '�ang k� th?t b?i');
             } finally {
                 restoreBtn();
             }
@@ -293,14 +293,14 @@
             if (!emailRegex.test(email)) {
                 emailInput?.classList.add('is-invalid');
                 if (emailErr) {
-                    emailErr.textContent = 'Vui lòng nhập email hợp lệ';
+                    emailErr.textContent = 'Vui l�ng nh?p email h?p l?';
                     emailErr.style.display = 'block';
                 }
                 return;
             }
 
             const submitBtn = forgotForm.querySelector('button[type="submit"]');
-            const restoreBtn = disableButton(submitBtn, '<span class="spinner-border spinner-border-sm me-2"></span>Đang gửi...');
+            const restoreBtn = disableButton(submitBtn, '<span class="spinner-border spinner-border-sm me-2"></span>�ang g?i...');
 
             try {
                 const response = await fetch(ENDPOINTS.forgot, {
@@ -311,14 +311,14 @@
 
                 const data = await parseJsonResponse(response);
                 if (!response.ok) {
-                    throw new Error(data?.message || 'Không thể gửi yêu cầu');
+                    throw new Error(data?.message || 'Kh�ng th? g?i y�u c?u');
                 }
 
-                setAlert(successBox, 'success', data.message || 'Vui lòng kiểm tra email của bạn');
+                setAlert(successBox, 'success', data.message || 'Vui l�ng ki?m tra email c?a b?n');
                 forgotForm.reset();
             } catch (error) {
                 console.error('Forgot password error:', error);
-                setAlert(forgotError, 'danger', error.message || 'Không thể xử lý yêu cầu');
+                setAlert(forgotError, 'danger', error.message || 'Kh�ng th? x? l� y�u c?u');
             } finally {
                 restoreBtn();
             }

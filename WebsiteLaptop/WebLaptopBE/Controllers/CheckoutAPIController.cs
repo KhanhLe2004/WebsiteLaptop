@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Text.Json.Serialization;
 using System.Collections.Generic;
 using WebLaptopBE.Data;
+using WebLaptopBE.Services;
 namespace WebLaptopBE.Controllers
 {
     [Route("api/Checkout")]
@@ -13,6 +14,12 @@ namespace WebLaptopBE.Controllers
     public class CheckoutAPIController : ControllerBase
     {
         private readonly Testlaptop33Context _db = new();
+        private readonly EmailService _emailService;
+
+        public CheckoutAPIController(EmailService emailService)
+        {
+            _emailService = emailService;
+        }
 
         // POST: api/Checkout/create
         [HttpPost("create")]
@@ -244,6 +251,91 @@ namespace WebLaptopBE.Controllers
                 }
                 
                 _db.SaveChanges();
+
+                // Gửi email xác nhận đơn hàng
+                if (_emailService != null && !string.IsNullOrWhiteSpace(request.Email))
+                {
+                    try
+                    {
+                        // Lấy thông tin khách hàng
+                        var customerInfo = _db.Customers.FirstOrDefault(c => c.CustomerId == request.CustomerId);
+                        var customerName = customerInfo?.CustomerName ?? request.FullName;
+                        
+                        // Lấy chi tiết đơn hàng
+                        var orderItems = new List<OrderItem>();
+                        var invoiceDetails = _db.SaleInvoiceDetails
+                            .Include(sid => sid.Product)
+                            .Where(sid => sid.SaleInvoiceId == saleInvoice.SaleInvoiceId)
+                            .ToList();
+                        
+                        foreach (var detail in invoiceDetails)
+                        {
+                            var product = detail.Product;
+                            orderItems.Add(new OrderItem
+                            {
+                                ProductName = product?.ProductName ?? "Sản phẩm",
+                                Specifications = detail.Specifications,
+                                Quantity = detail.Quantity ?? 0,
+                                UnitPrice = detail.UnitPrice ?? 0,
+                                Total = (detail.Quantity ?? 0) * (detail.UnitPrice ?? 0)
+                            });
+                        }
+                        
+                        // Gửi email (không chặn response nếu email lỗi)
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                System.Diagnostics.Debug.WriteLine($"Bắt đầu gửi email đến: {request.Email}");
+                                System.Diagnostics.Debug.WriteLine($"EmailService is null: {_emailService == null}");
+                                
+                                var emailSent = await _emailService.SendOrderConfirmationEmailAsync(
+                                    toEmail: request.Email,
+                                    customerName: customerName,
+                                    orderId: saleInvoice.SaleInvoiceId,
+                                    phone: request.Phone,
+                                    email: request.Email,
+                                    address: request.DeliveryAddress,
+                                    note: request.Note ?? "",
+                                    items: orderItems,
+                                    subtotal: subtotal,
+                                    discount: 0, // Có thể tính từ promotion nếu có
+                                    deliveryFee: deliveryFee,
+                                    totalAmount: totalAmount
+                                );
+                                
+                                if (emailSent)
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"Email đã được gửi thành công đến: {request.Email}");
+                                }
+                                else
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"Không thể gửi email đến: {request.Email}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"Lỗi khi gửi email: {ex.Message}");
+                                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                                if (ex.InnerException != null)
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                                    System.Diagnostics.Debug.WriteLine($"Inner stack trace: {ex.InnerException.StackTrace}");
+                                }
+                            }
+                        });
+                    }
+                    catch (Exception emailEx)
+                    {
+                        // Log lỗi nhưng không ảnh hưởng đến response
+                        System.Diagnostics.Debug.WriteLine($"Error preparing email: {emailEx.Message}");
+                        System.Diagnostics.Debug.WriteLine($"Stack trace: {emailEx.StackTrace}");
+                    }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"EmailService is null hoặc email trống. EmailService: {_emailService == null}, Email: {request.Email}");
+                }
 
                 return Ok(new
                 {

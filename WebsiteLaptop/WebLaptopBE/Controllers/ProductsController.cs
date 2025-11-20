@@ -28,7 +28,7 @@ namespace WebLaptopBE.Controllers
                 var query = _db.Products
                     .AsNoTracking()
                     .Include(p => p.Brand)
-                    .Where(p => p.BrandId == brandId);
+                    .Where(p => p.BrandId == brandId && p.Active == true);
 
                 if (!string.IsNullOrWhiteSpace(productName))
                 {
@@ -94,7 +94,7 @@ namespace WebLaptopBE.Controllers
                 // Lấy min và max price từ Products.SellingPrice (theo yêu cầu dùng sellingPrice để filter)
                 var sellingPrices = _db.Products
                     .AsNoTracking()
-                    .Where(p => p.SellingPrice != null && p.SellingPrice > 0)
+                    .Where(p => p.Active == true && p.SellingPrice != null && p.SellingPrice > 0)
                     .Select(p => p.SellingPrice!.Value)
                     .ToList();
 
@@ -164,7 +164,9 @@ namespace WebLaptopBE.Controllers
                 bool hasStorageFilter = !string.IsNullOrWhiteSpace(storageOptions);
 
                 // 1) Build base product set applying brand and sellingPrice filters
-                var productsBaseQuery = _db.Products.AsNoTracking();
+                var productsBaseQuery = _db.Products
+                    .AsNoTracking()
+                    .Where(p => p.Active == true);
 
                 if (hasBrandFilter)
                 {
@@ -208,7 +210,7 @@ namespace WebLaptopBE.Controllers
                         {
                             var matchedIds = _db.Products
                                 .AsNoTracking()
-                                .Where(p => p.SellingPrice != null && p.SellingPrice >= range!.Min && p.SellingPrice <= range!.Max)
+                                .Where(p => p.Active == true && p.SellingPrice != null && p.SellingPrice >= range!.Min && p.SellingPrice <= range!.Max)
                                 .Select(p => p.ProductId!)
                                 .ToList();
 
@@ -343,7 +345,7 @@ namespace WebLaptopBE.Controllers
                 {
                     finalProductIds = _db.Products
                         .AsNoTracking()
-                        .Where(p => p.ProductId != null)
+                        .Where(p => p.Active == true && p.ProductId != null)
                         .Select(p => p.ProductId!)
                         .Distinct()
                         .ToList();

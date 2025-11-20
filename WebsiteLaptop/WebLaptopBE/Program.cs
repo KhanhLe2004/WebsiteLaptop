@@ -29,6 +29,12 @@ builder.Services.AddSwaggerGen();
 // Add HttpClientFactory
 builder.Services.AddHttpClient();
 
+// Đăng ký NotificationService như singleton
+builder.Services.AddSingleton<WebLaptopBE.Services.NotificationService>();
+
+// Đăng ký EmailService như singleton
+builder.Services.AddSingleton<WebLaptopBE.Services.EmailService>();
+
 // Add CORS
 builder.Services.AddCors(options =>
 {

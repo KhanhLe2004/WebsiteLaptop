@@ -11,6 +11,14 @@
                     <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
                         <div class="d-flex justify-content-between align-items-center">
                             <h6 class="text-white text-capitalize ps-3 mb-0">Quản lý hóa đơn bán</h6>
+                            <div class="pe-3">
+                                <button type="button" class="btn btn-sm btn-white mb-0 position-relative" onclick="openNotificationModal()" id="notificationBtn">
+                                    <i class="material-icons text-sm">notifications</i>
+                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notificationBadge" style="display: none;">
+                                        0
+                                    </span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -27,6 +35,7 @@
                                 <option value="">Tất cả trạng thái</option>
                                 <option value="Chờ xử lý">Chờ xử lý</option>
                                 <option value="Đang xử lý">Đang xử lý</option>
+                                <option value="Đang vận chuyển">Đang vận chuyển</option>
                                 <option value="Hoàn thành">Hoàn thành</option>
                                 <option value="Đã hủy">Đã hủy</option>
                             </select>
@@ -107,6 +116,7 @@
                             <option value="">Tất cả trạng thái</option>
                             <option value="Chờ xử lý">Chờ xử lý</option>
                             <option value="Đang xử lý">Đang xử lý</option>
+                            <option value="Đang vận chuyển">Đang vận chuyển</option>
                             <option value="Hoàn thành">Hoàn thành</option>
                             <option value="Đã hủy">Đã hủy</option>
                         </select>
@@ -124,6 +134,30 @@
     </div>
 </div>
 
+<!-- Modal Thông báo -->
+<div class="modal fade" id="notificationModal" tabindex="-1" aria-labelledby="notificationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-info">
+                <h5 class="modal-title text-white" id="notificationModalLabel">Thông báo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span id="notificationCount">0 thông báo</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="markAllAsRead()">Đánh dấu tất cả đã đọc</button>
+                </div>
+                <div id="notificationList" style="max-height: 500px; overflow-y: auto;">
+                    <!-- Danh sách thông báo sẽ được load ở đây -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <!-- Select2 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -132,13 +166,19 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         const API_URL = 'http://localhost:5068/api/admin/sale-invoices';
+        const NOTIFICATION_API_URL = 'http://localhost:5068/api/admin/notifications';
         let currentPage = 1;
         let pageSize = 10;
         let searchDebounceTimer = null;
         const SEARCH_DEBOUNCE_DELAY = 300;
+        const currentEmployeeId = @Html.Raw(Json.Serialize(ViewBag.EmployeeId ?? ""));
+        const currentEmployeeName = @Html.Raw(Json.Serialize(ViewBag.EmployeeName ?? ""));
 
         $(document).ready(function() {
             loadSaleInvoices();
+            loadNotificationCount();
+            // Tải lại số lượng thông báo mỗi 30 giây
+            setInterval(loadNotificationCount, 30000);
 
             // Tìm kiếm tự động
             $('#searchInput').on('input', function() {
@@ -278,9 +318,11 @@
                             <button class="btn btn-info action-btn" onclick='viewSaleInvoice("${invoice.saleInvoiceId}")' title="Xem">
                                 <i class="material-icons text-sm">visibility</i>
                             </button>
+                            ${status !== 'Hoàn thành' && status !== 'Đã hủy' ? `
                             <button class="btn btn-warning action-btn" onclick='updateStatus("${invoice.saleInvoiceId}", "${status}")' title="Cập nhật trạng thái">
                                 <i class="material-icons text-sm">edit</i>
                             </button>
+                            ` : ''}
                         </td>
                     </tr>
                 `);
@@ -437,9 +479,21 @@
 
         // Cập nhật trạng thái
         function updateStatus(invoiceId, currentStatus) {
+            // Kiểm tra nếu trạng thái là "Hoàn thành" hoặc "Đã hủy" thì không cho cập nhật
+            if (currentStatus === 'Hoàn thành' || currentStatus === 'Đã hủy') {
+                showNotification('Không thể cập nhật trạng thái cho đơn hàng đã hoàn thành hoặc đã hủy', 'error');
+                return;
+            }
+            
             $('#statusInvoiceId').val(invoiceId);
+            // Lưu trạng thái ban đầu để kiểm tra sau
+            $('#statusSelect').data('original-status', currentStatus);
             $('#statusSelect').val(currentStatus).trigger('change');
             $('#statusErrorMessage').hide();
+            
+            // Enable select và nút lưu
+            $('#statusSelect').prop('disabled', false);
+            $('.modal-footer .btn-primary').prop('disabled', false);
             
             setTimeout(function() {
                 updateInputLabels();
@@ -461,11 +515,21 @@
                 return;
             }
 
+            // Kiểm tra nếu trạng thái ban đầu là "Hoàn thành" hoặc "Đã hủy" thì không cho cập nhật
+            const originalStatus = $('#statusSelect').data('original-status');
+            if (originalStatus === 'Hoàn thành' || originalStatus === 'Đã hủy') {
+                showStatusError('Không thể cập nhật trạng thái cho đơn hàng đã hoàn thành hoặc đã hủy');
+                return;
+            }
+
             $.ajax({
                 url: `${API_URL}/${invoiceId}/status`,
                 type: 'PUT',
                 contentType: 'application/json',
-                data: JSON.stringify({ status: status }),
+                data: JSON.stringify({ 
+                    status: status,
+                    employeeId: currentEmployeeId || null
+                }),
                 success: function(response) {
                     showNotification('Cập nhật trạng thái thành công', 'success');
                     const modalInstance = bootstrap.Modal.getInstance(document.getElementById('statusModal'));
@@ -509,11 +573,128 @@
             return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
         }
 
+        // ========== XỬ LÝ THÔNG BÁO ==========
+        
+        // Tải số lượng thông báo chưa đọc
+        function loadNotificationCount() {
+            $.ajax({
+                url: `${NOTIFICATION_API_URL}/count`,
+                type: 'GET',
+                success: function(count) {
+                    const badge = $('#notificationBadge');
+                    if (count > 0) {
+                        badge.text(count).show();
+                    } else {
+                        badge.hide();
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Error loading notification count:', xhr);
+                }
+            });
+        }
+
+        // Mở modal thông báo và tải danh sách
+        function openNotificationModal() {
+            const modal = new bootstrap.Modal(document.getElementById('notificationModal'));
+            modal.show();
+            loadNotifications();
+        }
+
+        // Tải danh sách thông báo
+        function loadNotifications() {
+            $.ajax({
+                url: `${NOTIFICATION_API_URL}?unreadOnly=false`,
+                type: 'GET',
+                success: function(notifications) {
+                    const list = $('#notificationList');
+                    const count = $('#notificationCount');
+                    
+                    count.text(`${notifications.length} thông báo`);
+                    
+                    if (notifications.length === 0) {
+                        list.html('<p class="text-center text-muted py-4">Không có thông báo nào</p>');
+                        return;
+                    }
+
+                    let html = '<div class="list-group">';
+                    notifications.forEach(function(notif) {
+                        const isRead = notif.isRead ? '' : 'border-start border-3 border-primary';
+                        const readIcon = notif.isRead ? '' : '<i class="material-icons text-sm text-primary">fiber_manual_record</i>';
+                        const date = notif.createdAt ? new Date(notif.createdAt).toLocaleString('vi-VN') : '';
+                        
+                        html += `
+                            <div class="list-group-item ${isRead}" data-id="${notif.notificationId}">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex align-items-center mb-1">
+                                            ${readIcon}
+                                            <h6 class="mb-0 ms-2">${notif.message || 'Thông báo'}</h6>
+                                        </div>
+                                        <small class="text-muted">${date}</small>
+                                        ${notif.saleInvoiceId ? `<div class="mt-1"><small class="text-info">Hóa đơn: ${notif.saleInvoiceId}</small></div>` : ''}
+                                        ${notif.stockExportId ? `<div class="mt-1"><small class="text-info">Phiếu xuất: ${notif.stockExportId}</small></div>` : ''}
+                                    </div>
+                                    ${!notif.isRead ? `
+                                        <button type="button" class="btn btn-sm btn-outline-primary ms-2" onclick="markAsRead('${notif.notificationId}')">
+                                            <i class="material-icons text-sm">check</i>
+                                        </button>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    list.html(html);
+                },
+                error: function(xhr) {
+                    console.error('Error loading notifications:', xhr);
+                    $('#notificationList').html('<p class="text-center text-danger py-4">Có lỗi xảy ra khi tải thông báo</p>');
+                }
+            });
+        }
+
+        // Đánh dấu thông báo đã đọc
+        function markAsRead(notificationId) {
+            $.ajax({
+                url: `${NOTIFICATION_API_URL}/${notificationId}/read`,
+                type: 'PUT',
+                success: function() {
+                    loadNotifications();
+                    loadNotificationCount();
+                },
+                error: function(xhr) {
+                    console.error('Error marking notification as read:', xhr);
+                    showNotification('Có lỗi xảy ra khi đánh dấu thông báo', 'error');
+                }
+            });
+        }
+
+        // Đánh dấu tất cả thông báo đã đọc
+        function markAllAsRead() {
+            $.ajax({
+                url: `${NOTIFICATION_API_URL}/read-all`,
+                type: 'PUT',
+                success: function() {
+                    loadNotifications();
+                    loadNotificationCount();
+                    showNotification('Đã đánh dấu tất cả thông báo đã đọc', 'success');
+                },
+                error: function(xhr) {
+                    console.error('Error marking all notifications as read:', xhr);
+                    showNotification('Có lỗi xảy ra khi đánh dấu thông báo', 'error');
+                }
+            });
+        }
+
+        // ========== KẾT THÚC XỬ LÝ THÔNG BÁO ==========
+
         // Lấy badge trạng thái
         function getStatusBadge(status) {
             const badges = {
                 'Chờ xử lý': '<span class="badge bg-gradient-warning">Chờ xử lý</span>',
                 'Đang xử lý': '<span class="badge bg-gradient-info">Đang xử lý</span>',
+                'Đang vận chuyển': '<span class="badge bg-gradient-dark">Đang vận chuyển</span>',
                 'Hoàn thành': '<span class="badge bg-gradient-success">Hoàn thành</span>',
                 'Đã hủy': '<span class="badge bg-gradient-danger">Đã hủy</span>'
             };

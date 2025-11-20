@@ -18,6 +18,7 @@ namespace WebLaptopBE.Controllers
             var lstSanPham = _db.Products
                 .AsNoTracking()
                 .Include(p => p.Brand)
+                .Where(p => p.Active == true)
                 .Select(p => new
                 {
                     p.ProductId,
@@ -51,7 +52,7 @@ namespace WebLaptopBE.Controllers
                 var product = _db.Products
                     .AsNoTracking()
                     .Include(p => p.Brand)
-                    .Where(p => p.ProductId == id)
+                    .Where(p => p.ProductId == id && p.Active == true)
                     .Select(p => new
                     {
                         p.ProductId,

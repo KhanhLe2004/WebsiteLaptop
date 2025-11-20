@@ -1291,7 +1291,7 @@
             }
 
             $.each(employees, function(index, employee) {
-                const avatar = employee.avatar ? `${IMAGE_BASE_URL}/${employee.avatar}` : `${IMAGE_BASE_URL}/default-avatar.jpg`;
+                const avatar = employee.avatar ? `${IMAGE_BASE_URL}/${employee.avatar}` : `${API_BASE_URL}/image/avatar.jpg`;
                 const dateOfBirth = employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString('vi-VN') : '-';
                 const phoneNumber = employee.phoneNumber || '-';
                 const email = employee.email || '-';
@@ -1334,7 +1334,7 @@
                         <td style="vertical-align: middle;">
                             <div class="d-flex px-2 py-1">
                                 <div>
-                                    <img src="${avatar}" class="employee-image me-3" alt="${employee.employeeName}" onerror="this.src='${IMAGE_BASE_URL}/default-avatar.jpg'">
+                                    <img src="${avatar}" class="employee-image me-3" alt="${employee.employeeName}" onerror="this.src='${API_BASE_URL}/image/avatar.jpg'">
                                 </div>
                                 <div class="d-flex flex-column justify-content-center" style="min-width: 0; flex: 1;">
                                     <h6 class="mb-0 text-sm" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${employee.employeeName}</h6>
@@ -1600,7 +1600,7 @@
                             return Promise.resolve({ provinceName, communeName, branchesName, roleName });
                         }
                     }).then(function({ provinceName, communeName, branchesName, roleName }) {
-                        const avatar = employee.avatar ? `${IMAGE_BASE_URL}/${employee.avatar}` : `${IMAGE_BASE_URL}/default-avatar.jpg`;
+                        const avatar = employee.avatar ? `${IMAGE_BASE_URL}/${employee.avatar}` : `${API_BASE_URL}/image/avatar.jpg`;
                         const dateOfBirth = employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString('vi-VN') : '-';
                         const activeBadge = employee.active !== false 
                             ? '<span class="badge bg-gradient-success">Đang hoạt động</span>' 
@@ -1627,7 +1627,7 @@
                         let html = `
                             <div class="row mb-2">
                                 <div class="col-md-3 text-center">
-                                    <img src="${avatar}" class="img-fluid rounded" style="max-height: 200px;" alt="${employee.employeeName || ''}" onerror="this.src='${IMAGE_BASE_URL}/default-avatar.jpg'">
+                                    <img src="${avatar}" class="img-fluid rounded" style="max-height: 200px;" alt="${employee.employeeName || ''}" onerror="this.src='${API_BASE_URL}/image/avatar.jpg'">
                                 </div>
                                 <div class="col-md-9">
                                     <div class="row mb-2">

@@ -6,6 +6,7 @@ using System.Linq;
 using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
+using WebLaptopBE.Services;
 
 namespace WebLaptopBE.Areas.Admin.Controllers
 {
@@ -14,10 +15,12 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     public class ManageStockExportAPIController : ControllerBase
     {
         private readonly Testlaptop33Context _context;
+        private readonly NotificationService _notificationService;
 
-        public ManageStockExportAPIController(Testlaptop33Context context)
+        public ManageStockExportAPIController(Testlaptop33Context context, NotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         // GET: api/admin/stock-exports
@@ -668,6 +671,12 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
+                // Tạo thông báo khi cập nhật trạng thái thành "Hoàn thành"
+                if (statusChanged && oldStatus == "Chờ xử lý" && stockExport.Status == "Hoàn thành" && !string.IsNullOrEmpty(stockExport.SaleInvoiceId))
+                {
+                    CreateNotificationForStockExportCompleted(stockExport.StockExportId, stockExport.SaleInvoiceId);
+                }
+
                 // Load lại để lấy thông tin đầy đủ
                 await _context.Entry(stockExport)
                     .Reference(se => se.SaleInvoice)
@@ -1297,6 +1306,20 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error restoring ProductSerials: {ex.Message}");
+            }
+        }
+
+        // Tạo thông báo khi phiếu xuất hàng hoàn thành
+        private void CreateNotificationForStockExportCompleted(string stockExportId, string saleInvoiceId)
+        {
+            try
+            {
+                string message = $"Phiếu xuất hàng {stockExportId} đã hoàn thành cho hóa đơn {saleInvoiceId}";
+                _notificationService.CreateNotification(saleInvoiceId, stockExportId, message, "StockExportCompleted");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error creating notification: {ex.Message}");
             }
         }
 

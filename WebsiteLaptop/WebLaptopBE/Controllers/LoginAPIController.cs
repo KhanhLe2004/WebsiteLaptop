@@ -32,16 +32,27 @@ namespace WebLaptopBE.Controllers
                     return BadRequest(new { message = "Mật khẩu không hợp lệ" });
                 }
 
+                // Tìm customer theo email hoặc username (không kiểm tra Active ở đây)
                 var customer = _db.Customers
                     .AsNoTracking()
                     .FirstOrDefault(c =>
-                        (c.Email == credential || c.Username == credential) &&
-                        c.Password == password &&
-                        (c.Active == null || c.Active.Value));
+                        (c.Email == credential || c.Username == credential));
 
                 if (customer == null)
                 {
                     return Unauthorized(new { message = "Email/Tên đăng nhập hoặc mật khẩu không đúng" });
+                }
+
+                // Kiểm tra mật khẩu
+                if (customer.Password != password)
+                {
+                    return Unauthorized(new { message = "Email/Tên đăng nhập hoặc mật khẩu không đúng" });
+                }
+
+                // Kiểm tra trạng thái Active
+                if (customer.Active == false)
+                {
+                    return Unauthorized(new { message = "Tài khoản của bạn đã bị khóa" });
                 }
 
                 return Ok(new

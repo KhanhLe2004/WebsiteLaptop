@@ -42,9 +42,9 @@ namespace WebLaptopBE.Controllers
                     CustomerName = request.FullName!.Trim(),
                     Email = email,
                     PhoneNumber = phone,
-                    Address = request.Address?.Trim() ?? string.Empty,
+                    Address = string.Empty, // Không yêu cầu địa chỉ khi đăng ký
                     Password = request.Password!.Trim(),
-                    Username = GenerateUsername(email),
+                    Username = email,
                     Active = true
                 };
 
@@ -130,31 +130,13 @@ namespace WebLaptopBE.Controllers
             return $"C{number + 1:000}";
         }
 
-        private string GenerateUsername(string email)
-        {
-            var baseUsername = email.Split('@')[0];
-            var username = baseUsername;
-            var suffix = 1;
-
-            while (_db.Customers.Any(c => c.Username == username))
-            {
-                username = $"{baseUsername}{suffix++}";
-                if (suffix > 999)
-                {
-                    username = $"{baseUsername}{Guid.NewGuid():N}".Substring(0, baseUsername.Length + 4);
-                    break;
-                }
-            }
-
-            return username;
-        }
+        
 
         public class RegisterRequest
         {
             public string? FullName { get; set; }
             public string? Email { get; set; }
             public string? Phone { get; set; }
-            public string? Address { get; set; }
             public string? Password { get; set; }
         }
     }
