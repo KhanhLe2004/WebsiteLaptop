@@ -108,7 +108,25 @@ namespace WebLaptopBE.Controllers
                 }
 
                 // Tính tổng tiền chỉ cho các sản phẩm đã chọn
-                decimal subtotal = 0;
+                decimal originalSubtotal = 0;
+                decimal finalSubtotal = 0;
+                
+                // Lấy danh sách khuyến mại nếu có
+                List<Promotion> applicablePromotions = new List<Promotion>();
+                if ((request.SelectedDiscountPromotions != null && request.SelectedDiscountPromotions.Any()) ||
+                    (request.SelectedFreeshipPromotions != null && request.SelectedFreeshipPromotions.Any()))
+                {
+                    var allSelectedPromotionIds = new List<string>();
+                    if (request.SelectedDiscountPromotions != null)
+                        allSelectedPromotionIds.AddRange(request.SelectedDiscountPromotions);
+                    if (request.SelectedFreeshipPromotions != null)
+                        allSelectedPromotionIds.AddRange(request.SelectedFreeshipPromotions);
+
+                    applicablePromotions = await _db.Promotions
+                        .Where(p => allSelectedPromotionIds.Contains(p.PromotionId))
+                        .ToListAsync();
+                }
+
                 foreach (var item in cartDetailsToProcess)
                 {
                     if (item == null) continue;
@@ -116,17 +134,52 @@ namespace WebLaptopBE.Controllers
                     var quantity = item.Quantity ?? 0;
                     if (quantity > 0 && price > 0)
                     {
-                        subtotal += price * quantity;
+                        var itemTotal = price * quantity;
+                        originalSubtotal += itemTotal;
+
+                        // Áp dụng khuyến mại giảm giá nếu có
+                        var discountPromotion = applicablePromotions.FirstOrDefault(p => 
+                            p.ProductId == item.ProductId && 
+                            request.SelectedDiscountPromotions != null && 
+                            request.SelectedDiscountPromotions.Contains(p.PromotionId));
+
+                        if (discountPromotion != null)
+                        {
+                            // Lấy phần trăm từ ContentDetail
+                            var discountPercent = ExtractDiscountPercent(discountPromotion.ContentDetail);
+                            if (discountPercent > 0)
+                            {
+                                finalSubtotal += itemTotal * (1 - discountPercent / 100m);
+                            }
+                            else
+                            {
+                                finalSubtotal += itemTotal;
+                            }
+                        }
+                        else
+                        {
+                            // Sản phẩm không có khuyến mại giảm giá
+                            finalSubtotal += itemTotal;
+                        }
                     }
                 }
                 
-                if (subtotal <= 0)
+                if (originalSubtotal <= 0)
                 {
                     return BadRequest(new { message = "Tổng tiền đơn hàng không hợp lệ" });
                 }
 
                 decimal deliveryFee = request.DeliveryFee ?? 0;
-                decimal totalAmount = subtotal + deliveryFee;
+                
+                // Áp dụng freeship nếu có
+                if (request.SelectedFreeshipPromotions != null && 
+                    request.SelectedFreeshipPromotions.Any() && 
+                    applicablePromotions.Any(p => request.SelectedFreeshipPromotions.Contains(p.PromotionId)))
+                {
+                    deliveryFee = 0;
+                }
+
+                decimal totalAmount = finalSubtotal + deliveryFee;
 
                 // Kiểm tra phương thức thanh toán để quyết định xử lý tiếp theo
                 if (request.PaymentMethod == "Chuyển khoản ngân hàng")
@@ -146,6 +199,10 @@ namespace WebLaptopBE.Controllers
                         Note = request.Note,
                         SelectedCartDetailIds = request.SelectedCartDetailIds ?? cartDetailsToProcess.Select(cd => cd.CartDetailId).ToList(),
                         TotalAmount = totalAmount,
+                        SelectedDiscountPromotions = request.SelectedDiscountPromotions,
+                        SelectedFreeshipPromotions = request.SelectedFreeshipPromotions,
+                        Discount = request.Discount,
+                        ShippingDiscount = request.ShippingDiscount,
                         CreatedDate = DateTime.Now
                     };
 
@@ -168,6 +225,10 @@ namespace WebLaptopBE.Controllers
                         Note = request.Note,
                         SelectedCartDetailIds = request.SelectedCartDetailIds ?? cartDetailsToProcess.Select(cd => cd.CartDetailId).ToList(),
                         TotalAmount = totalAmount,
+                        SelectedDiscountPromotions = request.SelectedDiscountPromotions,
+                        SelectedFreeshipPromotions = request.SelectedFreeshipPromotions,
+                        Discount = request.Discount,
+                        ShippingDiscount = request.ShippingDiscount,
                         CreatedDate = DateTime.Now
                     };
 
@@ -262,6 +323,294 @@ namespace WebLaptopBE.Controllers
                     details = ex.InnerException?.Message
                 });
             }
+        }
+
+        // GET: api/Checkout/promotions
+        [HttpGet("promotions")]
+        public async Task<IActionResult> GetPromotions([FromQuery] string customerId, [FromQuery] List<string>? selectedCartDetailIds)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(customerId))
+                {
+                    return BadRequest(new { message = "CustomerId không được để trống" });
+                }
+
+                // Lấy giỏ hàng
+                var cart = _db.Carts
+                    .Include(c => c.CartDetails)
+                        .ThenInclude(cd => cd.Product)
+                    .FirstOrDefault(c => c.CustomerId == customerId);
+
+                if (cart == null || cart.CartDetails == null || !cart.CartDetails.Any())
+                {
+                    return Ok(new { discountPromotions = new List<object>(), freeshipPromotions = new List<object>() });
+                }
+
+                // Lọc chỉ các sản phẩm đã chọn
+                var cartDetailsToProcess = cart.CartDetails.ToList();
+                if (selectedCartDetailIds != null && selectedCartDetailIds.Any())
+                {
+                    cartDetailsToProcess = cart.CartDetails
+                        .Where(cd => selectedCartDetailIds.Contains(cd.CartDetailId))
+                        .ToList();
+                }
+
+                if (!cartDetailsToProcess.Any())
+                {
+                    return Ok(new { discountPromotions = new List<object>(), freeshipPromotions = new List<object>() });
+                }
+
+                // Lấy danh sách ProductId đã chọn
+                var productIds = cartDetailsToProcess.Select(cd => cd.ProductId).ToList();
+
+                // Lấy khuyến mại cho các sản phẩm đã chọn
+                var promotions = await _db.Promotions
+                    .Include(p => p.Product)
+                    .Where(p => productIds.Contains(p.ProductId) && !string.IsNullOrEmpty(p.Type))
+                    .ToListAsync();
+
+                // Phân loại khuyến mại
+                var discountPromotions = promotions
+                    .Where(p => p.Type != null && (p.Type.ToLower().Contains("giảm") || p.Type.Contains("%")))
+                    .Select(p => {
+                        var discountPercent = ExtractDiscountPercent(p.ContentDetail);
+                        var displayText = discountPercent > 0 
+                            ? $"Giảm giá {discountPercent}% - {p.Product?.ProductName}"
+                            : $"{p.Type} - {p.Product?.ProductName}";
+                        
+                        return new {
+                            promotionId = p.PromotionId,
+                            productId = p.ProductId,
+                            productName = p.Product?.ProductName,
+                            type = p.Type,
+                            contentDetail = p.ContentDetail,
+                            displayText = displayText
+                        };
+                    })
+                    .ToList();
+
+                var freeshipPromotions = promotions
+                    .Where(p => p.Type != null && p.Type.ToLower().Contains("freeship"))
+                    .Select(p => new {
+                        promotionId = p.PromotionId,
+                        productId = p.ProductId,
+                        productName = p.Product?.ProductName,
+                        type = p.Type,
+                        contentDetail = p.ContentDetail,
+                        displayText = "Freeship"  // Chỉ hiển thị "Freeship", không có tên sản phẩm
+                    })
+                    .ToList();
+
+                return Ok(new { 
+                    discountPromotions = discountPromotions,
+                    freeshipPromotions = freeshipPromotions
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"GetPromotions error: {ex.Message}");
+                return StatusCode(500, new { message = "Lỗi khi lấy danh sách khuyến mại", error = ex.Message });
+            }
+        }
+
+        // POST: api/Checkout/apply-promotion
+        [HttpPost("apply-promotion")]
+        public async Task<IActionResult> ApplyPromotion([FromBody] ApplyPromotionRequest request)
+        {
+            try
+            {
+                if (request == null || string.IsNullOrWhiteSpace(request.CustomerId))
+                {
+                    return BadRequest(new { message = "Thông tin không hợp lệ" });
+                }
+
+                if ((request.SelectedDiscountPromotions == null || !request.SelectedDiscountPromotions.Any()) &&
+                    (request.SelectedFreeshipPromotions == null || !request.SelectedFreeshipPromotions.Any()))
+                {
+                    return BadRequest(new { message = "Vui lòng chọn ít nhất một khuyến mại" });
+                }
+
+                // Kiểm tra khách hàng
+                var customer = _db.Customers.FirstOrDefault(c => c.CustomerId == request.CustomerId);
+                if (customer == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy khách hàng" });
+                }
+
+                // Lấy giỏ hàng
+                var cart = _db.Carts
+                    .Include(c => c.CartDetails)
+                        .ThenInclude(cd => cd.Product)
+                    .FirstOrDefault(c => c.CustomerId == request.CustomerId);
+
+                if (cart == null || cart.CartDetails == null || !cart.CartDetails.Any())
+                {
+                    return BadRequest(new { message = "Giỏ hàng trống" });
+                }
+
+                // Lọc chỉ các sản phẩm đã chọn
+                var cartDetailsToProcess = cart.CartDetails.ToList();
+                if (request.SelectedCartDetailIds != null && request.SelectedCartDetailIds.Any())
+                {
+                    cartDetailsToProcess = cart.CartDetails
+                        .Where(cd => request.SelectedCartDetailIds.Contains(cd.CartDetailId))
+                        .ToList();
+                    
+                    if (!cartDetailsToProcess.Any())
+                    {
+                        return BadRequest(new { message = "Không có sản phẩm nào được chọn" });
+                    }
+                }
+
+                // Lấy tất cả khuyến mại được chọn
+                var allSelectedPromotionIds = new List<string>();
+                if (request.SelectedDiscountPromotions != null)
+                    allSelectedPromotionIds.AddRange(request.SelectedDiscountPromotions);
+                if (request.SelectedFreeshipPromotions != null)
+                    allSelectedPromotionIds.AddRange(request.SelectedFreeshipPromotions);
+
+                var promotions = await _db.Promotions
+                    .Include(p => p.Product)
+                    .Where(p => allSelectedPromotionIds.Contains(p.PromotionId))
+                    .ToListAsync();
+
+                if (!promotions.Any())
+                {
+                    return BadRequest(new { message = "Không tìm thấy khuyến mại được chọn" });
+                }
+
+                // Tính toán khuyến mại
+                decimal originalSubtotal = 0;
+                decimal discountedSubtotal = 0;
+                decimal deliveryFee = request.DeliveryFee ?? 30000;
+                decimal finalDeliveryFee = deliveryFee;
+                var applicablePromotions = new List<string>();
+                var promotionDetails = new List<object>();
+                var hasFreeship = false;
+
+                foreach (var item in cartDetailsToProcess)
+                {
+                    if (item == null) continue;
+                    var price = item.Product?.SellingPrice ?? 0;
+                    var quantity = item.Quantity ?? 0;
+                    if (quantity > 0 && price > 0)
+                    {
+                        var itemTotal = price * quantity;
+                        originalSubtotal += itemTotal;
+
+                        // Tìm khuyến mại giảm giá cho sản phẩm này
+                        var discountPromotion = promotions.FirstOrDefault(p => 
+                            p.ProductId == item.ProductId && 
+                            request.SelectedDiscountPromotions != null && 
+                            request.SelectedDiscountPromotions.Contains(p.PromotionId));
+
+                        if (discountPromotion != null)
+                        {
+                            // Lấy phần trăm từ ContentDetail
+                            var discountPercent = ExtractDiscountPercent(discountPromotion.ContentDetail);
+                            if (discountPercent > 0)
+                            {
+                                var discountedPrice = itemTotal * (1 - discountPercent / 100m);
+                                var discountAmount = itemTotal - discountedPrice;
+                                discountedSubtotal += discountedPrice;
+                                
+                                applicablePromotions.Add($"Giảm giá {discountPercent}% - {item.Product?.ProductName}");
+                                promotionDetails.Add(new {
+                                    type = "discount",
+                                    productName = item.Product?.ProductName,
+                                    discountPercent = discountPercent,
+                                    discountAmount = discountAmount,
+                                    displayText = $"Giảm giá {discountPercent}% - {item.Product?.ProductName}"
+                                });
+                            }
+                            else
+                            {
+                                discountedSubtotal += itemTotal;
+                            }
+                        }
+                        else
+                        {
+                            discountedSubtotal += itemTotal;
+                        }
+
+                        // Kiểm tra freeship cho sản phẩm này
+                        var freeshipPromotion = promotions.FirstOrDefault(p => 
+                            p.ProductId == item.ProductId && 
+                            request.SelectedFreeshipPromotions != null && 
+                            request.SelectedFreeshipPromotions.Contains(p.PromotionId));
+
+                        if (freeshipPromotion != null && !hasFreeship)
+                        {
+                            hasFreeship = true;
+                            finalDeliveryFee = 0;
+                            // Không hiển thị cụ thể sản phẩm nào có freeship
+                        }
+                    }
+                }
+
+                var discount = originalSubtotal - discountedSubtotal;
+                var shippingDiscount = deliveryFee - finalDeliveryFee;
+                var totalDiscount = discount + shippingDiscount;
+                var finalTotal = discountedSubtotal + finalDeliveryFee;
+
+                // Thêm thông báo freeship nếu có
+                if (hasFreeship)
+                {
+                    applicablePromotions.Add("Freeship");
+                    promotionDetails.Add(new {
+                        type = "freeship",
+                        discountAmount = shippingDiscount,
+                        displayText = "Freeship cho toàn bộ đơn hàng"
+                    });
+                }
+
+                return Ok(new
+                {
+                    message = "Áp dụng khuyến mại thành công",
+                    applicablePromotions = applicablePromotions,
+                    promotionDetails = promotionDetails,
+                    originalSubtotal = originalSubtotal,
+                    discountedSubtotal = discountedSubtotal,
+                    discount = discount,
+                    originalDeliveryFee = deliveryFee,
+                    finalDeliveryFee = finalDeliveryFee,
+                    shippingDiscount = shippingDiscount,
+                    totalDiscount = totalDiscount,
+                    finalTotal = finalTotal,
+                    selectedDiscountPromotions = request.SelectedDiscountPromotions,
+                    selectedFreeshipPromotions = request.SelectedFreeshipPromotions,
+                    hasFreeship = hasFreeship
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ApplyPromotion error: {ex.Message}");
+                return StatusCode(500, new { message = "Lỗi khi áp dụng khuyến mại", error = ex.Message });
+            }
+        }
+
+        // Helper method để lấy phần trăm giảm giá từ ContentDetail
+        private decimal ExtractDiscountPercent(string? contentDetail)
+        {
+            if (string.IsNullOrWhiteSpace(contentDetail))
+                return 0;
+
+            try
+            {
+                // Tìm số phần trăm trong chuỗi (ví dụ: "Giảm 15% giá bán" -> 15)
+                var match = System.Text.RegularExpressions.Regex.Match(contentDetail, @"(\d+)%");
+                if (match.Success && decimal.TryParse(match.Groups[1].Value, out decimal percent))
+                {
+                    return percent;
+                }
+            }
+            catch
+            {
+                // Ignore parsing errors
+            }
+
+            return 0;
         }
 
         // GET: api/Checkout/vnpay-callback
@@ -883,6 +1232,36 @@ namespace WebLaptopBE.Controllers
             
             [JsonPropertyName("selectedCartDetailIds")]
             public List<string>? SelectedCartDetailIds { get; set; }
+            
+            [JsonPropertyName("selectedDiscountPromotions")]
+            public List<string>? SelectedDiscountPromotions { get; set; }
+            
+            [JsonPropertyName("selectedFreeshipPromotions")]
+            public List<string>? SelectedFreeshipPromotions { get; set; }
+            
+            [JsonPropertyName("discount")]
+            public decimal? Discount { get; set; }
+            
+            [JsonPropertyName("shippingDiscount")]
+            public decimal? ShippingDiscount { get; set; }
+        }
+
+        public class ApplyPromotionRequest
+        {
+            [JsonPropertyName("customerId")]
+            public string CustomerId { get; set; } = string.Empty;
+            
+            [JsonPropertyName("selectedDiscountPromotions")]
+            public List<string>? SelectedDiscountPromotions { get; set; }
+            
+            [JsonPropertyName("selectedFreeshipPromotions")]
+            public List<string>? SelectedFreeshipPromotions { get; set; }
+            
+            [JsonPropertyName("selectedCartDetailIds")]
+            public List<string>? SelectedCartDetailIds { get; set; }
+            
+            [JsonPropertyName("deliveryFee")]
+            public decimal? DeliveryFee { get; set; }
         }
 
         // Model tạm để lưu thông tin đơn hàng chờ thanh toán
@@ -898,6 +1277,10 @@ namespace WebLaptopBE.Controllers
             public string? Note { get; set; }
             public List<string> SelectedCartDetailIds { get; set; } = new();
             public decimal TotalAmount { get; set; }
+            public List<string>? SelectedDiscountPromotions { get; set; }
+            public List<string>? SelectedFreeshipPromotions { get; set; }
+            public decimal? Discount { get; set; }
+            public decimal? ShippingDiscount { get; set; }
             public DateTime CreatedDate { get; set; }
         }
 

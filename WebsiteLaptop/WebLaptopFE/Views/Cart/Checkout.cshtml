@@ -114,6 +114,55 @@
 
         let provinces = [];
         const wardsCache = new Map();
+        
+        // Biến lưu trữ thông tin khuyến mại
+        let appliedPromotion = null;
+        let originalSubtotal = 0;
+        let currentDeliveryFee = 30000;
+
+        // Load danh sách khuyến mại
+        async function loadPromotions() {
+            try {
+                // Lấy danh sách cartDetailId đã chọn từ sessionStorage
+                const selectedCartItemsJson = sessionStorage.getItem('selectedCartItems');
+                const selectedCartDetailIds = selectedCartItemsJson ? JSON.parse(selectedCartItemsJson) : [];
+                
+                if (!selectedCartDetailIds || selectedCartDetailIds.length === 0) {
+                    $('#discountPromotionSelect').html('<option value="">Vui lòng chọn sản phẩm trước</option>');
+                    $('#freeshipPromotionSelect').html('<option value="">Vui lòng chọn sản phẩm trước</option>');
+                    return;
+                }
+
+                const url = `${CHECKOUT_API_BASE}/promotions?customerId=${encodeURIComponent(currentCustomerId)}&${selectedCartDetailIds.map(id => `selectedCartDetailIds=${encodeURIComponent(id)}`).join('&')}`;
+                const response = await fetch(url, { credentials: 'include' });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                
+                // Load khuyến mại giảm giá
+                const $discountSelect = $('#discountPromotionSelect');
+                $discountSelect.html('<option value="">Chọn khuyến mại giảm giá</option>');
+                
+                if (data.discountPromotions && data.discountPromotions.length > 0) {
+                    data.discountPromotions.forEach(promo => {
+                        $discountSelect.append(`<option value="${promo.promotionId}">${promo.displayText}</option>`);
+                    });
+                }
+
+                // Load khuyến mại freeship
+                const $freeshipSelect = $('#freeshipPromotionSelect');
+                $freeshipSelect.html('<option value="">Chọn khuyến mại freeship</option>');
+                
+                if (data.freeshipPromotions && data.freeshipPromotions.length > 0) {
+                    data.freeshipPromotions.forEach(promo => {
+                        $freeshipSelect.append(`<option value="${promo.promotionId}">${promo.displayText}</option>`);
+                    });
+                }
+            } catch (err) {
+                console.error('loadPromotions error:', err);
+                $('#discountPromotionSelect').html('<option value="">Lỗi khi tải khuyến mại</option>');
+                $('#freeshipPromotionSelect').html('<option value="">Lỗi khi tải khuyến mại</option>');
+            }
+        }
 
         // Load địa chỉ
         async function loadProvinces() {
@@ -479,6 +528,17 @@
                     const subtotal = item.subtotal || item.Subtotal || (price * quantity);
                     return sum + subtotal;
                 }, 0);
+                
+                // Reset khuyến mại khi load lại giỏ hàng
+                appliedPromotion = null;
+                $('#discountPromotionSelect').val('');
+                $('#freeshipPromotionSelect').val('');
+                $('#promotion-message').html('');
+                $('#discount-row').hide();
+                
+                // Load lại danh sách khuyến mại cho sản phẩm mới
+                await loadPromotions();
+                
                 updateTotals(selectedTotal);
             } catch (err) {
                 console.error('loadCart error:', err);
@@ -526,13 +586,156 @@
             $body.html(rows.join(''));
         }
 
-        function updateTotals(subtotal) {
-            const deliveryFee = 30000; // Phí giao hàng mặc định
-            const total = subtotal + deliveryFee;
+        function updateTotals(subtotal, deliveryFee = null, promotionData = null) {
+            originalSubtotal = subtotal;
+            let finalSubtotal = subtotal;
+            let finalDeliveryFee = deliveryFee !== null ? deliveryFee : currentDeliveryFee;
             
-            $('.subtotal-amount').text(formatCurrency(subtotal));
-            $('.delivery-fee-amount').text(formatCurrency(deliveryFee));
+            // Áp dụng khuyến mại nếu có
+            if (promotionData) {
+                finalSubtotal = promotionData.discountedSubtotal || subtotal;
+                finalDeliveryFee = promotionData.finalDeliveryFee !== undefined ? promotionData.finalDeliveryFee : finalDeliveryFee;
+            }
+            
+            const total = finalSubtotal + finalDeliveryFee;
+            
+            // Tạm tính luôn hiển thị số tiền gốc (không áp dụng khuyến mại)
+            $('.subtotal-amount').text(formatCurrency(originalSubtotal));
+            $('.delivery-fee-amount').text(formatCurrency(finalDeliveryFee));
+            // Tổng hiển thị số tiền sau khi áp dụng khuyến mại
             $('.total-amount').text(formatCurrency(total));
+            
+            // Hiển thị dòng giảm giá nếu có khuyến mại
+            if (promotionData && (promotionData.discount > 0 || promotionData.shippingDiscount > 0)) {
+                const totalDiscount = (promotionData.discount || 0) + (promotionData.shippingDiscount || 0);
+                $('.discount-amount').text(`-${formatCurrency(totalDiscount)}`);
+                $('#discount-row').show();
+            } else {
+                $('#discount-row').hide();
+            }
+        }
+
+        // Áp dụng khuyến mại
+        async function applyPromotion() {
+            const selectedDiscountPromotion = $('#discountPromotionSelect').val();
+            const selectedFreeshipPromotion = $('#freeshipPromotionSelect').val();
+            
+            if (!selectedDiscountPromotion && !selectedFreeshipPromotion) {
+                showAlert('warning', 'Vui lòng chọn ít nhất một loại khuyến mại');
+                return;
+            }
+
+            const btn = $('#btnApplyPromotion');
+            const original = btn.html();
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Đang áp dụng...');
+
+            try {
+                // Lấy danh sách cartDetailId đã chọn từ sessionStorage
+                const selectedCartItemsJson = sessionStorage.getItem('selectedCartItems');
+                const selectedCartDetailIds = selectedCartItemsJson ? JSON.parse(selectedCartItemsJson) : [];
+                
+                if (!selectedCartDetailIds || selectedCartDetailIds.length === 0) {
+                    showAlert('warning', 'Vui lòng chọn ít nhất một sản phẩm để áp dụng khuyến mại');
+                    return;
+                }
+
+                const requestBody = {
+                    customerId: currentCustomerId,
+                    selectedDiscountPromotions: selectedDiscountPromotion ? [selectedDiscountPromotion] : [],
+                    selectedFreeshipPromotions: selectedFreeshipPromotion ? [selectedFreeshipPromotion] : [],
+                    selectedCartDetailIds: selectedCartDetailIds,
+                    deliveryFee: currentDeliveryFee
+                };
+
+                const response = await fetch(`${CHECKOUT_API_BASE}/apply-promotion`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(requestBody)
+                });
+
+                const responseText = await response.text();
+                let data = null;
+                
+                if (responseText) {
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (parseError) {
+                        console.error('Failed to parse response as JSON:', responseText);
+                        if (!response.ok) {
+                            throw new Error(`Lỗi từ server: ${response.status} ${response.statusText}`);
+                        }
+                    }
+                }
+                
+                if (!response.ok) {
+                    let errorMessage = `Lỗi ${response.status}: ${response.statusText}`;
+                    if (data && data.message) {
+                        errorMessage = data.message;
+                    }
+                    throw new Error(errorMessage);
+                }
+                
+                if (!data) {
+                    throw new Error('Không nhận được dữ liệu từ server');
+                }
+
+                // Lưu thông tin khuyến mại đã áp dụng
+                appliedPromotion = {
+                    selectedDiscountPromotions: data.selectedDiscountPromotions,
+                    selectedFreeshipPromotions: data.selectedFreeshipPromotions,
+                    data: data
+                };
+
+                // Cập nhật hiển thị tổng tiền
+                updateTotals(originalSubtotal, currentDeliveryFee, data);
+
+                // Hiển thị danh sách sản phẩm được áp dụng khuyến mại
+                if (data.promotionDetails && data.promotionDetails.length > 0) {
+                    // Tách riêng khuyến mại giảm giá và freeship
+                    const discountPromotions = data.promotionDetails.filter(p => p.type === 'discount');
+                    const freeshipPromotions = data.promotionDetails.filter(p => p.type === 'freeship');
+                    
+                    let promotionInfo = '';
+                    
+                    if (discountPromotions.length > 0) {
+                        promotionInfo += `<strong>Sản phẩm được giảm giá:</strong><br><br>`;
+                        
+                        // Hiển thị chi tiết từng sản phẩm với số tiền giảm chính xác
+                        discountPromotions.forEach(promo => {
+                            promotionInfo += `${promo.displayText}: -${formatCurrency(promo.discountAmount)}<br>`;
+                        });
+                    }
+                    
+                    if (freeshipPromotions.length > 0) {
+                        if (promotionInfo) promotionInfo += '<br>';
+                        promotionInfo += `<strong>Khuyến mại vận chuyển:</strong><br><br>`;
+                        
+                        freeshipPromotions.forEach(promo => {
+                            promotionInfo += `${promo.displayText}: -${formatCurrency(promo.discountAmount)}`;
+                        });
+                    }
+                    
+                    if (promotionInfo) {
+                        $('#promotion-message').append(`<div class="alert alert-info small mt-2">${promotionInfo}</div>`);
+                    }
+                }
+
+            } catch (err) {
+                console.error('applyPromotion error:', err);
+                const errorMessage = err.message || 'Không thể áp dụng khuyến mại. Vui lòng thử lại sau.';
+                showAlert('danger', errorMessage);
+                $('#promotion-message').html('');
+                $('#discount-row').hide();
+                // Reset về trạng thái ban đầu
+                appliedPromotion = null;
+                updateTotals(originalSubtotal, currentDeliveryFee);
+            } finally {
+                btn.prop('disabled', false).html(original);
+            }
         }
 
         // Parse địa chỉ từ chuỗi đầy đủ
@@ -804,9 +1007,13 @@
                     email: email,
                     deliveryAddress: deliveryAddress,
                     paymentMethod: paymentMethod,
-                    deliveryFee: 30000,
+                    deliveryFee: appliedPromotion && appliedPromotion.data.finalDeliveryFee !== undefined ? appliedPromotion.data.finalDeliveryFee : 30000,
                     note: note || null,
-                    selectedCartDetailIds: selectedCartDetailIds
+                    selectedCartDetailIds: selectedCartDetailIds,
+                    selectedDiscountPromotions: appliedPromotion ? appliedPromotion.selectedDiscountPromotions : null,
+                    selectedFreeshipPromotions: appliedPromotion ? appliedPromotion.selectedFreeshipPromotions : null,
+                    discount: appliedPromotion ? appliedPromotion.data.discount : null,
+                    shippingDiscount: appliedPromotion ? appliedPromotion.data.shippingDiscount : null
                 };
                 
                 console.log('Sending checkout request:', requestBody);
@@ -946,6 +1153,7 @@
             checkPaymentStatus();
             
             await loadProvinces();
+            await loadPromotions();
             loadCart();
             await loadCustomerInfo();
 
@@ -982,11 +1190,25 @@
                 showPaymentMethodError('');
             });
 
+            // Event handler cho nút áp dụng khuyến mại
+            $('#btnApplyPromotion').on('click', applyPromotion);
+            
+            // Reset khuyến mại khi thay đổi selection
+            $('#discountPromotionSelect, #freeshipPromotionSelect').on('change', function() {
+                if (!$('#discountPromotionSelect').val() && !$('#freeshipPromotionSelect').val()) {
+                    appliedPromotion = null;
+                    $('#promotion-message').html('');
+                    $('#discount-row').hide();
+                    updateTotals(originalSubtotal, currentDeliveryFee);
+                }
+            });
 
             $('#btnPlaceOrder').on('click', handleCheckout);
         });
     })(jQuery);
 </script>
+}
+
 <style>
     /* Autocomplete styling */
     .autocomplete-wrapper {
@@ -1075,13 +1297,12 @@
         background-color: #17a2b8 !important;
     }
 </style>
-}
 
         <!-- Checkout Page Start -->
         <div class="container-fluid py-5">
             <div class="container py-5">
                 <h1 class="mb-4">Thông tin thanh toán</h1>
-                <form action="#">
+                <div class="checkout-form">
                     <div class="row g-5">
                         <div class="col-md-12 col-lg-6 col-xl-6">
                             <div class="row">
@@ -1182,6 +1403,19 @@
                                                 </div>
                                             </td>
                                         </tr>
+                                        <tr id="discount-row" style="display: none;">
+                                            <th scope="row"></th>
+                                            <td class="py-0">
+                                                <p class="mb-0 text-success py-3">Giảm giá</p>
+                                            </td>
+                                            <td class="py-0"></td>
+                                            <td class="py-0"></td>
+                                            <td class="py-0">
+                                                <div class="py-3">
+                                                    <p class="mb-0 text-success discount-amount" style="font-size: larger;">0 ₫</p>
+                                                </div>
+                                            </td>
+                                        </tr>
                                         <tr>
                                             <th scope="row"></th>
                                             <td class="py-0">
@@ -1198,10 +1432,40 @@
                                     </tfoot>
                                 </table>
                             </div>
-                            <div class="row g-4 text-start py-3" style="margin-left: 15%;">
-                                <p class="text-dark fw-bold mb-3" style="font-size: x-large;"><b>Chọn phương thức thanh toán</b></p>
+                            <!-- Khuyến mại -->
+                            <div class="py-3">
+                                <p class="text-dark fw-bold mb-3" style="font-size: large;"><b>Chọn khuyến mại</b></p>
+                                
+                                <!-- Khuyến mại giảm giá -->
+                                <div class="mb-3">
+                                    <label class="form-label">Khuyến mại giảm giá (chỉ chọn 1):</label>
+                                    <select id="discountPromotionSelect" class="form-select border-0 border-bottom rounded py-2" style="box-shadow:none;">
+                                        <option value="">Chọn khuyến mại giảm giá</option>
+                                    </select>
+                                </div>
 
-                                <div class="col-12" style="margin-top: 0%; margin-left: 8%;">
+                                <!-- Khuyến mại freeship -->
+                                <div class="mb-3">
+                                    <label class="form-label">Khuyến mại miễn phí vận chuyển (chỉ chọn 1):</label>
+                                    <select id="freeshipPromotionSelect" class="form-select border-0 border-bottom rounded py-2" style="box-shadow:none;">
+                                        <option value="">Chọn khuyến mại freeship</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <button type="button" id="btnApplyPromotion" class="btn border-secondary rounded-pill px-4 py-3 text-primary">
+                                        Áp dụng khuyến mại
+                                    </button>
+                                </div>
+                                
+                                <div id="promotion-message" class="w-100 mt-2"></div>
+                            </div>
+
+                            <!-- Phương thức thanh toán -->
+                            <div class="py-3">
+                                <p class="text-dark fw-bold mb-3" style="font-size: large;"><b>Chọn phương thức thanh toán</b></p>
+
+                                <div class="mb-3">
                                     <div class="form-check my-2">
                                         <input type="radio" class="form-check-input bg-primary border-0" id="Payment-Transfer" name="PaymentMethod" value="Chuyển khoản ngân hàng">
                                         <label class="form-check-label" for="Payment-Transfer">Chuyển khoản ngân hàng</label>
@@ -1215,12 +1479,13 @@
                                 </div>
                             </div>
 
-                            <div class="row g-4 text-center align-items-center justify-content-center pt-4">
+                            <!-- Nút đặt hàng -->
+                            <div class="py-3">
                                 <button type="button" id="btnPlaceOrder" class="btn border-secondary py-3 px-4 text-uppercase w-100 text-primary">Đặt hàng</button>
                             </div>
                         </div>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
         <!-- Checkout Page End -->
