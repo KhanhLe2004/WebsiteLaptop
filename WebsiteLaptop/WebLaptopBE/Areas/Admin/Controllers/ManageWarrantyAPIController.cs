@@ -365,16 +365,39 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     return BadRequest(new { message = "Mã bảo hành đã tồn tại" });
                 }
 
+                // Xử lý logic khác nhau cho Bảo hành và Sửa chữa
+                string customerId = dto.CustomerId;
+                decimal totalAmount = dto.TotalAmount ?? 0;
+
+                if (dto.Type == "Bảo hành")
+                {
+                    // Bảo hành: Yêu cầu CustomerId và SerialId, TotalAmount = 0
+                    if (string.IsNullOrWhiteSpace(customerId))
+                    {
+                        return BadRequest(new { message = "Bảo hành yêu cầu thông tin khách hàng" });
+                    }
+                    totalAmount = 0; // Cố định = 0 cho bảo hành
+                }
+                else if (dto.Type == "Sửa chữa")
+                {
+                    // Sửa chữa: Có thể tạo khách hàng mới nếu cần, SerialId = null
+                    if (string.IsNullOrWhiteSpace(customerId) && !string.IsNullOrWhiteSpace(dto.CustomerName))
+                    {
+                        // Tạo khách hàng mới cho sửa chữa
+                        customerId = await CreateNewCustomer(dto.CustomerName, dto.PhoneNumber);
+                    }
+                }
+
                 var warranty = new Warranty
                 {
                     WarrantyId = warrantyId,
-                    CustomerId = dto.CustomerId,
-                    SerialId = dto.SerialId,
+                    CustomerId = customerId,
+                    SerialId = dto.Type == "Sửa chữa" ? null : dto.SerialId, // SerialId = null cho sửa chữa
                     EmployeeId = dto.EmployeeId,
                     Type = dto.Type,
                     ContentDetail = dto.ContentDetail,
                     Status = dto.Status ?? "Đang xử lý",
-                    TotalAmount = dto.TotalAmount
+                    TotalAmount = totalAmount
                 };
 
                 _context.Warranties.Add(warranty);
@@ -442,14 +465,39 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     return NotFound(new { message = "Không tìm thấy bảo hành" });
                 }
 
+                // Không cho phép cập nhật khi trạng thái là "Hoàn thành" hoặc "Đã hủy"
+                if (warranty.Status == "Hoàn thành" || warranty.Status == "Đã hủy")
+                {
+                    return BadRequest(new { message = "Không thể chỉnh sửa phiếu bảo hành đã hoàn thành hoặc đã hủy" });
+                }
+
+                // Xử lý logic cập nhật khác nhau cho Bảo hành và Sửa chữa
+                string customerId = dto.CustomerId ?? warranty.CustomerId;
+                decimal? totalAmount = dto.TotalAmount ?? warranty.TotalAmount;
+                string type = dto.Type ?? warranty.Type;
+
+                if (type == "Bảo hành")
+                {
+                    // Bảo hành: TotalAmount = 0
+                    totalAmount = 0;
+                }
+                else if (type == "Sửa chữa")
+                {
+                    // Sửa chữa: Có thể tạo khách hàng mới nếu cần
+                    if (string.IsNullOrWhiteSpace(customerId) && !string.IsNullOrWhiteSpace(dto.CustomerName))
+                    {
+                        customerId = await CreateNewCustomer(dto.CustomerName, dto.PhoneNumber);
+                    }
+                }
+
                 // Cập nhật thông tin
-                warranty.CustomerId = dto.CustomerId ?? warranty.CustomerId;
-                warranty.SerialId = dto.SerialId ?? warranty.SerialId;
+                warranty.CustomerId = customerId;
+                warranty.SerialId = type == "Sửa chữa" ? null : (dto.SerialId ?? warranty.SerialId);
                 warranty.EmployeeId = dto.EmployeeId ?? warranty.EmployeeId;
-                warranty.Type = dto.Type ?? warranty.Type;
+                warranty.Type = type;
                 warranty.ContentDetail = dto.ContentDetail ?? warranty.ContentDetail;
                 warranty.Status = dto.Status ?? warranty.Status;
-                warranty.TotalAmount = dto.TotalAmount ?? warranty.TotalAmount;
+                warranty.TotalAmount = totalAmount;
 
                 await _context.SaveChangesAsync();
 
@@ -495,31 +543,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
         }
 
-        // DELETE: api/admin/warranties/{id}
-        // Xóa bảo hành
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteWarranty(string id)
-        {
-            try
-            {
-                var warranty = await _context.Warranties
-                    .FirstOrDefaultAsync(w => w.WarrantyId == id);
-
-                if (warranty == null)
-                {
-                    return NotFound(new { message = "Không tìm thấy bảo hành" });
-                }
-
-                _context.Warranties.Remove(warranty);
-                await _context.SaveChangesAsync();
-
-                return Ok(new { message = "Xóa bảo hành thành công" });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Lỗi khi xóa bảo hành", error = ex.Message });
-            }
-        }
 
         // Helper methods
         private string GenerateWarrantyId()
@@ -541,6 +564,40 @@ namespace WebLaptopBE.Areas.Admin.Controllers
 
             // Trả về ID tiếp theo
             return $"WA{(maxNumber + 1):D3}";
+        }
+
+        private async Task<string> CreateNewCustomer(string customerName, string phoneNumber)
+        {
+            // Tạo CustomerId mới
+            var allCustomerIds = await _context.Customers
+                .Select(c => c.CustomerId)
+                .Where(id => id != null && id.StartsWith("C") && id.Length == 4)
+                .ToListAsync();
+
+            int maxNumber = 0;
+            foreach (var id in allCustomerIds)
+            {
+                if (id.Length >= 2 && int.TryParse(id.Substring(1), out int num))
+                {
+                    maxNumber = Math.Max(maxNumber, num);
+                }
+            }
+
+            string newCustomerId = $"C{(maxNumber + 1):D3}";
+
+            // Tạo khách hàng mới
+            var newCustomer = new Customer
+            {
+                CustomerId = newCustomerId,
+                CustomerName = customerName,
+                PhoneNumber = phoneNumber,
+                Active = true
+            };
+
+            _context.Customers.Add(newCustomer);
+            await _context.SaveChangesAsync();
+
+            return newCustomerId;
         }
     }
 }

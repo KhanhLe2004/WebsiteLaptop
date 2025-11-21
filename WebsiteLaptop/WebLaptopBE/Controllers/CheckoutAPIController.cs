@@ -7,6 +7,7 @@ using System.Text.Json.Serialization;
 using System.Collections.Generic;
 using WebLaptopBE.Data;
 using WebLaptopBE.Services;
+using WebLaptopBE.Models.VnPay;
 namespace WebLaptopBE.Controllers
 {
     [Route("api/Checkout")]
@@ -15,10 +16,14 @@ namespace WebLaptopBE.Controllers
     {
         private readonly Testlaptop33Context _db = new();
         private readonly EmailService _emailService;
+        private readonly IVnPayService _vnPayService;
+        private readonly IConfiguration _configuration;
 
-        public CheckoutAPIController(EmailService emailService)
+        public CheckoutAPIController(EmailService emailService, IVnPayService vnPayService, IConfiguration configuration)
         {
             _emailService = emailService;
+            _vnPayService = vnPayService;
+            _configuration = configuration;
         }
 
         // POST: api/Checkout/create
@@ -237,20 +242,47 @@ namespace WebLaptopBE.Controllers
                 // Lưu đơn hàng trước
                 _db.SaveChanges();
 
-                // Xóa các CartDetail đã chọn sau khi tạo đơn hàng thành công
-                _db.CartDetails.RemoveRange(cartDetailsToProcess);
-                
-                // Kiểm tra xem còn CartDetail nào không, nếu không còn thì xóa luôn Cart
-                var remainingDetails = _db.CartDetails
-                    .Where(cd => cd.CartId == cart.CartId)
-                    .ToList();
-                
-                if (!remainingDetails.Any())
+                // Kiểm tra phương thức thanh toán để quyết định xử lý tiếp theo
+                if (request.PaymentMethod == "Chuyển khoản ngân hàng")
                 {
-                    _db.Carts.Remove(cart);
+                    // Tạo URL thanh toán VNPay
+                    var vnPayRequest = new VnPaymentRequestModel
+                    {
+                        OrderId = int.Parse(saleInvoice.SaleInvoiceId.Substring(2)), // Lấy số từ SI001 -> 1
+                        FullName = request.FullName,
+                        Description = $"Thanh toán đơn hàng {saleInvoice.SaleInvoiceId}",
+                        Amount = (double)totalAmount,
+                        CreatedDate = DateTime.Now
+                    };
+
+                    var paymentUrl = _vnPayService.CreatePaymentUrl(HttpContext, vnPayRequest);
+                    
+                    return Ok(new
+                    {
+                        message = "Đơn hàng đã được tạo. Chuyển hướng đến VNPay để thanh toán.",
+                        orderId = saleInvoice.SaleInvoiceId,
+                        totalAmount = totalAmount,
+                        paymentUrl = paymentUrl,
+                        requiresPayment = true
+                    });
                 }
-                
-                _db.SaveChanges();
+                else
+                {
+                    // Thanh toán khi nhận hàng - xóa giỏ hàng ngay
+                    _db.CartDetails.RemoveRange(cartDetailsToProcess);
+                    
+                    // Kiểm tra xem còn CartDetail nào không, nếu không còn thì xóa luôn Cart
+                    var remainingDetails = _db.CartDetails
+                        .Where(cd => cd.CartId == cart.CartId)
+                        .ToList();
+                    
+                    if (!remainingDetails.Any())
+                    {
+                        _db.Carts.Remove(cart);
+                    }
+                    
+                    _db.SaveChanges();
+                }
 
                 // Gửi email xác nhận đơn hàng
                 if (_emailService != null && !string.IsNullOrWhiteSpace(request.Email))
@@ -341,7 +373,8 @@ namespace WebLaptopBE.Controllers
                 {
                     message = "Đặt hàng thành công",
                     orderId = saleInvoice.SaleInvoiceId,
-                    totalAmount = totalAmount
+                    totalAmount = totalAmount,
+                    requiresPayment = false
                 });
             }
             catch (DbUpdateException dbEx)
@@ -376,7 +409,100 @@ namespace WebLaptopBE.Controllers
             }
         }
 
+        // GET: api/Checkout/vnpay-callback
+        [HttpGet("vnpay-callback")]
+        public IActionResult VnPayCallback()
+        {
+            try
+            {
+                var response = _vnPayService.PaymentExecute(Request.Query);
+                
+                if (response.Success && VnPayHelper.IsSuccessResponse(response.VnPayResponseCode))
+                {
+                    // Parse OrderId từ TxnRef sử dụng helper
+                    var txnRef = response.OrderId; // TxnRef từ VNPay
+                    var orderIdNumber = VnPayHelper.ParseOrderIdFromTxnRef(txnRef);
+                    var orderId = $"SI{orderIdNumber:D3}";
+                    var saleInvoice = _db.SaleInvoices.FirstOrDefault(si => si.SaleInvoiceId == orderId);
+                    
+                    if (saleInvoice != null && saleInvoice.Status != "Đã thanh toán")
+                    {
+                        // Cập nhật trạng thái đơn hàng
+                        saleInvoice.Status = "Đã thanh toán";
+                        saleInvoice.PaymentMethod = "Chuyển khoản ngân hàng (VNPay)";
+                        
+                        _db.SaveChanges();
+                        
+                        // Xóa giỏ hàng sau khi thanh toán thành công
+                        var customerId = saleInvoice.CustomerId;
+                        var cart = _db.Carts
+                            .Include(c => c.CartDetails)
+                            .FirstOrDefault(c => c.CustomerId == customerId);
+                            
+                        if (cart != null && cart.CartDetails != null)
+                        {
+                            // Lấy danh sách sản phẩm trong đơn hàng
+                            var orderProductIds = _db.SaleInvoiceDetails
+                                .Where(sid => sid.SaleInvoiceId == orderId)
+                                .Select(sid => sid.ProductId)
+                                .ToList();
+                            
+                            // Xóa các sản phẩm tương ứng khỏi giỏ hàng
+                            var cartDetailsToRemove = cart.CartDetails
+                                .Where(cd => orderProductIds.Contains(cd.ProductId))
+                                .ToList();
+                            
+                            _db.CartDetails.RemoveRange(cartDetailsToRemove);
+                            
+                            // Kiểm tra xem còn sản phẩm nào trong giỏ hàng không
+                            var remainingDetails = cart.CartDetails
+                                .Where(cd => !orderProductIds.Contains(cd.ProductId))
+                                .ToList();
+                            
+                            if (!remainingDetails.Any())
+                            {
+                                _db.Carts.Remove(cart);
+                            }
+                            
+                            _db.SaveChanges();
+                        }
+                        
+                        // Chuyển hướng về trang thành công với thông báo
+                        return Redirect($"{GetFrontendUrl()}/User/Account?success=payment&orderId={orderId}#tab-your-orders");
+                    }
+                    else if (saleInvoice != null && saleInvoice.Status == "Đã thanh toán")
+                    {
+                        // Đơn hàng đã được thanh toán trước đó
+                        return Redirect($"{GetFrontendUrl()}/User/Account?success=payment&orderId={orderId}#tab-your-orders");
+                    }
+                    else
+                    {
+                        // Không tìm thấy đơn hàng
+                        return Redirect($"{GetFrontendUrl()}/Cart/Checkout?error=order-not-found");
+                    }
+                }
+                
+                // Thanh toán thất bại hoặc bị hủy
+                var errorCode = response.VnPayResponseCode;
+                var errorMessage = VnPayHelper.GetResponseMessage(errorCode);
+                
+                var frontendUrl = _configuration["FrontendUrl"] ?? "http://localhost:5000";
+                return Redirect($"{GetFrontendUrl()}/Cart/Checkout?error=payment-failed&code={errorCode}&message={Uri.EscapeDataString(errorMessage)}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"VNPay callback error: {ex.Message}");
+                return Redirect($"{GetFrontendUrl()}/Cart/Checkout?error=payment-error");
+            }
+        }
+        
+
         // Helper methods
+        private string GetFrontendUrl()
+        {
+            return _configuration["FrontendUrl"] ?? "http://localhost:5253";
+        }
+
         private string GenerateSaleInvoiceId()
         {
             try

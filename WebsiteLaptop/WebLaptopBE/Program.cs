@@ -35,6 +35,9 @@ builder.Services.AddSingleton<WebLaptopBE.Services.NotificationService>();
 // Đăng ký EmailService như singleton
 builder.Services.AddSingleton<WebLaptopBE.Services.EmailService>();
 
+// Đăng ký VnPayService
+builder.Services.AddScoped<WebLaptopBE.Services.IVnPayService, WebLaptopBE.Services.VnPayService>();
+
 // Add CORS
 builder.Services.AddCors(options =>
 {

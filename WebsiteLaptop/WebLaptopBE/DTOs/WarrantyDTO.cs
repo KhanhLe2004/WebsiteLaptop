@@ -26,6 +26,13 @@ namespace WebLaptopBE.DTOs
     {
         public string? WarrantyId { get; set; }
         public string? CustomerId { get; set; }
+        
+        [StringLength(200, ErrorMessage = "Tên khách hàng không được quá 200 ký tự")]
+        public string? CustomerName { get; set; }
+        
+        [StringLength(15, ErrorMessage = "Số điện thoại không được quá 15 ký tự")]
+        public string? PhoneNumber { get; set; }
+        
         public string? SerialId { get; set; }
         public string? EmployeeId { get; set; }
         
@@ -45,6 +52,13 @@ namespace WebLaptopBE.DTOs
     public class WarrantyUpdateDTO
     {
         public string? CustomerId { get; set; }
+        
+        [StringLength(200, ErrorMessage = "Tên khách hàng không được quá 200 ký tự")]
+        public string? CustomerName { get; set; }
+        
+        [StringLength(15, ErrorMessage = "Số điện thoại không được quá 15 ký tự")]
+        public string? PhoneNumber { get; set; }
+        
         public string? SerialId { get; set; }
         public string? EmployeeId { get; set; }
         

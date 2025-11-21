@@ -115,18 +115,28 @@
                                 <input type="text" class="form-control" id="warrantyIdInput" readonly>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Loại *</label>
+                                <select class="form-control" id="typeInput" required onchange="handleTypeChange()">
+                                    <option value=""></option>
+                                    <option value="Bảo hành">Bảo hành</option>
+                                    <option value="Sửa chữa">Sửa chữa</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
                                 <label class="form-label">Số điện thoại *</label>
-                                <input type="text" class="form-control" id="phoneNumberInput" onblur="searchCustomerByPhone()">
+                                <input type="text" class="form-control" id="phoneNumberInput" onblur="handlePhoneNumberChange()">
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
-                                <label class="form-label">Tên khách hàng</label>
-                                <input type="text" class="form-control" id="customerNameInput" readonly>
+                                <label class="form-label">Tên khách hàng *</label>
+                                <input type="text" class="form-control" id="customerNameInput">
                             </div>
                         </div>
                     </div>
@@ -149,16 +159,7 @@
                         </div>
                     </div>
                     <div class="row">
-                        <div class="col-md-6">
-                            <div class="input-group input-group-outline mb-3">
-                                <label class="form-label">Loại *</label>
-                                <select class="form-control" id="typeInput" required>
-                                    <option value=""></option>
-                                    <option value="Bảo hành">Bảo hành</option>
-                                    <option value="Sửa chữa">Sửa chữa</option>
-                                </select>
-                            </div>
-                        </div>
+                        
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
                                 <label class="form-label">Trạng thái *</label>
@@ -201,24 +202,6 @@
     </div>
 </div>
 
-<!-- Modal Xác nhận xóa -->
-<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-gradient-danger">
-                <h5 class="modal-title text-white" id="deleteModalLabel">Xác nhận xóa</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>Bạn có chắc chắn muốn xóa bảo hành <strong id="deleteWarrantyId"></strong>?</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                <button type="button" class="btn btn-danger" onclick="confirmDelete()">Xóa</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 @section Scripts {
     <!-- Select2 CSS -->
@@ -232,7 +215,6 @@
         let pageSize = 10;
         let searchDebounceTimer = null;
         const SEARCH_DEBOUNCE_DELAY = 300;
-        let deleteWarrantyId = null;
         let customersList = [];
         let employeesList = [];
         let serialsList = [];
@@ -388,12 +370,11 @@
                             <button class="btn btn-info action-btn" onclick='viewWarranty("${warranty.warrantyId}")' title="Xem">
                                 <i class="material-icons text-sm">visibility</i>
                             </button>
+                            ${warranty.status !== 'Hoàn thành' && warranty.status !== 'Đã hủy' ? `
                             <button class="btn btn-warning action-btn" onclick='editWarranty("${warranty.warrantyId}")' title="Sửa">
                                 <i class="material-icons text-sm">edit</i>
                             </button>
-                            <button class="btn btn-danger action-btn" onclick='deleteWarranty("${warranty.warrantyId}")' title="Xóa">
-                                <i class="material-icons text-sm">delete</i>
-                            </button>
+                            ` : ''}
                         </td>
                     </tr>
                 `);
@@ -577,7 +558,90 @@
             });
         }
 
-        // Tìm khách hàng theo số điện thoại
+        // Xử lý thay đổi loại bảo hành
+        function handleTypeChange() {
+            const type = $('#typeInput').val();
+            const customerNameInput = $('#customerNameInput');
+            const serialIdInput = $('#serialIdInput');
+            const totalAmountInput = $('#totalAmountInput');
+            
+            if (type === 'Bảo hành') {
+                // Bảo hành: Tên khách hàng readonly, serial bắt buộc, tổng tiền = 0
+                customerNameInput.prop('readonly', true);
+                serialIdInput.prop('disabled', false);
+                totalAmountInput.val('0').prop('readonly', true);
+                
+                // Clear và reset form cho bảo hành
+                $('#customerIdInput').val('');
+                $('#customerNameInput').val('');
+                $('#serialIdInput').empty().append('<option value=""></option>');
+                
+            } else if (type === 'Sửa chữa') {
+                // Sửa chữa: Tên khách hàng có thể nhập, serial không bắt buộc, tổng tiền có thể nhập
+                customerNameInput.prop('readonly', false);
+                serialIdInput.prop('disabled', true).val('');
+                totalAmountInput.prop('readonly', false);
+                
+                // Clear customer info cho sửa chữa
+                $('#customerIdInput').val('');
+                $('#customerNameInput').val('');
+                
+            } else {
+                // Chưa chọn loại: Reset về trạng thái mặc định
+                customerNameInput.prop('readonly', true);
+                serialIdInput.prop('disabled', false);
+                totalAmountInput.prop('readonly', false);
+                
+                $('#customerIdInput').val('');
+                $('#customerNameInput').val('');
+                $('#serialIdInput').empty().append('<option value=""></option>');
+            }
+            
+            updateInputLabels();
+        }
+
+        // Xử lý thay đổi loại bảo hành khi edit (không reset thông tin khách hàng)
+        function handleTypeChangeForEdit(type) {
+            const customerNameInput = $('#customerNameInput');
+            const serialIdInput = $('#serialIdInput');
+            const totalAmountInput = $('#totalAmountInput');
+            
+            if (type === 'Bảo hành') {
+                // Bảo hành: Tên khách hàng readonly, serial bắt buộc, tổng tiền = 0
+                customerNameInput.prop('readonly', true);
+                serialIdInput.prop('disabled', false);
+                totalAmountInput.prop('readonly', true);
+                
+            } else if (type === 'Sửa chữa') {
+                // Sửa chữa: Tên khách hàng có thể nhập, serial không bắt buộc, tổng tiền có thể nhập
+                customerNameInput.prop('readonly', false);
+                serialIdInput.prop('disabled', true);
+                totalAmountInput.prop('readonly', false);
+                
+            } else {
+                // Chưa chọn loại: Reset về trạng thái mặc định
+                customerNameInput.prop('readonly', true);
+                serialIdInput.prop('disabled', false);
+                totalAmountInput.prop('readonly', false);
+            }
+            
+            updateInputLabels();
+        }
+
+        // Xử lý thay đổi số điện thoại
+        function handlePhoneNumberChange() {
+            const type = $('#typeInput').val();
+            
+            if (type === 'Bảo hành') {
+                // Chỉ tìm kiếm khách hàng cho bảo hành
+                searchCustomerByPhone();
+            } else if (type === 'Sửa chữa') {
+                // Cho sửa chữa, không tự động tìm kiếm, chỉ clear customerId
+                $('#customerIdInput').val('');
+            }
+        }
+
+        // Tìm khách hàng theo số điện thoại (chỉ cho bảo hành)
         function searchCustomerByPhone() {
             const phoneNumber = $('#phoneNumberInput').val().trim();
             
@@ -646,8 +710,9 @@
             $('#warrantyIdInput').val('');
             $('#warrantyIdInput').prop('readonly', true);
             $('#phoneNumberInput').val('');
-            $('#customerNameInput').val('');
-            $('#serialIdInput').empty().append('<option value="">-</option>');
+            $('#customerNameInput').val('').prop('readonly', true);
+            $('#serialIdInput').empty().append('<option value="">-</option>').prop('disabled', false);
+            $('#totalAmountInput').val('').prop('readonly', false);
             $('#formErrorMessage').hide();
             
             generateNextWarrantyId();
@@ -665,6 +730,11 @@
                 url: `${API_URL}/${warrantyId}`,
                 type: 'GET',
                 success: function(warranty) {
+                    // Kiểm tra trạng thái trước khi cho phép sửa
+                    if (warranty.status === 'Hoàn thành' || warranty.status === 'Đã hủy') {
+                        showNotification('Không thể chỉnh sửa phiếu bảo hành đã hoàn thành hoặc đã hủy', 'error');
+                        return;
+                    }
                     $('#createEditModalLabel').text('Sửa bảo hành');
                     $('#warrantyId').val(warranty.warrantyId);
                     $('#warrantyIdInput').val(warranty.warrantyId);
@@ -682,32 +752,53 @@
                     // Populate employee select với EmployeeId từ dữ liệu (giữ nguyên nhân viên đã tạo)
                     populateEmployeeSelect(savedEmployeeId);
                     
-                    // Load thông tin khách hàng và serial nếu có customerId
-                    if (warranty.customerId) {
+                    // Set type trước để xử lý form đúng cách
+                    $('#typeInput').val(savedType);
+                    
+                    // Set thông tin cơ bản từ warranty response trước
+                    $('#phoneNumberInput').val(warranty.phoneNumber || '');
+                    $('#customerNameInput').val(warranty.customerName || '');
+                    
+                    // Load thông tin khách hàng và serial nếu có customerId và là bảo hành
+                    if (warranty.customerId && savedType === 'Bảo hành') {
                         loadCustomerInfoForEdit(warranty.customerId, savedSerialId, function() {
                             // Set lại các giá trị sau khi load customer info xong
                             setTimeout(function() {
-                                $('#typeInput').val(savedType);
                                 $('#statusInput').val(savedStatus);
                                 $('#contentDetailInput').val(savedContentDetail);
                                 $('#totalAmountInput').val(savedTotalAmount);
+                                
+                                // Xử lý form theo loại nhưng không reset thông tin khách hàng
+                                handleTypeChangeForEdit(savedType);
+                                
+                                // Đảm bảo serial được set đúng cho bảo hành
+                                if (savedSerialId) {
+                                    $('#serialIdInput').val(savedSerialId);
+                                }
+                                
                                 updateInputLabels();
                             }, 100);
                         });
                     } else {
-                        $('#phoneNumberInput').val('');
-                        $('#customerNameInput').val('');
-                        $('#serialIdInput').val(savedSerialId);
-                        populateSerialSelect();
+                        // Trường hợp sửa chữa hoặc không có customerId
+                        if (savedType === 'Sửa chữa') {
+                            $('#serialIdInput').empty().append();
+                        } else {
+                            $('#serialIdInput').val(savedSerialId);
+                            populateSerialSelect();
+                        }
                         
-                        // Set lại các giá trị sau khi populate xong
+                        // Set lại các giá trị
                         setTimeout(function() {
-                            $('#typeInput').val(savedType);
                             $('#statusInput').val(savedStatus);
                             $('#contentDetailInput').val(savedContentDetail);
                             $('#totalAmountInput').val(savedTotalAmount);
+                            
+                            // Xử lý form theo loại nhưng không reset thông tin khách hàng
+                            handleTypeChangeForEdit(savedType);
+                            
                             updateInputLabels();
-                        }, 200);
+                        }, 100);
                     }
 
                     $('#formErrorMessage').hide();
@@ -894,6 +985,8 @@
 
             let warrantyId = $('#warrantyIdInput').val().trim();
             const customerId = $('#customerIdInput').val().trim();
+            const customerName = $('#customerNameInput').val().trim();
+            const phoneNumber = $('#phoneNumberInput').val().trim();
             const serialId = $('#serialIdInput').val().trim();
             // Lấy EmployeeId từ select hoặc từ biến global nếu không có
             let employeeId = $('#employeeIdInput').val().trim();
@@ -910,16 +1003,15 @@
             if (!isEdit && !warrantyId) {
                 warrantyId = null;
             }
-
-            const phoneNumber = $('#phoneNumberInput').val().trim();
             
+            // Validation
             if (!phoneNumber) {
                 showFormError('Vui lòng nhập số điện thoại');
                 return;
             }
             
-            if (!customerId) {
-                showFormError('Không tìm thấy khách hàng. Vui lòng kiểm tra lại số điện thoại');
+            if (!customerName) {
+                showFormError('Vui lòng nhập tên khách hàng');
                 return;
             }
             
@@ -933,18 +1025,32 @@
                 return;
             }
 
+            // Validation riêng cho từng loại
+            if (type === 'Bảo hành') {
+                if (!customerId) {
+                    showFormError('Không tìm thấy khách hàng. Vui lòng kiểm tra lại số điện thoại');
+                    return;
+                }
+                if (!serialId) {
+                    showFormError('Vui lòng chọn serial cho bảo hành');
+                    return;
+                }
+            }
+
             const url = isEdit ? `${API_URL}/${warrantyId}` : API_URL;
             const method = isEdit ? 'PUT' : 'POST';
 
             const data = {
                 warrantyId: warrantyId || null,
                 customerId: customerId || null,
-                serialId: serialId || null,
+                customerName: customerName || null,
+                phoneNumber: phoneNumber || null,
+                serialId: type === 'Sửa chữa' ? null : (serialId || null),
                 employeeId: employeeId || null,
                 type: type || null,
                 contentDetail: contentDetail || null,
                 status: status,
-                totalAmount: totalAmount
+                totalAmount: type === 'Bảo hành' ? 0 : totalAmount
             };
 
             $.ajax({
@@ -971,40 +1077,6 @@
             });
         }
 
-        // Xóa bảo hành
-        function deleteWarranty(warrantyId) {
-            deleteWarrantyId = warrantyId;
-            $('#deleteWarrantyId').text(warrantyId);
-            const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
-            modal.show();
-        }
-
-        // Xác nhận xóa
-        function confirmDelete() {
-            if (!deleteWarrantyId) return;
-
-            $.ajax({
-                url: `${API_URL}/${deleteWarrantyId}`,
-                type: 'DELETE',
-                success: function(response) {
-                    showNotification('Xóa bảo hành thành công', 'success');
-                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
-                    if (modalInstance) {
-                        modalInstance.hide();
-                    }
-                    loadWarranties();
-                    deleteWarrantyId = null;
-                },
-                error: function(xhr) {
-                    console.error('Error deleting warranty:', xhr);
-                    let message = 'Có lỗi xảy ra khi xóa bảo hành';
-                    if (xhr.responseJSON && xhr.responseJSON.message) {
-                        message = xhr.responseJSON.message;
-                    }
-                    showNotification(message, 'error');
-                }
-            });
-        }
 
         // Hiển thị thông báo
         function showNotification(message, type) {
@@ -1035,6 +1107,9 @@
             $('#warrantyForm')[0].reset();
             $('#warrantyId').val('');
             $('#warrantyIdInput').prop('readonly', false);
+            $('#customerNameInput').prop('readonly', true);
+            $('#serialIdInput').prop('disabled', false);
+            $('#totalAmountInput').prop('readonly', false);
             $('#formErrorMessage').hide();
             $('.input-group-outline').removeClass('is-filled is-focused');
             if (typeof updateInputLabels === 'function') {

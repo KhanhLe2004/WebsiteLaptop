@@ -858,22 +858,41 @@
                     throw new Error('Không nhận được dữ liệu từ server');
                 }
                 
-                if (data && data.message) {
-                    showAlert('success', data.message);
+                // Kiểm tra xem có cần chuyển hướng đến VNPay không
+                if (data && data.requiresPayment && data.paymentUrl) {
+                    // Thanh toán qua VNPay
+                    showAlert('info', 'Đang chuyển hướng đến VNPay để thanh toán...');
+                    
+                    // Trigger event để cập nhật số lượng đơn hàng trong header
+                    $(document).trigger('orderUpdated');
+                    if (typeof window.updateOrderCount === 'function') {
+                        window.updateOrderCount();
+                    }
+                    document.dispatchEvent(new Event('orderUpdated'));
+                    
+                    // Chuyển hướng đến VNPay sau 1 giây
+                    setTimeout(() => {
+                        window.location.href = data.paymentUrl;
+                    }, 1000);
                 } else {
-                    showAlert('success', 'Đặt hàng thành công!');
+                    // Thanh toán khi nhận hàng
+                    if (data && data.message) {
+                        showAlert('success', data.message);
+                    } else {
+                        showAlert('success', 'Đặt hàng thành công!');
+                    }
+                    
+                    // Trigger event để cập nhật số lượng đơn hàng trong header
+                    $(document).trigger('orderUpdated');
+                    if (typeof window.updateOrderCount === 'function') {
+                        window.updateOrderCount();
+                    }
+                    document.dispatchEvent(new Event('orderUpdated'));
+                    
+                    setTimeout(() => {
+                        window.location.href = '/User/Account#tab-your-orders';
+                    }, 1500);
                 }
-                
-                // Trigger event để cập nhật số lượng đơn hàng trong header
-                $(document).trigger('orderUpdated');
-                if (typeof window.updateOrderCount === 'function') {
-                    window.updateOrderCount();
-                }
-                document.dispatchEvent(new Event('orderUpdated'));
-                
-                setTimeout(() => {
-                    window.location.href = '/User/Account#tab-your-orders';
-                }, 1500);
             } catch (err) {
                 console.error('handleCheckout error:', err);
                 console.error('Error details:', {
@@ -888,8 +907,40 @@
             }
         }
 
+        // Kiểm tra URL parameters để hiển thị thông báo lỗi thanh toán
+        function checkPaymentStatus() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const error = urlParams.get('error');
+            const errorCode = urlParams.get('code');
+            const errorMessage = urlParams.get('message');
+            
+            if (error === 'payment-failed') {
+                let message = 'Thanh toán thất bại. Vui lòng thử lại.';
+                if (errorMessage) {
+                    message = decodeURIComponent(errorMessage);
+                }
+                if (errorCode) {
+                    message += ` (Mã lỗi: ${errorCode})`;
+                }
+                showAlert('danger', message);
+            } else if (error === 'payment-error') {
+                showAlert('danger', 'Có lỗi xảy ra trong quá trình thanh toán. Vui lòng thử lại.');
+            } else if (error === 'order-not-found') {
+                showAlert('warning', 'Không tìm thấy đơn hàng. Vui lòng kiểm tra lại.');
+            }
+            
+            // Xóa parameters khỏi URL sau khi hiển thị thông báo
+            if (error) {
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, newUrl);
+            }
+        }
+
         // Initialize
         $(document).ready(async function () {
+            // Kiểm tra trạng thái thanh toán từ URL
+            checkPaymentStatus();
+            
             await loadProvinces();
             loadCart();
             await loadCustomerInfo();
