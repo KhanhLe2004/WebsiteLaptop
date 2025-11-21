@@ -10,7 +10,7 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class LoginAPIController : ControllerBase
     {
-        private readonly Testlaptop33Context _db = new();
+        private readonly Testlaptop35Context _db = new();
 
         [HttpPost]
         public IActionResult Login([FromBody] LoginRequest request)

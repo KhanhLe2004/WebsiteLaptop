@@ -418,8 +418,13 @@
                         </div>
                         <div class="row mb-3">
                             <div class="col-md-6">
-                                <strong>Phí giao hàng:</strong> ${formatCurrency(invoice.deliveryFee || 0)}
+                                <strong>Phí giao hàng:</strong> +${formatCurrency(invoice.deliveryFee || 0)}
                             </div>
+                            <div class="col-md-6">
+                                <strong>Khuyến mại:</strong> -${formatCurrency(invoice.discount || 0)}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
                             <div class="col-md-6">
                                 <strong>Tổng tiền:</strong> ${formatCurrency(invoice.totalAmount || 0)}
                             </div>

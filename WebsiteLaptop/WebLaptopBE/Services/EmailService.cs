@@ -137,6 +137,10 @@ namespace WebLaptopBE.Services
             var maskedPhone = MaskPhone(phone);
             var maskedEmail = MaskEmail(email);
 
+            // Chỉ hiển thị dòng giảm giá khi có khuyến mại
+            var discountRow = discount;
+                
+
             return $@"
 <!DOCTYPE html>
 <html>
@@ -208,16 +212,16 @@ namespace WebLaptopBE.Services
         <div style=""padding: 0 20px 20px 20px;"">
             <table style=""width: 100%; border-collapse: collapse;"">
                 <tr>
-                    <td style=""padding: 8px 0; text-align: right; color: #666;""><strong>Tổng tiền:</strong></td>
+                    <td style=""padding: 8px 0; text-align: right; color: #666;""><strong>Tạm tính:</strong></td>
                     <td style=""padding: 8px 0; text-align: right; width: 150px; color: #333;"">{subtotal:N0}₫</td>
+                </tr>
+                <tr>
+                    <td style=""padding: 8px 0; text-align: right; color: #666;""><strong>Phí giao hàng:</strong></td>
+                    <td style=""padding: 8px 0; text-align: right; color: #333;"">+{deliveryFee:N0}₫</td>
                 </tr>
                 <tr>
                     <td style=""padding: 8px 0; text-align: right; color: #666;""><strong>Giảm giá:</strong></td>
                     <td style=""padding: 8px 0; text-align: right; color: #dc3545;"">-{discount:N0}₫</td>
-                </tr>
-                <tr>
-                    <td style=""padding: 8px 0; text-align: right; color: #666;""><strong>Phí giao hàng:</strong></td>
-                    <td style=""padding: 8px 0; text-align: right; color: #333;"">{deliveryFee:N0}₫</td>
                 </tr>
                 <tr style=""border-top: 2px solid #81C408;"">
                     <td style=""padding: 12px 0; text-align: right; color: #333; font-size: 18px;""><strong>Tổng tiền thanh toán:</strong></td>

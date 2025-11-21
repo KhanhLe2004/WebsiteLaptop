@@ -14,10 +14,10 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class CustomerAccountAPIController : ControllerBase
     {
-        private readonly Testlaptop33Context _db;
+        private readonly Testlaptop35Context _db;
         private readonly IWebHostEnvironment _environment;
 
-        public CustomerAccountAPIController(Testlaptop33Context db, IWebHostEnvironment environment)
+        public CustomerAccountAPIController(Testlaptop35Context db, IWebHostEnvironment environment)
         {
             _db = db;
             _environment = environment;
@@ -90,7 +90,8 @@ namespace WebLaptopBE.Controllers
                         si.TotalAmount,
                         si.PaymentMethod,
                         si.DeliveryAddress,
-                        si.DeliveryFee
+                        si.DeliveryFee,
+                        si.Discount
                     })
                     .ToList();
 
@@ -129,7 +130,8 @@ namespace WebLaptopBE.Controllers
                         si.TotalAmount,
                         si.PaymentMethod,
                         si.DeliveryAddress,
-                        si.DeliveryFee
+                        si.DeliveryFee,
+                        si.Discount
                     })
                     .ToList();
 
@@ -166,6 +168,7 @@ namespace WebLaptopBE.Controllers
                         si.PaymentMethod,
                         si.DeliveryAddress,
                         si.DeliveryFee,
+                        si.Discount,
                         Items = si.SaleInvoiceDetails.Select(d => new
                         {
                             d.SaleInvoiceDetailId,

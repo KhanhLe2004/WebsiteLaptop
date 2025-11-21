@@ -14,10 +14,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageStockExportAPIController : ControllerBase
     {
-        private readonly Testlaptop33Context _context;
+        private readonly Testlaptop35Context _context;
         private readonly NotificationService _notificationService;
 
-        public ManageStockExportAPIController(Testlaptop33Context context, NotificationService notificationService)
+        public ManageStockExportAPIController(Testlaptop35Context context, NotificationService notificationService)
         {
             _context = context;
             _notificationService = notificationService;

@@ -5,13 +5,13 @@ using WebLaptopBE.Models;
 
 namespace WebLaptopBE.Data;
 
-public partial class Testlaptop33Context : DbContext
+public partial class Testlaptop35Context : DbContext
 {
-    public Testlaptop33Context()
+    public Testlaptop35Context()
     {
     }
 
-    public Testlaptop33Context(DbContextOptions<Testlaptop33Context> options)
+    public Testlaptop35Context(DbContextOptions<Testlaptop35Context> options)
         : base(options)
     {
     }
@@ -62,11 +62,9 @@ public partial class Testlaptop33Context : DbContext
 
     public virtual DbSet<Warranty> Warranties { get; set; }
 
-    public virtual DbSet<Notification> Notifications { get; set; }
-
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseSqlServer("Data Source=DESKTOP-GDN4V8P;Initial Catalog=testlaptop33;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False");
+        => optionsBuilder.UseSqlServer("Data Source=DESKTOP-GDN4V8P;Initial Catalog=testlaptop35;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -187,7 +185,7 @@ public partial class Testlaptop33Context : DbContext
                 .HasMaxLength(100)
                 .HasColumnName("address");
             entity.Property(e => e.Avatar)
-                .HasMaxLength(100)
+                .HasMaxLength(300)
                 .HasColumnName("avatar");
             entity.Property(e => e.CustomerName)
                 .HasMaxLength(100)
@@ -499,6 +497,9 @@ public partial class Testlaptop33Context : DbContext
             entity.Property(e => e.DeliveryFee)
                 .HasColumnType("decimal(18, 2)")
                 .HasColumnName("delivery_fee");
+            entity.Property(e => e.Discount)
+                .HasColumnType("decimal(18, 2)")
+                .HasColumnName("discount");
             entity.Property(e => e.EmployeeId)
                 .HasMaxLength(20)
                 .HasColumnName("employee_id");
@@ -730,40 +731,6 @@ public partial class Testlaptop33Context : DbContext
             entity.HasOne(d => d.Serial).WithMany(p => p.Warranties)
                 .HasForeignKey(d => d.SerialId)
                 .HasConstraintName("FK_Warranty_ProductSerial");
-        });
-
-        modelBuilder.Entity<Notification>(entity =>
-        {
-            entity.ToTable("Notification");
-
-            entity.Property(e => e.NotificationId)
-                .HasMaxLength(20)
-                .HasColumnName("notification_id");
-            entity.Property(e => e.SaleInvoiceId)
-                .HasMaxLength(20)
-                .HasColumnName("saleInvoice_id");
-            entity.Property(e => e.StockExportId)
-                .HasMaxLength(20)
-                .HasColumnName("stockExport_id");
-            entity.Property(e => e.Message)
-                .HasMaxLength(500)
-                .HasColumnName("message");
-            entity.Property(e => e.IsRead)
-                .HasColumnName("is_read");
-            entity.Property(e => e.CreatedAt)
-                .HasColumnType("datetime")
-                .HasColumnName("created_at");
-            entity.Property(e => e.Type)
-                .HasMaxLength(50)
-                .HasColumnName("type");
-
-            entity.HasOne(d => d.SaleInvoice).WithMany()
-                .HasForeignKey(d => d.SaleInvoiceId)
-                .HasConstraintName("FK_Notification_SaleInvoice");
-
-            entity.HasOne(d => d.StockExport).WithMany()
-                .HasForeignKey(d => d.StockExportId)
-                .HasConstraintName("FK_Notification_StockExport");
         });
 
         OnModelCreatingPartial(modelBuilder);

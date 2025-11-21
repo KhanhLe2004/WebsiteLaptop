@@ -1206,7 +1206,8 @@
                 </div>
                 <div class="d-flex justify-content-end">
                     <div class="text-end">
-                        <p class="mb-1"><strong>Phí giao hàng:</strong> ${formatCurrency(order.DeliveryFee || order.deliveryFee)}</p>
+                        <p class="mb-1"><strong>Phí giao hàng:</strong> +${formatCurrency(order.DeliveryFee || order.deliveryFee)}</p>
+                         <p class="mb-1 text-success"><strong>Khuyến mại:</strong> -${formatCurrency(order.Discount || order.discount)}</p>
                         <p class="mb-0"><strong>Tổng cộng:</strong> ${formatCurrency(order.TotalAmount || order.totalAmount)}</p>
                     </div>
                 </div>`;

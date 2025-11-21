@@ -14,7 +14,7 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class CheckoutAPIController : ControllerBase
     {
-        private readonly Testlaptop33Context _db = new();
+        private readonly Testlaptop35Context _db = new();
         private readonly EmailService _emailService;
         private readonly IVnPayService _vnPayService;
         private readonly IConfiguration _configuration;
@@ -770,6 +770,9 @@ namespace WebLaptopBE.Controllers
         {
             try
             {
+                // Tính tổng khuyến mại
+                decimal totalDiscountAmount = (request.Discount ?? 0) + (request.ShippingDiscount ?? 0);
+
                 // Tạo đơn hàng
                 var saleInvoice = new SaleInvoice
                 {
@@ -779,6 +782,7 @@ namespace WebLaptopBE.Controllers
                     DeliveryAddress = request.DeliveryAddress,
                     DeliveryFee = deliveryFee,
                     TotalAmount = totalAmount,
+                    Discount = totalDiscountAmount,
                     Status = "Chờ xử lý",
                     TimeCreate = DateTime.Now
                 };
@@ -824,6 +828,9 @@ namespace WebLaptopBE.Controllers
         {
             try
             {
+                // Tính tổng khuyến mại
+                decimal totalDiscountAmount = (pendingOrder.Discount ?? 0) + (pendingOrder.ShippingDiscount ?? 0);
+
                 // Tạo đơn hàng
                 var saleInvoice = new SaleInvoice
                 {
@@ -833,6 +840,7 @@ namespace WebLaptopBE.Controllers
                     DeliveryAddress = pendingOrder.DeliveryAddress,
                     DeliveryFee = pendingOrder.DeliveryFee,
                     TotalAmount = pendingOrder.TotalAmount,
+                    Discount = totalDiscountAmount,
                     Status = "Chờ xử lý",
                     TimeCreate = DateTime.Now
                 };
@@ -990,8 +998,8 @@ namespace WebLaptopBE.Controllers
                                 address: request.DeliveryAddress,
                                 note: request.Note ?? "",
                                 items: orderItems,
-                                subtotal: totalAmount - deliveryFee,
-                                discount: 0,
+                                subtotal: (totalAmount - deliveryFee) + ((request.Discount ?? 0) + (request.ShippingDiscount ?? 0)),
+                                discount: (request.Discount ?? 0) + (request.ShippingDiscount ?? 0),
                                 deliveryFee: deliveryFee,
                                 totalAmount: totalAmount
                             );
@@ -1054,8 +1062,8 @@ namespace WebLaptopBE.Controllers
                                 address: pendingOrder.DeliveryAddress,
                                 note: pendingOrder.Note ?? "",
                                 items: orderItems,
-                                subtotal: pendingOrder.TotalAmount - pendingOrder.DeliveryFee,
-                                discount: 0,
+                                subtotal: (pendingOrder.TotalAmount - pendingOrder.DeliveryFee) + ((pendingOrder.Discount ?? 0) + (pendingOrder.ShippingDiscount ?? 0)),
+                                discount: (pendingOrder.Discount ?? 0) + (pendingOrder.ShippingDiscount ?? 0),
                                 deliveryFee: pendingOrder.DeliveryFee,
                                 totalAmount: pendingOrder.TotalAmount
                             );

@@ -12,6 +12,7 @@ namespace WebLaptopBE.DTOs
         public string? Status { get; set; }
         public decimal? DeliveryFee { get; set; }
         public string? DeliveryAddress { get; set; }
+        public decimal? Discount { get; set; }
         public string? EmployeeId { get; set; }
         public string? EmployeeName { get; set; }
         public string? CustomerId { get; set; }

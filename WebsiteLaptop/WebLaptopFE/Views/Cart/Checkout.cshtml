@@ -601,7 +601,7 @@
             
             // Tạm tính luôn hiển thị số tiền gốc (không áp dụng khuyến mại)
             $('.subtotal-amount').text(formatCurrency(originalSubtotal));
-            $('.delivery-fee-amount').text(formatCurrency(finalDeliveryFee));
+            $('.delivery-fee-amount').text(`+${formatCurrency(finalDeliveryFee)}`);
             // Tổng hiển thị số tiền sau khi áp dụng khuyến mại
             $('.total-amount').text(formatCurrency(total));
             
@@ -1399,7 +1399,7 @@
                                             <td class="py-0"></td>
                                             <td class="py-0">
                                                 <div class="py-3">
-                                                    <p class="mb-0 text-dark delivery-fee-amount" style="font-size: larger;">30,000 ₫</p>
+                                                    <p class="mb-0 text-dark delivery-fee-amount" style="font-size: larger;">+30,000 ₫</p>
                                                 </div>
                                             </td>
                                         </tr>
