@@ -516,6 +516,183 @@ namespace WebLaptopBE.Controllers
             return upper.Contains("TB") ? number * 1024 : number;
         }
 
+        // GET /api/products/bestsellers - Lấy 8 sản phẩm bán chạy gần đây nhất
+        [HttpGet("bestsellers")]
+        public IActionResult GetBestsellerProducts([FromQuery] int count = 8, [FromQuery] int days = 90)
+        {
+            try
+            {
+                System.Diagnostics.Debug.WriteLine($"[BESTSELLER] Starting with count={count}, days={days}");
+                
+                // Đơn giản hóa: Trước tiên thử lấy sản phẩm bán chạy từ dữ liệu có sẵn
+                var startDate = DateTime.Now.AddDays(-days);
+                System.Diagnostics.Debug.WriteLine($"[BESTSELLER] Start date: {startDate}");
+
+                // Bước 1: Kiểm tra xem có dữ liệu bán hàng không
+                var hasSalesData = _db.SaleInvoiceDetails.Any();
+                System.Diagnostics.Debug.WriteLine($"[BESTSELLER] Has sales data: {hasSalesData}");
+
+                List<object> bestsellerProducts = new List<object>();
+
+                if (hasSalesData)
+                {
+                    try
+                    {
+                        // Lấy sản phẩm bán chạy từ dữ liệu bán hàng (đơn giản hóa query)
+                        var salesData = _db.SaleInvoiceDetails
+                            .AsNoTracking()
+                            .Include(sid => sid.SaleInvoice)
+                            .Include(sid => sid.Product)
+                                .ThenInclude(p => p!.Brand)
+                            .Where(sid => sid.SaleInvoice != null && 
+                                          sid.SaleInvoice.TimeCreate >= startDate && 
+                                          sid.Product != null &&
+                                          sid.Product.Active == true)
+                            .ToList(); // Materialize first to avoid complex SQL
+
+                        System.Diagnostics.Debug.WriteLine($"[BESTSELLER] Found {salesData.Count} sales records");
+
+                        if (salesData.Any())
+                        {
+                            var groupedData = salesData
+                                .GroupBy(sid => sid.ProductId)
+                                .Select(g => new
+                                {
+                                    ProductId = g.Key,
+                                    Product = g.First().Product,
+                                    TotalSold = g.Sum(sid => sid.Quantity ?? 0)
+                                })
+                                .Where(x => x.Product != null)
+                                .OrderByDescending(x => x.TotalSold)
+                                .Take(count)
+                                .ToList();
+
+                            bestsellerProducts = groupedData.Select(x => new
+                            {
+                                ProductId = x.ProductId,
+                                ProductName = x.Product!.ProductName,
+                                ProductModel = x.Product.ProductModel,
+                                WarrantyPeriod = x.Product.WarrantyPeriod,
+                                OriginalSellingPrice = x.Product.OriginalSellingPrice,
+                                SellingPrice = x.Product.SellingPrice,
+                                Screen = x.Product.Screen,
+                                Camera = x.Product.Camera,
+                                Connect = x.Product.Connect,
+                                Weight = x.Product.Weight,
+                                Pin = x.Product.Pin,
+                                BrandId = x.Product.BrandId,
+                                Avatar = x.Product.Avatar,
+                                Brand = x.Product.Brand != null ? new
+                                {
+                                    BrandId = x.Product.Brand.BrandId,
+                                    BrandName = x.Product.Brand.BrandName
+                                } : null,
+                                TotalSold = x.TotalSold,
+                                TotalRevenue = 0m,
+                                RecentScore = (double)x.TotalSold
+                            }).Cast<object>().ToList();
+                        }
+                    }
+                    catch (Exception salesEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[BESTSELLER] Sales query error: {salesEx.Message}");
+                        // Fallback to latest products if sales query fails
+                    }
+                }
+
+                // Nếu không có dữ liệu bán hàng hoặc query thất bại, lấy sản phẩm mới nhất
+                if (!bestsellerProducts.Any())
+                {
+                    System.Diagnostics.Debug.WriteLine("[BESTSELLER] Falling back to latest products");
+                    
+                    var latestProducts = _db.Products
+                        .AsNoTracking()
+                        .Include(p => p.Brand)
+                        .Where(p => p.Active == true)
+                        .OrderByDescending(p => p.ProductId)
+                        .Take(count)
+                        .Select(p => new
+                        {
+                            p.ProductId,
+                            p.ProductName,
+                            p.ProductModel,
+                            p.WarrantyPeriod,
+                            p.OriginalSellingPrice,
+                            p.SellingPrice,
+                            p.Screen,
+                            p.Camera,
+                            p.Connect,
+                            p.Weight,
+                            p.Pin,
+                            p.BrandId,
+                            p.Avatar,
+                            Brand = p.Brand != null ? new
+                            {
+                                p.Brand.BrandId,
+                                p.Brand.BrandName
+                            } : null,
+                            TotalSold = 0,
+                            TotalRevenue = 0m,
+                            RecentScore = 0.0
+                        })
+                        .ToList();
+
+                    bestsellerProducts = latestProducts.Cast<object>().ToList();
+                }
+
+                System.Diagnostics.Debug.WriteLine($"[BESTSELLER] Returning {bestsellerProducts.Count} products");
+                return Ok(bestsellerProducts);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[BESTSELLER] Error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[BESTSELLER] Stack trace: {ex.StackTrace}");
+                
+                return StatusCode(500, new
+                {
+                    message = "Lỗi khi lấy danh sách sản phẩm bán chạy gần đây nhất",
+                    error = ex.Message,
+                    details = ex.InnerException?.Message,
+                    stackTrace = ex.StackTrace
+                });
+            }
+        }
+
+        // GET /api/products/test - Test API và database connection
+        [HttpGet("test")]
+        public IActionResult TestConnection()
+        {
+            try
+            {
+                var productCount = _db.Products.Count();
+                var salesCount = _db.SaleInvoiceDetails.Count();
+                var invoiceCount = _db.SaleInvoices.Count();
+                
+                return Ok(new
+                {
+                    message = "API hoạt động bình thường",
+                    timestamp = DateTime.Now,
+                    data = new
+                    {
+                        totalProducts = productCount,
+                        totalSalesDetails = salesCount,
+                        totalInvoices = invoiceCount,
+                        databaseConnected = true
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Lỗi kết nối database",
+                    error = ex.Message,
+                    timestamp = DateTime.Now,
+                    databaseConnected = false
+                });
+            }
+        }
+
         private static string NormalizeSpecString(string? s)
         {
             if (string.IsNullOrWhiteSpace(s)) return string.Empty;
