@@ -318,7 +318,7 @@
                             <button class="btn btn-info action-btn" onclick='viewSaleInvoice("${invoice.saleInvoiceId}")' title="Xem">
                                 <i class="material-icons text-sm">visibility</i>
                             </button>
-                            ${status !== 'Hoàn thành' && status !== 'Đã hủy' ? `
+                            ${status !== 'Hoàn thành' && status !== 'đã hủy' ? `
                             <button class="btn btn-warning action-btn" onclick='updateStatus("${invoice.saleInvoiceId}", "${status}")' title="Cập nhật trạng thái">
                                 <i class="material-icons text-sm">edit</i>
                             </button>
@@ -485,7 +485,7 @@
         // Cập nhật trạng thái
         function updateStatus(invoiceId, currentStatus) {
             // Kiểm tra nếu trạng thái là "Hoàn thành" hoặc "Đã hủy" thì không cho cập nhật
-            if (currentStatus === 'Hoàn thành' || currentStatus === 'Đã hủy') {
+            if (currentStatus === 'Hoàn thành' || currentStatus === 'đã hủy') {
                 showNotification('Không thể cập nhật trạng thái cho đơn hàng đã hoàn thành hoặc đã hủy', 'error');
                 return;
             }
@@ -701,7 +701,7 @@
                 'Đang xử lý': '<span class="badge bg-gradient-info">Đang xử lý</span>',
                 'Đang vận chuyển': '<span class="badge bg-gradient-dark">Đang vận chuyển</span>',
                 'Hoàn thành': '<span class="badge bg-gradient-success">Hoàn thành</span>',
-                'Đã hủy': '<span class="badge bg-gradient-danger">Đã hủy</span>'
+                'đã hủy': '<span class="badge bg-gradient-danger">Đã hủy</span>'
             };
             return badges[status] || '<span class="badge bg-gradient-secondary">' + status + '</span>';
         }

@@ -12,7 +12,7 @@
         </div>
     </div>
 
-    <!-- Overview Statistics Cards -->
+    <!-- Overview Statistics Cards - Hàng 1 -->
     <div class="row mb-4">
         <div class="col-xl-3 col-md-6 mb-4">
             <div class="card border-0 shadow-lg">
@@ -25,7 +25,7 @@
                             <div class="numbers">
                                 <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">TỔNG DOANH THU</p>
                                 <h5 class="font-weight-bolder mb-0 text-white" id="totalRevenue">0 VNĐ</h5>
-                                <p class="text-xs mb-0 text-white opacity-8">Tất cả thời gian</p>
+                                <p class="text-xs mb-0 text-white opacity-8">Đơn hoàn thành</p>
                             </div>
                         </div>
                     </div>
@@ -44,7 +44,7 @@
                             <div class="numbers">
                                 <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">TỔNG ĐƠN HÀNG</p>
                                 <h5 class="font-weight-bolder mb-0 text-white" id="totalOrders">0</h5>
-                                <p class="text-xs mb-0 text-white opacity-8">Tất cả thời gian</p>
+                                <p class="text-xs mb-0 text-white opacity-8">Tất cả trạng thái</p>
                             </div>
                         </div>
                     </div>
@@ -63,7 +63,7 @@
                             <div class="numbers">
                                 <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">GIÁ TRỊ TB/ĐƠN</p>
                                 <h5 class="font-weight-bolder mb-0 text-white" id="averageOrderValue">0 VNĐ</h5>
-                                <p class="text-xs mb-0 text-white opacity-8">Trung bình mỗi đơn</p>
+                                <p class="text-xs mb-0 text-white opacity-8">Đơn hoàn thành</p>
                             </div>
                         </div>
                     </div>
@@ -82,7 +82,86 @@
                             <div class="numbers">
                                 <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">SP TB/ĐƠN HÀNG</p>
                                 <h5 class="font-weight-bolder mb-0 text-white" id="averageProductsPerOrder">0</h5>
-                                <p class="text-xs mb-0 text-white opacity-8">Trung bình mỗi đơn</p>
+                                <p class="text-xs mb-0 text-white opacity-8">Đơn hoàn thành</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overview Statistics Cards - Hàng 2 -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body bg-gradient-dark border-radius-lg">
+                    <div class="d-flex align-items-center">
+                        <div class="icon icon-shape bg-white shadow text-center border-radius-md">
+                            <i class="material-icons text-dark text-lg opacity-10">input</i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">SL NHẬP HÀNG</p>
+                                <h5 class="font-weight-bolder mb-0 text-white" id="totalImportedQuantity">0</h5>
+                                <p class="text-xs mb-0 text-white opacity-8">Tổng số lượng</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body bg-gradient-secondary border-radius-lg">
+                    <div class="d-flex align-items-center">
+                        <div class="icon icon-shape bg-white shadow text-center border-radius-md">
+                            <i class="material-icons text-secondary text-lg opacity-10">inventory</i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">SL TỒN KHO</p>
+                                <h5 class="font-weight-bolder mb-0 text-white" id="totalStockQuantity">0</h5>
+                                <p class="text-xs mb-0 text-white opacity-8">Tất cả cấu hình</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body bg-gradient-danger border-radius-lg">
+                    <div class="d-flex align-items-center">
+                        <div class="icon icon-shape bg-white shadow text-center border-radius-md">
+                            <i class="material-icons text-danger text-lg opacity-10">trending_up</i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">PHIẾU NHẬP</p>
+                                <h5 class="font-weight-bolder mb-0 text-white" id="totalImportInvoices">0</h5>
+                                <p class="text-xs mb-0 text-white opacity-8">Tổng số phiếu</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body bg-gradient-light border-radius-lg">
+                    <div class="d-flex align-items-center">
+                        <div class="icon icon-shape bg-white shadow text-center border-radius-md">
+                            <i class="material-icons text-light text-lg opacity-10">output</i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">PHIẾU XUẤT</p>
+                                <h5 class="font-weight-bolder mb-0 text-white" id="totalExportInvoices">0</h5>
+                                <p class="text-xs mb-0 text-white opacity-8">Tổng số phiếu</p>
                             </div>
                         </div>
                     </div>
@@ -123,6 +202,30 @@
                 </div>
                 <div class="card-body">
                     <canvas id="topProductsChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pie Charts Row -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header pb-0 pt-3">
+                    <h6 class="mb-0">Thống Kê Trạng Thái Đơn Hàng</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="orderStatusChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header pb-0 pt-3">
+                    <h6 class="mb-0">Thống Kê Bảo Hành & Sửa Chữa</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="warrantyChart" height="300"></canvas>
                 </div>
             </div>
         </div>
@@ -216,6 +319,8 @@
         // Charts instances
         let revenueChart = null;
         let topProductsChart = null;
+        let orderStatusChart = null;
+        let warrantyChart = null;
 
         // Format number with commas
         function formatNumber(num) {
@@ -250,6 +355,44 @@
                 document.getElementById('totalOrders').textContent = 'Lỗi kết nối';
                 document.getElementById('averageOrderValue').textContent = 'Lỗi kết nối';
                 document.getElementById('averageProductsPerOrder').textContent = 'Lỗi kết nối';
+            }
+        }
+
+        // Load Import Statistics
+        async function loadImportStatistics() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/import-statistics`);
+                
+                document.getElementById('totalImportedQuantity').textContent = formatNumber(data.totalImportedQuantity || 0);
+                document.getElementById('totalImportInvoices').textContent = formatNumber(data.totalImportInvoices || 0);
+            } catch (error) {
+                console.error('Error loading import statistics:', error);
+                document.getElementById('totalImportedQuantity').textContent = 'Lỗi kết nối';
+                document.getElementById('totalImportInvoices').textContent = 'Lỗi kết nối';
+            }
+        }
+
+        // Load Stock Statistics
+        async function loadStockStatistics() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/stock-statistics`);
+                
+                document.getElementById('totalStockQuantity').textContent = formatNumber(data.totalStockQuantity || 0);
+            } catch (error) {
+                console.error('Error loading stock statistics:', error);
+                document.getElementById('totalStockQuantity').textContent = 'Lỗi kết nối';
+            }
+        }
+
+        // Load Export Statistics
+        async function loadExportStatistics() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/export-statistics`);
+                
+                document.getElementById('totalExportInvoices').textContent = formatNumber(data.totalExportInvoices || 0);
+            } catch (error) {
+                console.error('Error loading export statistics:', error);
+                document.getElementById('totalExportInvoices').textContent = 'Lỗi kết nối';
             }
         }
 
@@ -481,6 +624,173 @@
             }
         }
 
+        // Load Order Status Statistics (Pie Chart)
+        async function loadOrderStatusChart() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/orders-by-status`);
+
+                if (orderStatusChart) {
+                    orderStatusChart.destroy();
+                }
+
+                const ctx = document.getElementById('orderStatusChart').getContext('2d');
+                
+                const labels = data.map(item => item.status || 'Không xác định');
+                const counts = data.map(item => item.count || 0);
+                
+                // Hàm lấy màu theo trạng thái
+                function getStatusColor(status) {
+                    const statusColors = {
+                        'Chờ xử lý': 'rgba(255, 152, 0, 0.8)',      // Cam
+                        'chờ xử lý': 'rgba(255, 152, 0, 0.8)',      // Cam                      
+                        'Đang xử lý': 'rgba(33, 150, 243, 0.8)',    // Xanh biển
+                        'đang xử lý': 'rgba(33, 150, 243, 0.8)',    // Xanh biển              
+                        'Đang vận chuyển': 'rgba(66, 66, 66, 0.8)', // Đen
+                        'đang vận chuyển': 'rgba(66, 66, 66, 0.8)', // Đen           
+                        'Hoàn thành': 'rgba(76, 175, 80, 0.8)',     // Xanh lá
+                        'hoàn thành': 'rgba(76, 175, 80, 0.8)',     // Xanh lá                     
+                        'Đã hủy': 'rgba(244, 67, 54, 0.8)',         // Đỏ
+                        'đã hủy': 'rgba(244, 67, 54, 0.8)',         // Đỏ
+                    };
+                    return statusColors[status] || 'rgba(158, 158, 158, 0.8)'; // Xám mặc định
+                }
+                
+                // Tạo mảng màu sắc theo thứ tự labels
+                const colors = labels.map(label => getStatusColor(label));
+
+                orderStatusChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: counts,
+                            backgroundColor: colors,
+                            borderColor: colors.map(color => color.replace('0.8', '1')),
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    padding: 20,
+                                    usePointStyle: true
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                        return `${context.label}: ${context.parsed} đơn (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading order status chart:', error);
+                const ctx = document.getElementById('orderStatusChart').getContext('2d');
+                if (orderStatusChart) {
+                    orderStatusChart.destroy();
+                }
+                orderStatusChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Không có dữ liệu'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['rgba(200, 200, 200, 0.5)']
+                        }]
+                    }
+                });
+            }
+        }
+
+        // Load Warranty Statistics (Pie Chart)
+        async function loadWarrantyChart() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/warranty-statistics`);
+
+                if (warrantyChart) {
+                    warrantyChart.destroy();
+                }
+
+                const ctx = document.getElementById('warrantyChart').getContext('2d');
+                
+                const labels = data.warrantyByType.map(item => item.type || 'Không xác định');
+                const counts = data.warrantyByType.map(item => item.count || 0);
+                
+                // Màu sắc cho bảo hành
+                const colors = [
+                    'rgba(76, 175, 80, 0.8)',    // Xanh lá - Bảo hành
+                    'rgba(255, 152, 0, 0.8)',    // Cam - Sửa chữa
+                    'rgba(63, 81, 181, 0.8)',    // Xanh tím
+                    'rgba(233, 30, 99, 0.8)',    // Hồng
+                    'rgba(96, 125, 139, 0.8)'    // Xanh xám
+                ];
+
+                warrantyChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: counts,
+                            backgroundColor: colors.slice(0, labels.length),
+                            borderColor: colors.slice(0, labels.length).map(color => color.replace('0.8', '1')),
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    padding: 20,
+                                    usePointStyle: true
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                        const item = data.warrantyByType[context.dataIndex];
+                                        return [
+                                            `${context.label}: ${context.parsed} yêu cầu (${percentage}%)`,
+                                            `Chi phí: ${formatCurrency(item.totalAmount || 0)}`
+                                        ];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading warranty chart:', error);
+                const ctx = document.getElementById('warrantyChart').getContext('2d');
+                if (warrantyChart) {
+                    warrantyChart.destroy();
+                }
+                warrantyChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Không có dữ liệu'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['rgba(200, 200, 200, 0.5)']
+                        }]
+                    }
+                });
+            }
+        }
+
         // Year select change handler
         document.getElementById('yearSelect').addEventListener('change', function() {
             loadRevenueByMonth(parseInt(this.value));
@@ -489,9 +799,14 @@
         // Initialize all data on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadOverviewStatistics();
+            loadImportStatistics();
+            loadStockStatistics();
+            loadExportStatistics();
             loadRevenueByMonth(2025);
             loadTopProducts();
             loadProductSalesDetails();
+            loadOrderStatusChart();
+            loadWarrantyChart();
         });
     </script>
 

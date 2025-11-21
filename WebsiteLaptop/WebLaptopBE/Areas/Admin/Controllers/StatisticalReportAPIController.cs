@@ -23,20 +23,30 @@ namespace WebLaptopBE.Areas.Admin.Controllers
         {
             try
             {
-                var saleInvoices = await _context.SaleInvoices
+                // Tổng doanh thu - chỉ tính những đơn hàng hoàn thành
+                var completedInvoices = await _context.SaleInvoices
+                    .Include(si => si.SaleInvoiceDetails)
+                    .Where(si => si.TotalAmount != null && si.Status == "Hoàn thành")
+                    .ToListAsync();
+
+                var totalRevenue = completedInvoices.Sum(si => si.TotalAmount ?? 0);
+
+                // Tổng đơn hàng - tính tất cả trạng thái
+                var allInvoices = await _context.SaleInvoices
                     .Include(si => si.SaleInvoiceDetails)
                     .Where(si => si.TotalAmount != null)
                     .ToListAsync();
 
-                var totalRevenue = saleInvoices.Sum(si => si.TotalAmount ?? 0);
-                var totalOrders = saleInvoices.Count;
-                var averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+                var totalOrders = allInvoices.Count;
 
-                // Tính số sản phẩm trung bình mỗi đơn hàng
-                var totalProducts = saleInvoices
+                // Giá trị trung bình/đơn - tính theo đơn hoàn thành
+                var averageOrderValue = completedInvoices.Count > 0 ? totalRevenue / completedInvoices.Count : 0;
+
+                // Tính số sản phẩm trung bình mỗi đơn hàng - tính theo đơn hoàn thành (để nhất quán)
+                var totalProductsCompleted = completedInvoices
                     .SelectMany(si => si.SaleInvoiceDetails ?? new List<WebLaptopBE.Models.SaleInvoiceDetail>())
                     .Sum(detail => detail.Quantity ?? 0);
-                var averageProductsPerOrder = totalOrders > 0 ? (double)totalProducts / totalOrders : 0;
+                var averageProductsPerOrder = completedInvoices.Count > 0 ? (double)totalProductsCompleted / completedInvoices.Count : 0;
 
                 var result = new
                 {
@@ -55,7 +65,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
         }
 
         // GET: api/admin/statistical-report/revenue-by-month
-        // Lấy doanh thu theo tháng
+        // Lấy doanh thu theo tháng (chỉ tính đơn hàng hoàn thành)
         [HttpGet("revenue-by-month")]
         public async Task<IActionResult> GetRevenueByMonth([FromQuery] int year = 2025)
         {
@@ -65,7 +75,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 var endDate = new DateTime(year, 12, 31, 23, 59, 59);
 
                 var revenueByMonth = await _context.SaleInvoices
-                    .Where(si => si.TimeCreate >= startDate && si.TimeCreate <= endDate && si.TotalAmount != null)
+                    .Where(si => si.TimeCreate >= startDate && si.TimeCreate <= endDate && si.TotalAmount != null && si.Status == "Hoàn thành")
                     .GroupBy(si => new { si.TimeCreate.Value.Year, si.TimeCreate.Value.Month })
                     .Select(g => new
                     {
@@ -99,7 +109,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
         }
 
         // GET: api/admin/statistical-report/top-products
-        // Lấy top 5 sản phẩm bán chạy
+        // Lấy top 5 sản phẩm bán chạy (chỉ từ hóa đơn hoàn thành)
         [HttpGet("top-products")]
         public async Task<IActionResult> GetTopProducts([FromQuery] int top = 5)
         {
@@ -108,6 +118,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 var topProducts = await _context.SaleInvoiceDetails
                     .Include(d => d.Product)
                         .ThenInclude(p => p.Brand)
+                    .Include(d => d.SaleInvoice)
+                    .Where(d => d.SaleInvoice != null && d.SaleInvoice.Status == "Hoàn thành")
                     .GroupBy(d => new { d.ProductId, d.Product.ProductName })
                     .Select(g => new
                     {
@@ -245,7 +257,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
         }
 
         // GET: api/admin/statistical-report/product-sales-details
-        // Lấy chi tiết sản phẩm bán chạy
+        // Lấy chi tiết sản phẩm bán chạy (chỉ từ hóa đơn hoàn thành)
         [HttpGet("product-sales-details")]
         public async Task<IActionResult> GetProductSalesDetails([FromQuery] int top = 5)
         {
@@ -254,6 +266,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 var productSales = await _context.SaleInvoiceDetails
                     .Include(d => d.Product)
                         .ThenInclude(p => p.Brand)
+                    .Include(d => d.SaleInvoice)
+                    .Where(d => d.SaleInvoice != null && d.SaleInvoice.Status == "Hoàn thành")
                     .GroupBy(d => new 
                     { 
                         d.ProductId, 
@@ -303,6 +317,182 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi khi lấy chi tiết sản phẩm bán chạy", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/statistical-report/import-statistics
+        // Lấy thống kê số lượng sản phẩm nhập
+        [HttpGet("import-statistics")]
+        public async Task<IActionResult> GetImportStatistics()
+        {
+            try
+            {
+                // Tổng số lượng sản phẩm đã nhập
+                var totalImportedQuantity = await _context.StockImportDetails
+                    .SumAsync(sid => sid.Quantity ?? 0);
+
+                // Tổng số phiếu nhập
+                var totalImportInvoices = await _context.StockImports.CountAsync();
+
+                // Tổng giá trị nhập
+                var totalImportValue = await _context.StockImports
+                    .SumAsync(si => si.TotalAmount ?? 0);
+
+                // Số lượng nhập trung bình mỗi phiếu
+                var averageQuantityPerImport = totalImportInvoices > 0 
+                    ? (double)totalImportedQuantity / totalImportInvoices 
+                    : 0;
+
+                var result = new
+                {
+                    totalImportedQuantity = totalImportedQuantity,
+                    totalImportInvoices = totalImportInvoices,
+                    totalImportValue = totalImportValue,
+                    averageQuantityPerImport = Math.Round(averageQuantityPerImport, 2)
+                };
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy thống kê nhập hàng", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/statistical-report/stock-statistics
+        // Lấy thống kê số lượng tồn kho (tính theo cấu hình)
+        [HttpGet("stock-statistics")]
+        public async Task<IActionResult> GetStockStatistics()
+        {
+            try
+            {
+                // Tổng số lượng tồn kho từ tất cả các cấu hình
+                var totalStockQuantity = await _context.ProductConfigurations
+                    .SumAsync(pc => pc.Quantity ?? 0);
+
+                // Tổng số cấu hình sản phẩm
+                var totalConfigurations = await _context.ProductConfigurations.CountAsync();
+
+                // Số cấu hình có tồn kho > 0
+                var configurationsInStock = await _context.ProductConfigurations
+                    .CountAsync(pc => pc.Quantity > 0);
+
+                // Số cấu hình hết hàng
+                var configurationsOutOfStock = await _context.ProductConfigurations
+                    .CountAsync(pc => pc.Quantity == 0 || pc.Quantity == null);
+
+                // Giá trị tồn kho (tính theo giá cấu hình)
+                var totalStockValue = await _context.ProductConfigurations
+                    .Where(pc => pc.Quantity > 0 && pc.Price != null)
+                    .SumAsync(pc => (pc.Quantity ?? 0) * (pc.Price ?? 0));
+
+                var result = new
+                {
+                    totalStockQuantity = totalStockQuantity,
+                    totalConfigurations = totalConfigurations,
+                    configurationsInStock = configurationsInStock,
+                    configurationsOutOfStock = configurationsOutOfStock,
+                    totalStockValue = totalStockValue
+                };
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy thống kê tồn kho", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/statistical-report/export-statistics
+        // Lấy thống kê phiếu xuất
+        [HttpGet("export-statistics")]
+        public async Task<IActionResult> GetExportStatistics()
+        {
+            try
+            {
+                // Tổng số phiếu xuất
+                var totalExportInvoices = await _context.StockExports.CountAsync();
+
+                // Tổng số lượng sản phẩm đã xuất
+                var totalExportedQuantity = await _context.StockExportDetails
+                    .SumAsync(sed => sed.Quantity ?? 0);
+
+                // Số phiếu xuất theo trạng thái
+                var exportsByStatus = await _context.StockExports
+                    .Where(se => !string.IsNullOrEmpty(se.Status))
+                    .GroupBy(se => se.Status)
+                    .Select(g => new
+                    {
+                        status = g.Key,
+                        count = g.Count()
+                    })
+                    .ToListAsync();
+
+                var result = new
+                {
+                    totalExportInvoices = totalExportInvoices,
+                    totalExportedQuantity = totalExportedQuantity,
+                    exportsByStatus = exportsByStatus
+                };
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy thống kê phiếu xuất", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/statistical-report/warranty-statistics
+        // Lấy thống kê bảo hành và sửa chữa
+        [HttpGet("warranty-statistics")]
+        public async Task<IActionResult> GetWarrantyStatistics()
+        {
+            try
+            {
+                // Thống kê theo loại (Type)
+                var warrantyByType = await _context.Warranties
+                    .Where(w => !string.IsNullOrEmpty(w.Type))
+                    .GroupBy(w => w.Type)
+                    .Select(g => new
+                    {
+                        type = g.Key,
+                        count = g.Count(),
+                        totalAmount = g.Sum(w => w.TotalAmount ?? 0)
+                    })
+                    .ToListAsync();
+
+                // Thống kê theo trạng thái (Status)
+                var warrantyByStatus = await _context.Warranties
+                    .Where(w => !string.IsNullOrEmpty(w.Status))
+                    .GroupBy(w => w.Status)
+                    .Select(g => new
+                    {
+                        status = g.Key,
+                        count = g.Count()
+                    })
+                    .ToListAsync();
+
+                // Tổng số lượng bảo hành
+                var totalWarranties = await _context.Warranties.CountAsync();
+
+                // Tổng chi phí bảo hành
+                var totalWarrantyCost = await _context.Warranties
+                    .SumAsync(w => w.TotalAmount ?? 0);
+
+                var result = new
+                {
+                    warrantyByType = warrantyByType,
+                    warrantyByStatus = warrantyByStatus,
+                    totalWarranties = totalWarranties,
+                    totalWarrantyCost = totalWarrantyCost
+                };
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy thống kê bảo hành", error = ex.Message });
             }
         }
     }
