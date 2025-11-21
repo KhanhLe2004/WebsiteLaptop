@@ -38,14 +38,25 @@ builder.Services.AddSingleton<WebLaptopBE.Services.EmailService>();
 // Đăng ký VnPayService
 builder.Services.AddScoped<WebLaptopBE.Services.IVnPayService, WebLaptopBE.Services.VnPayService>();
 
-// Add CORS
+// Add Session support cho VNPay pending orders
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30); // Session timeout 30 phút
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+});
+
+// Add CORS với hỗ trợ credentials cho Session
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins("http://localhost:5253", "https://localhost:5253") // Frontend URLs
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials(); // Quan trọng: cho phép gửi cookies/session
     });
 });
 
@@ -72,10 +83,13 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Use CORS - must be before UseStaticFiles và UseAuthorization
+app.UseHttpsRedirection();
+
+// Use CORS - must be before UseSession và UseAuthorization
 app.UseCors("AllowAll");
 
-app.UseHttpsRedirection();
+// Enable Session - must be after UseCors and before UseAuthorization
+app.UseSession();
 
 // Enable static files để serve ảnh từ wwwroot/image
 // UseStaticFiles() mặc định serve từ wwwroot, nên /image/... sẽ tìm file trong wwwroot/image/...

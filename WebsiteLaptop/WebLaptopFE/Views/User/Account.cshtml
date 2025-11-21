@@ -1054,7 +1054,7 @@
                 };
 
                 // Chỉ hiển thị nút "Hủy đơn hàng" khi trạng thái là "Chờ xử lý"
-                const canCancel = statusText.includes('Chờ xử lý');
+                const canCancel = statusText.includes('chờ xử lý');
                 const cancelButton = canCancel 
                     ? `<button class="btn btn-sm btn-outline-danger ms-2 cancel-order" data-order-id="${orderId}">Hủy đơn hàng</button>`
                     : '';
@@ -1240,53 +1240,251 @@
             e.preventDefault();
             const orderId = $(this).data('order-id');
             if (!orderId) {
-                showAlert('danger', 'Mã đơn hàng không hợp lệ');
-                return;
-            }
-
-            // Xác nhận trước khi hủy
-            if (!confirm('Bạn có chắc chắn muốn hủy đơn hàng này không?')) {
+                showNotificationToast('Mã đơn hàng không hợp lệ', 'danger');
                 return;
             }
 
             const $btn = $(this);
-            const originalText = $btn.html();
-            $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...');
+            
+            // Hiển thị toast xác nhận thay vì confirm dialog
+            showConfirmationToast(
+                `Bạn có chắc chắn muốn hủy đơn hàng #${orderId} không?<br><small class="text-muted">Hành động này không thể hoàn tác.</small>`,
+                async () => {
+                    // Callback khi xác nhận hủy
+                    const originalText = $btn.html();
+                    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...');
 
-            try {
-                const response = await fetch(`${CUSTOMER_API_BASE}/order/${orderId}/cancel`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'same-origin'
-                });
-
-                const responseText = await response.text();
-                let data = null;
-                if (responseText) {
                     try {
-                        data = JSON.parse(responseText);
-                    } catch (parseError) {
-                        console.error('Failed to parse response:', responseText);
+                        const response = await fetch(`${CUSTOMER_API_BASE}/order/${orderId}/cancel`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'same-origin'
+                        });
+
+                        const responseText = await response.text();
+                        let data = null;
+                        if (responseText) {
+                            try {
+                                data = JSON.parse(responseText);
+                            } catch (parseError) {
+                                console.error('Failed to parse response:', responseText);
+                            }
+                        }
+
+                        if (!response.ok) {
+                            const errorMessage = data?.message || responseText || `Lỗi ${response.status}: ${response.statusText}`;
+                            throw new Error(errorMessage);
+                        }
+
+                        // Hiển thị thông báo thành công bằng toast
+                        showNotificationToast(data?.message || `Hủy đơn hàng #${orderId} thành công`, 'success');
+                        
+                        // Reload danh sách đơn hàng (sẽ tự động cập nhật badge)
+                        setTimeout(() => {
+                            loadCustomerOrders();
+                        }, 1000);
+                    } catch (err) {
+                        console.error('handleCancelOrder error:', err);
+                        showNotificationToast(err.message || 'Không thể hủy đơn hàng. Vui lòng thử lại sau.', 'danger');
+                    } finally {
+                        $btn.prop('disabled', false).html(originalText);
                     }
+                },
+                () => {
+                    // Callback khi hủy bỏ (không làm gì)
+                    console.log('Hủy bỏ thao tác hủy đơn hàng');
                 }
+            );
+        }
 
-                if (!response.ok) {
-                    const errorMessage = data?.message || responseText || `Lỗi ${response.status}: ${response.statusText}`;
-                    throw new Error(errorMessage);
+        // Kiểm tra URL parameters và hiển thị thông báo thành công
+        function checkSuccessMessage() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const success = urlParams.get('success');
+            const message = urlParams.get('message');
+            const orderId = urlParams.get('orderId');
+            
+            if (success === 'true') {
+                let successMessage = 'Thao tác thành công!';
+                if (message) {
+                    successMessage = decodeURIComponent(message);
                 }
-
-                showAlert('success', data?.message || 'Hủy đơn hàng thành công');
+                if (orderId) {
+                    successMessage += ` Mã đơn hàng: #${orderId}`;
+                }
                 
-                // Reload danh sách đơn hàng (sẽ tự động cập nhật badge)
-                setTimeout(() => {
-                    loadCustomerOrders();
-                }, 1000);
-            } catch (err) {
-                console.error('handleCancelOrder error:', err);
-                showAlert('danger', err.message || 'Không thể hủy đơn hàng. Vui lòng thử lại sau.');
-            } finally {
-                $btn.prop('disabled', false).html(originalText);
+                // Hiển thị toast notification ở góc trên bên phải
+                showSuccessToast(successMessage);
+                
+                // Xóa parameters khỏi URL sau khi hiển thị
+                const newUrl = window.location.pathname + window.location.hash;
+                window.history.replaceState({}, document.title, newUrl);
             }
+        }
+
+        // Hàm hiển thị toast notification ở góc trên bên phải
+        function showSuccessToast(message) {
+            const toastId = 'success-toast-' + Date.now();
+            const toastHtml = `
+                <div id="${toastId}" class="toast-notification success-toast" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="toast-header bg-success text-white">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong class="me-auto">Thông báo</strong>
+                        <button type="button" class="btn-close btn-close-white" onclick="closeToast('${toastId}')" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                </div>
+            `;
+            
+            // Tạo container nếu chưa có
+            if ($('#success-toast-container').length === 0) {
+                $('body').append('<div id="success-toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>');
+            }
+            
+            $('#success-toast-container').append(toastHtml);
+            
+            // Hiển thị toast với animation
+            const $toast = $(`#${toastId}`);
+            $toast.addClass('show');
+            
+            // Tự động ẩn sau 5 giây
+            setTimeout(() => {
+                closeToast(toastId);
+            }, 5000);
+        }
+
+        // Hàm đóng toast
+        function closeToast(toastId) {
+            const $toast = $(`#${toastId}`);
+            $toast.removeClass('show').addClass('hide');
+            setTimeout(() => {
+                $toast.remove();
+            }, 300);
+        }
+
+        // Hàm hiển thị toast xác nhận (confirmation)
+        function showConfirmationToast(message, onConfirm, onCancel) {
+            const toastId = 'confirm-toast-' + Date.now();
+            const toastHtml = `
+                <div id="${toastId}" class="toast-notification confirm-toast" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="toast-header bg-warning text-dark">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong class="me-auto">Xác nhận</strong>
+                        <button type="button" class="btn-close confirm-close-btn" data-toast-id="${toastId}" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body">
+                        <p class="mb-3">${message}</p>
+                        <div class="d-flex gap-2 justify-content-end">
+                            <button type="button" class="btn btn-sm btn-secondary confirm-cancel-btn" data-toast-id="${toastId}">Hủy bỏ</button>
+                            <button type="button" class="btn btn-sm btn-danger confirm-ok-btn" data-toast-id="${toastId}">Xác nhận</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Tạo overlay và container nếu chưa có
+            if ($('#confirm-overlay').length === 0) {
+                $('body').append('<div id="confirm-overlay" class="confirm-overlay position-fixed top-0 start-0 w-100 h-100" style="z-index: 10000; background: rgba(0,0,0,0.5); display: none;"></div>');
+            }
+            if ($('#confirm-toast-container').length === 0) {
+                $('body').append('<div id="confirm-toast-container" class="toast-container position-fixed top-50 start-50 translate-middle" style="z-index: 10001;"></div>');
+            }
+            
+            // Hiển thị overlay
+            $('#confirm-overlay').fadeIn(200);
+            
+            $('#confirm-toast-container').append(toastHtml);
+            
+            // Hiển thị toast với animation
+            const $toast = $(`#${toastId}`);
+            setTimeout(() => {
+                $toast.addClass('show');
+            }, 10);
+            
+            // Lưu callback functions
+            window[`confirmCallback_${toastId}`] = onConfirm;
+            window[`cancelCallback_${toastId}`] = onCancel;
+            
+            // Thêm event listeners cho các nút
+            $toast.find('.confirm-ok-btn').on('click', function() {
+                closeConfirmToast(toastId, true);
+            });
+            
+            $toast.find('.confirm-cancel-btn, .confirm-close-btn').on('click', function() {
+                closeConfirmToast(toastId, false);
+            });
+        }
+
+        // Hàm đóng toast xác nhận
+        function closeConfirmToast(toastId, confirmed) {
+            const $toast = $(`#${toastId}`);
+            $toast.removeClass('show').addClass('hide');
+            
+            // Ẩn overlay
+            $('#confirm-overlay').fadeOut(200);
+            
+            setTimeout(() => {
+                $toast.remove();
+                
+                // Gọi callback tương ứng
+                if (confirmed && window[`confirmCallback_${toastId}`]) {
+                    window[`confirmCallback_${toastId}`]();
+                } else if (!confirmed && window[`cancelCallback_${toastId}`]) {
+                    window[`cancelCallback_${toastId}`]();
+                }
+                
+                // Cleanup callbacks
+                delete window[`confirmCallback_${toastId}`];
+                delete window[`cancelCallback_${toastId}`];
+            }, 300);
+        }
+
+        // Hàm hiển thị toast thông báo thành công (có thể dùng chung)
+        function showNotificationToast(message, type = 'success') {
+            const toastId = `${type}-toast-` + Date.now();
+            const iconMap = {
+                'success': 'fas fa-check-circle',
+                'danger': 'fas fa-times-circle',
+                'warning': 'fas fa-exclamation-triangle',
+                'info': 'fas fa-info-circle'
+            };
+            const bgMap = {
+                'success': 'bg-success',
+                'danger': 'bg-danger', 
+                'warning': 'bg-warning',
+                'info': 'bg-info'
+            };
+            
+            const toastHtml = `
+                <div id="${toastId}" class="toast-notification ${type}-toast" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="toast-header ${bgMap[type]} text-white">
+                        <i class="${iconMap[type]} me-2"></i>
+                        <strong class="me-auto">Thông báo</strong>
+                        <button type="button" class="btn-close btn-close-white" onclick="closeToast('${toastId}')" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                </div>
+            `;
+            
+            // Tạo container nếu chưa có
+            if ($('#notification-toast-container').length === 0) {
+                $('body').append('<div id="notification-toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>');
+            }
+            
+            $('#notification-toast-container').append(toastHtml);
+            
+            // Hiển thị toast với animation
+            const $toast = $(`#${toastId}`);
+            $toast.addClass('show');
+            
+            // Tự động ẩn sau 4 giây
+            setTimeout(() => {
+                closeToast(toastId);
+            }, 4000);
         }
 
         // Initialize - Đảm bảo jQuery đã sẵn sàng
@@ -1309,6 +1507,9 @@
                 }, 2000);
                 return;
             }
+            
+            // Kiểm tra thông báo thành công từ URL
+            checkSuccessMessage();
             
             loadBirthDropdowns();
             clearAlert();
@@ -1484,6 +1685,152 @@
     
     .account-menu .nav-link i.fa-shopping-cart {
         position: relative;
+    }
+
+    /* Success Toast Notification Styles */
+    .toast-container {
+        z-index: 9999;
+        pointer-events: none;
+    }
+    
+    .toast-container .toast-notification {
+        pointer-events: auto;
+    }
+    
+    #confirm-toast-container {
+        z-index: 10001 !important;
+        pointer-events: none;
+    }
+    
+    #confirm-toast-container .confirm-toast {
+        pointer-events: auto;
+    }
+    
+    .success-toast {
+        min-width: 350px;
+        max-width: 450px;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+        margin-bottom: 15px;
+        border: none;
+        border-radius: 8px;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s ease-in-out;
+    }
+    
+    .success-toast.show {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    
+    .success-toast.hide {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    
+    .success-toast .toast-header {
+        background: linear-gradient(135deg, #28a745, #20c997);
+        border-bottom: none;
+        border-radius: 8px 8px 0 0;
+        font-weight: 600;
+        padding: 12px 16px;
+    }
+    
+    .success-toast .toast-body {
+        padding: 16px;
+        font-size: 14px;
+        line-height: 1.5;
+        background: #fff;
+        border-radius: 0 0 8px 8px;
+    }
+    
+    .success-toast .btn-close {
+        font-size: 12px;
+        opacity: 0.8;
+    }
+    
+    .success-toast .btn-close:hover {
+        opacity: 1;
+    }
+
+    /* Confirmation Toast Styles */
+    .confirm-toast {
+        min-width: 400px;
+        max-width: 500px;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+        border: none;
+        border-radius: 12px;
+        opacity: 0;
+        transform: scale(0.8);
+        transition: all 0.3s ease-in-out;
+        pointer-events: auto;
+        position: relative;
+        z-index: 10002;
+    }
+    
+    .confirm-toast.show {
+        opacity: 1;
+        transform: scale(1);
+    }
+    
+    .confirm-toast.hide {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    
+    .confirm-toast .toast-header {
+        background: linear-gradient(135deg, #ffc107, #fd7e14);
+        border-bottom: none;
+        border-radius: 12px 12px 0 0;
+        font-weight: 600;
+        padding: 16px 20px;
+    }
+    
+    .confirm-toast .toast-body {
+        padding: 20px;
+        background: #fff;
+        border-radius: 0 0 12px 12px;
+    }
+    
+    .confirm-toast .toast-body p {
+        margin-bottom: 16px;
+        line-height: 1.5;
+    }
+
+    /* General Toast Notification Styles */
+    .danger-toast, .warning-toast, .info-toast {
+        min-width: 350px;
+        max-width: 450px;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+        margin-bottom: 15px;
+        border: none;
+        border-radius: 8px;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s ease-in-out;
+    }
+    
+    .danger-toast.show, .warning-toast.show, .info-toast.show {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    
+    .danger-toast.hide, .warning-toast.hide, .info-toast.hide {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    
+    .danger-toast .toast-header {
+        background: linear-gradient(135deg, #dc3545, #c82333);
+    }
+    
+    .warning-toast .toast-header {
+        background: linear-gradient(135deg, #ffc107, #e0a800);
+        color: #000 !important;
+    }
+    
+    .info-toast .toast-header {
+        background: linear-gradient(135deg, #17a2b8, #138496);
     }
 </style>
 }

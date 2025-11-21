@@ -12,84 +12,35 @@ namespace WebLaptopBE.Services
             _config = config;
         }
 
-        public string CreatePaymentUrl(HttpContext context, VnPaymentRequestModel model)
+        public string CreatePaymentUrl(HttpContext context, VnPaymentRequestModel model, string? customTxnRef = null)
         {
+            var tick = customTxnRef ?? DateTime.Now.Ticks.ToString();
+
             var vnpay = new VnPayLibrary();
-            
-            // Validate cấu hình trước khi tạo URL
-            ValidateVnPayConfig();
-            
-            // Tạo mã giao dịch unique
-            var txnRef = VnPayHelper.GenerateTransactionRef(model.OrderId);
-            
-            // Các tham số bắt buộc theo đúng thứ tự và chuẩn VNPay
-            // Đảm bảo đầy đủ tất cả tham số theo tài liệu VNPay
             vnpay.AddRequestData("vnp_Version", _config["VnPay:Version"]);
             vnpay.AddRequestData("vnp_Command", _config["VnPay:Command"]);
             vnpay.AddRequestData("vnp_TmnCode", _config["VnPay:TmnCode"]);
-            vnpay.AddRequestData("vnp_Amount", VnPayHelper.FormatAmount((decimal)model.Amount).ToString());
-            vnpay.AddRequestData("vnp_CurrCode", _config["VnPay:CurrCode"]);
-            vnpay.AddRequestData("vnp_TxnRef", txnRef);
-            vnpay.AddRequestData("vnp_OrderInfo", $"Thanh toan don hang {model.OrderId}"); // Không dùng ký tự đặc biệt
-            vnpay.AddRequestData("vnp_OrderType", "other");
-            vnpay.AddRequestData("vnp_Locale", _config["VnPay:Locale"]);
-            vnpay.AddRequestData("vnp_ReturnUrl", _config["VnPay:PaymentBackReturnUrl"]);
-            vnpay.AddRequestData("vnp_IpAddr", Utils.GetIpAddress(context));
+            vnpay.AddRequestData("vnp_Amount", (model.Amount * 100).ToString()); //Số tiền thanh toán. Số tiền không mang các ký tự phân tách thập phân, phần nghìn, ký tự tiền tệ. Để gửi số tiền thanh toán là 100,000 VND (một trăm nghìn VNĐ) thì merchant cần nhân thêm 100 lần (khử phần thập phân), sau đó gửi sang VNPAY là: 10000000
+
             vnpay.AddRequestData("vnp_CreateDate", model.CreatedDate.ToString("yyyyMMddHHmmss"));
-            
-            // Thêm thời gian hết hạn (15 phút từ thời điểm tạo)
-            var expireDate = model.CreatedDate.AddMinutes(15);
-            vnpay.AddRequestData("vnp_ExpireDate", expireDate.ToString("yyyyMMddHHmmss"));
+            vnpay.AddRequestData("vnp_CurrCode", _config["VnPay:CurrCode"]);
+            vnpay.AddRequestData("vnp_IpAddr", GetClientIpAddress(context));
+            vnpay.AddRequestData("vnp_Locale", _config["VnPay:Locale"]);
+
+            vnpay.AddRequestData("vnp_OrderInfo", "Thanh toán cho đơn hàng:" + model.OrderId);
+            vnpay.AddRequestData("vnp_OrderType", "other"); //default value: other
+            vnpay.AddRequestData("vnp_ReturnUrl", _config["VnPay:PaymentBackReturnUrl"]);
+
+            vnpay.AddRequestData("vnp_TxnRef", tick); // Mã tham chiếu của giao dịch tại hệ thống của merchant. Mã này là duy nhất dùng để phân biệt các đơn hàng gửi sang VNPAY. Không được trùng lặp trong ngày
 
             var paymentUrl = vnpay.CreateRequestUrl(_config["VnPay:BaseUrl"], _config["VnPay:HashSecret"]);
 
             return paymentUrl;
         }
 
-        // Validate cấu hình VNPay
-        private void ValidateVnPayConfig()
-        {
-            var requiredConfigs = new[]
-            {
-                "VnPay:TmnCode",
-                "VnPay:HashSecret", 
-                "VnPay:BaseUrl",
-                "VnPay:Version",
-                "VnPay:Command",
-                "VnPay:CurrCode",
-                "VnPay:Locale",
-                "VnPay:PaymentBackReturnUrl"
-            };
-
-            foreach (var config in requiredConfigs)
-            {
-                var value = _config[config];
-                if (string.IsNullOrWhiteSpace(value))
-                {
-                    throw new InvalidOperationException($"Thiếu cấu hình VNPay: {config}");
-                }
-            }
-
-            // Validate TmnCode format (thường là 8 ký tự)
-            var tmnCode = _config["VnPay:TmnCode"];
-            if (tmnCode.Length != 8)
-            {
-                throw new InvalidOperationException($"TmnCode không đúng format: {tmnCode}");
-            }
-
-            // Validate HashSecret format (thường là 32 ký tự)
-            var hashSecret = _config["VnPay:HashSecret"];
-            if (hashSecret.Length != 32)
-            {
-                throw new InvalidOperationException($"HashSecret không đúng format: độ dài {hashSecret.Length}, yêu cầu 32 ký tự");
-            }
-        }
-
         public VnPaymentResponseModel PaymentExecute(IQueryCollection collections)
         {
             var vnpay = new VnPayLibrary();
-            
-            // Thêm tất cả các tham số VNPay vào response data
             foreach (var (key, value) in collections)
             {
                 if (!string.IsNullOrEmpty(key) && key.StartsWith("vnp_"))
@@ -98,38 +49,70 @@ namespace WebLaptopBE.Services
                 }
             }
 
-            // Lấy các thông tin cần thiết
-            var vnp_TxnRef = vnpay.GetResponseData("vnp_TxnRef");
-            var vnp_TransactionNo = vnpay.GetResponseData("vnp_TransactionNo");
+            var vnp_orderId = vnpay.GetResponseData("vnp_TxnRef"); // Giữ nguyên string format
+            var vnp_TransactionId = vnpay.GetResponseData("vnp_TransactionNo");
             var vnp_SecureHash = collections.FirstOrDefault(p => p.Key == "vnp_SecureHash").Value;
             var vnp_ResponseCode = vnpay.GetResponseData("vnp_ResponseCode");
             var vnp_OrderInfo = vnpay.GetResponseData("vnp_OrderInfo");
-            var vnp_Amount = vnpay.GetResponseData("vnp_Amount");
 
-            // Xác thực chữ ký
             bool checkSignature = vnpay.ValidateSignature(vnp_SecureHash, _config["VnPay:HashSecret"]);
             if (!checkSignature)
             {
                 return new VnPaymentResponseModel
                 {
-                    Success = false,
-                    VnPayResponseCode = "97" // Chữ ký không hợp lệ
+                    Success = false
                 };
             }
 
-            // Kiểm tra mã phản hồi từ VNPay
-            bool isSuccessful = vnp_ResponseCode == "00";
-
             return new VnPaymentResponseModel
             {
-                Success = isSuccessful,
+                Success = true,
                 PaymentMethod = "VnPay",
                 OrderDescription = vnp_OrderInfo,
-                OrderId = vnp_TxnRef, // Giữ nguyên TxnRef để xử lý trong controller
-                TransactionId = vnp_TransactionNo,
+                OrderId = vnp_orderId, // Đã là string rồi
+                TransactionId = vnp_TransactionId, // Đã là string rồi
                 Token = vnp_SecureHash,
                 VnPayResponseCode = vnp_ResponseCode
             };
+        }
+
+        private string GetClientIpAddress(HttpContext context)
+        {
+            try
+            {
+                // Kiểm tra X-Forwarded-For header (cho proxy/load balancer)
+                var forwardedFor = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+                if (!string.IsNullOrEmpty(forwardedFor))
+                {
+                    return forwardedFor.Split(',')[0].Trim();
+                }
+
+                // Kiểm tra X-Real-IP header
+                var realIp = context.Request.Headers["X-Real-IP"].FirstOrDefault();
+                if (!string.IsNullOrEmpty(realIp))
+                {
+                    return realIp;
+                }
+
+                // Lấy từ RemoteIpAddress
+                var remoteIp = context.Connection.RemoteIpAddress?.ToString();
+                if (!string.IsNullOrEmpty(remoteIp))
+                {
+                    // Chuyển IPv6 loopback thành IPv4
+                    if (remoteIp == "::1")
+                    {
+                        return "127.0.0.1";
+                    }
+                    return remoteIp;
+                }
+
+                // Fallback
+                return "127.0.0.1";
+            }
+            catch
+            {
+                return "127.0.0.1";
+            }
         }
     }
 

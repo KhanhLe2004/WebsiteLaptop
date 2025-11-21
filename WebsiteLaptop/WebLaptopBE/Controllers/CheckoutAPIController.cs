@@ -28,7 +28,7 @@ namespace WebLaptopBE.Controllers
 
         // POST: api/Checkout/create
         [HttpPost("create")]
-        public IActionResult CreateOrder([FromBody] CheckoutRequest request)
+        public async Task<IActionResult> CreateOrder([FromBody] CheckoutRequest request)
         {
             try
             {
@@ -128,139 +128,68 @@ namespace WebLaptopBE.Controllers
                 decimal deliveryFee = request.DeliveryFee ?? 0;
                 decimal totalAmount = subtotal + deliveryFee;
 
-                // Tạo đơn hàng
-                var saleInvoice = new SaleInvoice
-                {
-                    SaleInvoiceId = GenerateSaleInvoiceId(),
-                    CustomerId = request.CustomerId,
-                    PaymentMethod = request.PaymentMethod ?? "Thanh toán khi nhận hàng",
-                    DeliveryAddress = request.DeliveryAddress,
-                    DeliveryFee = deliveryFee,
-                    TotalAmount = totalAmount,
-                    Status = "Chờ xử lý",
-                    TimeCreate = DateTime.Now
-                };
-
-                // Tạo mã đơn hàng
-                string saleInvoiceId = GenerateSaleInvoiceId();
-                
-                // Kiểm tra mã đơn hàng đã tồn tại chưa và tạo lại nếu trùng
-                int maxAttempts = 50;
-                int attempts = 0;
-                while (_db.SaleInvoices.Any(si => si.SaleInvoiceId == saleInvoiceId) && attempts < maxAttempts)
-                {
-                    saleInvoiceId = GenerateSaleInvoiceId();
-                    attempts++;
-                }
-                
-                if (attempts >= maxAttempts)
-                {
-                    return BadRequest(new { message = "Không thể tạo mã đơn hàng. Vui lòng thử lại sau." });
-                }
-                
-                saleInvoice.SaleInvoiceId = saleInvoiceId;
-                _db.SaleInvoices.Add(saleInvoice);
-
-                // Lấy ID lớn nhất hiện có một lần duy nhất trước khi tạo chi tiết
-                int startDetailNumber = GetMaxSaleInvoiceDetailNumber();
-                
-                // Tạo chi tiết đơn hàng với ID tuần tự (chỉ cho các sản phẩm đã chọn)
-                var detailIds = new HashSet<string>();
-                int detailIndex = 0;
-                
-                foreach (var cartItem in cartDetailsToProcess)
-                {
-                    if (cartItem == null) continue;
-                    
-                    // Kiểm tra ProductId
-                    if (string.IsNullOrWhiteSpace(cartItem.ProductId))
-                    {
-                        return BadRequest(new { message = "Một số sản phẩm trong giỏ hàng không hợp lệ" });
-                    }
-                    
-                    var price = cartItem.Product?.SellingPrice ?? 0;
-                    if (price <= 0)
-                    {
-                        return BadRequest(new { message = $"Sản phẩm {cartItem.ProductId} không có giá hợp lệ" });
-                    }
-                    
-                    if (!cartItem.Quantity.HasValue || cartItem.Quantity.Value <= 0)
-                    {
-                        return BadRequest(new { message = $"Số lượng sản phẩm {cartItem.ProductId} không hợp lệ" });
-                    }
-                    
-                    // Tạo ID tuần tự: SID002, SID003, SID004...
-                    string detailId = $"SID{(startDetailNumber + detailIndex + 1):D3}";
-                    
-               
-                    
-                    detailIds.Add(detailId);
-                    
-                    // Xử lý specifications: đảm bảo format "CPU / RAM / ROM / Card"
-                    string specifications = cartItem.Specifications ?? "";
-                    
-                    // Nếu là format cũ "ConfigurationId:xxx", chuyển đổi sang format mới
-                    if (!string.IsNullOrWhiteSpace(specifications) && specifications.StartsWith("ConfigurationId:"))
-                    {
-                        var configId = specifications.Substring("ConfigurationId:".Length).Trim();
-                        var config = _db.ProductConfigurations
-                            .AsNoTracking()
-                            .FirstOrDefault(pc => pc.ConfigurationId == configId);
-                        
-                        if (config != null)
-                        {
-                            var parts = new List<string>();
-                            if (!string.IsNullOrWhiteSpace(config.Cpu)) parts.Add(config.Cpu);
-                            if (!string.IsNullOrWhiteSpace(config.Ram)) parts.Add(config.Ram);
-                            if (!string.IsNullOrWhiteSpace(config.Rom)) parts.Add(config.Rom);
-                            if (!string.IsNullOrWhiteSpace(config.Card)) parts.Add(config.Card);
-                            specifications = string.Join(" / ", parts);
-                        }
-                    }
-                    // Nếu đã là format mới (có dấu " / "), giữ nguyên
-                    // Nếu không có format nào, để trống
-                    
-                    var saleInvoiceDetail = new SaleInvoiceDetail
-                    {
-                        SaleInvoiceDetailId = detailId,
-                        SaleInvoiceId = saleInvoice.SaleInvoiceId,
-                        ProductId = cartItem.ProductId,
-                        Quantity = cartItem.Quantity,
-                        UnitPrice = price,
-                        Specifications = specifications
-                    };
-                    _db.SaleInvoiceDetails.Add(saleInvoiceDetail);
-                    
-                    detailIndex++;
-                }
-                
-                if (!detailIds.Any())
-                {
-                    return BadRequest(new { message = "Không có sản phẩm hợp lệ trong giỏ hàng" });
-                }
-
-                // Lưu đơn hàng trước
-                _db.SaveChanges();
-
                 // Kiểm tra phương thức thanh toán để quyết định xử lý tiếp theo
                 if (request.PaymentMethod == "Chuyển khoản ngân hàng")
                 {
-                    // Tạo URL thanh toán VNPay
+                    // Với VNPay, lưu thông tin tạm và tạo URL thanh toán
+                    // Đơn hàng sẽ được tạo sau khi thanh toán thành công
+                    
+                    var pendingOrder = new PendingOrder
+                    {
+                        CustomerId = request.CustomerId,
+                        FullName = request.FullName,
+                        Phone = request.Phone,
+                        Email = request.Email,
+                        DeliveryAddress = request.DeliveryAddress,
+                        PaymentMethod = request.PaymentMethod,
+                        DeliveryFee = deliveryFee,
+                        Note = request.Note,
+                        SelectedCartDetailIds = request.SelectedCartDetailIds ?? cartDetailsToProcess.Select(cd => cd.CartDetailId).ToList(),
+                        TotalAmount = totalAmount,
+                        CreatedDate = DateTime.Now
+                    };
+
+
+                    // Tạo mã tham chiếu tạm thời cho VNPay kết hợp với CustomerId
+                    var tempOrderId = DateTime.Now.Ticks % 1000000; // Lấy 6 chữ số cuối của timestamp
+                    var txnRef = $"{tempOrderId}_{request.CustomerId}"; // Kết hợp tempOrderId với CustomerId
+                    
+                    // Lưu mapping giữa TxnRef và thông tin đơn hàng
+                    var pendingOrderWithTxnRef = new PendingOrderWithTxnRef
+                    {
+                        TxnRef = txnRef,
+                        CustomerId = request.CustomerId,
+                        FullName = request.FullName,
+                        Phone = request.Phone,
+                        Email = request.Email,
+                        DeliveryAddress = request.DeliveryAddress,
+                        PaymentMethod = request.PaymentMethod,
+                        DeliveryFee = deliveryFee,
+                        Note = request.Note,
+                        SelectedCartDetailIds = request.SelectedCartDetailIds ?? cartDetailsToProcess.Select(cd => cd.CartDetailId).ToList(),
+                        TotalAmount = totalAmount,
+                        CreatedDate = DateTime.Now
+                    };
+
+                    // Lưu thông tin đơn hàng tạm với key là TxnRef
+                    var pendingOrderJson = System.Text.Json.JsonSerializer.Serialize(pendingOrderWithTxnRef);
+                    HttpContext.Session.SetString($"PendingOrder_{txnRef}", pendingOrderJson);
+                    
                     var vnPayRequest = new VnPaymentRequestModel
                     {
-                        OrderId = int.Parse(saleInvoice.SaleInvoiceId.Substring(2)), // Lấy số từ SI001 -> 1
+                        OrderId = (int)tempOrderId,
                         FullName = request.FullName,
-                        Description = $"Thanh toán đơn hàng {saleInvoice.SaleInvoiceId}",
+                        Description = $"Thanh toan don hang {tempOrderId}",
                         Amount = (double)totalAmount,
                         CreatedDate = DateTime.Now
                     };
 
-                    var paymentUrl = _vnPayService.CreatePaymentUrl(HttpContext, vnPayRequest);
+                    var paymentUrl = _vnPayService.CreatePaymentUrl(HttpContext, vnPayRequest, txnRef);
                     
                     return Ok(new
                     {
-                        message = "Đơn hàng đã được tạo. Chuyển hướng đến VNPay để thanh toán.",
-                        orderId = saleInvoice.SaleInvoiceId,
+                        message = "Chuyển hướng đến VNPay để thanh toán. Đơn hàng sẽ được tạo sau khi thanh toán thành công.",
+                        tempOrderId = tempOrderId,
                         totalAmount = totalAmount,
                         paymentUrl = paymentUrl,
                         requiresPayment = true
@@ -268,7 +197,14 @@ namespace WebLaptopBE.Controllers
                 }
                 else
                 {
-                    // Thanh toán khi nhận hàng - xóa giỏ hàng ngay
+                    // Thanh toán khi nhận hàng - tạo đơn hàng ngay
+                    var orderResult = await CreateSaleInvoiceFromCart(request, cartDetailsToProcess, totalAmount, deliveryFee);
+                    if (!orderResult.Success)
+                    {
+                        return BadRequest(new { message = orderResult.ErrorMessage });
+                    }
+
+                    // Xóa giỏ hàng sau khi tạo đơn hàng thành công
                     _db.CartDetails.RemoveRange(cartDetailsToProcess);
                     
                     // Kiểm tra xem còn CartDetail nào không, nếu không còn thì xóa luôn Cart
@@ -282,100 +218,19 @@ namespace WebLaptopBE.Controllers
                     }
                     
                     _db.SaveChanges();
+
+                    // Gửi email xác nhận đơn hàng cho COD
+                    await SendOrderConfirmationEmail(request, orderResult.OrderId, totalAmount, deliveryFee, cartDetailsToProcess);
+
+                    return Ok(new
+                    {
+                        message = "Đặt hàng thành công",
+                        orderId = orderResult.OrderId,
+                        totalAmount = totalAmount,
+                        requiresPayment = false
+                    });
                 }
 
-                // Gửi email xác nhận đơn hàng
-                if (_emailService != null && !string.IsNullOrWhiteSpace(request.Email))
-                {
-                    try
-                    {
-                        // Lấy thông tin khách hàng
-                        var customerInfo = _db.Customers.FirstOrDefault(c => c.CustomerId == request.CustomerId);
-                        var customerName = customerInfo?.CustomerName ?? request.FullName;
-                        
-                        // Lấy chi tiết đơn hàng
-                        var orderItems = new List<OrderItem>();
-                        var invoiceDetails = _db.SaleInvoiceDetails
-                            .Include(sid => sid.Product)
-                            .Where(sid => sid.SaleInvoiceId == saleInvoice.SaleInvoiceId)
-                            .ToList();
-                        
-                        foreach (var detail in invoiceDetails)
-                        {
-                            var product = detail.Product;
-                            orderItems.Add(new OrderItem
-                            {
-                                ProductName = product?.ProductName ?? "Sản phẩm",
-                                Specifications = detail.Specifications,
-                                Quantity = detail.Quantity ?? 0,
-                                UnitPrice = detail.UnitPrice ?? 0,
-                                Total = (detail.Quantity ?? 0) * (detail.UnitPrice ?? 0)
-                            });
-                        }
-                        
-                        // Gửi email (không chặn response nếu email lỗi)
-                        _ = Task.Run(async () =>
-                        {
-                            try
-                            {
-                                System.Diagnostics.Debug.WriteLine($"Bắt đầu gửi email đến: {request.Email}");
-                                System.Diagnostics.Debug.WriteLine($"EmailService is null: {_emailService == null}");
-                                
-                                var emailSent = await _emailService.SendOrderConfirmationEmailAsync(
-                                    toEmail: request.Email,
-                                    customerName: customerName,
-                                    orderId: saleInvoice.SaleInvoiceId,
-                                    phone: request.Phone,
-                                    email: request.Email,
-                                    address: request.DeliveryAddress,
-                                    note: request.Note ?? "",
-                                    items: orderItems,
-                                    subtotal: subtotal,
-                                    discount: 0, // Có thể tính từ promotion nếu có
-                                    deliveryFee: deliveryFee,
-                                    totalAmount: totalAmount
-                                );
-                                
-                                if (emailSent)
-                                {
-                                    System.Diagnostics.Debug.WriteLine($"Email đã được gửi thành công đến: {request.Email}");
-                                }
-                                else
-                                {
-                                    System.Diagnostics.Debug.WriteLine($"Không thể gửi email đến: {request.Email}");
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"Lỗi khi gửi email: {ex.Message}");
-                                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
-                                if (ex.InnerException != null)
-                                {
-                                    System.Diagnostics.Debug.WriteLine($"Inner exception: {ex.InnerException.Message}");
-                                    System.Diagnostics.Debug.WriteLine($"Inner stack trace: {ex.InnerException.StackTrace}");
-                                }
-                            }
-                        });
-                    }
-                    catch (Exception emailEx)
-                    {
-                        // Log lỗi nhưng không ảnh hưởng đến response
-                        System.Diagnostics.Debug.WriteLine($"Error preparing email: {emailEx.Message}");
-                        System.Diagnostics.Debug.WriteLine($"Stack trace: {emailEx.StackTrace}");
-                    }
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine($"EmailService is null hoặc email trống. EmailService: {_emailService == null}, Email: {request.Email}");
-                }
-
-                return Ok(new
-                {
-                    message = "Đặt hàng thành công",
-                    orderId = saleInvoice.SaleInvoiceId,
-                    totalAmount = totalAmount,
-                    requiresPayment = false
-                });
             }
             catch (DbUpdateException dbEx)
             {
@@ -411,80 +266,127 @@ namespace WebLaptopBE.Controllers
 
         // GET: api/Checkout/vnpay-callback
         [HttpGet("vnpay-callback")]
-        public IActionResult VnPayCallback()
+        public async Task<IActionResult> VnPayCallback()
         {
             try
             {
+                // Log VNPay callback parameters for debugging
+                System.Diagnostics.Debug.WriteLine("=== VNPay Callback ===");
+                foreach (var param in Request.Query)
+                {
+                    System.Diagnostics.Debug.WriteLine($"{param.Key}: {param.Value}");
+                }
+                System.Diagnostics.Debug.WriteLine("=====================");
+
                 var response = _vnPayService.PaymentExecute(Request.Query);
                 
-                if (response.Success && VnPayHelper.IsSuccessResponse(response.VnPayResponseCode))
+                if (response.Success && response.VnPayResponseCode == "00")
                 {
-                    // Parse OrderId từ TxnRef sử dụng helper
+                    // Parse TxnRef từ VNPay response
                     var txnRef = response.OrderId; // TxnRef từ VNPay
-                    var orderIdNumber = VnPayHelper.ParseOrderIdFromTxnRef(txnRef);
-                    var orderId = $"SI{orderIdNumber:D3}";
-                    var saleInvoice = _db.SaleInvoices.FirstOrDefault(si => si.SaleInvoiceId == orderId);
                     
-                    if (saleInvoice != null && saleInvoice.Status != "Đã thanh toán")
+                    // Tìm thông tin đơn hàng tạm từ session dựa trên TxnRef
+                    string? pendingOrderJson = null;
+                    string? customerId = null;
+                    
+                    // Tìm kiếm trực tiếp bằng TxnRef
+                    var sessionKey = $"PendingOrder_{txnRef}";
+                    pendingOrderJson = HttpContext.Session.GetString(sessionKey);
+                    
+                    if (!string.IsNullOrEmpty(pendingOrderJson))
                     {
-                        // Cập nhật trạng thái đơn hàng
-                        saleInvoice.Status = "Đã thanh toán";
-                        saleInvoice.PaymentMethod = "Chuyển khoản ngân hàng (VNPay)";
-                        
-                        _db.SaveChanges();
-                        
-                        // Xóa giỏ hàng sau khi thanh toán thành công
-                        var customerId = saleInvoice.CustomerId;
-                        var cart = _db.Carts
-                            .Include(c => c.CartDetails)
-                            .FirstOrDefault(c => c.CustomerId == customerId);
-                            
-                        if (cart != null && cart.CartDetails != null)
+                        try
                         {
-                            // Lấy danh sách sản phẩm trong đơn hàng
-                            var orderProductIds = _db.SaleInvoiceDetails
-                                .Where(sid => sid.SaleInvoiceId == orderId)
-                                .Select(sid => sid.ProductId)
-                                .ToList();
-                            
-                            // Xóa các sản phẩm tương ứng khỏi giỏ hàng
-                            var cartDetailsToRemove = cart.CartDetails
-                                .Where(cd => orderProductIds.Contains(cd.ProductId))
-                                .ToList();
-                            
-                            _db.CartDetails.RemoveRange(cartDetailsToRemove);
-                            
-                            // Kiểm tra xem còn sản phẩm nào trong giỏ hàng không
-                            var remainingDetails = cart.CartDetails
-                                .Where(cd => !orderProductIds.Contains(cd.ProductId))
-                                .ToList();
-                            
-                            if (!remainingDetails.Any())
+                            var tempOrder = System.Text.Json.JsonSerializer.Deserialize<PendingOrderWithTxnRef>(pendingOrderJson);
+                            if (tempOrder != null && tempOrder.TxnRef == txnRef)
                             {
-                                _db.Carts.Remove(cart);
+                                customerId = tempOrder.CustomerId;
                             }
-                            
-                            _db.SaveChanges();
                         }
-                        
-                        // Chuyển hướng về trang thành công với thông báo
-                        return Redirect($"{GetFrontendUrl()}/User/Account?success=payment&orderId={orderId}#tab-your-orders");
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Error deserializing pending order: {ex.Message}");
+                            pendingOrderJson = null;
+                        }
                     }
-                    else if (saleInvoice != null && saleInvoice.Status == "Đã thanh toán")
+                    
+                    if (!string.IsNullOrEmpty(pendingOrderJson) && !string.IsNullOrEmpty(customerId))
                     {
-                        // Đơn hàng đã được thanh toán trước đó
-                        return Redirect($"{GetFrontendUrl()}/User/Account?success=payment&orderId={orderId}#tab-your-orders");
+                        try
+                        {
+                            var pendingOrder = System.Text.Json.JsonSerializer.Deserialize<PendingOrderWithTxnRef>(pendingOrderJson);
+                            if (pendingOrder != null)
+                            {
+                                // Lấy lại thông tin giỏ hàng
+                                var cart = _db.Carts
+                                    .Include(c => c.CartDetails)
+                                        .ThenInclude(cd => cd.Product)
+                                    .FirstOrDefault(c => c.CustomerId == customerId);
+
+                                if (cart != null)
+                                {
+                                    var cartDetailsToProcess = cart.CartDetails
+                                        .Where(cd => pendingOrder.SelectedCartDetailIds.Contains(cd.CartDetailId))
+                                        .ToList();
+
+                                    // Tạo đơn hàng thực sự
+                                    var orderResult = await CreateSaleInvoiceFromPendingOrder(pendingOrder, cartDetailsToProcess);
+                                    
+                                    if (orderResult.Success)
+                                    {
+                                        // Xóa giỏ hàng sau khi tạo đơn hàng thành công
+                                        _db.CartDetails.RemoveRange(cartDetailsToProcess);
+                                        
+                                        var remainingDetails = _db.CartDetails
+                                            .Where(cd => cd.CartId == cart.CartId)
+                                            .ToList();
+                                        
+                                        if (!remainingDetails.Any())
+                                        {
+                                            _db.Carts.Remove(cart);
+                                        }
+                                        
+                                        _db.SaveChanges();
+
+                                        // Xóa thông tin tạm khỏi session
+                                        HttpContext.Session.Remove($"PendingOrder_{txnRef}");
+
+                                        // Gửi email xác nhận đơn hàng (không chặn nếu lỗi)
+                                        try
+                                        {
+                                            await SendOrderConfirmationEmailFromPendingOrder(pendingOrder, orderResult.OrderId, cartDetailsToProcess);
+                                        }
+                                        catch (Exception emailEx)
+                                        {
+                                            System.Diagnostics.Debug.WriteLine($"Email sending failed: {emailEx.Message}");
+                                            // Không chặn luồng chính nếu email thất bại
+                                        }
+
+                                        // Chuyển hướng về trang thành công với thông báo
+                                        return Redirect($"{GetFrontendUrl()}/User/Account?success=true&message={Uri.EscapeDataString("Đặt hàng thành công!")}&orderId={orderResult.OrderId}#tab-your-orders");
+                                    }
+                                    else
+                                    {
+                                        // Tạo đơn hàng thất bại - chuyển về trang lỗi
+                                        System.Diagnostics.Debug.WriteLine($"Order creation failed: {orderResult.ErrorMessage}");
+                                        return Redirect($"{GetFrontendUrl()}/Cart/Checkout?error=order-creation-failed&message={Uri.EscapeDataString(orderResult.ErrorMessage)}");
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Error processing VNPay callback: {ex.Message}");
+                        }
                     }
-                    else
-                    {
-                        // Không tìm thấy đơn hàng
-                        return Redirect($"{GetFrontendUrl()}/Cart/Checkout?error=order-not-found");
-                    }
+                    
+                    // Nếu không tìm thấy thông tin đơn hàng tạm
+                    return Redirect($"{GetFrontendUrl()}/Cart/Checkout?error=order-not-found");
                 }
                 
                 // Thanh toán thất bại hoặc bị hủy
                 var errorCode = response.VnPayResponseCode;
-                var errorMessage = VnPayHelper.GetResponseMessage(errorCode);
+                var errorMessage = GetVnPayErrorMessage(errorCode);
                 
                 var frontendUrl = _configuration["FrontendUrl"] ?? "http://localhost:5000";
                 return Redirect($"{GetFrontendUrl()}/Cart/Checkout?error=payment-failed&code={errorCode}&message={Uri.EscapeDataString(errorMessage)}");
@@ -492,7 +394,14 @@ namespace WebLaptopBE.Controllers
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"VNPay callback error: {ex.Message}");
-                return Redirect($"{GetFrontendUrl()}/Cart/Checkout?error=payment-error");
+                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
+                
+                var errorMessage = Uri.EscapeDataString($"Lỗi xử lý callback: {ex.Message}");
+                return Redirect($"{GetFrontendUrl()}/Cart/Checkout?error=payment-error&message={errorMessage}");
             }
         }
         
@@ -501,6 +410,341 @@ namespace WebLaptopBE.Controllers
         private string GetFrontendUrl()
         {
             return _configuration["FrontendUrl"] ?? "http://localhost:5253";
+        }
+
+        // Tạo đơn hàng từ giỏ hàng (cho COD)
+        private async Task<(bool Success, string OrderId, string ErrorMessage)> CreateSaleInvoiceFromCart(
+            CheckoutRequest request, 
+            List<CartDetail> cartDetailsToProcess, 
+            decimal totalAmount, 
+            decimal deliveryFee)
+        {
+            try
+            {
+                // Tạo đơn hàng
+                var saleInvoice = new SaleInvoice
+                {
+                    SaleInvoiceId = GenerateSaleInvoiceId(),
+                    CustomerId = request.CustomerId,
+                    PaymentMethod = request.PaymentMethod ?? "Thanh toán khi nhận hàng",
+                    DeliveryAddress = request.DeliveryAddress,
+                    DeliveryFee = deliveryFee,
+                    TotalAmount = totalAmount,
+                    Status = "Chờ xử lý",
+                    TimeCreate = DateTime.Now
+                };
+
+                // Tạo mã đơn hàng unique
+                string saleInvoiceId = GenerateSaleInvoiceId();
+                int maxAttempts = 50;
+                int attempts = 0;
+                while (_db.SaleInvoices.Any(si => si.SaleInvoiceId == saleInvoiceId) && attempts < maxAttempts)
+                {
+                    saleInvoiceId = GenerateSaleInvoiceId();
+                    attempts++;
+                }
+                
+                if (attempts >= maxAttempts)
+                {
+                    return (false, "", "Không thể tạo mã đơn hàng. Vui lòng thử lại sau.");
+                }
+                
+                saleInvoice.SaleInvoiceId = saleInvoiceId;
+                _db.SaleInvoices.Add(saleInvoice);
+
+                // Tạo chi tiết đơn hàng
+                var result = CreateSaleInvoiceDetails(saleInvoice.SaleInvoiceId, cartDetailsToProcess);
+                if (!result.Success)
+                {
+                    return (false, "", result.ErrorMessage);
+                }
+
+                _db.SaveChanges();
+                return (true, saleInvoice.SaleInvoiceId, "");
+            }
+            catch (Exception ex)
+            {
+                return (false, "", $"Lỗi khi tạo đơn hàng: {ex.Message}");
+            }
+        }
+
+        // Tạo đơn hàng từ thông tin tạm (cho VNPay)
+        private async Task<(bool Success, string OrderId, string ErrorMessage)> CreateSaleInvoiceFromPendingOrder(
+            PendingOrder pendingOrder, 
+            List<CartDetail> cartDetailsToProcess)
+        {
+            try
+            {
+                // Tạo đơn hàng
+                var saleInvoice = new SaleInvoice
+                {
+                    SaleInvoiceId = GenerateSaleInvoiceId(),
+                    CustomerId = pendingOrder.CustomerId,
+                    PaymentMethod = "Chuyển khoản ngân hàng",
+                    DeliveryAddress = pendingOrder.DeliveryAddress,
+                    DeliveryFee = pendingOrder.DeliveryFee,
+                    TotalAmount = pendingOrder.TotalAmount,
+                    Status = "Chờ xử lý",
+                    TimeCreate = DateTime.Now
+                };
+
+                // Tạo mã đơn hàng unique
+                string saleInvoiceId = GenerateSaleInvoiceId();
+                int maxAttempts = 50;
+                int attempts = 0;
+                while (_db.SaleInvoices.Any(si => si.SaleInvoiceId == saleInvoiceId) && attempts < maxAttempts)
+                {
+                    saleInvoiceId = GenerateSaleInvoiceId();
+                    attempts++;
+                }
+                
+                if (attempts >= maxAttempts)
+                {
+                    return (false, "", "Không thể tạo mã đơn hàng. Vui lòng thử lại sau.");
+                }
+                
+                saleInvoice.SaleInvoiceId = saleInvoiceId;
+                _db.SaleInvoices.Add(saleInvoice);
+
+                // Tạo chi tiết đơn hàng
+                var result = CreateSaleInvoiceDetails(saleInvoice.SaleInvoiceId, cartDetailsToProcess);
+                if (!result.Success)
+                {
+                    return (false, "", result.ErrorMessage);
+                }
+
+                _db.SaveChanges();
+                return (true, saleInvoice.SaleInvoiceId, "");
+            }
+            catch (Exception ex)
+            {
+                return (false, "", $"Lỗi khi tạo đơn hàng: {ex.Message}");
+            }
+        }
+
+        // Tạo chi tiết đơn hàng
+        private (bool Success, string ErrorMessage) CreateSaleInvoiceDetails(string saleInvoiceId, List<CartDetail> cartDetailsToProcess)
+        {
+            try
+            {
+                int startDetailNumber = GetMaxSaleInvoiceDetailNumber();
+                int detailIndex = 0;
+                
+                foreach (var cartItem in cartDetailsToProcess)
+                {
+                    if (cartItem == null) continue;
+                    
+                    if (string.IsNullOrWhiteSpace(cartItem.ProductId))
+                    {
+                        return (false, "Một số sản phẩm trong giỏ hàng không hợp lệ");
+                    }
+                    
+                    var price = cartItem.Product?.SellingPrice ?? 0;
+                    if (price <= 0)
+                    {
+                        return (false, $"Sản phẩm {cartItem.ProductId} không có giá hợp lệ");
+                    }
+                    
+                    if (!cartItem.Quantity.HasValue || cartItem.Quantity.Value <= 0)
+                    {
+                        return (false, $"Số lượng sản phẩm {cartItem.ProductId} không hợp lệ");
+                    }
+                    
+                    string detailId = $"SID{(startDetailNumber + detailIndex + 1):D3}";
+                    
+                    // Xử lý specifications
+                    string specifications = cartItem.Specifications ?? "";
+                    if (!string.IsNullOrWhiteSpace(specifications) && specifications.StartsWith("ConfigurationId:"))
+                    {
+                        var configId = specifications.Substring("ConfigurationId:".Length).Trim();
+                        var config = _db.ProductConfigurations
+                            .AsNoTracking()
+                            .FirstOrDefault(pc => pc.ConfigurationId == configId);
+                        
+                        if (config != null)
+                        {
+                            var parts = new List<string>();
+                            if (!string.IsNullOrWhiteSpace(config.Cpu)) parts.Add(config.Cpu);
+                            if (!string.IsNullOrWhiteSpace(config.Ram)) parts.Add(config.Ram);
+                            if (!string.IsNullOrWhiteSpace(config.Rom)) parts.Add(config.Rom);
+                            if (!string.IsNullOrWhiteSpace(config.Card)) parts.Add(config.Card);
+                            specifications = string.Join(" / ", parts);
+                        }
+                    }
+                    
+                    var saleInvoiceDetail = new SaleInvoiceDetail
+                    {
+                        SaleInvoiceDetailId = detailId,
+                        SaleInvoiceId = saleInvoiceId,
+                        ProductId = cartItem.ProductId,
+                        Quantity = cartItem.Quantity,
+                        UnitPrice = price,
+                        Specifications = specifications
+                    };
+                    _db.SaleInvoiceDetails.Add(saleInvoiceDetail);
+                    
+                    detailIndex++;
+                }
+                
+                return (true, "");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Lỗi khi tạo chi tiết đơn hàng: {ex.Message}");
+            }
+        }
+        
+        // Gửi email xác nhận đơn hàng (cho COD)
+        private async Task SendOrderConfirmationEmail(
+            CheckoutRequest request, 
+            string orderId, 
+            decimal totalAmount, 
+            decimal deliveryFee, 
+            List<CartDetail> cartDetailsToProcess)
+        {
+            if (_emailService != null && !string.IsNullOrWhiteSpace(request.Email))
+            {
+                try
+                {
+                    var customerInfo = _db.Customers.FirstOrDefault(c => c.CustomerId == request.CustomerId);
+                    var customerName = customerInfo?.CustomerName ?? request.FullName;
+                    
+                    var orderItems = new List<OrderItem>();
+                    var invoiceDetails = _db.SaleInvoiceDetails
+                        .Include(sid => sid.Product)
+                        .Where(sid => sid.SaleInvoiceId == orderId)
+                        .ToList();
+                    
+                    foreach (var detail in invoiceDetails)
+                    {
+                        var product = detail.Product;
+                        orderItems.Add(new OrderItem
+                        {
+                            ProductName = product?.ProductName ?? "Sản phẩm",
+                            Specifications = detail.Specifications,
+                            Quantity = detail.Quantity ?? 0,
+                            UnitPrice = detail.UnitPrice ?? 0,
+                            Total = (detail.Quantity ?? 0) * (detail.UnitPrice ?? 0)
+                        });
+                    }
+                    
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _emailService.SendOrderConfirmationEmailAsync(
+                                toEmail: request.Email,
+                                customerName: customerName,
+                                orderId: orderId,
+                                phone: request.Phone,
+                                email: request.Email,
+                                address: request.DeliveryAddress,
+                                note: request.Note ?? "",
+                                items: orderItems,
+                                subtotal: totalAmount - deliveryFee,
+                                discount: 0,
+                                deliveryFee: deliveryFee,
+                                totalAmount: totalAmount
+                            );
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Lỗi khi gửi email: {ex.Message}");
+                        }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error preparing email: {ex.Message}");
+                }
+            }
+        }
+
+        // Gửi email xác nhận đơn hàng (cho VNPay)
+        private async Task SendOrderConfirmationEmailFromPendingOrder(
+            PendingOrder pendingOrder, 
+            string orderId, 
+            List<CartDetail> cartDetailsToProcess)
+        {
+            if (_emailService != null && !string.IsNullOrWhiteSpace(pendingOrder.Email))
+            {
+                try
+                {
+                    var customerInfo = _db.Customers.FirstOrDefault(c => c.CustomerId == pendingOrder.CustomerId);
+                    var customerName = customerInfo?.CustomerName ?? pendingOrder.FullName;
+                    
+                    var orderItems = new List<OrderItem>();
+                    var invoiceDetails = _db.SaleInvoiceDetails
+                        .Include(sid => sid.Product)
+                        .Where(sid => sid.SaleInvoiceId == orderId)
+                        .ToList();
+                    
+                    foreach (var detail in invoiceDetails)
+                    {
+                        var product = detail.Product;
+                        orderItems.Add(new OrderItem
+                        {
+                            ProductName = product?.ProductName ?? "Sản phẩm",
+                            Specifications = detail.Specifications,
+                            Quantity = detail.Quantity ?? 0,
+                            UnitPrice = detail.UnitPrice ?? 0,
+                            Total = (detail.Quantity ?? 0) * (detail.UnitPrice ?? 0)
+                        });
+                    }
+                    
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _emailService.SendOrderConfirmationEmailAsync(
+                                toEmail: pendingOrder.Email,
+                                customerName: customerName,
+                                orderId: orderId,
+                                phone: pendingOrder.Phone,
+                                email: pendingOrder.Email,
+                                address: pendingOrder.DeliveryAddress,
+                                note: pendingOrder.Note ?? "",
+                                items: orderItems,
+                                subtotal: pendingOrder.TotalAmount - pendingOrder.DeliveryFee,
+                                discount: 0,
+                                deliveryFee: pendingOrder.DeliveryFee,
+                                totalAmount: pendingOrder.TotalAmount
+                            );
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Lỗi khi gửi email: {ex.Message}");
+                        }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error preparing email: {ex.Message}");
+                }
+            }
+        }
+
+        // Helper method để lấy thông báo lỗi VNPay
+        private string GetVnPayErrorMessage(string errorCode)
+        {
+            return errorCode switch
+            {
+                "00" => "Giao dịch thành công",
+                "07" => "Trừ tiền thành công. Giao dịch bị nghi ngờ (liên quan tới lừa đảo, giao dịch bất thường).",
+                "09" => "Giao dịch không thành công do: Thẻ/Tài khoản của khách hàng chưa đăng ký dịch vụ InternetBanking tại ngân hàng.",
+                "10" => "Giao dịch không thành công do: Khách hàng xác thực thông tin thẻ/tài khoản không đúng quá 3 lần",
+                "11" => "Giao dịch không thành công do: Đã hết hạn chờ thanh toán. Xin quý khách vui lòng thực hiện lại giao dịch.",
+                "12" => "Giao dịch không thành công do: Thẻ/Tài khoản của khách hàng bị khóa.",
+                "13" => "Giao dịch không thành công do Quý khách nhập sai mật khẩu xác thực giao dịch (OTP). Xin quý khách vui lòng thực hiện lại giao dịch.",
+                "24" => "Giao dịch không thành công do: Khách hàng hủy giao dịch",
+                "51" => "Giao dịch không thành công do: Tài khoản của quý khách không đủ số dư để thực hiện giao dịch.",
+                "65" => "Giao dịch không thành công do: Tài khoản của Quý khách đã vượt quá hạn mức giao dịch trong ngày.",
+                "75" => "Ngân hàng thanh toán đang bảo trì.",
+                "79" => "Giao dịch không thành công do: KH nhập sai mật khẩu thanh toán quá số lần quy định. Xin quý khách vui lòng thực hiện lại giao dịch",
+                "97" => "Chữ ký không hợp lệ",
+                "99" => "Các lỗi khác (lỗi còn lại, không có trong danh sách mã lỗi đã liệt kê)",
+                _ => "Giao dịch không thành công"
+            };
         }
 
         private string GenerateSaleInvoiceId()
@@ -639,6 +883,28 @@ namespace WebLaptopBE.Controllers
             
             [JsonPropertyName("selectedCartDetailIds")]
             public List<string>? SelectedCartDetailIds { get; set; }
+        }
+
+        // Model tạm để lưu thông tin đơn hàng chờ thanh toán
+        public class PendingOrder
+        {
+            public string CustomerId { get; set; } = string.Empty;
+            public string FullName { get; set; } = string.Empty;
+            public string Phone { get; set; } = string.Empty;
+            public string Email { get; set; } = string.Empty;
+            public string DeliveryAddress { get; set; } = string.Empty;
+            public string? PaymentMethod { get; set; }
+            public decimal DeliveryFee { get; set; }
+            public string? Note { get; set; }
+            public List<string> SelectedCartDetailIds { get; set; } = new();
+            public decimal TotalAmount { get; set; }
+            public DateTime CreatedDate { get; set; }
+        }
+
+        // Model tạm để lưu thông tin đơn hàng với TxnRef
+        public class PendingOrderWithTxnRef : PendingOrder
+        {
+            public string TxnRef { get; set; } = string.Empty;
         }
     }
 }

@@ -122,7 +122,7 @@
                 return provinces;
             }
             try {
-                const response = await fetch(`${ADDRESS_API_BASE}/provinces`, { credentials: 'same-origin' });
+                const response = await fetch(`${ADDRESS_API_BASE}/provinces`, { credentials: 'include' });
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
                 const list = Array.isArray(data) ? data : [];
@@ -155,7 +155,7 @@
             }
 
             try {
-                const response = await fetch(`${ADDRESS_API_BASE}/wards/${provinceCode}`, { credentials: 'same-origin' });
+                const response = await fetch(`${ADDRESS_API_BASE}/wards/${provinceCode}`, { credentials: 'include' });
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
                 const list = Array.isArray(data) ? data : [];
@@ -428,7 +428,7 @@
                 }
 
                 const response = await fetch(`${CART_API_BASE}/${currentCustomerId}`, { 
-                    credentials: 'same-origin',
+                    credentials: 'include',
                     headers: {
                         'Accept': 'application/json'
                     }
@@ -600,7 +600,7 @@
             if (!currentCustomerId) return;
 
             try {
-                const response = await fetch(`${API_BASE}/api/CustomerAccount/${currentCustomerId}`, { credentials: 'same-origin' });
+                const response = await fetch(`${API_BASE}/api/CustomerAccount/${currentCustomerId}`, { credentials: 'include' });
                 if (!response.ok) return;
                 const customer = await response.json();
                 
@@ -817,7 +817,7 @@
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
-                    credentials: 'same-origin',
+                    credentials: 'include', // Quan trọng: gửi cookies/session
                     body: JSON.stringify(requestBody)
                 });
                 
@@ -890,7 +890,7 @@
                     document.dispatchEvent(new Event('orderUpdated'));
                     
                     setTimeout(() => {
-                        window.location.href = '/User/Account#tab-your-orders';
+                        window.location.href = '/User/Account?success=true&message=' + encodeURIComponent('Đặt hàng thành công!') + '#tab-your-orders';
                     }, 1500);
                 }
             } catch (err) {
@@ -924,7 +924,11 @@
                 }
                 showAlert('danger', message);
             } else if (error === 'payment-error') {
-                showAlert('danger', 'Có lỗi xảy ra trong quá trình thanh toán. Vui lòng thử lại.');
+                let message = 'Có lỗi xảy ra trong quá trình thanh toán. Vui lòng thử lại.';
+                if (errorMessage) {
+                    message = decodeURIComponent(errorMessage);
+                }
+                showAlert('danger', message);
             } else if (error === 'order-not-found') {
                 showAlert('warning', 'Không tìm thấy đơn hàng. Vui lòng kiểm tra lại.');
             }
@@ -1204,7 +1208,7 @@
                                     </div>
 
                                     <div class="form-check my-2">
-                                        <input type="radio" class="form-check-input bg-primary border-0" id="Payment-COD" name="PaymentMethod" value="Thanh toán khi nhân hàng">
+                                        <input type="radio" class="form-check-input bg-primary border-0" id="Payment-COD" name="PaymentMethod" value="Thanh toán khi nhận hàng">
                                         <label class="form-check-label" for="Payment-COD">Thanh toán khi nhận hàng</label>
                                     </div>
                                     <div id="payment-method-error"></div>
