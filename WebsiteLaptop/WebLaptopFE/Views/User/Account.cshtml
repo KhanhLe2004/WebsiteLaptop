@@ -1409,6 +1409,37 @@
             loadCustomerOrders();
             loadCustomerHistory();
             
+            // Xử lý URL parameter để chuyển đến tab cụ thể
+            const urlParams = new URLSearchParams(window.location.search);
+            const tabParam = urlParams.get('tab');
+            if (tabParam === 'orders') {
+                // Chuyển đến tab "Đơn hàng của bạn"
+                setTimeout(function() {
+                    const ordersTab = document.querySelector('a[href="#tab-your-orders"]');
+                    if (ordersTab) {
+                        // Kích hoạt tab
+                        const tab = new bootstrap.Tab(ordersTab);
+                        tab.show();
+                        
+                        // Cuộn đến tab với hiệu ứng
+                        ordersTab.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        
+                        // Thêm hiệu ứng highlight tạm thời
+                        ordersTab.style.backgroundColor = '#fff3cd';
+                        ordersTab.style.transition = 'background-color 0.3s ease';
+                        setTimeout(function() {
+                            ordersTab.style.backgroundColor = '';
+                        }, 2000);
+                        
+                        // Xóa parameter khỏi URL để tránh reload lại tab
+                        const newUrl = window.location.pathname;
+                        window.history.replaceState({}, document.title, newUrl);
+                        
+                        console.log('Đã chuyển đến tab Đơn hàng của bạn từ header');
+                    }
+                }, 1000); // Đợi 1 giây để đảm bảo tất cả đã load xong
+            }
+            
             // Trigger event để cập nhật số lượng đơn hàng trong header sau khi load
             setTimeout(function() {
                 $(document).trigger('orderUpdated');
