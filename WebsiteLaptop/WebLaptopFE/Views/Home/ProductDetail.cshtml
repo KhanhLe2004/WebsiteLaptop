@@ -208,12 +208,12 @@
                             <div class="row g-4">
                                 <div class="col-lg-6">
                                     <div class="border-bottom rounded">
-                                        <input type="text" id="reviewName" class="form-control border-0 me-4" placeholder="Tên của bạn *" required>
+                                        <input type="text" id="reviewName" class="form-control border-0 me-4" placeholder="Tên của bạn *" readonly>
                                     </div>
                                 </div>
                                 <div class="col-lg-6">
                                     <div class="border-bottom rounded">
-                                        <input type="email" id="reviewEmail" class="form-control border-0" placeholder="Email của bạn *" required>
+                                        <input type="email" id="reviewEmail" class="form-control border-0" placeholder="Email của bạn *" readonly>
                                     </div>
                                 </div>
                                 <div class="col-lg-12">
@@ -349,13 +349,29 @@
         <script>
             let url = "http://localhost:5068/";
             const backendImageBase = url + "imageProducts/";
+            const backendCustomerImageBase = url + "imageCustomers/";
             const defaultProductImage = "/imageProducts/default-laptop.jpg";
+            const defaultCustomerAvatar = "../LaptopFe/img/avatar.jpg";
 
             function getBackendImageUrl(fileName) {
                 if (!fileName || typeof fileName !== "string" || !fileName.trim()) {
                     return defaultProductImage;
                 }
                 return backendImageBase + encodeURIComponent(fileName.trim());
+            }
+
+            // Hàm lấy URL avatar khách hàng
+            function getCustomerAvatarUrl(avatarFileName) {
+                if (!avatarFileName || typeof avatarFileName !== "string" || !avatarFileName.trim()) {
+                    return defaultCustomerAvatar;
+                }
+                const trimmed = avatarFileName.trim();
+                // Nếu là URL đầy đủ (http/https), dùng trực tiếp
+                if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                    return trimmed;
+                }
+                // Nếu là tên file, tạo URL từ backend
+                return backendCustomerImageBase + encodeURIComponent(trimmed);
             }
 
             let productId = '@ViewBag.ProductId';
@@ -609,19 +625,40 @@
                     $('#noReviews').hide();
                     let reviewsHtml = '';
                     reviews.forEach(function(review) {
-                        let reviewDate = review.time ? new Date(review.time).toLocaleDateString('vi-VN') : '';
+                        let reviewDate = review.time ? new Date(review.time).toLocaleDateString('vi-VN', { 
+                            year: 'numeric', 
+                            month: '2-digit', 
+                            day: '2-digit' 
+                        }) : '';
+                        let customerName = 'Khách hàng';
+                        if (review.customer) {
+                            customerName = review.customer.customerName || review.customer.CustomerName || 'Khách hàng';
+                        } else if (review.username) {
+                            customerName = review.username;
+                        }
+                        let avatarUrl = defaultCustomerAvatar;
+                        if (review.customer && review.customer.avatar) {
+                            avatarUrl = getCustomerAvatarUrl(review.customer.avatar);
+                        } else if (review.customer && review.customer.Avatar) {
+                            // Kiểm tra cả chữ hoa (trường hợp API trả về dạng PascalCase)
+                            avatarUrl = getCustomerAvatarUrl(review.customer.Avatar);
+                        }
                         reviewsHtml += `
                             <div class="d-flex mb-4">
-                                <img src="../LaptopFe/img/avatar.jpg" class="img-fluid rounded-circle p-3" style="width: 100px; height: 100px;" alt="">
-                                <div class="ms-3">
-                                    <p class="mb-2" style="font-size: 14px;">${reviewDate}</p>
-                                    <div class="d-flex justify-content-between">
-                                        <h5>${review.username || 'Khách hàng'}</h5>
-                                        <div class="d-flex mb-3">
+                                <img src="${avatarUrl}" 
+                                     class="img-fluid rounded-circle p-3" 
+                                     style="width: 100px; height: 100px; object-fit: cover;" 
+                                     alt="${customerName}"
+                                     onerror="this.onerror=null; this.src='${defaultCustomerAvatar}';">
+                                <div class="ms-3 flex-grow-1">
+                                    <p class="mb-2 text-muted" style="font-size: 14px;">${reviewDate}</p>
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h5 class="mb-0">${customerName}</h5>
+                                        <div class="d-flex">
                                             ${formatRating(review.rate || 0)}
                                         </div>
                                     </div>
-                                    <p>${review.contentDetail || 'Không có nội dung đánh giá'}</p>
+                                    <p class="mb-0">${review.contentDetail || 'Không có nội dung đánh giá'}</p>
                                 </div>
                             </div>
                         `;
@@ -856,7 +893,112 @@
                 }
             }
 
-            function submitReview() { showToast('info', 'Tính năng gửi đánh giá đang được phát triển!'); }
+            async function submitReview() {
+                // Kiểm tra đăng nhập
+                try {
+                    const isLoggedIn = sessionStorage.getItem('isLoggedIn');
+                    const customer = sessionStorage.getItem('customer');
+                    if (!isLoggedIn || !customer) {
+                        showConfirmDialog(
+                            'Bạn cần đăng nhập để đánh giá sản phẩm. Bạn có muốn chuyển đến trang đăng nhập không?',
+                            function() {
+                                window.location.href = '/User/Login';
+                            }
+                        );
+                        return;
+                    }
+
+                    const parsed = JSON.parse(customer);
+                    const customerId = parsed.customerId || parsed.CustomerId;
+                    if (!customerId) {
+                        showToast('warning', 'Không tìm thấy thông tin khách hàng. Vui lòng đăng nhập lại.');
+                        return;
+                    }
+
+                    // Lấy dữ liệu từ form
+                    const contentDetail = $('#reviewContent').val()?.toString().trim() || '';
+                    if (!contentDetail) {
+                        showToast('warning', 'Vui lòng nhập nội dung đánh giá');
+                        return;
+                    }
+
+                    if (selectedRating <= 0 || selectedRating > 5) {
+                        showToast('warning', 'Vui lòng chọn số sao đánh giá (1-5 sao)');
+                        return;
+                    }
+
+                    // API base
+                    const getDefaultApiBase = () => {
+                        if (window.CART_API_BASE && window.CART_API_BASE.trim()) {
+                            return window.CART_API_BASE.trim();
+                        }
+                        if (window.location && window.location.origin) {
+                            const origin = window.location.origin;
+                            if (!origin.includes('localhost')) {
+                                return origin;
+                            }
+                        }
+                        return 'http://localhost:5068';
+                    };
+                    const apiBase = getDefaultApiBase();
+                    const reviewApiBase = `${apiBase}/api/ProductReviewAPI`;
+
+                    // Hiển thị loading
+                    const btn = $('a[onclick*="submitReview"]');
+                    const originalHtml = btn.html();
+                    btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-2"></i>Đang gửi...');
+
+                    try {
+                        const response = await fetch(`${reviewApiBase}/create`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                customerId: customerId,
+                                productId: productId,
+                                rate: selectedRating,
+                                contentDetail: contentDetail
+                            })
+                        });
+
+                        // Đọc response text trước
+                        const responseText = await response.text();
+                        console.log('Submit review response:', response.status, responseText);
+
+                        let data;
+                        try {
+                            data = responseText ? JSON.parse(responseText) : {};
+                        } catch (parseErr) {
+                            console.error('JSON parse error:', parseErr, 'Response text:', responseText);
+                            throw new Error('Server trả về dữ liệu không hợp lệ');
+                        }
+
+                        if (!response.ok) {
+                            throw new Error(data?.message || `HTTP ${response.status}: Không thể gửi đánh giá`);
+                        }
+
+                        // Hiển thị thông báo thành công
+                        showToast('success', data.message || 'Đánh giá đã được gửi thành công!');
+                        
+                        // Reset form
+                        $('#reviewContent').val('');
+                        $('#reviewName').val('');
+                        $('#reviewEmail').val('');
+                        selectedRating = 0;
+                        $('#ratingStars i').removeClass('text-secondary').addClass('text-muted');
+
+                        // Reload lại danh sách reviews
+                        loadProductDetail();
+                    } catch (err) {
+                        console.error('submitReview error:', err);
+                        showToast('danger', 'Lỗi: ' + (err.message || 'Không thể gửi đánh giá'));
+                    } finally {
+                        btn.prop('disabled', false).html(originalHtml);
+                    }
+                } catch (err) {
+                    console.error('submitReview error:', err);
+                    showToast('danger', 'Có lỗi xảy ra. Vui lòng thử lại.');
+                }
+            }
             async function addToCart() {
                 // Kiểm tra đăng nhập
                 try {
@@ -1003,11 +1145,52 @@
                 });
             }
 
+            // Load customer info into review form if logged in
+            function loadCustomerInfoToReviewForm() {
+                try {
+                    const isLoggedIn = sessionStorage.getItem('isLoggedIn');
+                    const customer = sessionStorage.getItem('customer');
+                    
+                    if (isLoggedIn && customer) {
+                        const parsed = JSON.parse(customer);
+                        const customerName = parsed.customerName || parsed.CustomerName || '';
+                        const email = parsed.email || parsed.Email || '';
+                        
+                        if (customerName) {
+                            $('#reviewName').val(customerName);
+                        }
+                        if (email) {
+                            $('#reviewEmail').val(email);
+                        }
+                        
+                        // Xóa thông báo đăng nhập nếu có
+                        $('#reviewFormLoginNotice').remove();
+                    } else {
+                        // Nếu chưa đăng nhập, disable form và hiển thị thông báo
+                        $('#reviewForm input, #reviewForm textarea').prop('disabled', true);
+                        $('#reviewForm .btn').prop('disabled', true);
+                        
+                        // Thêm thông báo
+                        if ($('#reviewFormLoginNotice').length === 0) {
+                            $('#reviewForm h4').after(
+                                '<div id="reviewFormLoginNotice" class="alert alert-info mb-4" role="alert">' +
+                                '<i class="fa fa-info-circle me-2"></i>' +
+                                'Bạn cần <a href="/User/Login" class="alert-link">đăng nhập</a> để đánh giá sản phẩm.' +
+                                '</div>'
+                            );
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error loading customer info:', err);
+                }
+            }
+
             $(document).ready(function() {
                 $('.quantity button').off('click');
                 loadProductDetail();
                 loadFeaturedProducts();
                 updateQuantityDisplay();
+                loadCustomerInfoToReviewForm();
             });
         </script>
 }
