@@ -78,9 +78,9 @@ namespace WebLaptopBE.Controllers
                     .AsNoTracking()
                     .Where(si => si.CustomerId == customerId &&
                                  si.Status != null &&
-                                 (si.Status.ToLower().Contains("chờ xử lý") ||
-                                  si.Status.ToLower().Contains("đang xử lý") ||
-                                  si.Status.ToLower().Contains("đang vận chuyển")))
+                                 (si.Status.ToLower().Contains("Chờ xử lý") ||
+                                  si.Status.ToLower().Contains("Đang xử lý") ||
+                                  si.Status.ToLower().Contains("Đang vận chuyển")))
                     .OrderByDescending(si => si.TimeCreate)
                     .Select(si => new
                     {
@@ -119,8 +119,8 @@ namespace WebLaptopBE.Controllers
                     .AsNoTracking()
                     .Where(si => si.CustomerId == customerId &&
                                  si.Status != null &&
-                                 (si.Status.ToLower().Contains("hoàn thành") ||
-                                  si.Status.ToLower().Contains("đã hủy")))
+                                 (si.Status.ToLower().Contains("Hoàn thành") ||
+                                  si.Status.ToLower().Contains("Đã hủy")))
                     .OrderByDescending(si => si.TimeCreate)
                     .Select(si => new
                     {
@@ -310,13 +310,13 @@ namespace WebLaptopBE.Controllers
                 var statusLower = currentStatus.ToLower();
                 
                 // Chỉ cho phép hủy khi trạng thái là "Chờ xử lý"
-                if (!statusLower.Contains("chờ xử lý"))
+                if (!statusLower.Contains("Chờ xử lý"))
                 {
                     return BadRequest(new { message = "Chỉ có thể hủy đơn hàng khi trạng thái là 'Chờ xử lý'" });
                 }
 
                 // Cập nhật trạng thái thành "Đã hủy"
-                order.Status = "đã hủy";
+                order.Status = "Đã hủy";
                 _db.SaveChanges();
 
                 return Ok(new { message = "Hủy đơn hàng thành công" });

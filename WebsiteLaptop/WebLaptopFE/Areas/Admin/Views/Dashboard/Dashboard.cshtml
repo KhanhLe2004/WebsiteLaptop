@@ -2,3 +2,533 @@
     ViewData["Title"] = "Dashboard";
     Layout = "~/Areas/Admin/Views/Shared/_LayoutDashboard.cshtml";
 }
+
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h4 class="mb-0">Dashboard</h4>
+            <p class="text-sm text-secondary mb-0">Tổng quan hoạt động kinh doanh</p>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+            <div class="card">
+                <div class="card-header p-3 pt-2">
+                    <div class="icon icon-lg icon-shape bg-gradient-dark shadow-dark text-center border-radius-xl mt-n4 position-absolute">
+                        <i class="material-icons opacity-10">attach_money</i>
+                    </div>
+                    <div class="text-end pt-1">
+                        <p class="text-sm mb-0 text-capitalize">Doanh thu tháng này</p>
+                        <h4 class="mb-0" id="monthlyRevenue">0 VNĐ</h4>
+                        <p class="mb-0"><span class="text-success text-sm font-weight-bolder" id="revenueChange">+0%</span> so với tháng trước</p>
+                    </div>
+                </div>
+                <hr class="dark horizontal my-0">
+                <div class="card-footer p-3">
+                    <p class="mb-0"><span class="text-success text-sm font-weight-bolder">Đơn hoàn thành</span></p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+            <div class="card">
+                <div class="card-header p-3 pt-2">
+                    <div class="icon icon-lg icon-shape bg-gradient-primary shadow-primary text-center border-radius-xl mt-n4 position-absolute">
+                        <i class="material-icons opacity-10">shopping_cart</i>
+                    </div>
+                    <div class="text-end pt-1">
+                        <p class="text-sm mb-0 text-capitalize">Đơn hàng tháng này</p>
+                        <h4 class="mb-0" id="monthlyOrders">0</h4>
+                        <p class="mb-0"><span class="text-success text-sm font-weight-bolder" id="ordersChange">+0%</span> so với tháng trước</p>
+                    </div>
+                </div>
+                <hr class="dark horizontal my-0">
+                <div class="card-footer p-3">
+                    <p class="mb-0"><span class="text-success text-sm font-weight-bolder">Tất cả trạng thái</span></p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+            <div class="card">
+                <div class="card-header p-3 pt-2">
+                    <div class="icon icon-lg icon-shape bg-gradient-success shadow-success text-center border-radius-xl mt-n4 position-absolute">
+                        <i class="material-icons opacity-10">people</i>
+                    </div>
+                    <div class="text-end pt-1">
+                        <p class="text-sm mb-0 text-capitalize">Tổng khách hàng</p>
+                        <h4 class="mb-0" id="totalCustomers">0</h4>
+                        <p class="mb-0"><span class="text-info text-sm font-weight-bolder" id="monthlyNewCustomers">+0</span> khách hàng mới tháng này</p>
+                    </div>
+                </div>
+                <hr class="dark horizontal my-0">
+                <div class="card-footer p-3">
+                    <p class="mb-0"><span class="text-success text-sm font-weight-bolder">Khách hàng hoạt động</span></p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-sm-6">
+            <div class="card">
+                <div class="card-header p-3 pt-2">
+                    <div class="icon icon-lg icon-shape bg-gradient-info shadow-info text-center border-radius-xl mt-n4 position-absolute">
+                        <i class="material-icons opacity-10">inventory_2</i>
+                    </div>
+                    <div class="text-end pt-1">
+                        <p class="text-sm mb-0 text-capitalize">Tổng sản phẩm</p>
+                        <h4 class="mb-0" id="totalProducts">0</h4>
+                        <p class="mb-0"><span class="text-success text-sm font-weight-bolder">Sản phẩm đang bán</span></p>
+                    </div>
+                </div>
+                <hr class="dark horizontal my-0">
+                <div class="card-footer p-3">
+                    <p class="mb-0"><span class="text-success text-sm font-weight-bolder">Đang hoạt động</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mt-4">
+        <div class="col-lg-8 col-md-6 mt-4 mb-4">
+            <div class="card z-index-2">
+                <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2 bg-transparent">
+                    <div class="bg-gradient-primary shadow-primary border-radius-lg py-3 pe-1">
+                        <div class="chart">
+                            <canvas id="revenueChart" class="chart-canvas" height="170"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <h6 class="mb-0">Doanh thu 12 tháng gần đây</h6>
+                    <p class="text-sm">Biểu đồ doanh thu theo tháng</p>
+                    <hr class="dark horizontal">
+                    <div class="d-flex">
+                        <i class="material-icons text-sm my-auto me-1">schedule</i>
+                        <p class="mb-0 text-sm">Cập nhật mới nhất</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 col-md-6 mt-4 mb-4">
+            <div class="card z-index-2">
+                <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2 bg-transparent">
+                    <div class="bg-gradient-success shadow-success border-radius-lg py-3 pe-1">
+                        <div class="chart">
+                            <canvas id="topProductsChart" class="chart-canvas" height="170"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <h6 class="mb-0">Top 5 sản phẩm bán chạy</h6>
+                    <p class="text-sm">Sản phẩm được mua nhiều nhất</p>
+                    <hr class="dark horizontal">
+                    <div class="d-flex">
+                        <i class="material-icons text-sm my-auto me-1">schedule</i>
+                        <p class="mb-0 text-sm">Cập nhật mới nhất</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Orders Table -->
+    <div class="row mb-4">
+        <div class="col-lg-12 col-md-12 mb-md-0 mb-4">
+            <div class="card">
+                <div class="card-header pb-0">
+                    <div class="row">
+                        <div class="col-lg-6 col-7">
+                            <h6>Đơn hàng gần đây</h6>
+                            <p class="text-sm mb-0">
+                                <i class="fa fa-check text-info" aria-hidden="true"></i>
+                                <span class="font-weight-bold ms-1">10 đơn hàng</span> mới nhất
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body px-0 pb-2">
+                    <div class="table-responsive">
+                        <table class="table align-items-center mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Mã đơn</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Khách hàng</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Nhân viên</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Tổng tiền</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Trạng thái</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Thời gian</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentOrdersTableBody">
+                                <tr>
+                                    <td colspan="6" class="text-center py-4">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // API Base URL
+        const API_BASE_URL = 'http://localhost:5068/api/admin/dashboard';
+        
+        // Hàm format tiền
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('vi-VN', {
+                style: 'currency',
+                currency: 'VND'
+            }).format(amount);
+        }
+
+        // Hàm format số
+        function formatNumber(num) {
+            return new Intl.NumberFormat('vi-VN').format(num);
+        }
+
+        // Hàm thử kết nối với nhiều URL nếu cần
+        async function tryFetch(url) {
+            let lastError = null;
+            
+            // Thử URL đầu tiên
+            try {
+                const response = await fetch(url);
+                if (response.ok) {
+                    return await response.json();
+                } else {
+                    lastError = new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                lastError = error;
+            }
+            
+            // Thử HTTPS nếu HTTP không hoạt động
+            if (url.startsWith('http://')) {
+                const httpsUrl = url.replace('http://', 'https://');
+                try {
+                    const response = await fetch(httpsUrl);
+                    if (response.ok) {
+                        return await response.json();
+                    }
+                } catch (error) {
+                    // Bỏ qua
+                }
+            }
+            
+            throw lastError || new Error('Failed to fetch');
+        }
+
+        // Load Monthly Statistics
+        async function loadMonthlyStats() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/monthly-stats`);
+                
+                // Update cards
+                document.getElementById('monthlyRevenue').textContent = formatCurrency(data.monthlyRevenue || 0);
+                document.getElementById('totalCustomers').textContent = formatNumber(data.totalCustomers || 0);
+                document.getElementById('totalProducts').textContent = formatNumber(data.totalProducts || 0);
+                document.getElementById('monthlyOrders').textContent = formatNumber(data.monthlyOrders || 0);
+                document.getElementById('monthlyNewCustomers').textContent = `+${data.monthlyNewCustomers || 0}`;
+                
+                // Update change percentages
+                const revenueChange = data.revenueChange || 0;
+                const revenueChangeEl = document.getElementById('revenueChange');
+                revenueChangeEl.textContent = `${revenueChange >= 0 ? '+' : ''}${revenueChange.toFixed(1)}%`;
+                revenueChangeEl.className = revenueChange >= 0 ? 'text-success text-sm font-weight-bolder' : 'text-danger text-sm font-weight-bolder';
+                
+                const ordersChange = data.ordersChange || 0;
+                const ordersChangeEl = document.getElementById('ordersChange');
+                ordersChangeEl.textContent = `${ordersChange >= 0 ? '+' : ''}${ordersChange.toFixed(1)}%`;
+                ordersChangeEl.className = ordersChange >= 0 ? 'text-success text-sm font-weight-bolder' : 'text-danger text-sm font-weight-bolder';
+            } catch (error) {
+                console.error('Error loading monthly stats:', error);
+            }
+        }
+
+        // Load Revenue Chart
+        let revenueChart = null;
+        async function loadRevenueChart() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/revenue-chart?months=12`);
+                
+                if (revenueChart) {
+                    revenueChart.destroy();
+                }
+                
+                const ctx = document.getElementById('revenueChart').getContext('2d');
+                const labels = data.map(item => item.shortMonthName);
+                const revenues = data.map(item => item.revenue);
+                
+                revenueChart = new Chart(ctx, {
+                    type: "bar",
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: "Doanh thu",
+                            tension: 0.4,
+                            borderWidth: 0,
+                            borderRadius: 4,
+                            borderSkipped: false,
+                            backgroundColor: "rgba(255, 255, 255, .8)",
+                            data: revenues,
+                            maxBarThickness: 6
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false,
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    title: function(context) {
+                                        const index = context[0].dataIndex;
+                                        return data[index].monthName;
+                                    },
+                                    label: function(context) {
+                                        return `Doanh thu: ${formatCurrency(context.parsed.y)}`;
+                                    }
+                                }
+                            }
+                        },
+                        interaction: {
+                            intersect: false,
+                            mode: 'index',
+                        },
+                        scales: {
+                            y: {
+                                grid: {
+                                    drawBorder: false,
+                                    display: true,
+                                    drawOnChartArea: true,
+                                    drawTicks: false,
+                                    borderDash: [5, 5],
+                                    color: 'rgba(255, 255, 255, .2)'
+                                },
+                                ticks: {
+                                    suggestedMin: 0,
+                                    beginAtZero: true,
+                                    padding: 10,
+                                    font: {
+                                        size: 14,
+                                        weight: 300,
+                                        family: "Roboto",
+                                        style: 'normal',
+                                        lineHeight: 2
+                                    },
+                                    color: "#fff",
+                                    callback: function(value) {
+                                        return formatCurrency(value);
+                                    }
+                                },
+                            },
+                            x: {
+                                grid: {
+                                    drawBorder: false,
+                                    display: true,
+                                    drawOnChartArea: true,
+                                    drawTicks: false,
+                                    borderDash: [5, 5],
+                                    color: 'rgba(255, 255, 255, .2)'
+                                },
+                                ticks: {
+                                    display: true,
+                                    color: '#f8f9fa',
+                                    padding: 10,
+                                    font: {
+                                        size: 14,
+                                        weight: 300,
+                                        family: "Roboto",
+                                        style: 'normal',
+                                        lineHeight: 2
+                                    },
+                                }
+                            },
+                        },
+                    },
+                });
+            } catch (error) {
+                console.error('Error loading revenue chart:', error);
+            }
+        }
+
+        // Load Top Products Chart
+        let topProductsChart = null;
+        async function loadTopProductsChart() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/top-products?top=5`);
+                
+                if (topProductsChart) {
+                    topProductsChart.destroy();
+                }
+                
+                const ctx = document.getElementById('topProductsChart').getContext('2d');
+                const labels = data.map(item => item.productName || 'Chưa có tên');
+                const sold = data.map(item => item.totalSold || 0);
+                
+                topProductsChart = new Chart(ctx, {
+                    type: "line",
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: "Số lượng bán",
+                            tension: 0,
+                            borderWidth: 0,
+                            pointRadius: 5,
+                            pointBackgroundColor: "rgba(255, 255, 255, .8)",
+                            pointBorderColor: "transparent",
+                            borderColor: "rgba(255, 255, 255, .8)",
+                            borderWidth: 4,
+                            backgroundColor: "transparent",
+                            fill: true,
+                            data: sold,
+                            maxBarThickness: 6
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false,
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const item = data[context.dataIndex];
+                                        return [
+                                            `Số lượng: ${formatNumber(context.parsed.y)}`,
+                                            `Doanh thu: ${formatCurrency(item.totalRevenue || 0)}`
+                                        ];
+                                    }
+                                }
+                            }
+                        },
+                        interaction: {
+                            intersect: false,
+                            mode: 'index',
+                        },
+                        scales: {
+                            y: {
+                                grid: {
+                                    drawBorder: false,
+                                    display: true,
+                                    drawOnChartArea: true,
+                                    drawTicks: false,
+                                    borderDash: [5, 5],
+                                    color: 'rgba(255, 255, 255, .2)'
+                                },
+                                ticks: {
+                                    display: true,
+                                    color: '#f8f9fa',
+                                    padding: 10,
+                                    font: {
+                                        size: 14,
+                                        weight: 300,
+                                        family: "Roboto",
+                                        style: 'normal',
+                                        lineHeight: 2
+                                    },
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    drawBorder: false,
+                                    display: false,
+                                    drawOnChartArea: false,
+                                    drawTicks: false,
+                                    borderDash: [5, 5]
+                                },
+                                ticks: {
+                                    display: true,
+                                    color: '#f8f9fa',
+                                    padding: 10,
+                                    font: {
+                                        size: 12,
+                                        weight: 300,
+                                        family: "Roboto",
+                                        style: 'normal',
+                                        lineHeight: 2
+                                    },
+                                }
+                            },
+                        },
+                    },
+                });
+            } catch (error) {
+                console.error('Error loading top products chart:', error);
+            }
+        }
+
+        // Load Recent Orders
+        async function loadRecentOrders() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/recent-orders?limit=10`);
+                const tbody = document.getElementById('recentOrdersTableBody');
+                
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4">Không có đơn hàng nào</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = data.map(order => {
+                    const date = order.timeCreate ? new Date(order.timeCreate).toLocaleString('vi-VN') : 'Chưa xác định';
+                    const statusClass = order.status === 'Hoàn thành' ? 'badge bg-gradient-success' :
+                                      order.status === 'Đang xử lý' ? 'badge bg-gradient-warning' :
+                                      order.status === 'Đã hủy' ? 'badge bg-gradient-danger' :
+                                      'badge bg-gradient-secondary';
+                    
+                    return `
+                        <tr>
+                            <td>
+                                <div class="d-flex px-2 py-1">
+                                    <div class="d-flex flex-column justify-content-center">
+                                        <h6 class="mb-0 text-sm">${order.saleInvoiceId || 'N/A'}</h6>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <p class="text-xs font-weight-bold mb-0">${order.customerName || 'Khách vãng lai'}</p>
+                            </td>
+                            <td class="align-middle text-center text-sm">
+                                <span class="text-xs font-weight-bold">${order.employeeName || 'Chưa xác định'}</span>
+                            </td>
+                            <td class="align-middle text-center text-sm">
+                                <span class="text-xs font-weight-bold">${formatCurrency(order.totalAmount || 0)}</span>
+                            </td>
+                            <td class="align-middle text-center">
+                                <span class="${statusClass}">${order.status || 'Chưa xác định'}</span>
+                            </td>
+                            <td class="align-middle text-center">
+                                <span class="text-xs font-weight-bold">${date}</span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading recent orders:', error);
+                document.getElementById('recentOrdersTableBody').innerHTML = 
+                    '<tr><td colspan="6" class="text-center py-4 text-danger">Lỗi khi tải dữ liệu</td></tr>';
+            }
+        }
+
+        // Initialize all data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadMonthlyStats();
+            loadRevenueChart();
+            loadTopProductsChart();
+            loadRecentOrders();
+        });
+    </script>
+}

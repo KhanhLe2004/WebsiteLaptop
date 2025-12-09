@@ -1118,10 +1118,81 @@
                 }, 50);
             }
         });
+
+        // Ngăn scroll lan ra trang chính khi cuộn trong modal-body
+        $(document).on('wheel', '.modal-body', function(e) {
+            var $this = $(this);
+            var scrollTop = $this.scrollTop();
+            var scrollHeight = $this[0].scrollHeight;
+            var height = $this.outerHeight();
+            var delta = e.originalEvent.deltaY;
+
+            // Nếu cuộn lên và đã ở đầu, hoặc cuộn xuống và đã ở cuối -> chặn
+            if ((delta < 0 && scrollTop <= 0) || (delta > 0 && scrollTop + height >= scrollHeight)) {
+                e.preventDefault();
+            }
+        });
+
+        // Ngăn scroll trên modal backdrop
+        $(document).on('wheel', '.modal', function(e) {
+            if (!$(e.target).closest('.modal-body').length) {
+                e.preventDefault();
+            }
+        });
     </script>
 }
 
 <style>
+    /* Fix Modal hiển thị giữa main content và cho phép scroll */
+    .modal {
+        padding-left: 250px !important; /* Offset bằng với chiều rộng sidebar */
+        overflow-y: auto !important;
+    }
+    
+    .modal-dialog {
+        margin: 1.75rem auto;
+        max-height: calc(100vh - 3.5rem);
+    }
+    
+    .modal-content {
+        max-height: calc(100vh - 3.5rem);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    
+    .modal-body {
+        max-height: calc(100vh - 250px);
+        overflow-y: auto;
+        overflow-x: hidden;
+        flex: 1 1 auto;
+        overscroll-behavior: contain; /* Ngăn scroll lan ra trang chính */
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .modal-header, .modal-footer {
+        flex-shrink: 0;
+    }
+    
+    /* Responsive cho modal trên màn hình nhỏ */
+    @@media (max-width: 1200px) {
+        .modal { padding-left: 200px !important; }
+    }
+    
+    @@media (max-width: 992px) {
+        .modal { padding-left: 0 !important; }
+    }
+    
+    /* Khóa scroll trang chính khi modal mở */
+    body.modal-open {
+        overflow: hidden !important;
+        padding-right: 0 !important;
+    }
+    
+    body.modal-open .main-content {
+        overflow: hidden !important;
+    }
+
     /* Bảng chính */
     .table-responsive {
         border-radius: 0.5rem;

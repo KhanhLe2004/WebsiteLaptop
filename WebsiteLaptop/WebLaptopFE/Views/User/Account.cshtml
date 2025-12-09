@@ -1004,16 +1004,17 @@
             // Xác định màu badge dựa trên status (so sánh với text đã lowercase)
             let badgeClass = 'bg-secondary text-white'; // Mặc định
             
-            if (text.includes('chờ xử lý')) {
-                badgeClass = 'bg-warning text-white';
-            } else if (text.includes('đang xử lý')) {
-                badgeClass = 'bg-info text-white';
-            } else if (text.includes('đang vận chuyển')) {
-                badgeClass = 'bg-dark text-white';
-            } else if (text.includes('hoàn thành')) {
-                badgeClass = 'bg-success text-white';
-            } else if (text.includes('đã hủy')) {
+            // Kiểm tra "Đã hủy" trước tiên vì đây là trạng thái quan trọng cần hiển thị màu đỏ
+            if (statusText.includes('Đã hủy')) {
                 badgeClass = 'bg-danger text-white';
+            } else if (statusText.includes('Chờ xử lý')) {
+                badgeClass = 'bg-warning text-white';
+            } else if (statusText.includes('Đang xử lý')) {
+                badgeClass = 'bg-info text-white';
+            } else if (statusText.includes('Đang vận chuyển')) {
+                badgeClass = 'bg-dark text-white';
+            } else if (statusText.includes('Hoàn thành')) {
+                badgeClass = 'bg-success text-white';
             }
             
             // Hiển thị đúng status từ database với màu badge tương ứng
