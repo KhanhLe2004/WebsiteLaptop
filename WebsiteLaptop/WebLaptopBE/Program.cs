@@ -1,12 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using WebLaptopBE.Data;
+using WebLaptopBE.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
 // Đăng ký DbContext
-builder.Services.AddDbContext<Testlaptop35Context>(options =>
+builder.Services.AddDbContext<Testlaptop36Context>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection") 
         ?? "Data Source=DESKTOP-GDN4V8P;Initial Catalog=testlaptop20;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False"));
 
@@ -40,6 +41,9 @@ builder.Services.AddScoped<WebLaptopBE.Services.IVnPayService, WebLaptopBE.Servi
 
 // Đăng ký HistoryService
 builder.Services.AddScoped<WebLaptopBE.Services.HistoryService>();
+
+// Đăng ký SignalR
+builder.Services.AddSignalR();
 
 // Add Session support cho VNPay pending orders
 builder.Services.AddDistributedMemoryCache();
@@ -105,5 +109,8 @@ Console.WriteLine($"Image URL pattern: http://localhost:5068/image/{{filename}}"
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Map SignalR Hub
+app.MapHub<ChatHub>("/chathub");
 
 app.Run();

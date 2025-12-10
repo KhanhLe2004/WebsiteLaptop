@@ -1,0 +1,571 @@
+@{
+    ViewData["Title"] = "Trò chuyện với khách hàng";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutDashboard.cshtml";
+}
+
+<input type="hidden" id="employeeId" value="@Context.Session.GetString("EmployeeId")" />
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm" style="height: 85vh;">
+                <div class="card-header bg-gradient-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-white">
+                        <i class="material-icons me-2">chat</i>Trò chuyện với khách hàng
+                    </h5>
+                    <span id="connectionStatus" class="badge bg-light text-dark" style="display: none;">
+                        <i class="material-icons" style="font-size: 12px;">circle</i>
+                    </span>
+                </div>
+                <div class="card-body p-0 d-flex" style="height: calc(100% - 60px);">
+                    <!-- Conversations List -->
+                    <div class="border-end" style="width: 300px; overflow-y: auto;">
+                        <div class="p-3 border-bottom bg-gray-100">
+                            <h6 class="mb-0">Danh sách khách hàng</h6>
+                        </div>
+                        <div id="conversationsList" class="list-group list-group-flush">
+                            <!-- Conversations will be loaded here -->
+                        </div>
+                    </div>
+                    
+                    <!-- Chat Area -->
+                    <div class="flex-grow-1 d-flex flex-column">
+                        <div id="chatHeader" class="border-bottom p-3 bg-gray-100" style="display: none;">
+                            <h6 class="mb-0" id="currentCustomerName">Chọn khách hàng để bắt đầu trò chuyện</h6>
+                        </div>
+                        
+                        <!-- Messages Area -->
+                        <div id="messagesArea" class="flex-grow-1 p-3 overflow-auto" style="background-color: #f8f9fa; min-height: 0;">
+                            <div id="messagesList" class="d-flex flex-column gap-2">
+                                <div class="text-center text-muted mt-5">
+                                    <i class="material-icons" style="font-size: 48px; opacity: 0.3;">chat_bubble_outline</i>
+                                    <p class="mt-2">Chọn một khách hàng để bắt đầu trò chuyện</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Input Area -->
+                        <div id="inputArea" class="border-top p-3 bg-white" style="display: none;">
+                            <div class="input-group">
+                                <input type="text" id="messageInput" class="form-control" placeholder="Nhập tin nhắn..." />
+                                <button class="btn btn-primary" type="button" id="sendButton">
+                                    <i class="material-icons">send</i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
+    <style>
+        .message {
+            max-width: 70%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            margin-bottom: 10px;
+            word-wrap: break-word;
+        }
+        
+        .message.sent {
+            background-color: #007bff;
+            color: white;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        
+        .message.received {
+            background-color: #e9ecef;
+            color: #333;
+            align-self: flex-start;
+        }
+        
+        .message-time {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+        
+        .date-separator {
+            text-align: center;
+            margin: 15px 0;
+            position: relative;
+        }
+        
+        .date-separator::before,
+        .date-separator::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 40%;
+            height: 1px;
+            background-color: #dee2e6;
+        }
+        
+        .date-separator::before {
+            left: 0;
+        }
+        
+        .date-separator::after {
+            right: 0;
+        }
+        
+        .date-separator span {
+            background-color: #f8f9fa;
+            padding: 5px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            color: #6c757d;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .message-header {
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+        
+        .conversation-item {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .conversation-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .conversation-item.active {
+            background-color: #e3f2fd;
+        }
+        
+        #messagesArea {
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e0 #f7fafc;
+        }
+        
+        #messagesArea::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        #messagesArea::-webkit-scrollbar-track {
+            background: #f7fafc;
+        }
+        
+        #messagesArea::-webkit-scrollbar-thumb {
+            background-color: #cbd5e0;
+            border-radius: 4px;
+        }
+    </style>
+    
+    <script>
+        const apiBase = "http://localhost:5068/api/";
+        const hubUrl = "http://localhost:5068/chathub";
+        
+        let connection;
+        let currentEmployeeId = null;
+        let currentCustomerId = null;
+        let lastSentMessage = null; // Move outside to persist across function calls
+        
+        // Get employee info from session
+        function getEmployeeInfo() {
+            // Try to get from server-side rendered value first
+            const serverEmployeeId = '@Context.Session.GetString("EmployeeId")';
+            if (serverEmployeeId && serverEmployeeId !== '') {
+                return serverEmployeeId;
+            }
+            // Fallback: try to get from a hidden input or data attribute
+            const employeeIdInput = document.getElementById('employeeId');
+            if (employeeIdInput) {
+                return employeeIdInput.value;
+            }
+            return null;
+        }
+        
+        // Initialize SignalR connection
+        function startConnection() {
+            connection = new signalR.HubConnectionBuilder()
+                .withUrl(hubUrl)
+                .build();
+            
+            connection.on("ReceiveMessage", function (message) {
+                // If message is from employee (we sent it), only show if it's for current conversation
+                if (message.senderType === "employee") {
+                    if (message.customerId === currentCustomerId && currentCustomerId) {
+                        // Check if this is the message we just sent (to avoid duplicate)
+                        if (lastSentMessage && 
+                            message.contentDetail === lastSentMessage.contentDetail &&
+                            Math.abs(new Date(message.time) - lastSentMessage.time) < 2000) {
+                            lastSentMessage = null;
+                            return;
+                        }
+                        displayMessage(message, false);
+                    }
+                } else if (message.senderType === "customer") {
+                    // Message from customer
+                    // If we have a conversation open with this customer, show it immediately and mark as read
+                    if (message.customerId === currentCustomerId && currentCustomerId) {
+                        displayMessage(message, false);
+                        // Auto mark as read if conversation is open
+                        if (currentEmployeeId) {
+                            markConversationAsRead(currentCustomerId);
+                        }
+                    }
+                    // Always refresh conversations list to show new message and update unread count
+                    setTimeout(() => {
+                        loadConversations();
+                    }, 500);
+                }
+            });
+            
+            connection.on("Error", function (error) {
+                alert("Lỗi: " + error);
+            });
+            
+            connection.start().then(function () {
+                currentEmployeeId = getEmployeeInfo();
+                if (currentEmployeeId && currentEmployeeId !== '') {
+                    connection.invoke("JoinRoom", currentEmployeeId, "employee")
+                        .then(function() {
+                            updateConnectionStatus(true);
+                            loadConversations();
+                        })
+                        .catch(function (err) {
+                            console.error("Error joining room:", err);
+                            alert("Lỗi khi tham gia phòng chat: " + err.toString());
+                        });
+                } else {
+                    alert("Vui lòng đăng nhập");
+                    window.location.href = "/Admin/SignIn";
+                }
+            }).catch(function (err) {
+                console.error("Error starting connection:", err);
+                updateConnectionStatus(false);
+                alert("Không thể kết nối đến server chat. Vui lòng thử lại sau.");
+            });
+        }
+        
+        // Load conversations
+        async function loadConversations() {
+            if (!currentEmployeeId) return;
+            
+            try {
+                const response = await fetch(`${apiBase}Chat/GetConversations/Employee?employeeId=${currentEmployeeId}`);
+                const conversations = await response.json();
+                
+                const conversationsList = document.getElementById("conversationsList");
+                conversationsList.innerHTML = "";
+                
+                conversations.forEach(conv => {
+                    const convItem = document.createElement("a");
+                    convItem.className = "list-group-item list-group-item-action conversation-item";
+                    convItem.href = "#";
+                    convItem.onclick = function(e) {
+                        e.preventDefault();
+                        selectConversation(conv.customerId, conv.customerName, conv.customerAvatar);
+                        document.querySelectorAll('.conversation-item').forEach(item => {
+                            item.classList.remove('active');
+                        });
+                        convItem.classList.add('active');
+                    };
+                    
+                    const time = conv.lastMessageTime ? new Date(conv.lastMessageTime).toLocaleTimeString("vi-VN", {
+                        hour: "2-digit",
+                        minute: "2-digit"
+                    }) : "";
+                    
+                    convItem.innerHTML = `
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">${escapeHtml(conv.customerName || "Khách hàng")}</h6>
+                            ${conv.unreadCount > 0 ? `<span class="badge bg-danger">${conv.unreadCount}</span>` : ''}
+                        </div>
+                        <p class="mb-1 text-truncate" style="max-width: 250px;">${escapeHtml(conv.lastMessage || "Chưa có tin nhắn")}</p>
+                        <small>${time}</small>
+                    `;
+                    
+                    conversationsList.appendChild(convItem);
+                });
+            } catch (error) {
+                console.error("Error loading conversations:", error);
+            }
+        }
+        
+        // Select conversation
+        async function selectConversation(customerId, customerName, customerAvatar) {
+            currentCustomerId = customerId;
+            document.getElementById("currentCustomerName").textContent = customerName || "Khách hàng";
+            document.getElementById("chatHeader").style.display = "block";
+            document.getElementById("inputArea").style.display = "block";
+            
+            // Clear messages list and show placeholder
+            const messagesList = document.getElementById("messagesList");
+            messagesList.innerHTML = '<div class="text-center text-muted mt-5"><i class="material-icons" style="font-size: 48px; opacity: 0.3;">chat_bubble_outline</i><p class="mt-2">Đang tải tin nhắn...</p></div>';
+            
+            // Mark messages as read when opening conversation
+            if (currentCustomerId && currentEmployeeId) {
+                try {
+                    await fetch(`${apiBase}Chat/MarkAsRead`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            customerId: currentCustomerId,
+                            employeeId: currentEmployeeId
+                        })
+                    });
+                    // Refresh conversations list to update unread count
+                    loadConversations();
+                } catch (error) {
+                    console.error("Error marking as read:", error);
+                }
+            }
+            
+            loadMessages();
+        }
+        
+        // Send message
+        document.getElementById("sendButton").addEventListener("click", function (event) {
+            const messageInput = document.getElementById("messageInput");
+            const message = messageInput.value.trim();
+            
+            if (message === "" || !currentCustomerId || !currentEmployeeId) {
+                if (!currentCustomerId) {
+                    alert("Vui lòng chọn khách hàng để trò chuyện");
+                }
+                return;
+            }
+            
+            if (!connection || connection.state !== signalR.HubConnectionState.Connected) {
+                alert("Chưa kết nối đến server. Vui lòng đợi...");
+                return;
+            }
+            
+            // Show message immediately (optimistic update)
+            const tempMessage = {
+                contentDetail: message,
+                time: new Date(),
+                senderType: "employee",
+                employeeName: "Bạn",
+                customerId: currentCustomerId
+            };
+            lastSentMessage = tempMessage;
+            displayMessage(tempMessage, false);
+            messageInput.value = "";
+            
+            connection.invoke("SendMessage", currentCustomerId, currentEmployeeId, message, "employee")
+                .then(function() {
+                    // Clear lastSentMessage after a short delay to allow server message to be filtered
+                    setTimeout(function() {
+                        lastSentMessage = null;
+                    }, 3000);
+                })
+                .catch(function (err) {
+                    alert("Lỗi khi gửi tin nhắn: " + err.toString());
+                    // Remove the optimistic message if send failed
+                    const messagesList = document.getElementById("messagesList");
+                    if (messagesList.lastChild) {
+                        messagesList.removeChild(messagesList.lastChild);
+                    }
+                    lastSentMessage = null;
+                });
+        });
+        
+        // Send on Enter key
+        document.getElementById("messageInput").addEventListener("keypress", function (event) {
+            if (event.key === "Enter") {
+                document.getElementById("sendButton").click();
+            }
+        });
+        
+        // Format date for display
+        function formatDateHeader(date) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const messageDate = new Date(date);
+            messageDate.setHours(0, 0, 0, 0);
+            
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            
+            if (messageDate.getTime() === today.getTime()) {
+                return "Hôm nay";
+            } else if (messageDate.getTime() === yesterday.getTime()) {
+                return "Hôm qua";
+            } else {
+                return messageDate.toLocaleDateString("vi-VN", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric"
+                });
+            }
+        }
+        
+        // Check if we need to show date separator
+        function shouldShowDateSeparator(messagesList, messageDate) {
+            const lastMessage = messagesList.lastElementChild;
+            if (!lastMessage || lastMessage.classList.contains("date-separator")) {
+                return true;
+            }
+            
+            const lastMessageTime = lastMessage.getAttribute("data-message-date");
+            if (!lastMessageTime) {
+                return true;
+            }
+            
+            const lastDate = new Date(lastMessageTime);
+            lastDate.setHours(0, 0, 0, 0);
+            
+            const currentDate = new Date(messageDate);
+            currentDate.setHours(0, 0, 0, 0);
+            
+            return lastDate.getTime() !== currentDate.getTime();
+        }
+        
+        // Display date separator
+        function displayDateSeparator(messagesList, date) {
+            const separatorDiv = document.createElement("div");
+            separatorDiv.className = "date-separator";
+            separatorDiv.innerHTML = `<span>${formatDateHeader(date)}</span>`;
+            messagesList.appendChild(separatorDiv);
+        }
+        
+        // Display message
+        function displayMessage(message, skipDateCheck = false) {
+            const messagesList = document.getElementById("messagesList");
+            
+            // Clear placeholder if exists
+            if (messagesList.querySelector('.text-center.text-muted')) {
+                messagesList.innerHTML = "";
+            }
+            
+            const messageDate = new Date(message.time);
+            
+            // Show date separator if needed
+            if (!skipDateCheck && shouldShowDateSeparator(messagesList, messageDate)) {
+                displayDateSeparator(messagesList, messageDate);
+            }
+            
+            const messageDiv = document.createElement("div");
+            messageDiv.className = "message " + (message.senderType === "employee" ? "sent" : "received");
+            messageDiv.setAttribute("data-message-date", message.time);
+            
+            const time = new Date(message.time).toLocaleTimeString("vi-VN", {
+                hour: "2-digit",
+                minute: "2-digit"
+            });
+            
+            messageDiv.innerHTML = `
+                <div>${escapeHtml(message.contentDetail)}</div>
+                <div class="message-time">${time}</div>
+            `;
+            
+            messagesList.appendChild(messageDiv);
+            scrollToBottom();
+        }
+        
+        // Load messages
+        async function loadMessages() {
+            if (!currentCustomerId || !currentEmployeeId) {
+                if (!currentCustomerId) {
+                    console.log("No customer selected");
+                }
+                if (!currentEmployeeId) {
+                    console.log("No employee ID");
+                }
+                return;
+            }
+            
+            try {
+                // Load all messages for this customer (including unassigned ones)
+                const response = await fetch(`${apiBase}Chat/GetMessages?customerId=${currentCustomerId}&employeeId=${currentEmployeeId}`);
+                const messages = await response.json();
+                
+                const messagesList = document.getElementById("messagesList");
+                
+                // Clear placeholder if exists
+                if (messagesList.querySelector('.text-center.text-muted')) {
+                    messagesList.innerHTML = "";
+                } else {
+                    messagesList.innerHTML = "";
+                }
+                
+                if (messages && messages.length > 0) {
+                    messages.forEach(message => {
+                        displayMessage(message);
+                    });
+                } else {
+                    messagesList.innerHTML = '<div class="text-center text-muted mt-5"><p>Chưa có tin nhắn nào. Hãy bắt đầu trò chuyện!</p></div>';
+                }
+            } catch (error) {
+                console.error("Error loading messages:", error);
+                const messagesList = document.getElementById("messagesList");
+                messagesList.innerHTML = '<div class="text-center text-danger mt-5"><p>Lỗi khi tải tin nhắn. Vui lòng thử lại.</p></div>';
+            }
+        }
+        
+        // Scroll to bottom
+        function scrollToBottom() {
+            const messagesArea = document.getElementById("messagesArea");
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
+        
+        // Update connection status
+        function updateConnectionStatus(connected) {
+            const statusEl = document.getElementById("connectionStatus");
+            // Hide connection status badge
+            statusEl.style.display = "none";
+        }
+        
+        // Escape HTML
+        function escapeHtml(text) {
+            if (!text) return "";
+            const div = document.createElement("div");
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Mark conversation as read
+        async function markConversationAsRead(customerId) {
+            if (!customerId || !currentEmployeeId) return;
+            
+            try {
+                await fetch(`${apiBase}Chat/MarkAsRead`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        customerId: customerId,
+                        employeeId: currentEmployeeId
+                    })
+                });
+                // Refresh conversations list to update unread count
+                loadConversations();
+            } catch (error) {
+                console.error("Error marking as read:", error);
+            }
+        }
+        
+        // Start connection when page loads
+        startConnection();
+        
+        // Handle connection closed
+        if (connection) {
+            connection.onclose(function () {
+                updateConnectionStatus(false);
+                console.log("Connection closed. Reconnecting...");
+                setTimeout(startConnection, 5000);
+            });
+        }
+        
+        // Refresh conversations periodically
+        setInterval(loadConversations, 30000);
+    </script>
+}
+

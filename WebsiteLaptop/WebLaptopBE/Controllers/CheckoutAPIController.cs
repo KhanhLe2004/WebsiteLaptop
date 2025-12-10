@@ -14,7 +14,7 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class CheckoutAPIController : ControllerBase
     {
-        private readonly Testlaptop35Context _db = new();
+        private readonly Testlaptop36Context _db = new();
         private readonly EmailService _emailService;
         private readonly IVnPayService _vnPayService;
         private readonly IConfiguration _configuration;

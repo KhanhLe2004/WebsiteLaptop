@@ -164,7 +164,7 @@
             <li class="nav-item">
                 @if (HasPermissionMenu("ManageStockImport"))
                 {
-                    <a class="nav-link text-white active bg-gradient-primary" asp-area="Admin" asp-controller="ManageStockImport" asp-action="Index">
+                    <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageStockImport" asp-action="Index">
                         <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                             <i class="material-icons opacity-10">inventory</i>
                         </div>
@@ -332,7 +332,7 @@
             <li class="nav-item">
                 @if (HasPermissionMenu("Chat"))
                 {
-                    <a class="nav-link text-white" asp-area="Admin" asp-controller="Chat" asp-action="Index">
+                    <a class="nav-link text-white active bg-gradient-primary" asp-area="Admin" asp-controller="Chat" asp-action="Index">
                         <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                             <i class="material-icons opacity-10">chat</i>
                         </div>
@@ -393,23 +393,11 @@
     <script src="/LayoutAdmin/assets/js/core/bootstrap.min.js"></script>
     <script src="/LayoutAdmin/assets/js/plugins/perfect-scrollbar.min.js"></script>
     <script src="/LayoutAdmin/assets/js/plugins/smooth-scrollbar.min.js"></script>
+    <script src="/LayoutAdmin/assets/js/plugins/chartjs.min.js"></script>
     <!-- Github buttons -->
     <script async defer src="https://buttons.github.io/buttons.js"></script>
     <!-- Control Center for Material Dashboard: parallax effects, scripts for the example pages etc -->
     <script src="/LayoutAdmin/assets/js/material-dashboard.min.js?v=3.1.0"></script>
-
-    <script>
-        $(document).ready(function() {
-            var employeeId = '@Context.Session.GetString("EmployeeId")';
-            if (employeeId) {
-                $.ajaxSetup({
-                    headers: {
-                        'X-Employee-Id': employeeId
-                    }
-                });
-            }
-        });
-    </script>
 
     @RenderSection("Scripts", required: false)
 </body>

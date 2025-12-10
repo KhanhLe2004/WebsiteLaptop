@@ -14,10 +14,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageStockImportAPIController : ControllerBase
     {
-        private readonly Testlaptop35Context _context;
+        private readonly Testlaptop36Context _context;
         private readonly HistoryService _historyService;
 
-        public ManageStockImportAPIController(Testlaptop35Context context, HistoryService historyService)
+        public ManageStockImportAPIController(Testlaptop36Context context, HistoryService historyService)
         {
             _context = context;
             _historyService = historyService;

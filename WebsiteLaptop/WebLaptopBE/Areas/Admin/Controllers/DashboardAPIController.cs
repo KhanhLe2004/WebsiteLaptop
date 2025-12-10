@@ -9,9 +9,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class DashboardAPIController : ControllerBase
     {
-        private readonly Testlaptop35Context _context;
+        private readonly Testlaptop36Context _context;
 
-        public DashboardAPIController(Testlaptop35Context context)
+        public DashboardAPIController(Testlaptop36Context context)
         {
             _context = context;
         }

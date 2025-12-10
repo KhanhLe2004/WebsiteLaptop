@@ -1,0 +1,609 @@
+<!-- Chat Widget Floating -->
+@{
+    // Ẩn chat widget trên trang Chat/Index vì đã có trang chat riêng
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
+    var isChatPage = currentController == "Chat" && currentAction == "Index";
+}
+
+@if (!isChatPage)
+{
+<div id="chatWidget" class="chat-widget-container">
+    <!-- Chat Button (Floating) -->
+    <div id="chatWidgetButton" class="chat-widget-button">
+        <i class="bi bi-chat-dots-fill"></i>
+        <span class="chat-badge" id="chatBadge" style="display: none;">0</span>
+    </div>
+    
+    <!-- Chat Box -->
+    <div id="chatBox" class="chat-box" style="display: none;">
+        <div class="chat-box-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 text-white">
+                    <i class="bi bi-chat-dots me-2"></i>Trò chuyện với nhân viên
+                </h6>
+                <div>
+                    <span id="chatConnectionStatus" class="badge bg-light text-dark me-2" style="display: none;">
+                        <i class="bi bi-circle-fill text-secondary"></i>
+                    </span>
+                    <button type="button" class="btn-close btn-close-white" id="chatCloseButton" aria-label="Close"></button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="chat-box-body" id="chatMessagesArea">
+            <div id="chatMessagesList" class="chat-messages-list">
+                <!-- Messages will be loaded here -->
+            </div>
+        </div>
+        
+        <div class="chat-box-footer">
+            <div class="input-group">
+                <input type="text" id="chatMessageInput" class="form-control" placeholder="Nhập tin nhắn..." />
+                <button class="btn btn-primary" type="button" id="chatSendButton">
+                    <i class="bi bi-send-fill"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+}
+
+<style>
+    .chat-widget-container {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1000;
+    }
+    
+    .chat-widget-button {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+        transition: all 0.3s ease;
+        position: relative;
+    }
+    
+    .chat-widget-button:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 16px rgba(0, 123, 255, 0.6);
+    }
+    
+    .chat-widget-button i {
+        font-size: 24px;
+    }
+    
+    .chat-badge {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background: #dc3545;
+        color: white;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+    }
+    
+    .chat-box {
+        position: absolute;
+        bottom: 80px;
+        right: 0;
+        width: 380px;
+        height: 600px;
+        max-height: 80vh;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    
+    .chat-box-header {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 12px 12px 0 0;
+    }
+    
+    .chat-box-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 15px;
+        background-color: #f8f9fa;
+    }
+    
+    .chat-messages-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .chat-message {
+        max-width: 75%;
+        padding: 10px 15px;
+        border-radius: 18px;
+        word-wrap: break-word;
+        animation: fadeIn 0.3s ease;
+    }
+    
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .chat-message.sent {
+        background-color: #007bff;
+        color: white;
+        align-self: flex-end;
+        border-bottom-right-radius: 4px;
+    }
+    
+    .chat-message.received {
+        background-color: #e9ecef;
+        color: #333;
+        align-self: flex-start;
+        border-bottom-left-radius: 4px;
+    }
+    
+    .chat-message-time {
+        font-size: 0.7rem;
+        opacity: 0.7;
+        margin-top: 5px;
+    }
+    
+    .date-separator {
+        text-align: center;
+        margin: 15px 0;
+        position: relative;
+    }
+    
+    .date-separator::before,
+    .date-separator::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        width: 40%;
+        height: 1px;
+        background-color: #dee2e6;
+    }
+    
+    .date-separator::before {
+        left: 0;
+    }
+    
+    .date-separator::after {
+        right: 0;
+    }
+    
+    .date-separator span {
+        background-color: #f8f9fa;
+        padding: 5px 12px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        color: #6c757d;
+        position: relative;
+        z-index: 1;
+    }
+    
+    .chat-box-footer {
+        padding: 15px;
+        background: white;
+        border-top: 1px solid #e9ecef;
+    }
+    
+    .chat-box-footer .input-group {
+        margin: 0;
+    }
+    
+    .chat-box-footer .form-control {
+        border-radius: 20px 0 0 20px;
+        border-right: none;
+    }
+    
+    .chat-box-footer .btn {
+        border-radius: 0 20px 20px 0;
+        border-left: none;
+    }
+    
+    /* Scrollbar styling */
+    .chat-box-body::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .chat-box-body::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+    
+    .chat-box-body::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 3px;
+    }
+    
+    .chat-box-body::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+    
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .chat-box {
+            width: calc(100vw - 40px);
+            height: calc(100vh - 120px);
+            bottom: 80px;
+            right: 20px;
+        }
+    }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
+<script>
+    (function() {
+        const apiBase = "http://localhost:5068/api/";
+        const hubUrl = "http://localhost:5068/chathub";
+        
+        let chatConnection;
+        let currentCustomerId = null;
+        let lastSentMessage = null;
+        let isChatBoxOpen = false;
+        
+        // Get customer info from sessionStorage
+        function getCustomerInfo() {
+            const customerStr = sessionStorage.getItem('customer');
+            if (customerStr) {
+                const customer = JSON.parse(customerStr);
+                return customer.customerId || customer.CustomerId || customer.customer?.customerId;
+            }
+            return null;
+        }
+        
+        // Format date for display
+        function formatDateHeader(date) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const messageDate = new Date(date);
+            messageDate.setHours(0, 0, 0, 0);
+            
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            
+            if (messageDate.getTime() === today.getTime()) {
+                return "Hôm nay";
+            } else if (messageDate.getTime() === yesterday.getTime()) {
+                return "Hôm qua";
+            } else {
+                return messageDate.toLocaleDateString("vi-VN", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric"
+                });
+            }
+        }
+        
+        // Check if we need to show date separator
+        function shouldShowDateSeparator(messagesList, messageDate) {
+            const lastMessage = messagesList.lastElementChild;
+            if (!lastMessage || lastMessage.classList.contains("date-separator")) {
+                return true;
+            }
+            
+            const lastMessageTime = lastMessage.getAttribute("data-message-date");
+            if (!lastMessageTime) {
+                return true;
+            }
+            
+            const lastDate = new Date(lastMessageTime);
+            lastDate.setHours(0, 0, 0, 0);
+            
+            const currentDate = new Date(messageDate);
+            currentDate.setHours(0, 0, 0, 0);
+            
+            return lastDate.getTime() !== currentDate.getTime();
+        }
+        
+        // Display date separator
+        function displayDateSeparator(messagesList, date) {
+            const separatorDiv = document.createElement("div");
+            separatorDiv.className = "date-separator";
+            separatorDiv.innerHTML = `<span>${formatDateHeader(date)}</span>`;
+            messagesList.appendChild(separatorDiv);
+        }
+        
+        // Initialize SignalR connection
+        function startChatConnection() {
+            chatConnection = new signalR.HubConnectionBuilder()
+                .withUrl(hubUrl)
+                .build();
+            
+            chatConnection.on("ReceiveMessage", function (message) {
+                // Check if this is the message we just sent (to avoid duplicate)
+                if (lastSentMessage && 
+                    message.contentDetail === lastSentMessage.contentDetail && 
+                    message.senderType === "customer" &&
+                    Math.abs(new Date(message.time) - lastSentMessage.time) < 2000) {
+                    lastSentMessage = null;
+                    return;
+                }
+                
+                // Only display if chat box is open
+                if (isChatBoxOpen) {
+                    displayChatMessage(message, false);
+                }
+                
+                // Update unread badge if message is from employee
+                if (message.senderType === "employee") {
+                    updateUnreadBadge();
+                }
+            });
+            
+            chatConnection.on("Error", function (error) {
+                updateChatConnectionStatus(false);
+            });
+            
+            chatConnection.start().then(function () {
+                currentCustomerId = getCustomerInfo();
+                if (currentCustomerId) {
+                    chatConnection.invoke("JoinRoom", currentCustomerId, "customer")
+                        .then(function() {
+                            updateChatConnectionStatus(true);
+                            if (isChatBoxOpen) {
+                                loadChatMessages();
+                                markChatAsRead();
+                            } else {
+                                // Load unread count when connection is established
+                                updateUnreadBadgeFromAPI();
+                            }
+                        })
+                        .catch(function (err) {
+                            updateChatConnectionStatus(false);
+                        });
+                }
+            }).catch(function (err) {
+                updateChatConnectionStatus(false);
+            });
+            
+            chatConnection.onclose(function () {
+                updateChatConnectionStatus(false);
+                setTimeout(startChatConnection, 5000);
+            });
+        }
+        
+        // Toggle chat box
+        document.getElementById("chatWidgetButton").addEventListener("click", async function() {
+            const chatBox = document.getElementById("chatBox");
+            isChatBoxOpen = !isChatBoxOpen;
+            
+            if (isChatBoxOpen) {
+                chatBox.style.display = "flex";
+                currentCustomerId = getCustomerInfo();
+                if (currentCustomerId) {
+                    if (!chatConnection || chatConnection.state !== signalR.HubConnectionState.Connected) {
+                        startChatConnection();
+                    } else {
+                        await loadChatMessages();
+                        // Mark messages as read when opening chat box
+                        await markChatAsRead();
+                    }
+                } else {
+                    document.getElementById("chatMessagesList").innerHTML = 
+                        '<div class="text-center text-muted p-3">Vui lòng đăng nhập để sử dụng tính năng chat</div>';
+                }
+                // Hide badge when opening chat box
+                document.getElementById("chatBadge").style.display = "none";
+            } else {
+                chatBox.style.display = "none";
+            }
+        });
+        
+        // Close chat box
+        document.getElementById("chatCloseButton").addEventListener("click", function() {
+            document.getElementById("chatBox").style.display = "none";
+            isChatBoxOpen = false;
+        });
+        
+        // Send message
+        document.getElementById("chatSendButton").addEventListener("click", function() {
+            sendChatMessage();
+        });
+        
+        document.getElementById("chatMessageInput").addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                sendChatMessage();
+            }
+        });
+        
+        function sendChatMessage() {
+            const messageInput = document.getElementById("chatMessageInput");
+            const message = messageInput.value.trim();
+            
+            if (message === "" || !currentCustomerId) {
+                return;
+            }
+            
+            if (!chatConnection || chatConnection.state !== signalR.HubConnectionState.Connected) {
+                alert("Chưa kết nối đến server. Vui lòng đợi...");
+                return;
+            }
+            
+            // Show message immediately (optimistic update)
+            const tempMessage = {
+                contentDetail: message,
+                time: new Date(),
+                senderType: "customer"
+            };
+            lastSentMessage = tempMessage;
+            displayChatMessage(tempMessage, false);
+            messageInput.value = "";
+            
+            chatConnection.invoke("SendMessage", currentCustomerId, null, message, "customer")
+                .then(function() {
+                    setTimeout(function() {
+                        lastSentMessage = null;
+                    }, 3000);
+                })
+                .catch(function (err) {
+                    alert("Lỗi khi gửi tin nhắn: " + err.toString());
+                    const messagesList = document.getElementById("chatMessagesList");
+                    if (messagesList.lastChild) {
+                        messagesList.removeChild(messagesList.lastChild);
+                    }
+                    lastSentMessage = null;
+                });
+        }
+        
+        // Display message
+        function displayChatMessage(message, skipDateCheck = false) {
+            const messagesList = document.getElementById("chatMessagesList");
+            
+            // Clear placeholder if exists
+            if (messagesList.querySelector('.text-center.text-muted')) {
+                messagesList.innerHTML = "";
+            }
+            
+            const messageDate = new Date(message.time);
+            
+            // Show date separator if needed
+            if (!skipDateCheck && shouldShowDateSeparator(messagesList, messageDate)) {
+                displayDateSeparator(messagesList, messageDate);
+            }
+            
+            const messageDiv = document.createElement("div");
+            messageDiv.className = "chat-message " + (message.senderType === "customer" ? "sent" : "received");
+            messageDiv.setAttribute("data-message-date", message.time);
+            
+            const time = new Date(message.time).toLocaleTimeString("vi-VN", {
+                hour: "2-digit",
+                minute: "2-digit"
+            });
+            
+            messageDiv.innerHTML = `
+                <div>${escapeHtml(message.contentDetail)}</div>
+                <div class="chat-message-time">${time}</div>
+            `;
+            
+            messagesList.appendChild(messageDiv);
+            scrollChatToBottom();
+        }
+        
+        // Load messages
+        async function loadChatMessages() {
+            if (!currentCustomerId) return;
+            
+            try {
+                const response = await fetch(`${apiBase}Chat/GetMessages?customerId=${currentCustomerId}`);
+                const messages = await response.json();
+                
+                const messagesList = document.getElementById("chatMessagesList");
+                messagesList.innerHTML = "";
+                
+                if (messages && messages.length > 0) {
+                    messages.forEach(message => {
+                        displayChatMessage(message, false);
+                    });
+                } else {
+                    messagesList.innerHTML = '<div class="text-center text-muted p-3">Chưa có tin nhắn nào. Hãy bắt đầu trò chuyện!</div>';
+                }
+            } catch (error) {
+                console.error("Error loading messages:", error);
+            }
+        }
+        
+        // Mark messages as read
+        async function markChatAsRead() {
+            if (!currentCustomerId) return;
+            
+            try {
+                await fetch(`${apiBase}Chat/MarkAsRead`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        customerId: currentCustomerId,
+                        employeeId: null // Customer is marking their messages as read
+                    })
+                });
+                // Refresh unread badge after marking as read
+                updateUnreadBadgeFromAPI();
+            } catch (error) {
+                console.error("Error marking as read:", error);
+            }
+        }
+        
+        // Update unread badge from API
+        async function updateUnreadBadgeFromAPI() {
+            if (!currentCustomerId) return;
+            
+            try {
+                const response = await fetch(`${apiBase}Chat/GetConversations/Customer?customerId=${currentCustomerId}`);
+                const conversations = await response.json();
+                
+                if (conversations && conversations.length > 0) {
+                    const unreadCount = conversations[0].unreadCount || 0;
+                    const badge = document.getElementById("chatBadge");
+                    
+                    if (unreadCount > 0 && !isChatBoxOpen) {
+                        badge.textContent = unreadCount;
+                        badge.style.display = "flex";
+                    } else {
+                        badge.style.display = "none";
+                    }
+                }
+            } catch (error) {
+                console.error("Error updating unread badge:", error);
+            }
+        }
+        
+        // Scroll to bottom
+        function scrollChatToBottom() {
+            const messagesArea = document.getElementById("chatMessagesArea");
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
+        
+        // Update connection status
+        function updateChatConnectionStatus(connected) {
+            const statusEl = document.getElementById("chatConnectionStatus");
+            // Hide connection status badge
+            statusEl.style.display = "none";
+        }
+        
+        // Update unread badge
+        function updateUnreadBadge() {
+            if (!isChatBoxOpen) {
+                // Get actual unread count from API instead of just incrementing
+                updateUnreadBadgeFromAPI();
+            }
+        }
+        
+        // Escape HTML
+        function escapeHtml(text) {
+            if (!text) return "";
+            const div = document.createElement("div");
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Start connection when page loads
+        startChatConnection();
+    })();
+</script>
+
