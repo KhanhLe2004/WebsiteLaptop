@@ -1,0 +1,67 @@
+<!-- Chat Widget - Floating Button và Chat Window -->
+<div id="chatWidget">
+    <!-- Nút chat floating - góc dưới bên phải -->
+    <button id="chatToggleBtn" class="chat-toggle-btn" aria-label="Mở chat">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2ZM20 16H6L4 18V4H20V16Z" fill="currentColor"/>
+            <path d="M7 9H17V11H7V9ZM7 12H14V14H7V12Z" fill="currentColor"/>
+        </svg>
+    </button>
+
+    <!-- Cửa sổ chat -->
+    <div id="chatWindow" class="chat-window" style="display: none;">
+        <!-- Header -->
+        <div class="chat-header">
+            <div class="chat-header-content">
+                <h3 class="chat-title">Hỗ trợ tư vấn sản phẩm</h3>
+                <span class="chat-status">Đang trực tuyến</span>
+            </div>
+            <button id="chatCloseBtn" class="chat-close-btn" aria-label="Đóng chat">×</button>
+        </div>
+
+        <!-- Messages area -->
+        <div id="chatMessages" class="chat-messages">
+            <!-- Welcome message -->
+            <div class="message bot">
+                <div class="message-content">
+                    <p>Xin chào! Tôi là chatbot tư vấn bán hàng. Tôi có thể giúp bạn:</p>
+                    <ul>
+                        <li>Tìm kiếm laptop phù hợp</li>
+                        <li>Tư vấn về chính sách bảo hành, đổi trả</li>
+                        <li>Kiểm tra tình trạng bảo hành</li>
+                    </ul>
+                    <p>Bạn cần hỗ trợ gì?</p>
+                </div>
+                <div class="message-time"></div>
+            </div>
+        </div>
+
+        <!-- Typing indicator -->
+        <div id="chatTyping" class="chat-typing" style="display: none;">
+            <div class="typing-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <span class="typing-text">Đang trả lời...</span>
+        </div>
+
+        <!-- Input area -->
+        <div class="chat-input-container">
+            <input 
+                type="text" 
+                id="chatInput" 
+                class="chat-input" 
+                placeholder="Nhập câu hỏi của bạn..." 
+                autocomplete="off"
+            />
+            <button id="chatSendBtn" class="chat-send-btn" aria-label="Gửi tin nhắn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M2.01 21L23 12 2.01 3 2 10L17 12L2 14L2.01 21Z" fill="currentColor"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+

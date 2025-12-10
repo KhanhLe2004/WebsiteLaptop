@@ -578,6 +578,11 @@
         })();
     </script>
 
+    <!-- Chat Widget -->
+    @await Html.PartialAsync("_ChatWidget")
+    <link rel="stylesheet" href="~/css/chatbot.css" asp-append-version="true" />
+    <script src="~/js/chatbot.js" asp-append-version="true"></script>
+
     @RenderSection("Scripts", required: false)
 </body>
 

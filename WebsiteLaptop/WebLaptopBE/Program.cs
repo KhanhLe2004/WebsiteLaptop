@@ -1,5 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using WebLaptopBE.AI.Orchestrator;
+using WebLaptopBE.AI.Plugins;
+using WebLaptopBE.AI.SemanticKernel;
 using WebLaptopBE.Data;
+using WebLaptopBE.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,7 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Đăng ký DbContext
 builder.Services.AddDbContext<Testlaptop35Context>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection") 
-        ?? "Data Source=DESKTOP-4SKINCH\\SQLEXPRESS;Initial Catalog=testlaptop33;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False"));
+        ?? "Data Source=DESKTOP-48K2JPN\\SQLEXPRESS;Initial Catalog=testlaptop35;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False"));
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -29,16 +33,71 @@ builder.Services.AddSwaggerGen();
 // Add HttpClientFactory
 builder.Services.AddHttpClient();
 
-// Add CORS
+// Add Memory Cache for performance optimization (caching embeddings, responses)
+builder.Services.AddMemoryCache(options =>
+{
+    options.SizeLimit = 1024; // Limit cache size
+});
+
+// Add CORS - Improved configuration for development and production
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        // In development, allow all origins
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .WithExposedHeaders("Content-Type", "Content-Length");
+        }
+        else
+        {
+            // In production, specify allowed origins
+            policy.WithOrigins(
+                    "https://localhost:5001",
+                    "https://localhost:5000",
+                    "http://localhost:5001",
+                    "http://localhost:5000"
+                  )
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials()
+                  .WithExposedHeaders("Content-Type", "Content-Length");
+        }
     });
 });
+
+// ============================================
+// ĐĂNG KÝ SERVICES CHO AI CHATBOT
+// ============================================
+
+// 1. Product Service - Tìm kiếm sản phẩm từ SQL
+builder.Services.AddScoped<IProductService, ProductService>();
+
+// 2. Qdrant Service (cũ - cho policies)
+builder.Services.AddScoped<IQdrantService, QdrantService>();
+
+// 3. Qdrant Vector Service (mới - cho products + policies với RAG)
+builder.Services.AddScoped<IQdrantVectorService, QdrantVectorService>();
+
+// 4. Semantic Kernel Service - Quản lý LLM
+builder.Services.AddSingleton<ISemanticKernelService, SemanticKernelService>();
+
+// 5. RAG Chat Service - RAG pipeline hoàn chỉnh
+builder.Services.AddScoped<IRAGChatService, RAGChatService>();
+
+// 6. Indexing Service - Index dữ liệu từ SQL → Qdrant
+builder.Services.AddScoped<IIndexingService, IndexingService>();
+
+// 7. Chat Orchestrator Service - Điều phối chatbot (cũ - vẫn giữ để tương thích)
+builder.Services.AddScoped<IChatOrchestratorService, ChatOrchestratorService>();
+
+// 8. Plugins - Đăng ký các plugins cho Semantic Kernel
+builder.Services.AddScoped<ProductSearchPlugin>();
+builder.Services.AddScoped<PolicyRetrievalPlugin>();
+builder.Services.AddScoped<IntentDetectionPlugin>();
 
 var app = builder.Build();
 
