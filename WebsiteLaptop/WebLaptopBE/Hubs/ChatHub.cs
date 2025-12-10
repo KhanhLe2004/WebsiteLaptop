@@ -126,11 +126,27 @@ public class ChatHub : Hub
 
     private string GenerateChatId()
     {
-        // Generate a unique ID with max 20 characters
-        // Format: CHAT (4) + timestamp without seconds (12) + random (4) = 20 chars total
-        var timestamp = DateTime.Now.ToString("yyyyMMddHHmm"); // 12 chars (year, month, day, hour, minute)
-        var random = Guid.NewGuid().ToString().Replace("-", "").Substring(0, 4); // 4 chars
-        return $"CHAT{timestamp}{random}"; // Total: 4 + 12 + 4 = 20 chars
+        // Generate a unique ID with format CH001, CH002, CH003...
+        // Get the latest ChatId from database
+        var latestChat = _db.Chats
+            .Where(c => c.ChatId.StartsWith("CH") && c.ChatId.Length == 5)
+            .OrderByDescending(c => c.ChatId)
+            .FirstOrDefault();
+        
+        int nextNumber = 1;
+        
+        if (latestChat != null)
+        {
+            // Extract number from latest ID (e.g., "CH001" -> 1)
+            var numberPart = latestChat.ChatId.Substring(2); // Remove "CH" prefix
+            if (int.TryParse(numberPart, out int lastNumber))
+            {
+                nextNumber = lastNumber + 1;
+            }
+        }
+        
+        // Format as CH001, CH002, etc. (max 99999)
+        return $"CH{nextNumber:D3}";
     }
 }
 
