@@ -15,7 +15,7 @@ namespace WebLaptopBE.Controllers
     public class LoginAPIController : ControllerBase
     {
         private readonly Testlaptop36Context _db = new();
-
+        private readonly IConfiguration _configuration;
         public LoginAPIController(IConfiguration configuration)
         {
             _configuration = configuration;
@@ -280,16 +280,36 @@ namespace WebLaptopBE.Controllers
 
         private string GenerateUsername(string email)
         {
-            var baseUsername = email.Split('@')[0];
-            var username = baseUsername;
+            // Sử dụng toàn bộ email làm username
+            var username = email;
             var suffix = 1;
 
+            // Nếu email đã tồn tại, thêm số vào trước @
             while (_db.Customers.Any(c => c.Username == username))
             {
-                username = $"{baseUsername}{suffix++}";
+                var emailParts = email.Split('@');
+                if (emailParts.Length == 2)
+                {
+                    username = $"{emailParts[0]}{suffix}@{emailParts[1]}";
+                }
+                else
+                {
+                    username = $"{email}{suffix}";
+                }
+                suffix++;
                 if (suffix > 999)
                 {
-                    username = $"{baseUsername}{Guid.NewGuid():N}".Substring(0, Math.Min(baseUsername.Length + 4, 50));
+                    // Nếu vẫn trùng sau 999 lần, sử dụng GUID
+                    var emailParts2 = email.Split('@');
+                    if (emailParts2.Length == 2)
+                    {
+                        var guidPart = Guid.NewGuid().ToString("N").Substring(0, 4);
+                        username = $"{emailParts2[0]}{guidPart}@{emailParts2[1]}";
+                    }
+                    else
+                    {
+                        username = $"{email}{Guid.NewGuid():N}".Substring(0, Math.Min(email.Length + 4, 100));
+                    }
                     break;
                 }
             }

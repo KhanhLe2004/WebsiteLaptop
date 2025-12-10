@@ -105,3 +105,219 @@
       </div>
     </div>
   </div>
+
+@section Scripts {
+    <script type="text/javascript">
+    (function() {
+
+    // Get default API base URL
+    function getDefaultApiBase() {
+        if (window.AUTH_API_BASE && window.AUTH_API_BASE.trim()) {
+            return window.AUTH_API_BASE.trim();
+        }
+        if (window.location && window.location.origin) {
+            var origin = window.location.origin;
+            if (origin.indexOf('localhost') === -1) {
+                return origin;
+            }
+        }
+        return 'http://localhost:5068';
+    }
+
+    var AUTH_API_BASE = getDefaultApiBase();
+    var ENDPOINTS = {
+        register: AUTH_API_BASE + '/api/Register'
+    };
+
+    var emailRegex = /^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/;
+    var phoneRegex = /^\d{9,15}$/;
+    var passwordRegex = /^(?=.*[A-Za-z])(?=.*\d).{6,20}$/;
+
+    function setAlert(element, type, message) {
+        if (!element) {
+            console.warn('setAlert: element is null');
+            return;
+        }
+        element.textContent = message || '';
+        element.className = 'alert alert-' + type;
+        element.classList.remove('d-none');
+        element.style.display = 'block';
+    }
+
+    function clearAlert(element) {
+        if (!element) return;
+        element.classList.add('d-none');
+        element.textContent = '';
+    }
+
+    function parseJsonResponse(response) {
+        return new Promise(function(resolve, reject) {
+            var contentType = response.headers.get('content-type') || '';
+            if (contentType.indexOf('application/json') !== -1) {
+                response.json().then(function(data) {
+                    resolve(data);
+                }).catch(function(err) {
+                    reject(new Error('Dữ liệu JSON không hợp lệ'));
+                });
+            } else {
+                response.text().then(function(text) {
+                    if (!text) {
+                        resolve({});
+                    } else {
+                        try {
+                            resolve(JSON.parse(text));
+                        } catch (e) {
+                            resolve({ message: text });
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    function togglePasswordVisibility(buttonId, inputId, iconId) {
+        var btn = document.getElementById(buttonId);
+        if (!btn) return;
+        btn.addEventListener('click', function() {
+            var input = document.getElementById(inputId);
+            var icon = document.getElementById(iconId);
+            if (!input || !icon) return;
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('bi-eye-slash', 'bi-eye');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('bi-eye', 'bi-eye-slash');
+            }
+        });
+    }
+
+    function disableButton(button, loadingText) {
+        if (!button) return function() { };
+        var original = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = loadingText;
+        return function() {
+            button.disabled = false;
+            button.innerHTML = original;
+        };
+    }
+
+    // ========== REGISTER ==========
+    var registerForm = document.getElementById('registerForm');
+    if (registerForm) {
+        var registerAlert = document.getElementById('registerAlert');
+        var fullnameInput = document.getElementById('fullname');
+        var emailInput = document.getElementById('email');
+        var phoneInput = document.getElementById('phone');
+        var passwordInput = document.getElementById('password');
+        var confirmInput = document.getElementById('confirmPwd');
+        var agreeCheckbox = document.getElementById('agree');
+
+        togglePasswordVisibility('togglePwd', 'password', 'eyeIcon');
+        togglePasswordVisibility('togglePwd2', 'confirmPwd', 'eyeIcon2');
+
+        registerForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            clearAlert(registerAlert);
+
+            var inputs = [fullnameInput, emailInput, phoneInput, passwordInput, confirmInput];
+            inputs.forEach(function(input) {
+                if (input) {
+                    input.classList.remove('is-invalid');
+                }
+            });
+            if (agreeCheckbox) {
+                agreeCheckbox.classList.remove('is-invalid');
+            }
+
+            var fullName = fullnameInput ? fullnameInput.value.trim() : '';
+            var email = emailInput ? emailInput.value.trim() : '';
+            var phone = phoneInput ? phoneInput.value.trim() : '';
+            var password = passwordInput ? passwordInput.value : '';
+            var confirmPassword = confirmInput ? confirmInput.value : '';
+
+            var isValid = true;
+
+            if (!fullName) {
+                if (fullnameInput) fullnameInput.classList.add('is-invalid');
+                isValid = false;
+            }
+
+            if (!emailRegex.test(email)) {
+                if (emailInput) emailInput.classList.add('is-invalid');
+                isValid = false;
+            }
+
+            if (!phoneRegex.test(phone)) {
+                if (phoneInput) phoneInput.classList.add('is-invalid');
+                isValid = false;
+            }
+
+            if (!passwordRegex.test(password)) {
+                if (passwordInput) passwordInput.classList.add('is-invalid');
+                isValid = false;
+            }
+
+            if (password !== confirmPassword || !confirmPassword) {
+                if (confirmInput) confirmInput.classList.add('is-invalid');
+                isValid = false;
+            }
+
+            if (!agreeCheckbox || !agreeCheckbox.checked) {
+                if (agreeCheckbox) agreeCheckbox.classList.add('is-invalid');
+                isValid = false;
+            }
+
+            if (!isValid) {
+                setAlert(registerAlert, 'danger', 'Vui lòng kiểm tra lại các trường bắt buộc');
+                return;
+            }
+
+            var submitBtn = registerForm.querySelector('button[type="submit"]');
+            var restoreBtn = disableButton(submitBtn, '<span class="spinner-border spinner-border-sm me-2"></span>Đang đăng ký...');
+
+            fetch(ENDPOINTS.register, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    fullName: fullName,
+                    email: email,
+                    phone: phone,
+                    password: password
+                })
+            })
+            .then(function(response) {
+                return parseJsonResponse(response).then(function(data) {
+                    return { ok: response.ok, status: response.status, data: data };
+                });
+            })
+            .then(function(result) {
+                if (!result.ok) {
+                    var errorMsg = result.data && result.data.message ? result.data.message : (result.data && result.data.error ? result.data.error : 'Không thể đăng ký tài khoản');
+                    throw new Error(errorMsg);
+                }
+
+                var data = result.data;
+                if (registerAlert) {
+                    setAlert(registerAlert, 'success', data && data.message ? data.message : 'Đăng ký thành công');
+                }
+                registerForm.reset();
+                setTimeout(function() {
+                    window.location.href = '/User/Login';
+                }, 1000);
+            })
+            .catch(function(error) {
+                console.error('Register error:', error);
+                if (registerAlert) {
+                    setAlert(registerAlert, 'danger', error.message || 'Đăng ký thất bại');
+                }
+            })
+            .finally(function() {
+                restoreBtn();
+            });
+        });
+    }
+    })();
+    </script>
+}

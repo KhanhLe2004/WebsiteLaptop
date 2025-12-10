@@ -43,23 +43,23 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 var employee = await _context.Employees
                     .FirstOrDefaultAsync(e => e.Email != null && e.Email.ToLower() == request.Email.ToLower());
 
-                // Luôn trả về thành công để bảo mật (không tiết lộ email có tồn tại hay không)
+                // Kiểm tra tài khoản có tồn tại không
                 if (employee == null)
                 {
-                    return Ok(new ForgetPasswordResponseDTO
+                    return NotFound(new ForgetPasswordResponseDTO
                     {
-                        Success = true,
-                        Message = "Nếu email tồn tại trong hệ thống, mật khẩu mới đã được gửi đến email của bạn."
+                        Success = false,
+                        Message = "Tài khoản không tồn tại. Vui lòng kiểm tra lại email."
                     });
                 }
 
                 // Kiểm tra tài khoản có đang active không
                 if (employee.Active != true)
                 {
-                    return Ok(new ForgetPasswordResponseDTO
+                    return BadRequest(new ForgetPasswordResponseDTO
                     {
-                        Success = true,
-                        Message = "Nếu email tồn tại trong hệ thống, mật khẩu mới đã được gửi đến email của bạn."
+                        Success = false,
+                        Message = "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên để được hỗ trợ."
                     });
                 }
 
@@ -75,11 +75,11 @@ namespace WebLaptopBE.Areas.Admin.Controllers
 
                 if (!emailSent)
                 {
-                    // Nếu gửi email thất bại, vẫn trả về thành công để bảo mật
-                    return Ok(new ForgetPasswordResponseDTO
+                    // Nếu gửi email thất bại, trả về lỗi
+                    return StatusCode(500, new ForgetPasswordResponseDTO
                     {
-                        Success = true,
-                        Message = "Nếu email tồn tại trong hệ thống, mật khẩu mới đã được gửi đến email của bạn."
+                        Success = false,
+                        Message = "Không thể gửi email. Vui lòng thử lại sau hoặc liên hệ quản trị viên."
                     });
                 }
 
@@ -91,12 +91,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
             catch (Exception ex)
             {
-                // Log lỗi nhưng vẫn trả về thành công để bảo mật
+                // Log lỗi và trả về lỗi
                 Console.WriteLine($"Error in ForgetPassword: {ex.Message}");
-                return Ok(new ForgetPasswordResponseDTO
+                return StatusCode(500, new ForgetPasswordResponseDTO
                 {
-                    Success = true,
-                    Message = "Nếu email tồn tại trong hệ thống, mật khẩu mới đã được gửi đến email của bạn."
+                    Success = false,
+                    Message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau.",
+                    Error = ex.Message
                 });
             }
         }

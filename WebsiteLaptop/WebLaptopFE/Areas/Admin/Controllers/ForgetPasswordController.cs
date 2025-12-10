@@ -57,14 +57,17 @@ namespace WebLaptopFE.Areas.Admin.Controllers
                 var success = root.TryGetProperty("success", out var successElement) ? successElement.GetBoolean() : false;
                 var message = root.TryGetProperty("message", out var messageElement) ? messageElement.GetString() : null;
 
-                if (response.IsSuccessStatusCode && success)
+                // Kiểm tra status code và success flag
+                if (response.IsSuccessStatusCode && response.StatusCode == System.Net.HttpStatusCode.OK && success)
                 {
-                    TempData["SuccessMessage"] = message ?? "Mật khẩu mới đã được gửi đến email của bạn.";
+                    TempData["SuccessMessage"] = message ?? "Mật khẩu mới đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.";
                     return View("ForgetPassword");
                 }
                 else
                 {
-                    TempData["ErrorMessage"] = message ?? "Đã xảy ra lỗi. Vui lòng thử lại.";
+                    // Xử lý các trường hợp lỗi (404, 400, 500, etc.)
+                    var errorMessage = message ?? "Đã xảy ra lỗi. Vui lòng thử lại.";
+                    TempData["ErrorMessage"] = errorMessage;
                     return View("ForgetPassword");
                 }
             }

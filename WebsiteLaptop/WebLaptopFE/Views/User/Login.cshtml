@@ -84,3 +84,513 @@
       </div>
     </div>
   </div>
+
+@section Scripts {
+    <script type="text/javascript">
+    (function() {
+
+    // Get default API base URL
+    function getDefaultApiBase() {
+        if (window.AUTH_API_BASE && window.AUTH_API_BASE.trim()) {
+            return window.AUTH_API_BASE.trim();
+        }
+        if (window.location && window.location.origin) {
+            var origin = window.location.origin;
+            if (origin.indexOf('localhost') === -1) {
+                return origin;
+            }
+        }
+        return 'http://localhost:5068';
+    }
+
+    var AUTH_API_BASE = getDefaultApiBase();
+    var ENDPOINTS = {
+        login: AUTH_API_BASE + '/api/Login',
+        register: AUTH_API_BASE + '/api/Register',
+        forgot: AUTH_API_BASE + '/api/FogetPasssword',
+        googleLogin: AUTH_API_BASE + '/api/Login/google',
+        facebookLogin: AUTH_API_BASE + '/api/Login/facebook'
+    };
+
+    var emailRegex = /^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/;
+    var phoneRegex = /^\d{9,15}$/;
+    var passwordRegex = /^(?=.*[A-Za-z])(?=.*\d).{6,20}$/;
+
+    function setAlert(element, type, message) {
+        if (!element) {
+            console.warn('setAlert: element is null');
+            return;
+        }
+        element.textContent = message || '';
+        element.className = 'alert alert-' + type;
+        element.classList.remove('d-none');
+        element.style.display = 'block';
+    }
+
+    function clearAlert(element) {
+        if (!element) return;
+        element.classList.add('d-none');
+        element.textContent = '';
+    }
+
+    function parseJsonResponse(response) {
+        return new Promise(function(resolve, reject) {
+            var contentType = response.headers.get('content-type') || '';
+            if (contentType.indexOf('application/json') !== -1) {
+                response.json().then(function(data) {
+                    resolve(data);
+                }).catch(function(err) {
+                    reject(new Error('Dữ liệu JSON không hợp lệ'));
+                });
+            } else {
+                response.text().then(function(text) {
+                    if (!text) {
+                        resolve({});
+                    } else {
+                        try {
+                            resolve(JSON.parse(text));
+                        } catch (e) {
+                            resolve({ message: text });
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    function togglePasswordVisibility(buttonId, inputId, iconId) {
+        var btn = document.getElementById(buttonId);
+        if (!btn) return;
+        btn.addEventListener('click', function() {
+            var input = document.getElementById(inputId);
+            var icon = document.getElementById(iconId);
+            if (!input || !icon) return;
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('bi-eye-slash', 'bi-eye');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('bi-eye', 'bi-eye-slash');
+            }
+        });
+    }
+
+    function disableButton(button, loadingText) {
+        if (!button) return function() { };
+        var original = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = loadingText;
+        return function() {
+            button.disabled = false;
+            button.innerHTML = original;
+        };
+    }
+
+    // ========== LOGIN ==========
+    var loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        var loginAlert = document.getElementById('loginAlert');
+        var emailHelp = document.getElementById('emailHelp');
+        var emailInput = document.getElementById('email');
+        var passwordInput = document.getElementById('password');
+        var rememberCheckbox = document.getElementById('remember');
+
+        // Prefill remembered email
+        var rememberedEmail = localStorage.getItem('rememberedEmail');
+        if (rememberedEmail && emailInput) {
+            emailInput.value = rememberedEmail;
+            if (rememberCheckbox) rememberCheckbox.checked = true;
+        }
+
+        togglePasswordVisibility('togglePwd', 'password', 'eyeIcon');
+
+        loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            clearAlert(loginAlert);
+            if (emailHelp) {
+                emailHelp.style.display = 'none';
+            }
+            var inputs = [emailInput, passwordInput];
+            inputs.forEach(function(input) {
+                if (input) {
+                    input.classList.remove('is-invalid', 'input-error');
+                }
+            });
+
+            var credential = emailInput ? emailInput.value.trim() : '';
+            var password = passwordInput ? passwordInput.value : '';
+
+            if (!credential) {
+                if (emailInput) emailInput.classList.add('input-error');
+                if (emailHelp) {
+                    emailHelp.textContent = 'Vui lòng nhập email hoặc tên đăng nhập';
+                    emailHelp.style.display = 'block';
+                }
+                return;
+            }
+
+            if (!password) {
+                if (passwordInput) passwordInput.classList.add('is-invalid');
+                setAlert(loginAlert, 'danger', 'Vui lòng nhập mật khẩu');
+                return;
+            }
+
+            var submitBtn = loginForm.querySelector('button[type="submit"]');
+            var restoreBtn = disableButton(submitBtn, '<span class="spinner-border spinner-border-sm me-2"></span>Đang đăng nhập...');
+
+            fetch(ENDPOINTS.login, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    emailOrUsername: credential,
+                    password: password
+                })
+            })
+            .then(function(response) {
+                return parseJsonResponse(response).then(function(data) {
+                    return { ok: response.ok, status: response.status, data: data };
+                });
+            })
+            .then(function(result) {
+                if (!result.ok) {
+                    var errorMsg = result.data && result.data.message ? result.data.message : (result.data && result.data.error ? result.data.error : 'Không thể đăng nhập, vui lòng thử lại');
+                    throw new Error(errorMsg);
+                }
+
+                var data = result.data;
+                if (data && data.customer) {
+                    sessionStorage.setItem('customer', JSON.stringify(data.customer));
+                    sessionStorage.setItem('isLoggedIn', 'true');
+                    if (rememberCheckbox && rememberCheckbox.checked) {
+                        localStorage.setItem('rememberedEmail', credential);
+                    } else {
+                        localStorage.removeItem('rememberedEmail');
+                    }
+                }
+
+                if (loginAlert) {
+                    setAlert(loginAlert, 'success', data && data.message ? data.message : 'Đăng nhập thành công');
+                }
+                setTimeout(function() {
+                    window.location.href = '/User/Account';
+                }, 600);
+            })
+            .catch(function(error) {
+                console.error('Login error:', error);
+                if (loginAlert) {
+                    setAlert(loginAlert, 'danger', error.message || 'Đăng nhập thất bại');
+                }
+            })
+            .finally(function() {
+                restoreBtn();
+            });
+        });
+    }
+
+    // ========== GOOGLE LOGIN ==========
+    var googleSignInBtn = document.getElementById('googleSignInBtn');
+    if (googleSignInBtn) {
+        function getGoogleClientId() {
+            return window.GOOGLE_CLIENT_ID || '';
+        }
+
+        function handleGoogleLogin(accessToken, userInfo) {
+            return new Promise(function(resolve, reject) {
+                var loginAlert = document.getElementById('loginAlert');
+                if (loginAlert) {
+                    clearAlert(loginAlert);
+                }
+
+                var submitBtn = googleSignInBtn;
+                var originalText = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...';
+
+                fetch(ENDPOINTS.googleLogin, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        accessToken: accessToken,
+                        userInfo: {
+                            email: userInfo.email,
+                            name: userInfo.name,
+                            picture: userInfo.picture
+                        }
+                    })
+                })
+                .then(function(response) {
+                    return parseJsonResponse(response);
+                })
+                .then(function(data) {
+                    if (!data || data.error) {
+                        throw new Error(data ? (data.message || data.error) : 'Không thể đăng nhập bằng Google');
+                    }
+
+                    if (data.customer) {
+                        sessionStorage.setItem('customer', JSON.stringify(data.customer));
+                        sessionStorage.setItem('isLoggedIn', 'true');
+                    }
+
+                    if (loginAlert) {
+                        setAlert(loginAlert, 'success', data.message || 'Đăng nhập bằng Google thành công');
+                    }
+                    setTimeout(function() {
+                        window.location.href = '/User/Account';
+                    }, 600);
+                    resolve(data);
+                })
+                .catch(function(error) {
+                    console.error('Google login error:', error);
+                    if (loginAlert) {
+                        setAlert(loginAlert, 'danger', error.message || 'Đăng nhập bằng Google thất bại');
+                    }
+                    reject(error);
+                })
+                .finally(function() {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                });
+            });
+        }
+
+        googleSignInBtn.addEventListener('click', function() {
+            var clientId = getGoogleClientId();
+
+            if (!clientId) {
+                var loginAlert = document.getElementById('loginAlert');
+                if (loginAlert) {
+                    setAlert(loginAlert, 'warning', 'Google OAuth Client ID chưa được cấu hình. Vui lòng liên hệ quản trị viên.');
+                }
+                return;
+            }
+
+            function waitForGoogle() {
+                return new Promise(function(resolve) {
+                    if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+                        resolve();
+                    } else {
+                        var attempts = 0;
+                        var checkInterval = setInterval(function() {
+                            attempts++;
+                            if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+                                clearInterval(checkInterval);
+                                resolve();
+                            } else if (attempts > 20) {
+                                clearInterval(checkInterval);
+                                resolve();
+                            }
+                        }, 500);
+                    }
+                });
+            }
+
+            waitForGoogle().then(function() {
+                if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+                    var loginAlert = document.getElementById('loginAlert');
+                    if (loginAlert) {
+                        setAlert(loginAlert, 'danger', 'Không thể tải Google Sign-In. Vui lòng kiểm tra kết nối internet và thử lại.');
+                    }
+                    return;
+                }
+
+                try {
+                    var tokenClient = google.accounts.oauth2.initTokenClient({
+                        client_id: clientId,
+                        scope: 'openid email profile',
+                        callback: function(tokenResponse) {
+                            if (tokenResponse.error) {
+                                console.error('Google OAuth error:', tokenResponse.error);
+                                var loginAlert = document.getElementById('loginAlert');
+                                if (loginAlert) {
+                                    setAlert(loginAlert, 'danger', 'Lỗi đăng nhập Google: ' + (tokenResponse.error_description || tokenResponse.error));
+                                }
+                                return;
+                            }
+
+                            if (tokenResponse.access_token) {
+                                fetch('https://www.googleapis.com/oauth2/v2/userinfo?access_token=' + tokenResponse.access_token)
+                                .then(function(userInfoResponse) {
+                                    if (!userInfoResponse.ok) {
+                                        return userInfoResponse.text().then(function(errorText) {
+                                            throw new Error('Không thể lấy thông tin từ Google: ' + errorText);
+                                        });
+                                    }
+                                    return userInfoResponse.json();
+                                })
+                                .then(function(userInfo) {
+                                    return handleGoogleLogin(tokenResponse.access_token, userInfo);
+                                })
+                                .catch(function(error) {
+                                    console.error('Error fetching user info:', error);
+                                    var loginAlert = document.getElementById('loginAlert');
+                                    if (loginAlert) {
+                                        setAlert(loginAlert, 'danger', 'Không thể lấy thông tin từ Google: ' + error.message);
+                                    }
+                                });
+                            }
+                        }
+                    });
+
+                    tokenClient.requestAccessToken();
+                } catch (error) {
+                    console.error('Error initializing Google OAuth:', error);
+                    var loginAlert = document.getElementById('loginAlert');
+                    if (loginAlert) {
+                        setAlert(loginAlert, 'danger', 'Lỗi khởi tạo Google Sign-In: ' + error.message);
+                    }
+                }
+            });
+        });
+    }
+
+    // ========== FACEBOOK LOGIN ==========
+    var facebookSignInBtn = document.getElementById('facebookSignInBtn');
+    if (facebookSignInBtn) {
+        function getFacebookAppId() {
+            return window.FACEBOOK_APP_ID || '';
+        }
+
+        function handleFacebookLogin(accessToken) {
+            return new Promise(function(resolve, reject) {
+                var loginAlert = document.getElementById('loginAlert');
+                if (loginAlert) {
+                    clearAlert(loginAlert);
+                }
+
+                var submitBtn = facebookSignInBtn;
+                var originalText = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...';
+
+                fetch(ENDPOINTS.facebookLogin, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accessToken: accessToken })
+                })
+                .then(function(response) {
+                    return parseJsonResponse(response);
+                })
+                .then(function(data) {
+                    if (!data || data.error) {
+                        var error = new Error(data ? (data.message || data.error) : 'Không thể đăng nhập bằng Facebook');
+                        error.details = data ? (data.details || data.error || '') : '';
+                        throw error;
+                    }
+
+                    if (data.customer) {
+                        sessionStorage.setItem('customer', JSON.stringify(data.customer));
+                        sessionStorage.setItem('isLoggedIn', 'true');
+                    }
+
+                    if (loginAlert) {
+                        setAlert(loginAlert, 'success', data.message || 'Đăng nhập bằng Facebook thành công');
+                    }
+                    setTimeout(function() {
+                        window.location.href = '/User/Account';
+                    }, 600);
+                    resolve(data);
+                })
+                .catch(function(error) {
+                    console.error('Facebook login error:', error);
+                    if (loginAlert) {
+                        var errorMessage = error.message || 'Đăng nhập bằng Facebook thất bại';
+                        if (error.details) {
+                            errorMessage += ': ' + error.details;
+                        }
+                        setAlert(loginAlert, 'danger', errorMessage);
+                    }
+                    reject(error);
+                })
+                .finally(function() {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                });
+            });
+        }
+
+        var urlParams = new URLSearchParams(window.location.search);
+        var fbToken = urlParams.get('fb_token');
+        var fbError = urlParams.get('fb_error');
+
+        if (fbToken) {
+            window.history.replaceState(null, null, window.location.pathname);
+            handleFacebookLogin(fbToken);
+        } else if (fbError) {
+            window.history.replaceState(null, null, window.location.pathname);
+            var loginAlert = document.getElementById('loginAlert');
+            if (loginAlert) {
+                setAlert(loginAlert, 'danger', decodeURIComponent(fbError));
+            }
+        }
+
+        facebookSignInBtn.addEventListener('click', function() {
+            var appId = getFacebookAppId();
+
+            if (!appId) {
+                var loginAlert = document.getElementById('loginAlert');
+                if (loginAlert) {
+                    setAlert(loginAlert, 'warning', 'Facebook App ID chưa được cấu hình. Vui lòng liên hệ quản trị viên.');
+                }
+                return;
+            }
+
+            var redirectUri = encodeURIComponent(window.location.origin + '/User/FacebookCallback');
+            var facebookAuthUrl = 'https://www.facebook.com/v18.0/dialog/oauth?client_id=' + appId + '&redirect_uri=' + redirectUri + '&scope=public_profile,email&response_type=token&display=popup';
+
+            var width = 600;
+            var height = 700;
+            var left = (window.screen.width - width) / 2;
+            var top = (window.screen.height - height) / 2;
+
+            var popup = window.open(
+                facebookAuthUrl,
+                'Facebook Login',
+                'width=' + width + ',height=' + height + ',left=' + left + ',top=' + top + ',toolbar=no,menubar=no,scrollbars=yes,resizable=yes,location=no,directories=no,status=no'
+            );
+
+            if (!popup) {
+                var loginAlert = document.getElementById('loginAlert');
+                if (loginAlert) {
+                    setAlert(loginAlert, 'warning', 'Popup bị chặn. Vui lòng cho phép popup và thử lại.');
+                }
+                return;
+            }
+
+            var messageListener = function(event) {
+                if (event.origin !== window.location.origin) {
+                    return;
+                }
+
+                if (event.data && event.data.type === 'FACEBOOK_LOGIN_SUCCESS') {
+                    clearInterval(checkPopup);
+                    window.removeEventListener('message', messageListener);
+                    if (popup && !popup.closed) {
+                        popup.close();
+                    }
+                    handleFacebookLogin(event.data.accessToken);
+                } else if (event.data && event.data.type === 'FACEBOOK_LOGIN_ERROR') {
+                    clearInterval(checkPopup);
+                    window.removeEventListener('message', messageListener);
+                    if (popup && !popup.closed) {
+                        popup.close();
+                    }
+                    var loginAlert = document.getElementById('loginAlert');
+                    if (loginAlert) {
+                        setAlert(loginAlert, 'danger', event.data.error || 'Đăng nhập Facebook thất bại');
+                    }
+                }
+            };
+
+            window.addEventListener('message', messageListener);
+
+            var checkPopup = setInterval(function() {
+                if (popup.closed) {
+                    clearInterval(checkPopup);
+                    window.removeEventListener('message', messageListener);
+                }
+            }, 500);
+        });
+    }
+})();
+    </script>
+}
