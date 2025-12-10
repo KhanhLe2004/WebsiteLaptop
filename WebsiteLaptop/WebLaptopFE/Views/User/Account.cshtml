@@ -66,32 +66,32 @@
                 <div class="row g-3">
                   <div class="col-md-6">
                     <label class="form-label small">Họ và tên</label>
-                    <input type="text" name="fullname" class="form-control" placeholder="Nguyễn Văn A" disabled required>
+                    <input type="text" name="fullname" class="form-control" disabled>
                   </div>
 
                   <div class="col-md-6">
                     <label class="form-label small">Ngày sinh</label>
                     <div class="d-flex">
-                      <select id="birthDay" class="form-select me-1" disabled required></select>
-                      <select id="birthMonth" class="form-select me-1" disabled required></select>
-                      <select id="birthYear" class="form-select" disabled required></select>
+                      <select id="birthDay" class="form-select me-1" disabled></select>
+                      <select id="birthMonth" class="form-select me-1" disabled></select>
+                      <select id="birthYear" class="form-select" disabled></select>
                     </div>
                   </div>
 
                   <div class="col-md-6">
                     <label class="form-label small">Email</label>
-                    <input type="email" name="email" class="form-control" placeholder="email@example.com" disabled required>
+                    <input type="email" name="email" class="form-control" disabled>
                   </div>
 
                   <div class="col-md-6">
                     <label class="form-label small">Số điện thoại</label>
-                    <input type="text" name="phone" class="form-control" placeholder="0987654321" disabled required>
+                    <input type="text" name="phone" class="form-control" disabled>
                   </div>
 
                   <div class="col-md-6">
                     <label class="form-label small">Tỉnh / Thành phố</label>
                     <div class="autocomplete-wrapper position-relative">
-                      <input type="text" id="province" class="form-control" autocomplete="off" placeholder="Tìm kiếm tỉnh/thành phố..." disabled required>
+                      <input type="text" id="province" class="form-control" autocomplete="off" disabled>
                       <input type="hidden" id="provinceValue" value="">
                       <div id="provinceDropdown" class="autocomplete-dropdown"></div>
                     </div>
@@ -100,7 +100,7 @@
                   <div class="col-md-6">
                     <label class="form-label small">Xã / Phường</label>
                     <div class="autocomplete-wrapper position-relative">
-                      <input type="text" id="ward" class="form-control" autocomplete="off" placeholder="Tìm kiếm xã/phường..." disabled required>
+                      <input type="text" id="ward" class="form-control" autocomplete="off" disabled>
                       <input type="hidden" id="wardValue" value="">
                       <div id="wardDropdown" class="autocomplete-dropdown"></div>
                     </div>
@@ -108,7 +108,7 @@
 
                   <div class="col-12">
                     <label class="form-label small">Địa chỉ chi tiết</label>
-                    <input type="text" id="detailAddress" class="form-control" placeholder="Số nhà, đường..." disabled required>
+                    <input type="text" id="detailAddress" class="form-control" disabled>
                   </div>
 
                   <div class="col-12 text-end">
@@ -117,29 +117,31 @@
                 </div>
               </form>
 
-              <hr class="my-4">
+              <div id="changePasswordSection">
+                <hr class="my-4">
 
-              <h5>Đổi mật khẩu</h5>
-              <div id="passwordAlert" class="alert d-none" role="alert"></div>
-              <form id="passwordForm" class="row g-3 mt-2">
-                <div class="col-md-6">
-                  <label class="form-label small">Mật khẩu hiện tại</label>
-                  <input type="password" name="current" class="form-control" placeholder="Nhập mật khẩu hiện tại" required>
-                </div>
-                <div class="col-md-6"></div>
-                <div class="col-md-6">
-                  <label class="form-label small">Mật khẩu mới</label>
-                  <input type="password" name="new" class="form-control" placeholder="Nhập mật khẩu mới" required>
-                  <small class="text-muted">Tối thiểu 6 ký tự, gồm chữ và số</small>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label small">Xác nhận mật khẩu mới</label>
-                  <input type="password" name="confirm" class="form-control" placeholder="Nhập lại mật khẩu mới" required>
-                </div>
-                <div class="col-12 text-end">
-                  <button type="submit" class="btn btn-success">Cập nhật mật khẩu</button>
-                </div>
-              </form>
+                <h5>Đổi mật khẩu</h5>
+                <div id="passwordAlert" class="alert d-none" role="alert"></div>
+                <form id="passwordForm" class="row g-3 mt-2">
+                  <div class="col-md-6">
+                    <label class="form-label small">Mật khẩu hiện tại</label>
+                    <input type="password" name="current" class="form-control" required>
+                  </div>
+                  <div class="col-md-6"></div>
+                  <div class="col-md-6">
+                    <label class="form-label small">Mật khẩu mới</label>
+                    <input type="password" name="new" class="form-control" required>
+                    <small class="text-muted">Tối thiểu 6 ký tự, gồm chữ và số</small>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label small">Xác nhận mật khẩu mới</label>
+                    <input type="password" name="confirm" class="form-control" required>
+                  </div>
+                  <div class="col-12 text-end">
+                    <button type="submit" class="btn btn-success">Cập nhật mật khẩu</button>
+                  </div>
+                </form>
+              </div>
             </div>
 
             <!-- Đơn hàng của bạn -->
@@ -367,20 +369,34 @@
         }
 
         // Load wards trực tiếp từ province code (sau sáp nhập, chỉ còn 2 cấp)
-        async function loadWardsByProvince(provinceCode) {
+        async function loadWardsByProvince(provinceCode, preserveWardValue = false) {
             const $ward = $('#ward');
             if (!$ward.length) return;
-            $ward.prop('disabled', true).val('').attr('placeholder', 'Đang tải...');
-            $('#wardValue').val('');
+            
+            // Lưu giá trị hiện tại nếu cần preserve
+            const currentWardName = preserveWardValue ? $ward.val() : '';
+            const currentWardCode = preserveWardValue ? $('#wardValue').val() : '';
+            
+            $ward.prop('disabled', true).attr('placeholder', 'Đang tải...');
+            if (!preserveWardValue) {
+                $ward.val('');
+                $('#wardValue').val('');
+            }
             
             if (!provinceCode) {
                 $ward.prop('disabled', true).val('').attr('placeholder', 'Tìm kiếm xã/phường...');
+                $('#wardValue').val('');
                 return;
             }
 
             // Kiểm tra cache
             if (wardsCache.has(provinceCode)) {
                 initializeWardAutocomplete(wardsCache.get(provinceCode));
+                // Khôi phục giá trị nếu cần
+                if (preserveWardValue && currentWardName) {
+                    $ward.val(currentWardName);
+                    $('#wardValue').val(currentWardCode);
+                }
                 return;
             }
 
@@ -411,6 +427,11 @@
                 console.log('Processed wards:', wards.length);
                 wardsCache.set(provinceCode, wards);
                 initializeWardAutocomplete(wards);
+                // Khôi phục giá trị nếu cần
+                if (preserveWardValue && currentWardName) {
+                    $ward.val(currentWardName);
+                    $('#wardValue').val(currentWardCode);
+                }
             } catch (err) {
                 console.error('loadWards error:', err);
                 $ward.prop('disabled', true).val('').attr('placeholder', 'Không thể tải xã/phường');
@@ -702,14 +723,42 @@
             if (parts.length >= 2) {
                 wardName = parts[parts.length - 2];
             }
-            // Phần đầu là địa chỉ chi tiết
+            
+            // Kiểm tra xem phần đầu có phải là địa chỉ chi tiết thực sự không
+            // Nếu chỉ có 2 phần và phần đầu có vẻ là tên phường/xã thì không lấy làm địa chỉ chi tiết
             if (parts.length >= 3) {
                 detailAddress = parts.slice(0, parts.length - 2).join(', ');
             } else if (parts.length === 2) {
-                detailAddress = parts[0];
-            } else {
-                detailAddress = parts[0];
+                const firstPart = parts[0].toLowerCase();
+                // Kiểm tra xem phần đầu có phải là tên phường/xã không
+                if (firstPart.includes('phường') || firstPart.includes('xã') || 
+                    firstPart.includes('thị trấn') || firstPart.includes('thị xã') ||
+                    firstPart.includes('ward') || firstPart.includes('commune')) {
+                    // Nếu là tên phường/xã thì không lấy làm địa chỉ chi tiết
+                    detailAddress = '';
+                } else {
+                    // Nếu không phải tên phường/xã thì có thể là địa chỉ chi tiết
+                    detailAddress = parts[0];
+                }
+            } else if (parts.length === 1) {
+                const singlePart = parts[0].toLowerCase();
+                // Nếu chỉ có 1 phần và có vẻ là tên tỉnh/phường thì không lấy làm địa chỉ chi tiết
+                if (singlePart.includes('phường') || singlePart.includes('xã') || 
+                    singlePart.includes('thành phố') || singlePart.includes('tỉnh') ||
+                    singlePart.includes('thị trấn') || singlePart.includes('thị xã')) {
+                    detailAddress = '';
+                } else {
+                    detailAddress = parts[0];
+                }
             }
+
+            console.log('Parse address result:', {
+                fullAddress,
+                parts,
+                detailAddress,
+                wardName,
+                provinceName
+            });
 
             return {
                 detailAddress: detailAddress,
@@ -744,6 +793,19 @@
             $('input[name=email]').val(customer?.email || customer?.Email || '');
             $('input[name=phone]').val(customer?.phoneNumber || customer?.PhoneNumber || '');
             setDateOfBirth(customer?.dateOfBirth || customer?.DateOfBirth);
+
+            // Kiểm tra loại đăng nhập để ẩn/hiện phần đổi mật khẩu
+            const isOAuthLogin = customer?.isOAuthLogin || customer?.IsOAuthLogin || false;
+            
+            if (isOAuthLogin) {
+                // Ẩn phần đổi mật khẩu nếu đăng nhập bằng Google/Facebook
+                $('#changePasswordSection').hide();
+                console.log('OAuth login detected, hiding password change section');
+            } else {
+                // Hiện phần đổi mật khẩu nếu đăng nhập bằng email/password
+                $('#changePasswordSection').show();
+                console.log('Regular login detected, showing password change section');
+            }
 
             // Xử lý avatar - lấy từ imageCustomers nếu có
             const defaultAvatar = '../LaptopFe/img/avatar.jpg';
@@ -832,6 +894,9 @@
                                     $('#ward').val(ward.name);
                                     $('#wardValue').val(wardCode);
                                 }
+                            } else {
+                                // Nếu không tìm thấy code, vẫn hiển thị tên
+                                $('#ward').val(parsed.wardName);
                             }
                         }
                     } else {
@@ -861,16 +926,49 @@
             const email = $('input[name=email]').val()?.toString().trim();
             const phone = $('input[name=phone]').val()?.toString().trim();
             const detailAddress = $('#detailAddress').val()?.toString().trim();
+            
+            // Lấy tên hiển thị từ input (không phải hidden value)
             const provinceName = $('#province').val()?.toString().trim();
             const wardName = $('#ward').val()?.toString().trim();
 
-            let address = detailAddress || '';
-            if (wardName && wardName !== '') {
-                address = address ? `${address}, ${wardName}` : wardName;
+            // Tạo địa chỉ đầy đủ từ các phần
+            // Chỉ tạo địa chỉ khi có ít nhất một trong các thành phần
+            let address = null;
+            
+            // Nếu có địa chỉ chi tiết, tỉnh, hoặc phường thì tạo địa chỉ
+            if ((detailAddress && detailAddress !== '') || 
+                (provinceName && provinceName !== '') || 
+                (wardName && wardName !== '')) {
+                
+                let addressParts = [];
+                
+                // Thêm địa chỉ chi tiết trước (nếu có)
+                if (detailAddress && detailAddress !== '') {
+                    addressParts.push(detailAddress);
+                }
+                
+                // Thêm phường/xã (nếu có)
+                if (wardName && wardName !== '') {
+                    addressParts.push(wardName);
+                }
+                
+                // Thêm tỉnh/thành phố (nếu có)
+                if (provinceName && provinceName !== '') {
+                    addressParts.push(provinceName);
+                }
+                
+                // Chỉ tạo địa chỉ nếu có ít nhất 1 phần
+                if (addressParts.length > 0) {
+                    address = addressParts.join(', ');
+                }
             }
-            if (provinceName && provinceName !== '') {
-                address = address ? `${address}, ${provinceName}` : provinceName;
-            }
+
+            console.log('Collected address parts:', {
+                detailAddress,
+                wardName,
+                provinceName,
+                finalAddress: address
+            });
 
             return {
                 customerName: fullName,
@@ -886,10 +984,7 @@
             clearAlert();
 
             const payload = collectProfilePayload();
-            if (!payload.customerName || !payload.email || !payload.phoneNumber) {
-                showAlert('danger', 'Vui lòng nhập đầy đủ thông tin bắt buộc.');
-                return;
-            }
+            // Không bắt buộc các trường - chỉ lưu những gì đã nhập
 
             const btn = $('#profileForm button[type=submit]');
             const original = btn.html();
@@ -1518,6 +1613,37 @@
             loadCustomerData();
             loadCustomerOrders();
             loadCustomerHistory();
+            
+            // Xử lý URL parameter để chuyển đến tab cụ thể
+            const urlParams = new URLSearchParams(window.location.search);
+            const tabParam = urlParams.get('tab');
+            if (tabParam === 'orders') {
+                // Chuyển đến tab "Đơn hàng của bạn"
+                setTimeout(function() {
+                    const ordersTab = document.querySelector('a[href="#tab-your-orders"]');
+                    if (ordersTab) {
+                        // Kích hoạt tab
+                        const tab = new bootstrap.Tab(ordersTab);
+                        tab.show();
+                        
+                        // Cuộn đến tab với hiệu ứng
+                        ordersTab.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        
+                        // Thêm hiệu ứng highlight tạm thời
+                        ordersTab.style.backgroundColor = '#fff3cd';
+                        ordersTab.style.transition = 'background-color 0.3s ease';
+                        setTimeout(function() {
+                            ordersTab.style.backgroundColor = '';
+                        }, 2000);
+                        
+                        // Xóa parameter khỏi URL để tránh reload lại tab
+                        const newUrl = window.location.pathname;
+                        window.history.replaceState({}, document.title, newUrl);
+                        
+                        console.log('Đã chuyển đến tab Đơn hàng của bạn từ header');
+                    }
+                }, 1000); // Đợi 1 giây để đảm bảo tất cả đã load xong
+            }
             
             // Trigger event để cập nhật số lượng đơn hàng trong header sau khi load
             setTimeout(function() {

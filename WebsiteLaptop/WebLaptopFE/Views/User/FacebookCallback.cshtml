@@ -1,0 +1,104 @@
+@{
+    ViewData["Title"] = "Facebook Login Callback";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Facebook Login</title>
+</head>
+<body>
+    <script>
+        (function() {
+            try {
+                // Lấy access_token từ URL fragment
+                const hash = window.location.hash;
+                if (hash && hash.includes('access_token=')) {
+                    const params = new URLSearchParams(hash.substring(1));
+                    const accessToken = params.get('access_token');
+                    
+                    if (accessToken) {
+                        // Gửi message về parent window (popup)
+                        if (window.opener && !window.opener.closed) {
+                            try {
+                                window.opener.postMessage({
+                                    type: 'FACEBOOK_LOGIN_SUCCESS',
+                                    accessToken: accessToken
+                                }, window.location.origin);
+                                // Đợi một chút để đảm bảo message được gửi
+                                setTimeout(() => {
+                                    window.close();
+                                }, 100);
+                            } catch (e) {
+                                console.error('Error sending message:', e);
+                                // Fallback: redirect về trang login với token
+                                window.location.href = '/User/Login?fb_token=' + encodeURIComponent(accessToken);
+                            }
+                        } else {
+                            // Nếu không có opener hoặc opener đã đóng, redirect về trang login với token
+                            window.location.href = '/User/Login?fb_token=' + encodeURIComponent(accessToken);
+                        }
+                    } else {
+                        // Kiểm tra error
+                        const error = params.get('error');
+                        const errorReason = params.get('error_reason');
+                        const errorDescription = params.get('error_description');
+                        
+                        if (window.opener && !window.opener.closed) {
+                            try {
+                                window.opener.postMessage({
+                                    type: 'FACEBOOK_LOGIN_ERROR',
+                                    error: errorDescription || errorReason || error || 'Đăng nhập thất bại'
+                                }, window.location.origin);
+                                setTimeout(() => {
+                                    window.close();
+                                }, 100);
+                            } catch (e) {
+                                console.error('Error sending message:', e);
+                                window.location.href = '/User/Login?fb_error=' + encodeURIComponent(errorDescription || errorReason || error || 'Đăng nhập thất bại');
+                            }
+                        } else {
+                            window.location.href = '/User/Login?fb_error=' + encodeURIComponent(errorDescription || errorReason || error || 'Đăng nhập thất bại');
+                        }
+                    }
+                } else {
+                    // Không có token trong URL
+                    if (window.opener && !window.opener.closed) {
+                        try {
+                            window.opener.postMessage({
+                                type: 'FACEBOOK_LOGIN_ERROR',
+                                error: 'Không thể lấy access token từ Facebook'
+                            }, window.location.origin);
+                            setTimeout(() => {
+                                window.close();
+                            }, 100);
+                        } catch (e) {
+                            window.location.href = '/User/Login';
+                        }
+                    } else {
+                        window.location.href = '/User/Login';
+                    }
+                }
+            } catch (error) {
+                console.error('Facebook callback error:', error);
+                if (window.opener && !window.opener.closed) {
+                    try {
+                        window.opener.postMessage({
+                            type: 'FACEBOOK_LOGIN_ERROR',
+                            error: error.message || 'Lỗi xử lý callback'
+                        }, window.location.origin);
+                        setTimeout(() => {
+                            window.close();
+                        }, 100);
+                    } catch (e) {
+                        window.location.href = '/User/Login';
+                    }
+                } else {
+                    window.location.href = '/User/Login';
+                }
+            }
+        })();
+    </script>
+</body>
+</html>
+

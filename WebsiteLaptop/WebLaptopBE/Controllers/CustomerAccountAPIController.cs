@@ -53,7 +53,9 @@ namespace WebLaptopBE.Controllers
                     customer.Username,
                     customer.Avatar,
                     customer.Active,
-                    customer.DateOfBirth
+                    customer.DateOfBirth,
+                    // Thêm password để frontend kiểm tra loại đăng nhập (không trả về password thực)
+                    IsOAuthLogin = customer.Password == "GOOGLE_OAUTH" || customer.Password == "FACEBOOK_OAUTH"
                 });
             }
             catch (Exception ex)
@@ -258,6 +260,11 @@ namespace WebLaptopBE.Controllers
                 if (!string.IsNullOrWhiteSpace(request.Address))
                 {
                     customer.Address = request.Address.Trim();
+                }
+                else
+                {
+                    // Nếu address là null hoặc empty, set về null
+                    customer.Address = null;
                 }
 
                 DateOnly? dob = request.DateOfBirth;

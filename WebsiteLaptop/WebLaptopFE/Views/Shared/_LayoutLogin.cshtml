@@ -1,7 +1,20 @@
 ﻿@using System.Text.Json
+@using Microsoft.Extensions.Configuration
+@inject IConfiguration Configuration
 @{
     var authApiBase = Environment.GetEnvironmentVariable("AUTH_API_BASE") ?? "http://localhost:5068";
     var authApiBaseJson = JsonSerializer.Serialize(authApiBase);
+    // Lấy Google Client ID từ config
+    var googleClientId = Configuration["GoogleOAuth:ClientId"] 
+        ?? Configuration.GetValue<string>("GoogleOAuth:ClientId") 
+        ?? "959838467774-86s30prd14e27emt61neavb1m9r3uu5j.apps.googleusercontent.com"; // Fallback
+    var googleClientIdJson = JsonSerializer.Serialize(googleClientId);
+    
+    // Lấy Facebook App ID từ config
+    var facebookAppId = Configuration["FacebookOAuth:AppId"] 
+        ?? Configuration.GetValue<string>("FacebookOAuth:AppId") 
+        ?? "1188282026519584"; // Fallback
+    var facebookAppIdJson = JsonSerializer.Serialize(facebookAppId);
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -60,6 +73,58 @@
     <script src="../LaptopFe/js/main.js"></script>
     <script>
         window.AUTH_API_BASE = window.AUTH_API_BASE || @Html.Raw(authApiBaseJson);
+        // Đảm bảo Google Client ID được set
+        var googleClientIdValue = @Html.Raw(googleClientIdJson);
+        if (!window.GOOGLE_CLIENT_ID && googleClientIdValue) {
+            window.GOOGLE_CLIENT_ID = googleClientIdValue;
+        }
+        // Fallback: Nếu vẫn không có, sử dụng giá trị từ backend appsettings
+        if (!window.GOOGLE_CLIENT_ID || window.GOOGLE_CLIENT_ID === '') {
+            window.GOOGLE_CLIENT_ID = '959838467774-86s30prd14e27emt61neavb1m9r3uu5j.apps.googleusercontent.com';
+        }
+        console.log('Google Client ID:', window.GOOGLE_CLIENT_ID);
+        console.log('Google Client ID from config:', @Html.Raw(googleClientIdJson));
+        
+        // Facebook App ID
+        var facebookAppIdValue = @Html.Raw(facebookAppIdJson);
+        if (!window.FACEBOOK_APP_ID && facebookAppIdValue) {
+            window.FACEBOOK_APP_ID = facebookAppIdValue;
+        }
+        // Fallback: Nếu vẫn không có, sử dụng giá trị từ backend appsettings
+        if (!window.FACEBOOK_APP_ID || window.FACEBOOK_APP_ID === '') {
+            window.FACEBOOK_APP_ID = '1188282026519584';
+        }
+        console.log('Facebook App ID:', window.FACEBOOK_APP_ID);
+        console.log('Facebook App ID from config:', @Html.Raw(facebookAppIdJson));
+    </script>
+    <!-- Google Sign-In - Load trước access.js -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Facebook SDK -->
+    <div id="fb-root"></div>
+    <script>
+        window.fbAsyncInit = function() {
+            // Đảm bảo App ID đã được set
+            var appId = window.FACEBOOK_APP_ID || '1188282026519584';
+            if (appId && typeof FB !== 'undefined') {
+                FB.init({
+                    appId: appId,
+                    cookie: true,
+                    xfbml: true,
+                    version: 'v18.0'
+                });
+                console.log('Facebook SDK initialized with App ID:', appId);
+            } else {
+                console.warn('Facebook SDK chưa sẵn sàng hoặc App ID chưa được set');
+            }
+        };
+        (function(d, s, id) {
+            var js, fjs = d.getElementsByTagName(s)[0];
+            if (d.getElementById(id)) return;
+            js = d.createElement(s); js.id = id;
+            js.src = "https://connect.facebook.net/vi_VN/sdk.js";
+            js.async = true; js.defer = true;
+            fjs.parentNode.insertBefore(js, fjs);
+        }(document, 'script', 'facebook-jssdk'));
     </script>
     <script src="../LaptopFe/js/access.js"></script>
 
