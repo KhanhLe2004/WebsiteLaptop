@@ -308,6 +308,27 @@
                         </span>
                     }
                 </li>
+                <li class="nav-item">
+                    @if (HasPermissionMenu("History"))
+                    {
+                        <a class="nav-link text-white" asp-area="Admin" asp-controller="History" asp-action="Index">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">history</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Lịch sử hoạt động</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="nav-link text-white" style="opacity: 0.5; cursor: not-allowed;">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">history</i>
+                                <i class="material-icons opacity-10 ms-1" style="font-size: 16px;">lock</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Lịch sử hoạt động</span>
+                        </span>
+                    }
+                </li>
                 <li class="nav-item mt-3">
                     <h6 class="ps-4 ms-2 text-uppercase text-xs text-white font-weight-bolder opacity-8">Account pages</h6>
                 </li>
@@ -355,6 +376,20 @@
     <script async defer src="https://buttons.github.io/buttons.js"></script>
     <!-- Control Center for Material Dashboard: parallax effects, scripts for the example pages etc -->
     <script src="/LayoutAdmin/assets/js/material-dashboard.min.js?v=3.1.0"></script>
+    
+    <!-- Setup AJAX để tự động thêm EmployeeId header -->
+    <script>
+        $(document).ready(function() {
+            var employeeId = '@Context.Session.GetString("EmployeeId")';
+            if (employeeId) {
+                $.ajaxSetup({
+                    beforeSend: function(xhr) {
+                        xhr.setRequestHeader('X-Employee-Id', employeeId);
+                    }
+                });
+            }
+        });
+    </script>
     
     @RenderSection("Scripts", required: false)
 </body>

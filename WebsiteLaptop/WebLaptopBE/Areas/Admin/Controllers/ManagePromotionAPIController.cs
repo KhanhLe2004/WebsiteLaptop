@@ -7,6 +7,7 @@ using System.Linq;
 using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
+using WebLaptopBE.Services;
 
 namespace WebLaptopBE.Areas.Admin.Controllers
 {
@@ -15,10 +16,18 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     public class ManagePromotionAPIController : ControllerBase
     {
         private readonly Testlaptop35Context _context;
+        private readonly HistoryService _historyService;
 
-        public ManagePromotionAPIController(Testlaptop35Context context)
+        public ManagePromotionAPIController(Testlaptop35Context context, HistoryService historyService)
         {
             _context = context;
+            _historyService = historyService;
+        }
+
+        // Helper method để lấy EmployeeId từ header
+        private string? GetEmployeeId()
+        {
+            return Request.Headers["X-Employee-Id"].FirstOrDefault();
         }
 
         // GET: api/admin/promotions
@@ -186,6 +195,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 _context.Promotions.Add(promotion);
                 await _context.SaveChangesAsync();
 
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Thêm khuyến mại: {promotion.PromotionId} - {product.ProductName} ({promotion.Type})");
+                }
+
                 var result = new PromotionDTO
                 {
                     PromotionId = promotion.PromotionId,
@@ -250,6 +266,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
 
                 await _context.SaveChangesAsync();
 
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Sửa khuyến mại: {id} - {product.ProductName} ({promotion.Type})");
+                }
+
                 var result = new PromotionDTO
                 {
                     PromotionId = promotion.PromotionId,
@@ -283,8 +306,19 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     return NotFound(new { message = "Không tìm thấy khuyến mại" });
                 }
 
+                // Lấy thông tin sản phẩm trước khi xóa để log
+                var product = await _context.Products.FirstOrDefaultAsync(p => p.ProductId == promotion.ProductId);
+                var productName = product?.ProductName ?? promotion.ProductId;
+
                 _context.Promotions.Remove(promotion);
                 await _context.SaveChangesAsync();
+
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Xóa khuyến mại: {id} - {productName} ({promotion.Type})");
+                }
 
                 return Ok(new { message = "Xóa khuyến mại thành công" });
             }
@@ -397,6 +431,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 if (createdPromotions.Count > 0)
                 {
                     await _context.SaveChangesAsync();
+
+                    // Ghi log lịch sử
+                    var employeeId = GetEmployeeId();
+                    if (!string.IsNullOrEmpty(employeeId))
+                    {
+                        await _historyService.LogHistoryAsync(employeeId, $"Thêm khuyến mại hàng loạt: {createdPromotions.Count} khuyến mại ({dto.Type})");
+                    }
                 }
                 else if (errors.Count > 0)
                 {

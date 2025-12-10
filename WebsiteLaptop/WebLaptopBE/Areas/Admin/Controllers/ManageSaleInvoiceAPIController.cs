@@ -5,6 +5,7 @@ using System.Linq;
 using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
+using WebLaptopBE.Services;
 
 namespace WebLaptopBE.Areas.Admin.Controllers
 {
@@ -13,10 +14,18 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     public class ManageSaleInvoiceAPIController : ControllerBase
     {
         private readonly Testlaptop35Context _context;
+        private readonly HistoryService _historyService;
 
-        public ManageSaleInvoiceAPIController(Testlaptop35Context context)
+        public ManageSaleInvoiceAPIController(Testlaptop35Context context, HistoryService historyService)
         {
             _context = context;
+            _historyService = historyService;
+        }
+
+        // Helper method để lấy EmployeeId từ header
+        private string? GetEmployeeId()
+        {
+            return Request.Headers["X-Employee-Id"].FirstOrDefault();
         }
 
         // GET: api/admin/sale-invoices
@@ -204,6 +213,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 await _context.Entry(saleInvoice)
                     .Reference(si => si.Employee)
                     .LoadAsync();
+
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId() ?? dto.EmployeeId;
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Cập nhật trạng thái hóa đơn: {id} - {oldStatus} → {dto.Status}");
+                }
 
                 var result = new SaleInvoiceDTO
                 {

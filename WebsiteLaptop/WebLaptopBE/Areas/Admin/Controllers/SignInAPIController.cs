@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
+using WebLaptopBE.Services;
 
 namespace WebLaptopBE.Areas.Admin.Controllers
 {
@@ -12,10 +13,12 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     public class SignInAPIController : ControllerBase
     {
         private readonly Testlaptop35Context _context;
+        private readonly HistoryService _historyService;
 
-        public SignInAPIController(Testlaptop35Context context)
+        public SignInAPIController(Testlaptop35Context context, HistoryService historyService)
         {
             _context = context;
+            _historyService = historyService;
         }
 
         // POST: api/SignInAPI
@@ -90,6 +93,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         Active = employee.Active
                     }
                 };
+
+                // Log history cho đăng nhập thành công
+                await _historyService.LogHistoryAsync(employee.EmployeeId, $"Đăng nhập hệ thống");
 
                 return Ok(response);
             }

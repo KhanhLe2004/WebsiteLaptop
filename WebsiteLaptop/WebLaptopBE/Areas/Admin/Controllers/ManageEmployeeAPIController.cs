@@ -6,6 +6,7 @@ using System.Text.Json;
 using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
+using WebLaptopBE.Services;
 
 namespace WebLaptopBE.Areas.Admin.Controllers
 {
@@ -16,14 +17,22 @@ namespace WebLaptopBE.Areas.Admin.Controllers
         private readonly Testlaptop35Context _context;
         private readonly IWebHostEnvironment _environment;
         private readonly HttpClient _httpClient;
+        private readonly HistoryService _historyService;
         private const string ADDRESS_API_BASE_URL = "https://production.cas.so/address-kit/2025-07-01";
 
-        public ManageEmployeeAPIController(Testlaptop35Context context, IWebHostEnvironment environment, IHttpClientFactory httpClientFactory)
+        public ManageEmployeeAPIController(Testlaptop35Context context, IWebHostEnvironment environment, IHttpClientFactory httpClientFactory, HistoryService historyService)
         {
             _context = context;
             _environment = environment;
             _httpClient = httpClientFactory.CreateClient();
             _httpClient.Timeout = TimeSpan.FromSeconds(30);
+            _historyService = historyService;
+        }
+
+        // Helper method để lấy EmployeeId từ header
+        private string? GetEmployeeId()
+        {
+            return Request.Headers["X-Employee-Id"].FirstOrDefault();
         }
 
         // GET: api/admin/employees
@@ -322,6 +331,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
 
                 var result = ParseEmployeeAddress(employee);
 
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Thêm nhân viên: {employee.EmployeeId} - {employee.EmployeeName}");
+                }
+
                 return CreatedAtAction(nameof(GetEmployee), new { id = employee.EmployeeId }, result);
             }
             catch (Exception ex)
@@ -542,6 +558,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 
                 var result = ParseEmployeeAddress(employee);
                 
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Sửa nhân viên: {id} - {employee.EmployeeName}");
+                }
+                
                 return Ok(result);
             }
             catch (Exception ex)
@@ -574,6 +597,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 employee.Active = false;
                 await _context.SaveChangesAsync();
 
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Xóa nhân viên: {id} - {employee.EmployeeName}");
+                }
+
                 return Ok(new { message = "Đã ẩn nhân viên thành công" });
             }
             catch (Exception ex)
@@ -599,6 +629,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 // Set active = true
                 employee.Active = true;
                 await _context.SaveChangesAsync();
+
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Khôi phục nhân viên: {id} - {employee.EmployeeName}");
+                }
 
                 return Ok(new { message = "Khôi phục nhân viên thành công" });
             }

@@ -38,6 +38,9 @@ builder.Services.AddSingleton<WebLaptopBE.Services.EmailService>();
 // Đăng ký VnPayService
 builder.Services.AddScoped<WebLaptopBE.Services.IVnPayService, WebLaptopBE.Services.VnPayService>();
 
+// Đăng ký HistoryService
+builder.Services.AddScoped<WebLaptopBE.Services.HistoryService>();
+
 // Add Session support cho VNPay pending orders
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>

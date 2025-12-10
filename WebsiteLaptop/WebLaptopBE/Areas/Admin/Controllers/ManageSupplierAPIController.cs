@@ -7,6 +7,7 @@ using System.Linq;
 using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
+using WebLaptopBE.Services;
 
 namespace WebLaptopBE.Areas.Admin.Controllers
 {
@@ -15,10 +16,17 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     public class ManageSupplierAPIController : ControllerBase
     {
         private readonly Testlaptop35Context _context;
+        private readonly HistoryService _historyService;
 
-        public ManageSupplierAPIController(Testlaptop35Context context)
+        public ManageSupplierAPIController(Testlaptop35Context context, HistoryService historyService)
         {
             _context = context;
+            _historyService = historyService;
+        }
+
+        private string? GetEmployeeId()
+        {
+            return HttpContext.Request.Headers.TryGetValue("X-EmployeeId", out var employeeId) ? employeeId.ToString() : null;
         }
 
         // GET: api/admin/suppliers
@@ -170,6 +178,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 _context.Suppliers.Add(supplier);
                 await _context.SaveChangesAsync();
 
+                // Log history
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Thêm nhà cung cấp: {supplier.SupplierId} - {supplier.SupplierName}");
+                }
+
                 var result = new SupplierDTO
                 {
                     SupplierId = supplier.SupplierId,
@@ -223,6 +238,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
 
                 await _context.SaveChangesAsync();
 
+                // Log history
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Cập nhật nhà cung cấp: {id} - {supplier.SupplierName}");
+                }
+
                 var result = new SupplierDTO
                 {
                     SupplierId = supplier.SupplierId,
@@ -268,6 +290,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 supplier.Active = false;
                 await _context.SaveChangesAsync();
 
+                // Log history
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Xóa nhà cung cấp: {id} - {supplier.SupplierName}");
+                }
+
                 return Ok(new { message = "Đã ẩn nhà cung cấp thành công" });
             }
             catch (Exception ex)
@@ -292,6 +321,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 // Set active = true
                 supplier.Active = true;
                 await _context.SaveChangesAsync();
+
+                // Log history
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Khôi phục nhà cung cấp: {id} - {supplier.SupplierName}");
+                }
 
                 return Ok(new { message = "Khôi phục nhà cung cấp thành công" });
             }

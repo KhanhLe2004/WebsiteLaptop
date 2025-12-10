@@ -7,6 +7,7 @@ using System.Threading;
 using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
+using WebLaptopBE.Services;
 
 namespace WebLaptopBE.Areas.Admin.Controllers
 {
@@ -17,14 +18,22 @@ namespace WebLaptopBE.Areas.Admin.Controllers
         private readonly Testlaptop35Context _context;
         private readonly IWebHostEnvironment _environment;
         private readonly HttpClient _httpClient;
+        private readonly HistoryService _historyService;
         private const string ADDRESS_API_BASE_URL = "https://production.cas.so/address-kit/2025-07-01";
 
-        public ManageCustomerAPIController(Testlaptop35Context context, IWebHostEnvironment environment, IHttpClientFactory httpClientFactory)
+        public ManageCustomerAPIController(Testlaptop35Context context, IWebHostEnvironment environment, IHttpClientFactory httpClientFactory, HistoryService historyService)
         {
             _context = context;
             _environment = environment;
             _httpClient = httpClientFactory.CreateClient();
             _httpClient.Timeout = TimeSpan.FromSeconds(30);
+            _historyService = historyService;
+        }
+
+        // Helper method để lấy EmployeeId từ header
+        private string? GetEmployeeId()
+        {
+            return Request.Headers["X-Employee-Id"].FirstOrDefault();
         }
 
         // GET: api/admin/customers
@@ -291,6 +300,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 
                 var result = ParseCustomerAddress(customer);
                 
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Sửa khách hàng: {id} - {customer.CustomerName}");
+                }
+                
                 return Ok(result);
             }
             catch (Exception ex)
@@ -327,6 +343,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 customer.Active = false;
                 await _context.SaveChangesAsync();
 
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Xóa khách hàng: {id} - {customer.CustomerName}");
+                }
+
                 return Ok(new { message = "Đã ẩn khách hàng thành công" });
             }
             catch (Exception ex)
@@ -352,6 +375,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 // Set active = true
                 customer.Active = true;
                 await _context.SaveChangesAsync();
+
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Khôi phục khách hàng: {id} - {customer.CustomerName}");
+                }
 
                 return Ok(new { message = "Khôi phục khách hàng thành công" });
             }

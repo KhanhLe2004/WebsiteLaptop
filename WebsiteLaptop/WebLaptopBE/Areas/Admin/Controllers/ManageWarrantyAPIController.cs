@@ -6,6 +6,7 @@ using System.Linq;
 using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
+using WebLaptopBE.Services;
 
 namespace WebLaptopBE.Areas.Admin.Controllers
 {
@@ -14,10 +15,17 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     public class ManageWarrantyAPIController : ControllerBase
     {
         private readonly Testlaptop35Context _context;
+        private readonly HistoryService _historyService;
 
-        public ManageWarrantyAPIController(Testlaptop35Context context)
+        public ManageWarrantyAPIController(Testlaptop35Context context, HistoryService historyService)
         {
             _context = context;
+            _historyService = historyService;
+        }
+
+        private string? GetEmployeeId()
+        {
+            return HttpContext.Request.Headers.TryGetValue("X-EmployeeId", out var employeeId) ? employeeId.ToString() : null;
         }
 
         // GET: api/admin/warranties
@@ -403,6 +411,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 _context.Warranties.Add(warranty);
                 await _context.SaveChangesAsync();
 
+                // Log history
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Thêm bảo hành: {warranty.WarrantyId}");
+                }
+
                 // Load lại để lấy thông tin đầy đủ
                 await _context.Entry(warranty)
                     .Reference(w => w.Customer)
@@ -500,6 +515,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 warranty.TotalAmount = totalAmount;
 
                 await _context.SaveChangesAsync();
+
+                // Log history
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Cập nhật bảo hành: {id}");
+                }
 
                 // Load lại để lấy thông tin đầy đủ
                 await _context.Entry(warranty)

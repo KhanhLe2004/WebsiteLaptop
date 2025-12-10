@@ -59,8 +59,8 @@ namespace WebLaptopFE.Areas.Admin.Controllers
                 return false;
             }
 
-            // Dashboard và ManageProfile: Tất cả nhân viên đều có quyền truy cập
-            if (controllerName == "Dashboard" || controllerName == "ManageProfile")
+            // Dashboard, ManageProfile và History: Tất cả nhân viên đều có quyền truy cập
+            if (controllerName == "Dashboard" || controllerName == "ManageProfile" || controllerName == "History")
             {
                 return true;
             }

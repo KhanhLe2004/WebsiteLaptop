@@ -7,6 +7,7 @@ using System.Linq;
 using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
+using WebLaptopBE.Services;
 
 namespace WebLaptopBE.Areas.Admin.Controllers
 {
@@ -15,10 +16,18 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     public class ManageBrandAPIController : ControllerBase
     {
         private readonly Testlaptop35Context _context;
+        private readonly HistoryService _historyService;
 
-        public ManageBrandAPIController(Testlaptop35Context context)
+        public ManageBrandAPIController(Testlaptop35Context context, HistoryService historyService)
         {
             _context = context;
+            _historyService = historyService;
+        }
+
+        // Helper method để lấy EmployeeId từ header
+        private string? GetEmployeeId()
+        {
+            return Request.Headers["X-Employee-Id"].FirstOrDefault();
         }
 
         // GET: api/admin/brands
@@ -167,6 +176,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 _context.Brands.Add(brand);
                 await _context.SaveChangesAsync();
 
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Thêm thương hiệu: {brand.BrandId} - {brand.BrandName}");
+                }
+
                 var result = new BrandDTO
                 {
                     BrandId = brand.BrandId,
@@ -224,6 +240,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
 
                 await _context.SaveChangesAsync();
 
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Sửa thương hiệu: {id} - {brand.BrandName}");
+                }
+
                 var result = new BrandDTO
                 {
                     BrandId = brand.BrandId,
@@ -267,6 +290,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 brand.Active = false;
                 await _context.SaveChangesAsync();
 
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Xóa thương hiệu: {id} - {brand.BrandName}");
+                }
+
                 return Ok(new { message = "Đã ẩn hãng thành công" });
             }
             catch (Exception ex)
@@ -291,6 +321,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 // Set active = true
                 brand.Active = true;
                 await _context.SaveChangesAsync();
+
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Khôi phục thương hiệu: {id} - {brand.BrandName}");
+                }
 
                 return Ok(new { message = "Khôi phục hãng thành công" });
             }

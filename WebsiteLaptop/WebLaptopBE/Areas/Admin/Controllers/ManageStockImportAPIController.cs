@@ -6,6 +6,7 @@ using System.Linq;
 using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
+using WebLaptopBE.Services;
 
 namespace WebLaptopBE.Areas.Admin.Controllers
 {
@@ -14,10 +15,17 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     public class ManageStockImportAPIController : ControllerBase
     {
         private readonly Testlaptop35Context _context;
+        private readonly HistoryService _historyService;
 
-        public ManageStockImportAPIController(Testlaptop35Context context)
+        public ManageStockImportAPIController(Testlaptop35Context context, HistoryService historyService)
         {
             _context = context;
+            _historyService = historyService;
+        }
+
+        private string? GetEmployeeId()
+        {
+            return HttpContext.Request.Headers.TryGetValue("X-EmployeeId", out var employeeId) ? employeeId.ToString() : null;
         }
 
         // GET: api/admin/stock-imports
@@ -513,6 +521,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
 
                 await _context.SaveChangesAsync();
 
+                // Log history
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Cập nhật phiếu nhập hàng: {id}");
+                }
+
                 // Load lại để lấy thông tin đầy đủ
                 await _context.Entry(stockImport)
                     .Reference(si => si.Supplier)
@@ -527,26 +542,26 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     .LoadAsync();
 
                 var result = new StockImportDTO
-                {
-                    StockImportId = stockImport.StockImportId,
-                    SupplierId = stockImport.SupplierId,
-                    SupplierName = stockImport.Supplier?.SupplierName,
-                    EmployeeId = stockImport.EmployeeId,
-                    EmployeeName = stockImport.Employee?.EmployeeName,
-                    Time = stockImport.Time,
-                    TotalAmount = stockImport.TotalAmount,
-                    Details = stockImport.StockImportDetails?.Select(detail => new StockImportDetailDTO
                     {
-                        StockImportDetailId = detail.StockImportDetailId,
-                        StockImportId = detail.StockImportId,
-                        ProductId = detail.ProductId,
-                        ProductName = detail.Product?.ProductName,
-                        ProductModel = detail.Product?.ProductModel,
-                        Specifications = detail.Specifications,
-                        Quantity = detail.Quantity,
-                        Price = detail.Price
-                    }).ToList()
-                };
+                        StockImportId = stockImport.StockImportId,
+                        SupplierId = stockImport.SupplierId,
+                        SupplierName = stockImport.Supplier?.SupplierName,
+                        EmployeeId = stockImport.EmployeeId,
+                        EmployeeName = stockImport.Employee?.EmployeeName,
+                        Time = stockImport.Time,
+                        TotalAmount = stockImport.TotalAmount,
+                        Details = stockImport.StockImportDetails?.Select(detail => new StockImportDetailDTO
+                        {
+                            StockImportDetailId = detail.StockImportDetailId,
+                            StockImportId = detail.StockImportId,
+                            ProductId = detail.ProductId,
+                            ProductName = detail.Product?.ProductName,
+                            ProductModel = detail.Product?.ProductModel,
+                            Specifications = detail.Specifications,
+                            Quantity = detail.Quantity,
+                            Price = detail.Price
+                        }).ToList()
+                    };
 
                 return Ok(result);
             }
@@ -606,6 +621,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 _context.StockImports.Remove(stockImport);
 
                 await _context.SaveChangesAsync();
+
+                // Log history
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Xóa phiếu nhập hàng: {id}");
+                }
 
                 return Ok(new { message = "Xóa phiếu nhập hàng thành công" });
             }

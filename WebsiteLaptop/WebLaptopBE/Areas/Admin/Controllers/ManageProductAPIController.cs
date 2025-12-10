@@ -7,6 +7,7 @@ using System.Text.Json;
 using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
+using WebLaptopBE.Services;
 
 namespace WebLaptopBE.Areas.Admin.Controllers
 {
@@ -16,11 +17,19 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     {
         private readonly Testlaptop35Context _context;
         private readonly IWebHostEnvironment _environment;
+        private readonly HistoryService _historyService;
 
-        public ManageProductAPIController(  Testlaptop35Context context, IWebHostEnvironment environment)
+        public ManageProductAPIController(Testlaptop35Context context, IWebHostEnvironment environment, HistoryService historyService)
         {
             _context = context;
             _environment = environment;
+            _historyService = historyService;
+        }
+
+        // Helper method để lấy EmployeeId từ header
+        private string? GetEmployeeId()
+        {
+            return Request.Headers["X-Employee-Id"].FirstOrDefault();
         }
 
         // GET: api/admin/products
@@ -415,6 +424,14 @@ namespace WebLaptopBE.Areas.Admin.Controllers
 
                 // Load lại product với đầy đủ thông tin
                 var result = await GetProductByIdAsync(product.ProductId);
+                
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Thêm sản phẩm: {product.ProductId} - {product.ProductName}");
+                }
+                
                 return CreatedAtAction(nameof(GetProduct), new { id = product.ProductId }, result);
             }
             catch (Exception ex)
@@ -680,6 +697,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     }
                 }
 
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Sửa sản phẩm: {id} - {product.ProductName}");
+                }
+
                 return Ok(new { message = "Cập nhật sản phẩm thành công" });
             }
             catch (Exception ex)
@@ -704,6 +728,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 // Set active = 0 thay vì xóa
                 product.Active = false;
                 await _context.SaveChangesAsync();
+
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Xóa sản phẩm: {id} - {product.ProductName}");
+                }
 
                 return Ok(new { message = "Đã ẩn sản phẩm thành công" });
             }
@@ -730,6 +761,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 // Set active = 1
                 product.Active = true;
                 await _context.SaveChangesAsync();
+
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Khôi phục sản phẩm: {id} - {product.ProductName}");
+                }
 
                 return Ok(new { message = "Khôi phục sản phẩm thành công" });
             }
