@@ -12,9 +12,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageSaleInvoiceAPIController : ControllerBase
     {
-        private readonly Testlaptop35Context _context;
+        private readonly Data.Testlaptop36Context _context;
 
-        public ManageSaleInvoiceAPIController(Testlaptop35Context context)
+        public ManageSaleInvoiceAPIController(Data.Testlaptop36Context context)
         {
             _context = context;
         }

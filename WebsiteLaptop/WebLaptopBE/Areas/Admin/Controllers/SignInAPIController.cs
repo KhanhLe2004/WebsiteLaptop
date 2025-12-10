@@ -11,9 +11,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class SignInAPIController : ControllerBase
     {
-        private readonly Testlaptop35Context _context;
+        private readonly Data.Testlaptop36Context _context;
 
-        public SignInAPIController(Testlaptop35Context context)
+        public SignInAPIController(Data.Testlaptop36Context context)
         {
             _context = context;
         }

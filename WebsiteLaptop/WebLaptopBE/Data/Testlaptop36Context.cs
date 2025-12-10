@@ -5,13 +5,13 @@ using WebLaptopBE.Models;
 
 namespace WebLaptopBE.Data;
 
-public partial class Testlaptop35Context : DbContext
+public partial class Testlaptop36Context : DbContext
 {
-    public Testlaptop35Context()
+    public Testlaptop36Context()
     {
     }
 
-    public Testlaptop35Context(DbContextOptions<Testlaptop35Context> options)
+    public Testlaptop36Context(DbContextOptions<Testlaptop36Context> options)
         : base(options)
     {
     }

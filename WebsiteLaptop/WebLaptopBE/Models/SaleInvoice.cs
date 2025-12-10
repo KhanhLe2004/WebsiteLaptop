@@ -17,6 +17,8 @@ public partial class SaleInvoice
 
     public decimal? DeliveryFee { get; set; }
 
+    public decimal? Discount { get; set; }
+
     public string? DeliveryAddress { get; set; }
 
     public string? EmployeeId { get; set; }

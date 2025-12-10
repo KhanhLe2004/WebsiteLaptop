@@ -14,12 +14,12 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageCustomerAPIController : ControllerBase
     {
-        private readonly Testlaptop35Context _context;
+        private readonly Data.Testlaptop36Context _context;
         private readonly IWebHostEnvironment _environment;
         private readonly HttpClient _httpClient;
         private const string ADDRESS_API_BASE_URL = "https://production.cas.so/address-kit/2025-07-01";
 
-        public ManageCustomerAPIController(Testlaptop35Context context, IWebHostEnvironment environment, IHttpClientFactory httpClientFactory)
+        public ManageCustomerAPIController(Data.Testlaptop36Context context, IWebHostEnvironment environment, IHttpClientFactory httpClientFactory)
         {
             _context = context;
             _environment = environment;

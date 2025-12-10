@@ -9,7 +9,7 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class FogetPassswordAPIController : ControllerBase
     {
-        private readonly Testlaptop35Context _db = new();
+        private readonly Data.Testlaptop36Context _db = new();
 
         [HttpPost]
         public IActionResult SendReset([FromBody] ForgotPasswordRequest request)

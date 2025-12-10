@@ -14,9 +14,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageBrandAPIController : ControllerBase
     {
-        private readonly Testlaptop35Context _context;
+        private readonly Data.Testlaptop36Context _context;
 
-        public ManageBrandAPIController(Testlaptop35Context context)
+        public ManageBrandAPIController(Data.Testlaptop36Context context)
         {
             _context = context;
         }
