@@ -148,6 +148,7 @@ namespace WebLaptopBE.Controllers
         [HttpGet("shop/search")]
         public IActionResult SearchProducts(
             [FromQuery] string? brandIds, // Comma-separated brand IDs
+            [FromQuery] string? productName, // Product name filter
             [FromQuery] string? priceRanges, // Comma-separated price ranges like "500-1000,1500-2000"
             [FromQuery] string? ramOptions, // Comma-separated RAM values like "8GB,16GB"
             [FromQuery] string? storageOptions, // Comma-separated storage values
@@ -159,11 +160,12 @@ namespace WebLaptopBE.Controllers
             {
                 // Normalize input presence
                 bool hasBrandFilter = !string.IsNullOrWhiteSpace(brandIds);
+                bool hasProductNameFilter = !string.IsNullOrWhiteSpace(productName);
                 bool hasPriceFilter = !string.IsNullOrWhiteSpace(priceRanges);
                 bool hasRamFilter = !string.IsNullOrWhiteSpace(ramOptions);
                 bool hasStorageFilter = !string.IsNullOrWhiteSpace(storageOptions);
 
-                // 1) Build base product set applying brand and sellingPrice filters
+                // 1) Build base product set applying brand, productName and sellingPrice filters
                 var productsBaseQuery = _db.Products
                     .AsNoTracking()
                     .Where(p => p.Active == true);
@@ -180,6 +182,13 @@ namespace WebLaptopBE.Controllers
                     {
                         productsBaseQuery = productsBaseQuery.Where(p => p.BrandId != null && brandIdList.Contains(p.BrandId));
                     }
+                }
+
+                if (hasProductNameFilter)
+                {
+                    var normalizedProductName = $"%{productName!.Trim()}%";
+                    productsBaseQuery = productsBaseQuery.Where(p => p.ProductName != null &&
+                                                                     EF.Functions.Like(p.ProductName, normalizedProductName));
                 }
 
                 if (hasPriceFilter)
@@ -339,7 +348,7 @@ namespace WebLaptopBE.Controllers
 
                 // 3) Determine final product IDs
                 List<string> finalProductIds;
-                bool noFiltersAtAll = !(hasBrandFilter || hasPriceFilter || hasRamFilter || hasStorageFilter);
+                bool noFiltersAtAll = !(hasBrandFilter || hasProductNameFilter || hasPriceFilter || hasRamFilter || hasStorageFilter);
 
                 if (noFiltersAtAll)
                 {

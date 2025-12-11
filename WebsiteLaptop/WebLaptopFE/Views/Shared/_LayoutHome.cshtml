@@ -380,26 +380,26 @@
                     });
 
                     var brands = Object.values(brandMap).filter(function (b) { return (b.brandId || '').length > 0; });
-                    // Build list
-                    var html = '';
+                    // Build list - bắt đầu với "Tất cả sản phẩm"
+                    var html = '<li><a href="/Home/Shop" class="h6 px-5 py-3 rounded bg-white mb-2"><i class="fas fa-th text-primary me-2"></i>Tất cả sản phẩm</a></li>';
                     brands.forEach(function (b) {
                         var productNames = Array.from(b.productNames).sort();
                         if (productNames.length > 0) {
                             html += '<li>';
                             html += '  <div class="dropdown category-dropdown">';
-                            html += '    <a href="/Home/Index?brandId=' + encodeURIComponent(b.brandId) + '" class="h6 px-5 py-3 rounded bg-white mb-2 dropdown-toggle d-flex align-items-center justify-content-between js-has-sub" aria-expanded="false">';
+                            html += '    <a href="/Home/Shop?brandId=' + encodeURIComponent(b.brandId) + '" class="h6 px-5 py-3 rounded bg-white mb-2 dropdown-toggle d-flex align-items-center justify-content-between js-has-sub" aria-expanded="false">';
                             html += '      <span><i class="fas fa-laptop text-primary me-2"></i>' + (b.brandName || b.brandId) + '</span>';
                             html += '      <i class="fas fa-angle-right text-primary toggle-submenu"></i>';
                             html += '    </a>';
                             html += '    <div class="dropdown-menu m-0 bg-secondary rounded-0 category-submenu">';
                             productNames.forEach(function (pn) {
-                                html += '      <a class="dropdown-item" href="/Home/Index?brandId=' + encodeURIComponent(b.brandId) + '&productName=' + encodeURIComponent(pn) + '">' + pn + '</a>';
+                                html += '      <a class="dropdown-item" href="/Home/Shop?brandId=' + encodeURIComponent(b.brandId) + '&productName=' + encodeURIComponent(pn) + '">' + pn + '</a>';
                             });
                             html += '    </div>';
                             html += '  </div>';
                             html += '</li>';
                         } else {
-                            html += '<li><a href="/Home/Index?brandId=' + encodeURIComponent(b.brandId) + '" class="h6 px-5 py-3 rounded bg-white mb-2"><i class="fas fa-laptop text-primary me-2"></i>' + (b.brandName || b.brandId) + '</a></li>';
+                            html += '<li><a href="/Home/Shop?brandId=' + encodeURIComponent(b.brandId) + '" class="h6 px-5 py-3 rounded bg-white mb-2"><i class="fas fa-laptop text-primary me-2"></i>' + (b.brandName || b.brandId) + '</a></li>';
                         }
                     });
                     $list.html(html);

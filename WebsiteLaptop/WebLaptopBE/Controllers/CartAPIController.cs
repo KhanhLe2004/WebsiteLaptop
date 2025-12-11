@@ -272,27 +272,30 @@ namespace WebLaptopBE.Controllers
                 // Kiểm tra số lượng tồn kho nếu có cấu hình
                 if (config != null && config.Quantity.HasValue)
                 {
+                    // Tính số lượng có sẵn (tồn kho - số lượng trong đơn hàng "Chờ xử lý" và "Đang xử lý")
+                    int availableQuantity = CalculateAvailableQuantity(request.ProductId, specifications, request.ConfigurationId);
+                    
                     // Tính tổng số lượng hiện có trong giỏ hàng (nếu đã có sản phẩm cùng cấu hình)
                     int currentQuantityInCart = existingItem != null ? (existingItem.Quantity ?? 0) : 0;
                     
-                    // Kiểm tra tổng số lượng (số lượng hiện có + số lượng muốn thêm) không vượt quá số lượng tồn kho
+                    // Kiểm tra tổng số lượng (số lượng hiện có + số lượng muốn thêm) không vượt quá số lượng có sẵn
                     int totalQuantity = currentQuantityInCart + request.Quantity;
-                    if (totalQuantity > config.Quantity.Value)
+                    if (totalQuantity > availableQuantity)
                     {
-                        int availableQuantity = config.Quantity.Value - currentQuantityInCart;
-                        if (availableQuantity <= 0)
+                        int canAddQuantity = availableQuantity - currentQuantityInCart;
+                        if (canAddQuantity <= 0)
                         {
                             return BadRequest(new { 
-                                message = $"Sản phẩm này đã đạt số lượng tối đa trong giỏ hàng ({config.Quantity.Value} sản phẩm). Vui lòng kiểm tra giỏ hàng của bạn.",
+                                message = $"Sản phẩm này đã hết hàng hoặc đã đạt số lượng tối đa. Số lượng có sẵn: {availableQuantity}.",
                                 success = false
                             });
                         }
                         return BadRequest(new { 
-                            message = $"Số lượng tối đa có sẵn: {config.Quantity.Value}. Bạn đã có {currentQuantityInCart} sản phẩm trong giỏ hàng. Có thể thêm tối đa {availableQuantity} sản phẩm.",
+                            message = $"Số lượng có sẵn: {availableQuantity}. Bạn đã có {currentQuantityInCart} sản phẩm trong giỏ hàng. Có thể thêm tối đa {canAddQuantity} sản phẩm.",
                             success = false,
-                            maxQuantity = config.Quantity.Value,
+                            maxQuantity = availableQuantity,
                             currentInCart = currentQuantityInCart,
-                            available = availableQuantity
+                            available = canAddQuantity
                         });
                     }
                 }
@@ -424,12 +427,16 @@ namespace WebLaptopBE.Controllers
                 // Kiểm tra số lượng tối đa nếu có cấu hình
                 if (config != null && config.Quantity.HasValue)
                 {
-                    if (request.Quantity > config.Quantity.Value)
+                    // Tính số lượng có sẵn (tồn kho - số lượng trong đơn hàng "Chờ xử lý" và "Đang xử lý")
+                    string specifications = cartDetail.Specifications ?? "";
+                    int availableQuantity = CalculateAvailableQuantity(cartDetail.ProductId, specifications, null);
+                    
+                    if (request.Quantity > availableQuantity)
                     {
                         return BadRequest(new { 
-                            message = $"Số lượng tối đa có sẵn: {config.Quantity.Value}. Không thể cập nhật số lượng vượt quá giới hạn này.",
+                            message = $"Số lượng có sẵn: {availableQuantity}. Không thể cập nhật số lượng vượt quá giới hạn này.",
                             success = false,
-                            maxQuantity = config.Quantity.Value
+                            maxQuantity = availableQuantity
                         });
                     }
                 }
@@ -498,6 +505,195 @@ namespace WebLaptopBE.Controllers
             }
         }
 
+        // GET: api/Cart/available-quantity
+        // Lấy số lượng có sẵn cho một sản phẩm với cấu hình cụ thể
+        [HttpGet("available-quantity")]
+        public IActionResult GetAvailableQuantity([FromQuery] string productId, [FromQuery] string? specifications, [FromQuery] string? configurationId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(productId))
+                {
+                    return BadRequest(new { message = "ProductId không được để trống" });
+                }
+
+                int availableQuantity = CalculateAvailableQuantity(productId, specifications, configurationId);
+                
+                return Ok(new
+                {
+                    productId = productId,
+                    specifications = specifications ?? "",
+                    configurationId = configurationId ?? "",
+                    availableQuantity = availableQuantity
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy số lượng có sẵn", error = ex.Message });
+            }
+        }
+
+        // POST: api/Cart/check-stock
+        // Kiểm tra số lượng tồn kho trước khi thanh toán
+        [HttpPost("check-stock")]
+        public IActionResult CheckStock([FromBody] CheckStockRequest request)
+        {
+            try
+            {
+                if (request == null || string.IsNullOrWhiteSpace(request.CustomerId))
+                {
+                    return BadRequest(new { message = "Thông tin không hợp lệ" });
+                }
+
+                if (request.CartDetailIds == null || !request.CartDetailIds.Any())
+                {
+                    return BadRequest(new { message = "Không có sản phẩm nào được chọn" });
+                }
+
+                // Lấy giỏ hàng
+                var cart = _db.Carts
+                    .Include(c => c.CartDetails)
+                        .ThenInclude(cd => cd.Product)
+                    .FirstOrDefault(c => c.CustomerId == request.CustomerId);
+
+                if (cart == null || cart.CartDetails == null || !cart.CartDetails.Any())
+                {
+                    return BadRequest(new { message = "Giỏ hàng trống" });
+                }
+
+                // Lọc chỉ các sản phẩm đã chọn
+                var selectedCartDetails = cart.CartDetails
+                    .Where(cd => request.CartDetailIds.Contains(cd.CartDetailId))
+                    .ToList();
+
+                if (!selectedCartDetails.Any())
+                {
+                    return BadRequest(new { message = "Không có sản phẩm nào được chọn" });
+                }
+
+                var outOfStockItems = new List<object>();
+
+                foreach (var cartDetail in selectedCartDetails)
+                {
+                    if (cartDetail == null || string.IsNullOrWhiteSpace(cartDetail.ProductId))
+                        continue;
+
+                    // Tìm configuration từ specifications
+                    ProductConfiguration? config = null;
+                    if (!string.IsNullOrWhiteSpace(cartDetail.Specifications))
+                    {
+                        if (cartDetail.Specifications.StartsWith("ConfigurationId:"))
+                        {
+                            var configId = cartDetail.Specifications.Substring("ConfigurationId:".Length).Trim();
+                            config = _db.ProductConfigurations
+                                .AsNoTracking()
+                                .FirstOrDefault(pc => pc.ConfigurationId == configId);
+                        }
+                        else if (cartDetail.Specifications.Contains(" / "))
+                        {
+                            var specParts = cartDetail.Specifications.Split(new[] { " / " }, StringSplitOptions.RemoveEmptyEntries);
+                            if (specParts.Length >= 1)
+                            {
+                                var query = _db.ProductConfigurations
+                                    .AsNoTracking()
+                                    .Where(pc => pc.ProductId == cartDetail.ProductId);
+                                
+                                if (specParts.Length >= 1 && !string.IsNullOrWhiteSpace(specParts[0]))
+                                    query = query.Where(pc => pc.Cpu == specParts[0].Trim());
+                                if (specParts.Length >= 2 && !string.IsNullOrWhiteSpace(specParts[1]))
+                                    query = query.Where(pc => pc.Ram == specParts[1].Trim());
+                                if (specParts.Length >= 3 && !string.IsNullOrWhiteSpace(specParts[2]))
+                                    query = query.Where(pc => pc.Rom == specParts[2].Trim());
+                                if (specParts.Length >= 4 && !string.IsNullOrWhiteSpace(specParts[3]))
+                                    query = query.Where(pc => pc.Card == specParts[3].Trim());
+                                
+                                config = query.FirstOrDefault();
+                            }
+                        }
+                    }
+
+                    // Nếu không có configuration, bỏ qua (không kiểm tra số lượng)
+                    if (config == null || !config.Quantity.HasValue)
+                        continue;
+
+                    int stockQuantity = config.Quantity.Value;
+                    int cartQuantity = cartDetail.Quantity ?? 0;
+
+                    // Tính tổng số lượng đã đặt trong các đơn hàng khác
+                    // Chỉ tính các đơn hàng có status: "Chờ xử lý" và "Đang xử lý"
+                    var ordersInProgress = _db.SaleInvoices
+                        .Where(si => si.Status == "Chờ xử lý" || si.Status == "Đang xử lý")
+                        .Select(si => si.SaleInvoiceId)
+                        .ToList();
+
+                    int orderedQuantity = 0;
+                    if (ordersInProgress.Any())
+                    {
+                        // Tính tổng số lượng đã đặt cho sản phẩm và cấu hình này
+                        // So sánh chính xác specifications
+                        var orderDetails = _db.SaleInvoiceDetails
+                            .Where(sid => ordersInProgress.Contains(sid.SaleInvoiceId) &&
+                                          sid.ProductId == cartDetail.ProductId)
+                            .ToList();
+
+                        // So sánh specifications chi tiết
+                        string cartSpec = cartDetail.Specifications ?? "";
+                        foreach (var orderDetail in orderDetails)
+                        {
+                            string orderSpec = orderDetail.Specifications ?? "";
+                            
+                            // So sánh chính xác specifications
+                            if (cartSpec == orderSpec)
+                            {
+                                orderedQuantity += orderDetail.Quantity ?? 0;
+                            }
+                        }
+                    }
+
+                    // Kiểm tra: số lượng trong đơn hàng khác + số lượng trong giỏ hàng > số lượng tồn kho
+                    // Nếu bằng nhau thì vẫn cho phép đặt hàng
+                    if (orderedQuantity + cartQuantity > stockQuantity)
+                    {
+                        int availableQuantity = stockQuantity - orderedQuantity;
+                        outOfStockItems.Add(new
+                        {
+                            productId = cartDetail.ProductId,
+                            productName = cartDetail.Product?.ProductName ?? "",
+                            productModel = cartDetail.Product?.ProductModel ?? "",
+                            specifications = cartDetail.Specifications ?? "",
+                            cartQuantity = cartQuantity,
+                            stockQuantity = stockQuantity,
+                            orderedQuantity = orderedQuantity,
+                            availableQuantity = availableQuantity,
+                            message = availableQuantity < 0 
+                                ? $"Sản phẩm {cartDetail.Product?.ProductName} {cartDetail.Product?.ProductModel} (cấu hình: {cartDetail.Specifications}) đã hết hàng. Đã có {orderedQuantity} sản phẩm trong các đơn hàng khác, chỉ còn {stockQuantity} sản phẩm trong kho."
+                                : $"Sản phẩm {cartDetail.Product?.ProductName} {cartDetail.Product?.ProductModel} (cấu hình: {cartDetail.Specifications}) chỉ còn {availableQuantity} sản phẩm."
+                        });
+                    }
+                }
+
+                if (outOfStockItems.Any())
+                {
+                    return BadRequest(new
+                    {
+                        message = "Sản phẩm không đủ số lượng",
+                        outOfStockItems = outOfStockItems,
+                        hasError = true
+                    });
+                }
+
+                return Ok(new
+                {
+                    message = "Tất cả sản phẩm đều đủ số lượng",
+                    hasError = false
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi kiểm tra số lượng", error = ex.Message });
+            }
+        }
+
         // DELETE: api/Cart/{customerId}
         // Xóa toàn bộ giỏ hàng của khách hàng
         [HttpDelete("{customerId}")]
@@ -535,6 +731,95 @@ namespace WebLaptopBE.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi khi xóa giỏ hàng", error = ex.Message });
+            }
+        }
+
+        // Helper method để tính số lượng có sẵn (tồn kho - số lượng trong đơn hàng "Chờ xử lý" và "Đang xử lý")
+        private int CalculateAvailableQuantity(string productId, string? specifications, string? configurationId = null)
+        {
+            try
+            {
+                // Tìm configuration
+                ProductConfiguration? config = null;
+                if (!string.IsNullOrWhiteSpace(configurationId))
+                {
+                    config = _db.ProductConfigurations
+                        .AsNoTracking()
+                        .FirstOrDefault(pc => pc.ConfigurationId == configurationId);
+                }
+                else if (!string.IsNullOrWhiteSpace(specifications))
+                {
+                    if (specifications.StartsWith("ConfigurationId:"))
+                    {
+                        var configId = specifications.Substring("ConfigurationId:".Length).Trim();
+                        config = _db.ProductConfigurations
+                            .AsNoTracking()
+                            .FirstOrDefault(pc => pc.ConfigurationId == configId);
+                    }
+                    else if (specifications.Contains(" / "))
+                    {
+                        var specParts = specifications.Split(new[] { " / " }, StringSplitOptions.RemoveEmptyEntries);
+                        if (specParts.Length >= 1 && !string.IsNullOrWhiteSpace(productId))
+                        {
+                            var query = _db.ProductConfigurations
+                                .AsNoTracking()
+                                .Where(pc => pc.ProductId == productId);
+                            
+                            if (specParts.Length >= 1 && !string.IsNullOrWhiteSpace(specParts[0]))
+                                query = query.Where(pc => pc.Cpu == specParts[0].Trim());
+                            if (specParts.Length >= 2 && !string.IsNullOrWhiteSpace(specParts[1]))
+                                query = query.Where(pc => pc.Ram == specParts[1].Trim());
+                            if (specParts.Length >= 3 && !string.IsNullOrWhiteSpace(specParts[2]))
+                                query = query.Where(pc => pc.Rom == specParts[2].Trim());
+                            if (specParts.Length >= 4 && !string.IsNullOrWhiteSpace(specParts[3]))
+                                query = query.Where(pc => pc.Card == specParts[3].Trim());
+                            
+                            config = query.FirstOrDefault();
+                        }
+                    }
+                }
+
+                // Nếu không có configuration hoặc không có quantity, trả về 999 (không giới hạn)
+                if (config == null || !config.Quantity.HasValue)
+                {
+                    return 999;
+                }
+
+                int stockQuantity = config.Quantity.Value;
+
+                // Tính tổng số lượng đã đặt trong các đơn hàng "Chờ xử lý" và "Đang xử lý"
+                var ordersInProgress = _db.SaleInvoices
+                    .Where(si => si.Status == "Chờ xử lý" || si.Status == "Đang xử lý")
+                    .Select(si => si.SaleInvoiceId)
+                    .ToList();
+
+                int orderedQuantity = 0;
+                if (ordersInProgress.Any())
+                {
+                    string spec = specifications ?? "";
+                    var orderDetails = _db.SaleInvoiceDetails
+                        .Where(sid => ordersInProgress.Contains(sid.SaleInvoiceId) &&
+                                      sid.ProductId == productId)
+                        .ToList();
+
+                    foreach (var orderDetail in orderDetails)
+                    {
+                        string orderSpec = orderDetail.Specifications ?? "";
+                        if (spec == orderSpec)
+                        {
+                            orderedQuantity += orderDetail.Quantity ?? 0;
+                        }
+                    }
+                }
+
+                // Số lượng có sẵn = Tồn kho - Số lượng trong đơn hàng
+                int availableQuantity = stockQuantity - orderedQuantity;
+                return availableQuantity < 0 ? 0 : availableQuantity;
+            }
+            catch (Exception)
+            {
+                // Nếu có lỗi, trả về 999 (không giới hạn)
+                return 999;
             }
         }
 
@@ -700,6 +985,12 @@ namespace WebLaptopBE.Controllers
             public int Quantity { get; set; }
             public string? Specifications { get; set; }
             public string? ConfigurationId { get; set; }
+        }
+
+        public class CheckStockRequest
+        {
+            public string CustomerId { get; set; } = string.Empty;
+            public List<string> CartDetailIds { get; set; } = new();
         }
     }
 }

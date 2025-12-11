@@ -72,6 +72,24 @@ namespace WebLaptopBE.Controllers
                     return NotFound(new { message = "Không tìm thấy sản phẩm" });
                 }
 
+                // Kiểm tra khách hàng đã mua sản phẩm này chưa
+                var hasPurchased = _db.SaleInvoices
+                    .AsNoTracking()
+                    .Where(si => si.CustomerId == request.CustomerId && 
+                                 (si.Status == null || 
+                                  si.Status.ToLower().Contains("hoàn thành") || 
+                                  si.Status.ToLower().Contains("đã giao")))
+                    .Join(_db.SaleInvoiceDetails,
+                          si => si.SaleInvoiceId,
+                          sid => sid.SaleInvoiceId,
+                          (si, sid) => sid)
+                    .Any(sid => sid.ProductId == request.ProductId);
+
+                if (!hasPurchased)
+                {
+                    return BadRequest(new { message = "Bạn chỉ có thể đánh giá sản phẩm đã mua" });
+                }
+
                 // Generate ProductReviewId
                 string reviewId = GenerateProductReviewId();
 
@@ -206,6 +224,44 @@ namespace WebLaptopBE.Controllers
                     // Nếu vẫn lỗi, trả về PRV001
                     return "PRV001";
                 }
+            }
+        }
+
+        // GET: api/ProductReviewAPI/check-purchase/{customerId}/{productId}
+        [HttpGet("check-purchase/{customerId}/{productId}")]
+        public IActionResult CheckPurchase(string customerId, string productId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(customerId) || string.IsNullOrWhiteSpace(productId))
+                {
+                    return BadRequest(new { message = "Thông tin không hợp lệ", hasPurchased = false });
+                }
+
+                // Kiểm tra khách hàng đã mua sản phẩm này chưa
+                // Chỉ tính các đơn hàng đã hoàn thành hoặc đã giao
+                var hasPurchased = _db.SaleInvoices
+                    .AsNoTracking()
+                    .Where(si => si.CustomerId == customerId && 
+                                 (si.Status == null || 
+                                  si.Status.ToLower().Contains("hoàn thành") || 
+                                  si.Status.ToLower().Contains("đã giao")))
+                    .Join(_db.SaleInvoiceDetails,
+                          si => si.SaleInvoiceId,
+                          sid => sid.SaleInvoiceId,
+                          (si, sid) => sid)
+                    .Any(sid => sid.ProductId == productId);
+
+                return Ok(new { hasPurchased = hasPurchased });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Lỗi khi kiểm tra thông tin mua hàng",
+                    error = ex.Message,
+                    hasPurchased = false
+                });
             }
         }
     }

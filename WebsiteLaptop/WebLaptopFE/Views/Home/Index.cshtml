@@ -3,6 +3,13 @@
     Layout = "~/Views/Shared/_LayoutHome.cshtml";
 }
 
+<div id="searchResultHeader" class="mb-4" style="display: none;">
+    <h4 class="text-primary">
+        <i class="fa fa-search me-2"></i>Kết quả tìm kiếm cho: <span id="searchKeyword" class="fw-bold"></span>
+    </h4>
+    <p class="text-muted" id="searchResultCount"></p>
+</div>
+
 <div id="displayProducts" class="row g-4">
     <!-- Sản phẩm sẽ được hiển thị ở đây -->
 </div>
@@ -20,6 +27,45 @@
 </div>
 
 @section Scripts {
+        <style>
+            /* Toast Notification Styles */
+            .toast-container {
+                z-index: 9999;
+            }
+            
+            .toast-notification {
+                min-width: 300px;
+                max-width: 400px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                margin-bottom: 10px;
+                background-color: #ffffff;
+            }
+            
+            .toast-notification .toast-header {
+                font-weight: 600;
+            }
+            
+            .toast-notification .toast-body {
+                padding: 0.75rem;
+            }
+            
+            .toast-success .toast-header {
+                background-color: #28a745 !important;
+            }
+            
+            .toast-danger .toast-header {
+                background-color: #dc3545 !important;
+            }
+            
+            .toast-warning .toast-header {
+                background-color: #ffc107 !important;
+                color: #000 !important;
+            }
+            
+            .toast-info .toast-header {
+                background-color: #17a2b8 !important;
+            }
+        </style>
         <script>
             // Base API URL (chỉnh nếu cần)
             const apiBase = "http://localhost:5068/";
@@ -37,12 +83,13 @@
             let currentPage = 1;
             const productsPerPage = 8; // số sản phẩm hiển thị mỗi trang
 
-            // Lấy query params từ URL (brandId, productName, page)
+            // Lấy query params từ URL (brandId, productName, search, page)
             function getQueryParams() {
                 const params = new URLSearchParams(window.location.search);
                 return {
                     brandId: params.get('brandId'),
                     productName: params.get('productName'),
+                    search: params.get('search'),
                     page: parseInt(params.get('page')) || 1
                 };
             }
@@ -107,12 +154,15 @@
                                                 ${originalPriceHtml}
                                                 <span class="text-dark fs-5 fw-bold mb-0">${price}</span>
                                             </div>
-                                            <div class="d-flex gap-2">
-                                                <a href="${productDetailUrl}" class="btn border border-secondary rounded-pill px-3 text-primary">
-                                                    <i class="fa fa-eye me-2 text-primary"></i> Xem chi tiết
+                                            <div class="d-flex align-items-center justify-content-center gap-2">
+                                                <a href="${productDetailUrl}" class="btn border border-secondary rounded-pill px-3 py-2 text-primary d-flex align-items-center" style="min-height: 40px;">
+                                                    <i class="fa fa-eye me-2 text-primary"></i> <span>Xem chi tiết</span>
                                                 </a>
-                                                <a href="#" class="btn border border-secondary rounded-pill px-3 text-primary toggle-fav" data-id="${val.productId || ''}" title="Thêm vào yêu thích">
-                                                    <i class="far fa-heart" id="heart-${val.productId || ''}"></i>
+                                                <a href="#" class="btn border border-secondary rounded-circle d-flex align-items-center justify-content-center toggle-fav" data-id="${val.productId || ''}" title="Thêm vào yêu thích" style="width: 40px; height: 40px; padding: 0;">
+                                                    <i class="far fa-heart text-primary" id="heart-${val.productId || ''}"></i>
+                                                </a>
+                                                <a href="#" class="btn border border-secondary rounded-circle d-flex align-items-center justify-content-center btn-compare" data-product-id="${val.productId || ''}" data-product-name="${val.productName || ''}" title="So sánh sản phẩm" style="width: 40px; height: 40px; padding: 0;">
+                                                    <i class="fa fa-balance-scale text-primary"></i>
                                                 </a>
                                             </div>
                                         </div>
@@ -135,6 +185,16 @@
                         e.preventDefault();
                         const pid = $(this).data('id');
                         toggleFavorite(pid);
+                    });
+
+                    // Compare buttons (delegation)
+                    $('#displayProducts .btn-compare').off('click').on('click', function (e) {
+                        e.preventDefault();
+                        const productId = $(this).data('product-id');
+                        const productName = $(this).data('product-name');
+                        if (productId) {
+                            addToCompare(productId, productName);
+                        }
                     });
 
                     // Build pagination (client-side)
@@ -252,30 +312,61 @@
             }
 
             /**
-             * goToPage: transition to page WITHOUT reload and WITHOUT changing URL
-             * - renders products client-side only
+             * goToPage: transition to page WITH URL update to preserve search query
+             * - updates URL with page number and preserves search/brandId params
              */
             function goToPage(page) {
                 page = parseInt(page) || 1;
                 if (page < 1) page = 1;
                 currentPage = page;
 
-                // re-render products (no URL change)
+                // Update URL to preserve search query
+                const params = new URLSearchParams(window.location.search);
+                const search = params.get('search');
+                const brandId = params.get('brandId');
+                const productName = params.get('productName');
+                
+                // Build new URL with preserved params
+                const newParams = new URLSearchParams();
+                if (search) newParams.set('search', search);
+                if (brandId) newParams.set('brandId', brandId);
+                if (productName) newParams.set('productName', productName);
+                if (page > 1) newParams.set('page', page);
+                
+                const newUrl = window.location.pathname + (newParams.toString() ? '?' + newParams.toString() : '');
+                window.history.pushState({ page: page }, '', newUrl);
+
+                // re-render products
                 buildProductsHtml(allProducts, page);
 
                 // scroll to products
                 document.querySelector('#displayProducts')?.scrollIntoView({ behavior: 'smooth' });
             }
 
-            // Fetch products (all or by category)
+            // Fetch products (all or by category or by search)
             function showProductByCategory() {
-                const { brandId, productName, page } = getQueryParams();
+                const { brandId, productName, search, page } = getQueryParams();
                 currentPage = page;
                 let requestUrl;
-                if (brandId) {
+                
+                // Hiển thị/ẩn header tìm kiếm
+                const searchHeader = $('#searchResultHeader');
+                const searchKeyword = $('#searchKeyword');
+                const searchResultCount = $('#searchResultCount');
+                
+                if (search) {
+                    // Tìm kiếm sản phẩm
+                    requestUrl = apiBase + "api/ListProductAPI/search?keyword=" + encodeURIComponent(search) + "&limit=100";
+                    searchHeader.show();
+                    searchKeyword.text(search);
+                } else if (brandId) {
+                    // Lọc theo brand
                     requestUrl = apiBase + "api/products/category/" + encodeURIComponent(brandId) + (productName ? ("?productName=" + encodeURIComponent(productName)) : "");
+                    searchHeader.hide();
                 } else {
+                    // Tất cả sản phẩm
                     requestUrl = apiBase + "api/ListProductAPI/all";
+                    searchHeader.hide();
                 }
 
                 $.ajax({
@@ -284,15 +375,26 @@
                     dataType: 'json',
                     success: function (data) {
                         // Expect data = array of products
-                        console.log('Dữ liệu sản phẩm:', data);
                         allProducts = Array.isArray(data) ? data : (data || []);
+                        
+                        // Cập nhật số lượng kết quả tìm kiếm
+                        if (search) {
+                            const count = allProducts.length;
+                            if (count > 0) {
+                                searchResultCount.text(`Tìm thấy ${count} sản phẩm`);
+                            } else {
+                                searchResultCount.html('<span class="text-danger">Không tìm thấy sản phẩm nào phù hợp với từ khóa "' + search + '"</span>');
+                            }
+                        }
+                        
                         buildProductsHtml(allProducts, currentPage);
                     },
                     error: function (xhr, status, error) {
-                        console.error('Lỗi khi tải sản phẩm:', error);
-                        console.error('Chi tiết:', xhr.responseText);
                         $('#displayProducts').html('<div class="col-12"><p class="text-center text-danger">Không thể tải sản phẩm. Vui lòng thử lại sau.</p></div>');
                         $('#paginationContainer').hide();
+                        if (search) {
+                            searchResultCount.html('<span class="text-danger">Lỗi khi tìm kiếm sản phẩm</span>');
+                        }
                     }
                 });
             }
@@ -314,6 +416,231 @@
                     // TODO: call API to add favorite
                 }
             }
+
+            // Comparison functions
+            function getCompareList() {
+                try {
+                    const compareStr = sessionStorage.getItem('compareProducts');
+                    return compareStr ? JSON.parse(compareStr) : [];
+                } catch (e) {
+                    return [];
+                }
+            }
+
+            function saveCompareList(products) {
+                sessionStorage.setItem('compareProducts', JSON.stringify(products));
+                if (typeof window.updateCompareBadge === 'function') {
+                    window.updateCompareBadge();
+                } else {
+                    updateCompareBadgeLocal();
+                }
+            }
+
+            function addToCompare(productId, productName) {
+                if (!productId) {
+                    showToast('warning', 'Không tìm thấy ID sản phẩm');
+                    return;
+                }
+
+                let compareList = getCompareList();
+                
+                // Check if product already in compare list
+                if (compareList.some(p => p.id === productId)) {
+                    showToast('warning', 'Sản phẩm này đã có trong danh sách so sánh!');
+                    return;
+                }
+
+                // Check if compare list is full (max 2 products) - kiểm tra chặt chẽ
+                if (compareList.length >= 2) {
+                    showConfirmDialog(
+                        'Danh sách so sánh đã đầy (tối đa 2 sản phẩm). Bạn có muốn xóa sản phẩm đầu tiên và thêm sản phẩm mới không?',
+                        function() {
+                            // Lấy lại danh sách mới nhất để tránh race condition
+                            let updatedList = getCompareList();
+                            if (updatedList.length >= 2) {
+                                updatedList.shift(); // Remove first product
+                            }
+                            updatedList.push({ id: productId, name: productName });
+                            saveCompareList(updatedList);
+                            
+                            // Update badge
+                            if (typeof window.updateCompareBadge === 'function') {
+                                window.updateCompareBadge();
+                            } else {
+                                updateCompareBadgeLocal();
+                            }
+                            
+                            showToast('success', 'Đã thêm vào danh sách so sánh! Đang mở bảng so sánh...');
+                            
+                            // Auto open modal after a short delay
+                            setTimeout(function() {
+                                if (typeof window.openCompareModal === 'function') {
+                                    window.openCompareModal();
+                                }
+                            }, 500);
+                        }
+                    );
+                    return; // Quan trọng: return ngay để không thêm sản phẩm
+                }
+
+                // Chỉ thêm sản phẩm nếu danh sách chưa đầy (kiểm tra lại để chắc chắn)
+                if (compareList.length < 2) {
+                    compareList.push({ id: productId, name: productName });
+                    saveCompareList(compareList);
+                    
+                    // Update badge
+                    if (typeof window.updateCompareBadge === 'function') {
+                        window.updateCompareBadge();
+                    } else {
+                        updateCompareBadgeLocal();
+                    }
+                    
+                    // Show success message and open modal if 2 products
+                    if (compareList.length === 2) {
+                        showToast('success', 'Đã thêm vào danh sách so sánh! Đang mở bảng so sánh...');
+                        // Auto open modal after a short delay
+                        setTimeout(function() {
+                            if (typeof window.openCompareModal === 'function') {
+                                window.openCompareModal();
+                            }
+                        }, 500);
+                    } else {
+                        showToast('success', 'Đã thêm vào danh sách so sánh! Thêm 1 sản phẩm nữa để so sánh.');
+                    }
+                } else {
+                    // Trường hợp này không nên xảy ra, nhưng để an toàn
+                    showToast('warning', 'Danh sách so sánh đã đầy. Vui lòng xóa một sản phẩm trước khi thêm mới.');
+                }
+            }
+
+            function removeFromCompare(productId) {
+                let compareList = getCompareList();
+                compareList = compareList.filter(p => p.id !== productId);
+                saveCompareList(compareList);
+            }
+
+            // Use global updateCompareBadge from header if available, otherwise define local one
+            function updateCompareBadgeLocal() {
+                const compareList = getCompareList();
+                const badge = document.getElementById('compareBadge');
+                if (badge) {
+                    if (compareList.length > 0) {
+                        badge.textContent = compareList.length;
+                        badge.style.display = 'flex';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+            }
+
+            // Toast notification function
+            function showToast(type, message) {
+                const toastId = 'toast-' + Date.now();
+                const iconMap = {
+                    'success': '<i class="fa fa-check-circle me-2"></i>',
+                    'danger': '<i class="fa fa-times-circle me-2"></i>',
+                    'warning': '<i class="fa fa-exclamation-triangle me-2"></i>',
+                    'info': '<i class="fa fa-info-circle me-2"></i>'
+                };
+                const icon = iconMap[type] || '';
+                
+                const toastHtml = `
+                    <div id="${toastId}" class="toast-notification toast-${type}" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="toast-header bg-${type === 'danger' ? 'danger' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info'} text-white">
+                            ${icon}
+                            <strong class="me-auto">Thông báo</strong>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-body">
+                            ${message}
+                        </div>
+                    </div>
+                `;
+                
+                // Tạo container nếu chưa có
+                if ($('#toast-container').length === 0) {
+                    $('body').append('<div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>');
+                }
+                
+                $('#toast-container').append(toastHtml);
+                
+                // Khởi tạo và hiển thị toast
+                const toastElement = document.getElementById(toastId);
+                if (toastElement) {
+                    const toast = new bootstrap.Toast(toastElement, {
+                        autohide: true,
+                        delay: 4000
+                    });
+                    toast.show();
+                    
+                    // Xóa toast khỏi DOM sau khi ẩn
+                    toastElement.addEventListener('hidden.bs.toast', function() {
+                        $(this).remove();
+                    });
+                }
+            }
+
+            // Hiển thị dialog xác nhận (thay thế confirm)
+            function showConfirmDialog(message, onConfirm, onCancel) {
+                const confirmId = 'confirm-dialog-' + Date.now();
+                const confirmHtml = `
+                    <div class="modal fade" id="${confirmId}" tabindex="-1" aria-labelledby="confirmDialogLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header bg-warning text-dark">
+                                    <h5 class="modal-title" id="confirmDialogLabel">
+                                        <i class="fa fa-exclamation-triangle me-2"></i>Xác nhận
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p class="mb-0">${message}</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                                    <button type="button" class="btn btn-primary" id="confirmBtn">Xác nhận</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // Xóa modal cũ nếu có
+                $('.confirm-dialog-modal').remove();
+                
+                // Thêm modal mới
+                $('body').append(confirmHtml);
+                const $modal = $(`#${confirmId}`).addClass('confirm-dialog-modal');
+                const modal = new bootstrap.Modal($modal[0]);
+                
+                // Xử lý khi click Xác nhận
+                $modal.find('#confirmBtn').on('click', function() {
+                    modal.hide();
+                    if (onConfirm && typeof onConfirm === 'function') {
+                        onConfirm();
+                    }
+                });
+                
+                // Xử lý khi click Hủy hoặc đóng
+                $modal.on('hidden.bs.modal', function() {
+                    if (onCancel && typeof onCancel === 'function') {
+                        onCancel();
+                    }
+                    $(this).remove();
+                });
+                
+                // Hiển thị modal
+                modal.show();
+            }
+
+            // Initialize compare badge on page load
+            $(document).ready(function() {
+                if (typeof window.updateCompareBadge === 'function') {
+                    window.updateCompareBadge();
+                } else {
+                    updateCompareBadgeLocal();
+                }
+            });
 
             // Init on document ready
             $(document).ready(function () {

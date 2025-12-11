@@ -74,9 +74,14 @@
                                 <small class="text-muted" id="quantityInfo">Tối đa: <span id="maxQuantityDisplay">1</span></small>
                             </div>
 
-                            <a href="#" class="btn border border-secondary rounded-pill px-4 py-2 mb-4 text-primary" onclick="event.preventDefault(); addToCart();">
+                            <div class="d-flex gap-2 mb-4">
+                                <a href="#" class="btn border border-secondary rounded-pill px-4 py-2 text-primary" onclick="event.preventDefault(); addToCart();">
                                 <i class="fa fa-shopping-bag me-2 text-primary"></i> Thêm vào giỏ hàng
                             </a>
+                                <a href="#" class="btn border border-secondary rounded-pill px-4 py-2 text-primary" onclick="event.preventDefault(); addProductToCompare();">
+                                    <i class="fa fa-balance-scale me-2 text-primary"></i> So sánh
+                                </a>
+                            </div>
                         </div>
 
                         <!-- Product Details Tabs -->
@@ -192,6 +197,30 @@
 
                                 <!-- Reviews Tab -->
                                 <div class="tab-pane" id="nav-mission" role="tabpanel" aria-labelledby="nav-mission-tab">
+                                    <!-- Filter buttons -->
+                                    <div class="mb-4">
+                                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                                            <span class="me-2 fw-bold">Lọc theo đánh giá:</span>
+                                            <button class="btn btn-sm btn-outline-primary filter-rating-btn active" data-rating="0" onclick="filterReviewsByRate(0)">
+                                                Tất cả
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-primary filter-rating-btn" data-rating="5" onclick="filterReviewsByRate(5)">
+                                                <i class="fa fa-star text-warning"></i> 5 sao
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-primary filter-rating-btn" data-rating="4" onclick="filterReviewsByRate(4)">
+                                                <i class="fa fa-star text-warning"></i> 4 sao
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-primary filter-rating-btn" data-rating="3" onclick="filterReviewsByRate(3)">
+                                                <i class="fa fa-star text-warning"></i> 3 sao
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-primary filter-rating-btn" data-rating="2" onclick="filterReviewsByRate(2)">
+                                                <i class="fa fa-star text-warning"></i> 2 sao
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-primary filter-rating-btn" data-rating="1" onclick="filterReviewsByRate(1)">
+                                                <i class="fa fa-star text-warning"></i> 1 sao
+                                            </button>
+                                        </div>
+                                    </div>
                                     <div id="productReviewsList">
                                         <!-- Reviews will be inserted here -->
                                     </div>
@@ -318,6 +347,7 @@
                 max-width: 400px;
                 box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
                 margin-bottom: 10px;
+                background-color: #ffffff;
             }
             
             .toast-notification .toast-header {
@@ -343,6 +373,20 @@
             
             .toast-info .toast-header {
                 background-color: #17a2b8 !important;
+            }
+            
+            /* Filter rating buttons */
+            .filter-rating-btn {
+                transition: all 0.3s ease;
+            }
+            
+            .filter-rating-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+            
+            .filter-rating-btn.active {
+                font-weight: 600;
             }
         </style>
 
@@ -383,6 +427,8 @@
             let originalProductPrice = 0;
             let configurations = [];
             let maxQuantity = 1;
+            let allReviews = []; // Lưu trữ tất cả reviews gốc
+            let currentFilterRating = 0; // Rate hiện tại đang filter (0 = tất cả)
 
             // Helper: update specs display (prioritize src, fallback to product)
             function updateSpecsDisplay(src, fallbackProduct) {
@@ -573,7 +619,7 @@
                                                       .join(' / ') || 'N/A'
                                                   }
                                                 </p>
-                                                ${config.quantity != null ? '<small class="text-muted ms-4">Số lượng có sẵn: ' + config.quantity + '</small>' : ''}
+                                                ${(config.availableQuantity != null ? config.availableQuantity : config.quantity) != null ? '<small class="text-muted ms-4">Số lượng có sẵn: ' + (config.availableQuantity != null ? config.availableQuantity : config.quantity) + '</small>' : ''}
                                             </div>
                                             <div class="text-end">
                                                 <div>
@@ -602,8 +648,12 @@
                             selectedConfiguration = null;
                         }
 
-                        // Reviews
-                        displayReviews(data.reviews || []);
+                        // Reviews - lưu reviews gốc và hiển thị với filter hiện tại
+                        allReviews = data.reviews || [];
+                        displayReviews(allReviews, currentFilterRating);
+
+                        // Check purchase status and show/hide review form
+                        checkPurchaseStatus();
 
                         // Show content
                         $('#loadingSpinner').hide();
@@ -620,11 +670,24 @@
             }
 
             // Display reviews
-            function displayReviews(reviews) {
-                if (reviews && reviews.length > 0) {
+            function displayReviews(reviews, filterRating = null) {
+                // Lưu reviews gốc nếu chưa có
+                if (allReviews.length === 0 && reviews && reviews.length > 0) {
+                    allReviews = reviews;
+                }
+                
+                // Nếu có filter, lọc reviews
+                let reviewsToDisplay = reviews || [];
+                if (filterRating !== null && filterRating > 0) {
+                    reviewsToDisplay = reviewsToDisplay.filter(function(review) {
+                        return (review.rate || 0) === filterRating;
+                    });
+                }
+                
+                if (reviewsToDisplay && reviewsToDisplay.length > 0) {
                     $('#noReviews').hide();
                     let reviewsHtml = '';
-                    reviews.forEach(function(review) {
+                    reviewsToDisplay.forEach(function(review) {
                         let reviewDate = review.time ? new Date(review.time).toLocaleDateString('vi-VN', { 
                             year: 'numeric', 
                             month: '2-digit', 
@@ -666,7 +729,29 @@
                     $('#productReviewsList').html(reviewsHtml);
                 } else {
                     $('#productReviewsList').html('');
+                    if (filterRating !== null && filterRating > 0) {
+                        $('#noReviews').html('<p class="text-muted">Không có đánh giá ' + filterRating + ' sao nào cho sản phẩm này.</p>');
+                    } else {
+                        $('#noReviews').html('<p class="text-muted">Chưa có đánh giá nào cho sản phẩm này.</p>');
+                    }
                     $('#noReviews').show();
+                }
+            }
+
+            // Filter reviews by rate
+            function filterReviewsByRate(rating) {
+                currentFilterRating = rating;
+                
+                // Update active button
+                $('.filter-rating-btn').removeClass('active btn-primary').addClass('btn-outline-primary');
+                $(`.filter-rating-btn[data-rating="${rating}"]`).removeClass('btn-outline-primary').addClass('active btn-primary');
+                
+                // Filter and display reviews
+                if (allReviews.length > 0) {
+                    displayReviews(allReviews, rating);
+                } else {
+                    // Nếu chưa có reviews, load lại
+                    loadProductDetail();
                 }
             }
 
@@ -701,14 +786,62 @@
                 }
             }
 
+            // Cập nhật số lượng có sẵn từ API
+            async function updateAvailableQuantity(config) {
+                if (!config || !config.configurationId) {
+                    // Nếu không có config, dùng quantity mặc định
+                    maxQuantity = (config?.availableQuantity != null ? config.availableQuantity : config?.quantity) || 999;
+                    if (maxQuantity <= 0) maxQuantity = 1;
+                    updateQuantityDisplay();
+                    return;
+                }
+
+                // Ưu tiên sử dụng availableQuantity từ API response (đã được tính sẵn)
+                if (config.availableQuantity != null) {
+                    maxQuantity = config.availableQuantity;
+                    if (maxQuantity <= 0) maxQuantity = 1;
+                    updateQuantityDisplay();
+                    return;
+                }
+
+                // Nếu không có availableQuantity, gọi API để lấy
+                try {
+                    const apiBase = window.API_BASE || 'http://localhost:5068';
+                    const productId = window._productId || '';
+                    const specifications = [config.cpu, config.ram, config.rom || config.storage, config.card || config.gpu]
+                        .filter(Boolean).join(' / ');
+                    
+                    const response = await fetch(
+                        `${apiBase}/api/Cart/available-quantity?productId=${encodeURIComponent(productId)}&specifications=${encodeURIComponent(specifications)}&configurationId=${encodeURIComponent(config.configurationId)}`,
+                        { credentials: 'same-origin' }
+                    );
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        maxQuantity = data.availableQuantity || config.quantity || 1;
+                        if (maxQuantity <= 0) maxQuantity = 1;
+                    } else {
+                        // Fallback về quantity nếu API lỗi
+                        maxQuantity = config.quantity || 1;
+                        if (maxQuantity <= 0) maxQuantity = 1;
+                    }
+                } catch (err) {
+                    console.error('Error getting available quantity:', err);
+                    // Fallback về quantity nếu có lỗi
+                    maxQuantity = config.quantity || 1;
+                    if (maxQuantity <= 0) maxQuantity = 1;
+                }
+                
+                updateQuantityDisplay();
+            }
+
             // Select configuration
             function selectConfiguration(index) {
                 if (index >= 0 && index < configurations.length) {
                     selectedConfiguration = configurations[index];
 
-                    // Update max quantity
-                    maxQuantity = selectedConfiguration.quantity || 1;
-                    if (maxQuantity <= 0) maxQuantity = 1;
+                    // Lấy số lượng có sẵn từ API
+                    updateAvailableQuantity(selectedConfiguration);
 
                     // Update UI highlight
                     $('.config-item').removeClass('selected-config');
@@ -986,7 +1119,8 @@
                         selectedRating = 0;
                         $('#ratingStars i').removeClass('text-secondary').addClass('text-muted');
 
-                        // Reload lại danh sách reviews
+                        // Reload lại danh sách reviews và giữ filter hiện tại
+                        allReviews = [];
                         loadProductDetail();
                     } catch (err) {
                         console.error('submitReview error:', err);
@@ -1185,12 +1319,175 @@
                 }
             }
 
+            // Comparison functions
+            function getCompareList() {
+                try {
+                    const compareStr = sessionStorage.getItem('compareProducts');
+                    return compareStr ? JSON.parse(compareStr) : [];
+                } catch (e) {
+                    return [];
+                }
+            }
+
+            function saveCompareList(products) {
+                sessionStorage.setItem('compareProducts', JSON.stringify(products));
+                if (typeof window.updateCompareBadge === 'function') {
+                    window.updateCompareBadge();
+                } else {
+                    updateCompareBadge();
+                }
+            }
+
+            function addProductToCompare() {
+                if (!productId) {
+                    showToast('warning', 'Không tìm thấy ID sản phẩm');
+                    return;
+                }
+
+                let compareList = getCompareList();
+                const productName = $('#productName').text() || 'Sản phẩm';
+                
+                // Check if product already in compare list
+                if (compareList.some(p => p.id === productId)) {
+                    showToast('warning', 'Sản phẩm này đã có trong danh sách so sánh!');
+                    return;
+                }
+
+                // Check if compare list is full (max 2 products) - kiểm tra chặt chẽ
+                if (compareList.length >= 2) {
+                    showConfirmDialog(
+                        'Danh sách so sánh đã đầy (tối đa 2 sản phẩm). Bạn có muốn xóa sản phẩm đầu tiên và thêm sản phẩm mới không?',
+                        function() {
+                            // Lấy lại danh sách mới nhất để tránh race condition
+                            let updatedList = getCompareList();
+                            if (updatedList.length >= 2) {
+                                updatedList.shift(); // Remove first product
+                            }
+                            updatedList.push({ id: productId, name: productName });
+                            saveCompareList(updatedList);
+                            
+                            showToast('success', 'Đã thêm vào danh sách so sánh! Đang mở bảng so sánh...');
+                            
+                            // Auto open modal after a short delay
+                            setTimeout(function() {
+                                if (typeof window.openCompareModal === 'function') {
+                                    window.openCompareModal();
+                                }
+                            }, 500);
+                        }
+                    );
+                    return; // Quan trọng: return ngay để không thêm sản phẩm
+                }
+
+                // Chỉ thêm sản phẩm nếu danh sách chưa đầy (kiểm tra lại để chắc chắn)
+                if (compareList.length < 2) {
+                    compareList.push({ id: productId, name: productName });
+                    saveCompareList(compareList);
+                    
+                    // Show success message and open modal if 2 products
+                    if (compareList.length === 2) {
+                        showToast('success', 'Đã thêm vào danh sách so sánh! Đang mở bảng so sánh...');
+                        // Auto open modal after a short delay
+                        setTimeout(function() {
+                            if (typeof window.openCompareModal === 'function') {
+                                window.openCompareModal();
+                            }
+                        }, 500);
+                    } else {
+                        showToast('success', 'Đã thêm vào danh sách so sánh! Thêm 1 sản phẩm nữa để so sánh.');
+                    }
+                } else {
+                    // Trường hợp này không nên xảy ra, nhưng để an toàn
+                    showToast('warning', 'Danh sách so sánh đã đầy. Vui lòng xóa một sản phẩm trước khi thêm mới.');
+                }
+            }
+
+            // Check if customer has purchased this product
+            async function checkPurchaseStatus() {
+                try {
+                    const isLoggedIn = sessionStorage.getItem('isLoggedIn');
+                    const customer = sessionStorage.getItem('customer');
+                    
+                    // If not logged in, hide review form
+                    if (!isLoggedIn || !customer) {
+                        $('#reviewForm').hide();
+                        $('#reviewFormNotPurchased').remove();
+                        $('#reviewForm').after('<div id="reviewFormNotPurchased" class="alert alert-info mt-4"><i class="fa fa-info-circle me-2"></i>Bạn cần đăng nhập và đã mua sản phẩm này để có thể đánh giá.</div>');
+                        return;
+                    }
+
+                    const parsed = JSON.parse(customer);
+                    const customerId = parsed.customerId || parsed.CustomerId;
+                    if (!customerId || !productId) {
+                        $('#reviewForm').hide();
+                        $('#reviewFormNotPurchased').remove();
+                        $('#reviewForm').after('<div id="reviewFormNotPurchased" class="alert alert-info mt-4"><i class="fa fa-info-circle me-2"></i>Bạn cần đăng nhập và đã mua sản phẩm này để có thể đánh giá.</div>');
+                        return;
+                    }
+
+                    // API base
+                    const getDefaultApiBase = () => {
+                        if (window.CART_API_BASE && window.CART_API_BASE.trim()) {
+                            return window.CART_API_BASE.trim();
+                        }
+                        if (window.location && window.location.origin) {
+                            const origin = window.location.origin;
+                            if (!origin.includes('localhost')) {
+                                return origin;
+                            }
+                        }
+                        return 'http://localhost:5068';
+                    };
+                    const apiBase = getDefaultApiBase();
+                    const reviewApiBase = `${apiBase}/api/ProductReviewAPI`;
+
+                    // Check purchase status
+                    const response = await fetch(`${reviewApiBase}/check-purchase/${encodeURIComponent(customerId)}/${encodeURIComponent(productId)}`, {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+
+                    const responseText = await response.text();
+                    let data;
+                    try {
+                        data = responseText ? JSON.parse(responseText) : {};
+                    } catch (parseErr) {
+                        console.error('JSON parse error:', parseErr);
+                        // On error, hide form to be safe
+                        $('#reviewForm').hide();
+                        $('#reviewFormNotPurchased').remove();
+                        $('#reviewForm').after('<div id="reviewFormNotPurchased" class="alert alert-info mt-4"><i class="fa fa-info-circle me-2"></i>Bạn cần đăng nhập và đã mua sản phẩm này để có thể đánh giá.</div>');
+                        return;
+                    }
+
+                    if (data.hasPurchased) {
+                        // Show review form
+                        $('#reviewForm').show();
+                        $('#reviewFormNotPurchased').remove();
+                    } else {
+                        // Hide review form and show message
+                        $('#reviewForm').hide();
+                        $('#reviewFormNotPurchased').remove();
+                        $('#reviewForm').after('<div id="reviewFormNotPurchased" class="alert alert-info mt-4"><i class="fa fa-info-circle me-2"></i>Bạn chỉ có thể đánh giá sản phẩm đã mua. Vui lòng mua sản phẩm này trước khi đánh giá.</div>');
+                    }
+                } catch (err) {
+                    console.error('Error checking purchase status:', err);
+                    // On error, hide form to be safe
+                    $('#reviewForm').hide();
+                    $('#reviewFormNotPurchased').remove();
+                    $('#reviewForm').after('<div id="reviewFormNotPurchased" class="alert alert-info mt-4"><i class="fa fa-info-circle me-2"></i>Bạn cần đăng nhập và đã mua sản phẩm này để có thể đánh giá.</div>');
+                }
+            }
+
             $(document).ready(function() {
                 $('.quantity button').off('click');
                 loadProductDetail();
                 loadFeaturedProducts();
                 updateQuantityDisplay();
                 loadCustomerInfoToReviewForm();
+                if (typeof window.updateCompareBadge === 'function') {
+                    window.updateCompareBadge();
+                }
             });
         </script>
 }

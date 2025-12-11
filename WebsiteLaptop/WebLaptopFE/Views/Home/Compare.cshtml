@@ -1,0 +1,320 @@
+@{
+    ViewData["Title"] = "So sánh sản phẩm";
+    Layout = "~/Views/Shared/_LayoutHome.cshtml";
+}
+
+<div class="container-fluid py-5">
+    <div class="container">
+        <h2 class="mb-4">So sánh sản phẩm</h2>
+        
+        <!-- Loading Spinner -->
+        <div id="loadingSpinner" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Đang tải...</span>
+            </div>
+            <p class="mt-3">Đang tải thông tin sản phẩm...</p>
+        </div>
+
+        <!-- Compare Content -->
+        <div id="compareContent" style="display: none;">
+            <!-- Empty State -->
+            <div id="emptyCompare" class="text-center py-5" style="display: none;">
+                <i class="fa fa-balance-scale fa-4x text-muted mb-3"></i>
+                <h4 class="text-muted">Chưa có sản phẩm nào để so sánh</h4>
+                <p class="text-muted">Hãy thêm sản phẩm vào danh sách so sánh để bắt đầu</p>
+                <a href="/Home/Index" class="btn btn-primary rounded-pill px-4 py-2 mt-3">
+                    <i class="fa fa-arrow-left me-2"></i>Quay về trang chủ
+                </a>
+            </div>
+
+            <!-- Comparison Table -->
+            <div id="comparisonTable" style="display: none;">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 200px;">Thông số</th>
+                                <th id="product1Column" style="min-width: 300px;">
+                                    <div class="text-center">
+                                        <button class="btn btn-sm btn-danger float-end" onclick="removeFromCompare('product1')" title="Xóa khỏi so sánh">
+                                            <i class="fa fa-times"></i>
+                                        </button>
+                                        <div id="product1Image" class="mb-3"></div>
+                                        <h5 id="product1Name"></h5>
+                                        <div id="product1Price" class="text-primary fw-bold mb-2"></div>
+                                        <a id="product1Link" href="#" class="btn btn-sm btn-outline-primary">
+                                            <i class="fa fa-eye me-1"></i>Xem chi tiết
+                                        </a>
+                                    </div>
+                                </th>
+                                <th id="product2Column" style="min-width: 300px;">
+                                    <div class="text-center">
+                                        <button class="btn btn-sm btn-danger float-end" onclick="removeFromCompare('product2')" title="Xóa khỏi so sánh">
+                                            <i class="fa fa-times"></i>
+                                        </button>
+                                        <div id="product2Image" class="mb-3"></div>
+                                        <h5 id="product2Name"></h5>
+                                        <div id="product2Price" class="text-primary fw-bold mb-2"></div>
+                                        <a id="product2Link" href="#" class="btn btn-sm btn-outline-primary">
+                                            <i class="fa fa-eye me-1"></i>Xem chi tiết
+                                        </a>
+                                    </div>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="comparisonBody">
+                            <!-- Comparison rows will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="text-center mt-4">
+                    <a href="/Home/Index" class="btn btn-outline-secondary rounded-pill px-4 py-2">
+                        <i class="fa fa-arrow-left me-2"></i>Quay về trang chủ
+                    </a>
+                    <button class="btn btn-danger rounded-pill px-4 py-2 ms-2" onclick="clearCompare()">
+                        <i class="fa fa-trash me-2"></i>Xóa tất cả
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <style>
+        .comparison-table th {
+            vertical-align: middle;
+            text-align: center;
+        }
+        .comparison-table td {
+            vertical-align: middle;
+        }
+        .comparison-table .product-image {
+            width: 200px;
+            height: 200px;
+            object-fit: contain;
+            margin: 0 auto;
+        }
+        .spec-label {
+            font-weight: 600;
+            background-color: #f8f9fa;
+        }
+    </style>
+
+    <script>
+        let url = "http://localhost:5068/";
+        const backendImageBase = url + "imageProducts/";
+        const defaultProductImage = "/imageProducts/default-laptop.jpg";
+
+        function getBackendImageUrl(fileName) {
+            if (!fileName || typeof fileName !== "string" || !fileName.trim()) {
+                return defaultProductImage;
+            }
+            return backendImageBase + encodeURIComponent(fileName.trim());
+        }
+
+        function formatCurrency(amount) {
+            if (amount == null || amount === undefined) return 'Liên hệ';
+            try {
+                return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+            } catch (e) {
+                return amount.toString() + ' VND';
+            }
+        }
+
+        function getCompareList() {
+            try {
+                const compareStr = sessionStorage.getItem('compareProducts');
+                return compareStr ? JSON.parse(compareStr) : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveCompareList(products) {
+            sessionStorage.setItem('compareProducts', JSON.stringify(products));
+            if (typeof window.updateCompareBadge === 'function') {
+                window.updateCompareBadge();
+            }
+        }
+
+        function removeFromCompare(productKey) {
+            const compareList = getCompareList();
+            if (productKey === 'product1' && compareList.length > 0) {
+                compareList.shift();
+            } else if (productKey === 'product2' && compareList.length > 1) {
+                compareList.pop();
+            }
+            saveCompareList(compareList);
+            loadComparison();
+        }
+
+        function clearCompare() {
+            if (confirm('Bạn có chắc chắn muốn xóa tất cả sản phẩm khỏi danh sách so sánh?')) {
+                sessionStorage.removeItem('compareProducts');
+                updateCompareBadge();
+                loadComparison();
+            }
+        }
+
+
+        async function loadComparison() {
+            const compareList = getCompareList();
+            
+            $('#loadingSpinner').show();
+            $('#compareContent').hide();
+
+            if (compareList.length === 0) {
+                $('#loadingSpinner').hide();
+                $('#compareContent').show();
+                $('#emptyCompare').show();
+                $('#comparisonTable').hide();
+                return;
+            }
+
+            try {
+                const products = [];
+                
+                // Load product details
+                for (let i = 0; i < compareList.length && i < 2; i++) {
+                    const productId = compareList[i].id;
+                    try {
+                        const response = await fetch(url + 'api/ListProductAPI/detail/' + encodeURIComponent(productId));
+                        if (response.ok) {
+                            const data = await response.json();
+                            products.push(data);
+                        }
+                    } catch (err) {
+                        console.error('Error loading product:', productId, err);
+                    }
+                }
+
+                if (products.length === 0) {
+                    $('#loadingSpinner').hide();
+                    $('#compareContent').show();
+                    $('#emptyCompare').show();
+                    $('#comparisonTable').hide();
+                    return;
+                }
+
+                // Display products
+                displayComparison(products);
+
+            } catch (error) {
+                console.error('Error loading comparison:', error);
+                $('#loadingSpinner').hide();
+                $('#compareContent').show();
+                $('#emptyCompare').show();
+                $('#comparisonTable').hide();
+            }
+        }
+
+        function displayComparison(products) {
+            // Hide product2 column if only one product
+            if (products.length === 1) {
+                $('#product2Column').hide();
+            } else {
+                $('#product2Column').show();
+            }
+
+            // Product 1
+            if (products[0]) {
+                const p1 = products[0].product;
+                const image1 = getBackendImageUrl(p1.avatar);
+                $('#product1Image').html(`<img src="${image1}" class="product-image img-fluid rounded" alt="${p1.productName || ''}">`);
+                $('#product1Name').text(p1.productName || 'Chưa có tên');
+                const price1 = p1.sellingPrice || 0;
+                const originalPrice1 = p1.originalSellingPrice || 0;
+                let priceHtml1 = '';
+                if (originalPrice1 > 0 && price1 > 0 && originalPrice1 > price1) {
+                    priceHtml1 += `<span class="text-muted text-decoration-line-through me-2" style="font-size: 0.9em;">${formatCurrency(originalPrice1)}</span>`;
+                }
+                priceHtml1 += `<span>${formatCurrency(price1)}</span>`;
+                $('#product1Price').html(priceHtml1);
+                $('#product1Link').attr('href', '/Home/ProductDetail?id=' + encodeURIComponent(p1.productId));
+            }
+
+            // Product 2
+            if (products[1]) {
+                const p2 = products[1].product;
+                const image2 = getBackendImageUrl(p2.avatar);
+                $('#product2Image').html(`<img src="${image2}" class="product-image img-fluid rounded" alt="${p2.productName || ''}">`);
+                $('#product2Name').text(p2.productName || 'Chưa có tên');
+                const price2 = p2.sellingPrice || 0;
+                const originalPrice2 = p2.originalSellingPrice || 0;
+                let priceHtml2 = '';
+                if (originalPrice2 > 0 && price2 > 0 && originalPrice2 > price2) {
+                    priceHtml2 += `<span class="text-muted text-decoration-line-through me-2" style="font-size: 0.9em;">${formatCurrency(originalPrice2)}</span>`;
+                }
+                priceHtml2 += `<span>${formatCurrency(price2)}</span>`;
+                $('#product2Price').html(priceHtml2);
+                $('#product2Link').attr('href', '/Home/ProductDetail?id=' + encodeURIComponent(p2.productId));
+            } else {
+                $('#product2Image').html('');
+                $('#product2Name').text('');
+                $('#product2Price').html('');
+                $('#product2Link').attr('href', '#');
+            }
+
+            // Build comparison table
+            const specs = [
+                { label: 'Tên sản phẩm', key: 'productName', p1: products[0]?.product?.productName, p2: products[1]?.product?.productName },
+                { label: 'Model', key: 'productModel', p1: products[0]?.product?.productModel, p2: products[1]?.product?.productModel },
+                { label: 'Thương hiệu', key: 'brand', p1: products[0]?.product?.brand?.brandName, p2: products[1]?.product?.brand?.brandName },
+                { label: 'Giá bán', key: 'sellingPrice', p1: products[0]?.product?.sellingPrice, p2: products[1]?.product?.sellingPrice, format: 'currency' },
+                { label: 'Giá gốc', key: 'originalSellingPrice', p1: products[0]?.product?.originalSellingPrice, p2: products[1]?.product?.originalSellingPrice, format: 'currency' },
+                { label: 'Bộ vi xử lý (CPU)', key: 'cpu', p1: products[0]?.product?.cpu || products[0]?.configurations?.[0]?.cpu, p2: products[1]?.product?.cpu || products[1]?.configurations?.[0]?.cpu },
+                { label: 'Bộ nhớ RAM', key: 'ram', p1: products[0]?.product?.ram || products[0]?.configurations?.[0]?.ram, p2: products[1]?.product?.ram || products[1]?.configurations?.[0]?.ram },
+                { label: 'Ổ cứng', key: 'rom', p1: products[0]?.product?.rom || products[0]?.product?.storage || products[0]?.configurations?.[0]?.rom, p2: products[1]?.product?.rom || products[1]?.product?.storage || products[1]?.configurations?.[0]?.rom },
+                { label: 'Card đồ họa', key: 'card', p1: products[0]?.product?.card || products[0]?.product?.gpu || products[0]?.configurations?.[0]?.card, p2: products[1]?.product?.card || products[1]?.product?.gpu || products[1]?.configurations?.[0]?.card },
+                { label: 'Màn hình', key: 'screen', p1: products[0]?.product?.screen, p2: products[1]?.product?.screen },
+                { label: 'Camera', key: 'camera', p1: products[0]?.product?.camera, p2: products[1]?.product?.camera },
+                { label: 'Trọng lượng', key: 'weight', p1: products[0]?.product?.weight, p2: products[1]?.product?.weight, format: 'weight' },
+                { label: 'Pin', key: 'pin', p1: products[0]?.product?.pin, p2: products[1]?.product?.pin },
+                { label: 'Cổng kết nối', key: 'connect', p1: products[0]?.product?.connect, p2: products[1]?.product?.connect },
+                { label: 'Bảo hành', key: 'warranty', p1: products[0]?.product?.warrantyPeriod, p2: products[1]?.product?.warrantyPeriod, format: 'warranty' }
+            ];
+
+            let tableBody = '';
+            specs.forEach(spec => {
+                let p1Value = spec.p1 || 'N/A';
+                let p2Value = spec.p2 || 'N/A';
+
+                if (spec.format === 'currency') {
+                    p1Value = p1Value && p1Value !== 'N/A' ? formatCurrency(p1Value) : 'N/A';
+                    p2Value = p2Value && p2Value !== 'N/A' ? formatCurrency(p2Value) : 'N/A';
+                } else if (spec.format === 'weight') {
+                    p1Value = p1Value && p1Value !== 'N/A' ? p1Value + ' kg' : 'N/A';
+                    p2Value = p2Value && p2Value !== 'N/A' ? p2Value + ' kg' : 'N/A';
+                } else if (spec.format === 'warranty') {
+                    p1Value = p1Value && p1Value !== 'N/A' ? p1Value + ' tháng' : 'N/A';
+                    p2Value = p2Value && p2Value !== 'N/A' ? p2Value + ' tháng' : 'N/A';
+                }
+
+                tableBody += `
+                    <tr>
+                        <td class="spec-label">${spec.label}</td>
+                        <td>${p1Value}</td>
+                        <td>${p2Value}</td>
+                    </tr>
+                `;
+            });
+
+            $('#comparisonBody').html(tableBody);
+
+            $('#loadingSpinner').hide();
+            $('#compareContent').show();
+            $('#emptyCompare').hide();
+            $('#comparisonTable').show();
+        }
+
+        $(document).ready(function() {
+            loadComparison();
+            if (typeof window.updateCompareBadge === 'function') {
+                window.updateCompareBadge();
+            }
+        });
+    </script>
+}
+

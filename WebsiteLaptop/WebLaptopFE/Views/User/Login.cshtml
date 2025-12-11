@@ -261,6 +261,13 @@
                 if (data && data.customer) {
                     sessionStorage.setItem('customer', JSON.stringify(data.customer));
                     sessionStorage.setItem('isLoggedIn', 'true');
+                    // Xóa danh sách so sánh khi đăng nhập
+                    sessionStorage.removeItem('compareProducts');
+                    sessionStorage.removeItem('compareSelectedConfigs');
+                    // Cập nhật badge so sánh nếu có hàm
+                    if (typeof window.updateCompareBadge === 'function') {
+                        window.updateCompareBadge();
+                    }
                     if (rememberCheckbox && rememberCheckbox.checked) {
                         localStorage.setItem('rememberedEmail', credential);
                     } else {
@@ -329,6 +336,13 @@
                     if (data.customer) {
                         sessionStorage.setItem('customer', JSON.stringify(data.customer));
                         sessionStorage.setItem('isLoggedIn', 'true');
+                        // Xóa danh sách so sánh khi đăng nhập
+                        sessionStorage.removeItem('compareProducts');
+                        sessionStorage.removeItem('compareSelectedConfigs');
+                        // Cập nhật badge so sánh nếu có hàm
+                        if (typeof window.updateCompareBadge === 'function') {
+                            window.updateCompareBadge();
+                        }
                     }
 
                     if (loginAlert) {
@@ -480,6 +494,13 @@
                     if (data.customer) {
                         sessionStorage.setItem('customer', JSON.stringify(data.customer));
                         sessionStorage.setItem('isLoggedIn', 'true');
+                        // Xóa danh sách so sánh khi đăng nhập
+                        sessionStorage.removeItem('compareProducts');
+                        sessionStorage.removeItem('compareSelectedConfigs');
+                        // Cập nhật badge so sánh nếu có hàm
+                        if (typeof window.updateCompareBadge === 'function') {
+                            window.updateCompareBadge();
+                        }
                     }
 
                     if (loginAlert) {

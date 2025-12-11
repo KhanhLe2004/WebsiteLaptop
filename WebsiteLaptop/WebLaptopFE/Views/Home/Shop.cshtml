@@ -109,6 +109,13 @@
 
             <!-- PRODUCTS -->
             <div class="col-lg-9">
+                <div id="searchResultHeader" class="mb-4" style="display: none;">
+                    <h4 class="text-primary">
+                        <i class="fa fa-search me-2"></i>Kết quả tìm kiếm cho: <span id="searchKeyword" class="fw-bold"></span>
+                    </h4>
+                    <p class="text-muted" id="searchResultCount"></p>
+                </div>
+                
                 <div class="row g-4 justify-content-center" id="productsContainer">
                     <!-- Products will be loaded here -->
                 </div>
@@ -205,6 +212,8 @@
                         ram: [],
                         storage: [],
                         sortBy: 'price',
+                        search: '', // Search keyword
+                        productName: '', // Product name filter from category
                         page: 1,
                         // Set large pageSize so server returns all matched items (no client-side pagination)
                         pageSize: 100000
@@ -214,35 +223,125 @@
                     let allBrands = [];
                     let allRamOptions = [];
                     let allStorageOptions = [];
+                    let searchResults = []; // Lưu kết quả tìm kiếm để filter
 
                     // Initialize
                     $(document).ready(function() {
-                        // Always prioritize sessionStorage (has most recent filters)
-                        // Only use URL if sessionStorage is empty
-                        restoreFiltersFromSessionStorage();
-                        if (filters.brands.length === 0 && filters.priceRanges.length === 0 && 
-                            filters.ram.length === 0 && filters.storage.length === 0) {
+                        // Kiểm tra URL có các tham số không - nếu có thì ưu tiên URL
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const hasBrandIdInURL = urlParams.has('brandId');
+                        const hasProductNameInURL = urlParams.has('productName');
+                        const hasBrandsInURL = urlParams.has('brands');
+                        const hasSearchInURL = urlParams.has('search');
+                        
+                        if (hasBrandIdInURL || hasProductNameInURL || hasBrandsInURL || hasSearchInURL) {
+                            // Nếu URL có bất kỳ tham số nào, ưu tiên URL
                             restoreFiltersFromURL();
+                            // Xóa brands và productName khỏi sessionStorage để tránh conflict (nhưng giữ search nếu có)
+                            try {
+                                const savedFilters = sessionStorage.getItem('shopFilters');
+                                if (savedFilters) {
+                                    const parsed = JSON.parse(savedFilters);
+                                    if (parsed) {
+                                        if (!hasSearchInURL) {
+                                            parsed.brands = [];
+                                            parsed.productName = '';
+                                        } else {
+                                            // Nếu có search, chỉ xóa brands và productName, giữ các filter khác
+                                            parsed.brands = [];
+                                            parsed.productName = '';
+                                        }
+                                        sessionStorage.setItem('shopFilters', JSON.stringify(parsed));
+                                    }
+                                }
+                            } catch (e) {
+                                // Silent error handling
+                            }
+                        } else {
+                            // Nếu không có tham số nào trong URL (tức là "Tất cả sản phẩm")
+                            // Xóa brands và productName khỏi filters và sessionStorage
+                            filters.brands = [];
+                            filters.productName = '';
+                            filters.search = '';
+                            try {
+                                const savedFilters = sessionStorage.getItem('shopFilters');
+                                if (savedFilters) {
+                                    const parsed = JSON.parse(savedFilters);
+                                    if (parsed) {
+                                        parsed.brands = [];
+                                        parsed.productName = '';
+                                        parsed.search = '';
+                                        sessionStorage.setItem('shopFilters', JSON.stringify(parsed));
+                                    }
+                                }
+                            } catch (e) {
+                                // Silent error handling
+                            }
+                            // Restore các filter khác từ sessionStorage (price, RAM, storage, sort)
+                            restoreFiltersFromSessionStorage();
                         }
                         
                         loadFilters();
                         
                         // Handle browser back/forward navigation
                         window.addEventListener('popstate', function(event) {
-                            // Always prioritize sessionStorage (has most recent filters)
-                            restoreFiltersFromSessionStorage();
-                            if (filters.brands.length === 0 && filters.priceRanges.length === 0 && 
-                                filters.ram.length === 0 && filters.storage.length === 0) {
+                            // Kiểm tra URL có các tham số không
+                            const urlParams = new URLSearchParams(window.location.search);
+                            const hasBrandIdInURL = urlParams.has('brandId');
+                            const hasProductNameInURL = urlParams.has('productName');
+                            const hasBrandsInURL = urlParams.has('brands');
+                            const hasSearchInURL = urlParams.has('search');
+                            
+                            if (hasBrandIdInURL || hasProductNameInURL || hasBrandsInURL || hasSearchInURL) {
+                                // Nếu URL có bất kỳ tham số nào, ưu tiên URL
                                 restoreFiltersFromURL();
+                            } else {
+                                // Nếu không có, restore từ sessionStorage
+                                restoreFiltersFromSessionStorage();
+                                // Nếu sessionStorage rỗng, mới restore từ URL
+                                if (filters.brands.length === 0 && filters.priceRanges.length === 0 && 
+                                    filters.ram.length === 0 && filters.storage.length === 0 && !filters.productName && !filters.search) {
+                                    restoreFiltersFromURL();
+                                }
                             }
                             
                             restoreCheckboxStates();
                             loadProducts();
                         });
                         
-                        // Save filters to sessionStorage before navigating away
+                        // Clear all filters when navigating away
+                        function clearAllFiltersOnExit() {
+                            // Xóa tất cả filters
+                            filters.brands = [];
+                            filters.priceRanges = [];
+                            filters.ram = [];
+                            filters.storage = [];
+                            filters.sortBy = 'price';
+                            filters.search = '';
+                            filters.productName = '';
+                            searchResults = [];
+                            
+                            // Xóa tất cả filters khỏi sessionStorage
+                            try {
+                                sessionStorage.removeItem('shopFilters');
+                            } catch (e) {
+                                // Silent error handling
+                            }
+                        }
+                        
+                        // Clear all filters before navigating away
                         window.addEventListener('beforeunload', function() {
-                            saveFiltersToSessionStorage();
+                            clearAllFiltersOnExit();
+                        });
+                        
+                        // Xóa tất cả filters khi click vào các link navigation (trừ link trong cùng trang Shop)
+                        $(document).on('click', 'a[href]', function(e) {
+                            const href = $(this).attr('href');
+                            // Nếu link không phải là link trong cùng trang Shop hoặc là link đến trang khác
+                            if (href && !href.startsWith('#') && !href.startsWith('javascript:') && 
+                                !href.includes('/Home/Shop') && !href.includes('/Home/ProductDetail')) {
+                                clearAllFiltersOnExit();
+                            }
                         });
                         
                         // Attach price checkbox handler (delegated to handle dynamic inputs)
@@ -258,7 +357,12 @@
                             filters.sortBy = $(this).val();
                             filters.page = 1;
                             saveFiltersToSessionStorage(); // Save filters when changed
-                            loadProducts();
+                            // Nếu đang có search, apply filter vào search results, ngược lại load products bình thường
+                            if (filters.search && filters.search.trim() && searchResults.length > 0) {
+                                applyFiltersToSearchResults();
+                            } else {
+                                loadProducts();
+                            }
                         });
 
                         // Delegated handlers for brand/ram/storage -- filter change triggers loadProducts
@@ -271,6 +375,9 @@
                         $(document).on('change', '.storage-checkbox', function() {
                             updateStorageFilters();
                         });
+                        
+                        // Khi có search, filter change sẽ apply filter vào search results
+                        // Thay vì gọi lại API search
                     });
 
                     // Load filter options from API
@@ -296,7 +403,6 @@
                                 loadProducts();
                             },
                             error: function(xhr, status, error) {
-                                console.error('Error loading filters:', error);
                                 // Restore checkbox states even if API fails
                                 restoreCheckboxStates();
                                 // fallback: still try loadProducts (will request all)
@@ -357,7 +463,12 @@
                         });
                         filters.page = 1;
                         saveFiltersToSessionStorage(); // Save filters when changed
-                        loadProducts();
+                        // Nếu đang có search, apply filter vào search results, ngược lại load products bình thường
+                        if (filters.search && filters.search.trim() && searchResults.length > 0) {
+                            applyFiltersToSearchResults();
+                        } else {
+                            loadProducts();
+                        }
                     }
 
                     // Update ram filters
@@ -368,7 +479,12 @@
                         });
                         filters.page = 1;
                         saveFiltersToSessionStorage(); // Save filters when changed
-                        loadProducts();
+                        // Nếu đang có search, apply filter vào search results, ngược lại load products bình thường
+                        if (filters.search && filters.search.trim() && searchResults.length > 0) {
+                            applyFiltersToSearchResults();
+                        } else {
+                            loadProducts();
+                        }
                     }
 
                     // Update storage filters
@@ -380,7 +496,12 @@
                         });
                         filters.page = 1;
                         saveFiltersToSessionStorage(); // Save filters when changed
-                        loadProducts();
+                        // Nếu đang có search, apply filter vào search results, ngược lại load products bình thường
+                        if (filters.search && filters.search.trim() && searchResults.length > 0) {
+                            applyFiltersToSearchResults();
+                        } else {
+                            loadProducts();
+                        }
                     }
 
                     // Update price ranges from checked boxes
@@ -403,20 +524,40 @@
                                 filters.priceRanges.push({ min: 30000000, max: 1000000000 }); // Use large number for max
                             }
                         });
+                        // Nếu đang có search, apply filter vào search results, ngược lại load products bình thường
+                        if (filters.search && filters.search.trim() && searchResults.length > 0) {
+                            applyFiltersToSearchResults();
+                        } else {
+                            loadProducts();
+                        }
                     }
 
-                    // Save filters to sessionStorage
+                    // Save filters to sessionStorage (nhưng không lưu search và productName)
                     function saveFiltersToSessionStorage() {
                         try {
-                            sessionStorage.setItem('shopFilters', JSON.stringify(filters));
+                            // Tạo copy của filters nhưng không bao gồm search và productName
+                            const filtersToSave = {
+                                brands: filters.brands || [],
+                                priceRanges: filters.priceRanges || [],
+                                ram: filters.ram || [],
+                                storage: filters.storage || [],
+                                sortBy: filters.sortBy || 'price'
+                                // Không lưu search và productName
+                            };
+                            sessionStorage.setItem('shopFilters', JSON.stringify(filtersToSave));
                         } catch (e) {
-                            console.error('Error saving filters to sessionStorage:', e);
+                            // Silent error handling
                         }
                     }
 
                     // Restore filters from sessionStorage
                     function restoreFiltersFromSessionStorage() {
                         try {
+                            // Lưu search và productName từ URL trước khi reset (nếu có)
+                            const urlParams = new URLSearchParams(window.location.search);
+                            const searchFromURL = urlParams.get('search') || '';
+                            const productNameFromURL = urlParams.get('productName') || '';
+                            
                             const savedFilters = sessionStorage.getItem('shopFilters');
                             if (savedFilters) {
                                 const parsed = JSON.parse(savedFilters);
@@ -427,17 +568,41 @@
                                     filters.ram = [];
                                     filters.storage = [];
                                     filters.sortBy = 'price';
+                                    // Chỉ reset search và productName nếu không có trong URL
+                                    if (!searchFromURL) {
+                                        filters.search = '';
+                                    }
+                                    if (!productNameFromURL) {
+                                        filters.productName = '';
+                                    }
                                     
-                                    // Restore from sessionStorage
+                                    // Restore from sessionStorage (nhưng KHÔNG restore search và productName)
                                     filters.brands = parsed.brands || [];
                                     filters.priceRanges = parsed.priceRanges || [];
                                     filters.ram = parsed.ram || [];
                                     filters.storage = parsed.storage || [];
                                     filters.sortBy = parsed.sortBy || 'price';
+                                    // Không restore search và productName - luôn lấy từ URL nếu có
+                                    
+                                    // Restore search và productName từ URL nếu có
+                                    if (searchFromURL) {
+                                        filters.search = searchFromURL;
+                                    }
+                                    if (productNameFromURL) {
+                                        filters.productName = productNameFromURL;
+                                    }
+                                }
+                            } else {
+                                // Nếu không có savedFilters, vẫn cần restore search và productName từ URL nếu có
+                                if (searchFromURL) {
+                                    filters.search = searchFromURL;
+                                }
+                                if (productNameFromURL) {
+                                    filters.productName = productNameFromURL;
                                 }
                             }
                         } catch (e) {
-                            console.error('Error restoring filters from sessionStorage:', e);
+                            // Silent error handling
                         }
                     }
 
@@ -484,11 +649,33 @@
                         filters.ram = [];
                         filters.storage = [];
                         filters.sortBy = 'price';
+                        filters.search = '';
+                        filters.productName = '';
                         
-                        // Restore brands
-                        const brandsParam = urlParams.get('brands');
-                        if (brandsParam) {
-                            filters.brands = brandsParam.split(',').filter(b => b);
+                        // Check for search query parameter (chỉ lấy từ URL, không restore từ sessionStorage)
+                        const searchParam = urlParams.get('search');
+                        if (searchParam) {
+                            filters.search = searchParam;
+                        }
+                        
+                        // Restore productName từ URL (từ danh mục)
+                        const productNameParam = urlParams.get('productName');
+                        if (productNameParam) {
+                            filters.productName = productNameParam;
+                        }
+                        
+                        // Restore brands - ưu tiên brandId (từ danh mục), sau đó mới đến brands (từ filter)
+                        const brandIdParam = urlParams.get('brandId');
+                        if (brandIdParam) {
+                            filters.brands = [brandIdParam]; // Chỉ lấy brandId từ URL
+                        } else {
+                            // Nếu không có brandId, mới kiểm tra brands
+                            const brandsParam = urlParams.get('brands');
+                            if (brandsParam) {
+                                filters.brands = brandsParam.split(',').filter(b => b);
+                            }
+                            // Nếu không có brandId và không có brands trong URL (tức là "Tất cả sản phẩm")
+                            // Không set filters.brands ở đây - sẽ được set trong loadFilters sau khi allBrands được load
                         }
                         
                         // Restore price ranges
@@ -531,7 +718,8 @@
                     function restoreCheckboxStates() {
                         // Uncheck all brand checkboxes first
                         $('.brand-checkbox').prop('checked', false);
-                        // Restore brand checkboxes
+                        
+                        // Restore brand checkboxes theo filters.brands (chỉ tích chọn những brand có trong filters.brands)
                         filters.brands.forEach(brandId => {
                             $('#brand-' + brandId).prop('checked', true);
                         });
@@ -581,15 +769,160 @@
                         }
                     }
 
+                    // Filter products based on current filters
+                    function filterProducts(products) {
+                        if (!products || products.length === 0) return [];
+                        
+                        let filtered = products;
+                        
+                        // Filter by brands
+                        if (filters.brands.length > 0) {
+                            filtered = filtered.filter(p => {
+                                const brandId = (p.brand || p.Brand || {}).brandId || (p.brand || p.Brand || {}).BrandId || '';
+                                return filters.brands.includes(brandId);
+                            });
+                        }
+                        
+                        // Filter by price ranges
+                        if (filters.priceRanges.length > 0) {
+                            filtered = filtered.filter(p => {
+                                const price = p.sellingPrice || p.SellingPrice || 0;
+                                return filters.priceRanges.some(range => {
+                                    return price >= (range.min || 0) && price <= (range.max || 1000000000);
+                                });
+                            });
+                        }
+                        
+                        // Filter by RAM
+                        if (filters.ram.length > 0) {
+                            filtered = filtered.filter(p => {
+                                // Kiểm tra trong RamOptions (array) hoặc Ram (string)
+                                const ramOptions = p.ramOptions || p.RamOptions || [];
+                                const ram = p.ram || p.Ram || '';
+                                
+                                // Nếu có RamOptions array, kiểm tra trong đó
+                                if (Array.isArray(ramOptions) && ramOptions.length > 0) {
+                                    return filters.ram.some(filterRam => {
+                                        return ramOptions.some(productRam => {
+                                            return normalizeForApi(productRam) === normalizeForApi(filterRam);
+                                        });
+                                    });
+                                }
+                                // Nếu không có array, kiểm tra Ram string
+                                if (ram) {
+                                    return filters.ram.some(filterRam => {
+                                        return normalizeForApi(ram) === normalizeForApi(filterRam);
+                                    });
+                                }
+                                return false;
+                            });
+                        }
+                        
+                        // Filter by Storage
+                        if (filters.storage.length > 0) {
+                            filtered = filtered.filter(p => {
+                                // Kiểm tra trong StorageOptions (array) hoặc Storage (string)
+                                const storageOptions = p.storageOptions || p.StorageOptions || [];
+                                const storage = p.storage || p.Storage || '';
+                                
+                                // Nếu có StorageOptions array, kiểm tra trong đó
+                                if (Array.isArray(storageOptions) && storageOptions.length > 0) {
+                                    return filters.storage.some(filterStorage => {
+                                        return storageOptions.some(productStorage => {
+                                            return normalizeForApi(productStorage) === filterStorage;
+                                        });
+                                    });
+                                }
+                                // Nếu không có array, kiểm tra Storage string
+                                if (storage) {
+                                    return filters.storage.some(filterStorage => {
+                                        return normalizeForApi(storage) === filterStorage;
+                                    });
+                                }
+                                return false;
+                            });
+                        }
+                        
+                        // Sort products
+                        if (filters.sortBy === 'price') {
+                            filtered.sort((a, b) => {
+                                const priceA = a.sellingPrice || a.SellingPrice || 0;
+                                const priceB = b.sellingPrice || b.SellingPrice || 0;
+                                return priceA - priceB;
+                            });
+                        } else if (filters.sortBy === 'price_desc') {
+                            filtered.sort((a, b) => {
+                                const priceA = a.sellingPrice || a.SellingPrice || 0;
+                                const priceB = b.sellingPrice || b.SellingPrice || 0;
+                                return priceB - priceA;
+                            });
+                        } else if (filters.sortBy === 'name') {
+                            filtered.sort((a, b) => {
+                                const nameA = (a.productName || a.ProductName || '').toLowerCase();
+                                const nameB = (b.productName || b.ProductName || '').toLowerCase();
+                                return nameA.localeCompare(nameB);
+                            });
+                        }
+                        
+                        return filtered;
+                    }
+
                     // Build params and call API to load products
                     function loadProducts() {
+                        // Hiển thị/ẩn header tìm kiếm
+                        const searchHeader = $('#searchResultHeader');
+                        const searchKeyword = $('#searchKeyword');
+                        const searchResultCount = $('#searchResultCount');
+                        
+                        // Nếu có search keyword, gọi API search và áp dụng filter
+                        if (filters.search && filters.search.trim()) {
+                            const searchTerm = filters.search.trim();
+                            searchHeader.show();
+                            searchKeyword.text(searchTerm);
+                            
+                            // Kiểm tra xem đã có kết quả search chưa (tránh gọi API nhiều lần khi chỉ thay đổi filter)
+                            if (searchResults.length === 0 || searchResults[0]?.lastSearchTerm !== searchTerm) {
+                                $.ajax({
+                                    type: 'GET',
+                                    url: apiBase + "api/ListProductAPI/search?keyword=" + encodeURIComponent(searchTerm) + "&limit=100",
+                                    dataType: 'json',
+                                    success: function(products) {
+                                        const productList = Array.isArray(products) ? products : [];
+                                        // Lưu kết quả search với từ khóa
+                                        searchResults = productList.map(p => ({ ...p, lastSearchTerm: searchTerm }));
+                                        applyFiltersToSearchResults();
+                                    },
+                                    error: function(xhr, status, error) {
+                                        searchResultCount.html('<span class="text-danger">Lỗi khi tìm kiếm sản phẩm</span>');
+                                        $('#productsContainer').html('<div class="col-12"><p class="text-center text-danger">Không thể tải sản phẩm. Vui lòng thử lại sau.</p></div>');
+                                    }
+                                });
+                            } else {
+                                // Đã có kết quả search, chỉ cần apply filter lại
+                                applyFiltersToSearchResults();
+                            }
+                            return;
+                        }
+                        
+                        // Nếu không có search, xóa kết quả search
+                        searchResults = [];
+                        searchHeader.hide();
+                        
                         let params = {
                             page: filters.page || 1,
                             pageSize: filters.pageSize || 100000,
                             sortBy: filters.sortBy || 'price'
                         };
 
-                        if (filters.brands.length > 0) params.brandIds = filters.brands.join(',');
+                        // Chỉ thêm brandIds nếu có brands được chọn
+                        if (filters.brands.length > 0) {
+                            params.brandIds = filters.brands.join(',');
+                        }
+                        
+                        // Thêm productName vào params nếu có
+                        if (filters.productName && filters.productName.trim()) {
+                            params.productName = filters.productName.trim();
+                        }
                         
                         // Build priceRanges parameter
                         if (filters.priceRanges.length > 0) {
@@ -621,14 +954,10 @@
                                 if (data && data.products) {
                                     renderProducts(data.products || []);
                                 } else {
-                                    console.error('Invalid response format:', data);
                                     $('#productsContainer').html('<div class="col-12"><p class="text-center">Không có sản phẩm nào.</p></div>');
                                 }
                             },
                             error: function(xhr, status, error) {
-                                console.error('Error loading products:', error);
-                                console.error('Status:', status);
-                                console.error('Response:', xhr.responseText);
                                 // Show a friendly message inside products area (keeps sidebar visible)
                                 let errText = 'Không thể tải sản phẩm. Vui lòng thử lại sau.';
                                 try {
@@ -639,6 +968,36 @@
                                 $('#productsContainer').html('<div class="col-12"><p class="text-center text-danger">' + errText + '</p></div>');
                             }
                         });
+                    }
+                    
+                    // Áp dụng filter vào kết quả search
+                    function applyFiltersToSearchResults() {
+                        const searchHeader = $('#searchResultHeader');
+                        const searchKeyword = $('#searchKeyword');
+                        const searchResultCount = $('#searchResultCount');
+                        
+                        if (searchResults.length === 0) {
+                            searchResultCount.html('<span class="text-danger">Không tìm thấy sản phẩm nào</span>');
+                            $('#productsContainer').html('<div class="col-12"><p class="text-center">Không có sản phẩm nào.</p></div>');
+                            return;
+                        }
+                        
+                        // Áp dụng filter
+                        const filtered = filterProducts(searchResults);
+                        
+                        // Cập nhật số lượng kết quả
+                        const searchTerm = filters.search.trim();
+                        if (filtered.length > 0) {
+                            if (filtered.length === searchResults.length) {
+                                searchResultCount.text(`Tìm thấy ${filtered.length} sản phẩm`);
+                            } else {
+                                searchResultCount.html(`Tìm thấy <strong>${filtered.length}</strong> sản phẩm`);
+                            }
+                        } else {
+                            searchResultCount.html(`Không có sản phẩm nào phù hợp với bộ lọc`);
+                        }
+                        
+                        renderProducts(filtered);
                     }
 
                     // Render product cards

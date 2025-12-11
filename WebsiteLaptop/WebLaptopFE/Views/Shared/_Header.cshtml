@@ -29,15 +29,20 @@
             <div class="collapse navbar-collapse bg-white" id="navbarCollapse">
 
                 <div class="mx-auto w-50 position-relative">
-                    <input type="text" class="form-control border-2 border-secondary py-3 px-4 rounded-pill" placeholder="Search">
-                    <button type="submit" class="btn btn-primary border-2 border-secondary py-3 px-4 position-absolute rounded-pill text-white h-100" style="top: 0; right: 0%;">
+                    <input type="text" id="productSearchInput" class="form-control border-2 border-secondary py-3 px-4 rounded-pill" placeholder="Tìm kiếm sản phẩm..." autocomplete="off">
+                    <button type="button" id="productSearchBtn" class="btn btn-primary border-2 border-secondary py-3 px-4 position-absolute rounded-pill text-white h-100" style="top: 0; right: 0%;">
                         <i class="bi bi-search"></i>
                     </button>
+                    <div id="searchResultsDropdown" class="search-results-dropdown" style="display: none;"></div>
                 </div>
                 <div class="d-flex m-3 me-0">
                     <a href="/Cart/Cart" class="position-relative me-4 my-auto" id="cartIconLink">
                         <i class="fa fa-shopping-bag fa-2x"></i>
                         <span id="cartItemCount" class="position-absolute bg-danger rounded-circle d-flex align-items-center justify-content-center text-white px-1 fw-bold" style="top: -5px; left: 15px; height: 20px; min-width: 20px; font-size: 11px; line-height: 1; padding: 2px 4px !important; display: none;">0</span>
+                    </a>
+                    <a href="#" class="position-relative me-4 my-auto" id="compareIconLink" onclick="event.preventDefault(); openCompareModal();">
+                        <i class="fa fa-balance-scale fa-2x"></i>
+                        <span id="compareBadge" class="position-absolute bg-primary rounded-circle d-flex align-items-center justify-content-center text-white px-1 fw-bold" style="top: -5px; left: 15px; height: 20px; min-width: 20px; font-size: 11px; line-height: 1; padding: 2px 4px !important; display: none;">0</span>
                     </a>
                     <a href="/User/Account" class="my-auto">
                         <i class="fas fa-user fa-2x"></i>
@@ -183,5 +188,792 @@
         jQuery(document).on('cartUpdated', function() {
             updateCartItemCount();
         });
-    }    
+    }
+
+    // Comparison badge update function
+    function updateCompareBadge() {
+        try {
+            const compareStr = sessionStorage.getItem('compareProducts');
+            const compareList = compareStr ? JSON.parse(compareStr) : [];
+            const badge = document.getElementById('compareBadge');
+            if (badge) {
+                if (compareList.length > 0) {
+                    badge.textContent = compareList.length;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+        } catch (e) {
+            const badge = document.getElementById('compareBadge');
+            if (badge) badge.style.display = 'none';
+        }
+    }
+
+    // Make updateCompareBadge available globally
+    window.updateCompareBadge = updateCompareBadge;
+
+    // Update compare badge on page load
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', updateCompareBadge);
+    } else {
+        updateCompareBadge();
+    }
+
+    // Listen for storage changes (when compare list is updated in another tab)
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'compareProducts') {
+            updateCompareBadge();
+        }
+    });
 </script>
+
+<!-- Compare Modal -->
+<div class="modal fade" id="compareModal" tabindex="-1" aria-labelledby="compareModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="compareModalLabel">
+                    <i class="fa fa-balance-scale me-2"></i>So sánh sản phẩm
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Loading Spinner -->
+                <div id="compareModalLoading" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Đang tải...</span>
+                    </div>
+                    <p class="mt-3">Đang tải thông tin sản phẩm...</p>
+                </div>
+
+                <!-- Empty State -->
+                <div id="compareModalEmpty" class="text-center py-5" style="display: none;">
+                    <i class="fa fa-balance-scale fa-4x text-muted mb-3"></i>
+                    <h4 class="text-muted">Chưa có sản phẩm nào để so sánh</h4>
+                    <p class="text-muted">Hãy thêm sản phẩm vào danh sách so sánh để bắt đầu</p>
+                </div>
+
+                <!-- Comparison Table -->
+                <div id="compareModalContent" style="display: none;">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 200px;"></th>
+                                    <th id="modalProduct1Column" style="min-width: 250px;">
+                                        <div class="text-center">
+                                            <button class="btn btn-sm btn-danger float-end" onclick="removeFromCompareModal('product1')" title="Xóa khỏi so sánh">
+                                                <i class="fa fa-times"></i>
+                                            </button>
+                                            <div id="modalProduct1Image" class="mb-3"></div>
+                                            <h6 id="modalProduct1Name"></h6>
+                                            <div id="modalProduct1ConfigSelect" class="mb-2" style="display: none;">
+                                                <label class="form-label small mb-1">Chọn cấu hình:</label>
+                                                <select id="modalProduct1Config" class="form-select form-select-sm" onchange="updateCompareModalConfig('product1', this.value)">
+                                                    <option value="">Cấu hình mặc định</option>
+                                                </select>
+                                            </div>
+                                            <div id="modalProduct1Price" class="text-primary fw-bold mb-2"></div>
+                                            <a id="modalProduct1Link" href="#" class="btn btn-sm btn-outline-primary">
+                                                <i class="fa fa-eye me-1"></i>Xem chi tiết
+                                            </a>
+                                        </div>
+                                    </th>
+                                    <th id="modalProduct2Column" style="min-width: 250px;">
+                                        <div class="text-center">
+                                            <button class="btn btn-sm btn-danger float-end" onclick="removeFromCompareModal('product2')" title="Xóa khỏi so sánh">
+                                                <i class="fa fa-times"></i>
+                                            </button>
+                                            <div id="modalProduct2Image" class="mb-3"></div>
+                                            <h6 id="modalProduct2Name"></h6>
+                                            <div id="modalProduct2ConfigSelect" class="mb-2" style="display: none;">
+                                                <label class="form-label small mb-1">Chọn cấu hình:</label>
+                                                <select id="modalProduct2Config" class="form-select form-select-sm" onchange="updateCompareModalConfig('product2', this.value)">
+                                                    <option value="">Cấu hình mặc định</option>
+                                                </select>
+                                            </div>
+                                            <div id="modalProduct2Price" class="text-primary fw-bold mb-2"></div>
+                                            <a id="modalProduct2Link" href="#" class="btn btn-sm btn-outline-primary">
+                                                <i class="fa fa-eye me-1"></i>Xem chi tiết
+                                            </a>
+                                        </div>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="modalComparisonBody">
+                                <!-- Comparison rows will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-danger" onclick="clearCompareModal()" id="clearCompareBtn" style="display: none;">
+                    <i class="fa fa-trash me-2"></i>Xóa tất cả
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    #compareModal .product-image {
+        width: 150px;
+        height: 150px;
+        object-fit: contain;
+        margin: 0 auto;
+    }
+    #compareModal .spec-label {
+        font-weight: 600;
+        background-color: #f8f9fa;
+    }
+    #compareModal .table th {
+        vertical-align: middle;
+        text-align: center;
+    }
+    #compareModal .table td {
+        vertical-align: middle;
+    }
+</style>
+
+<script>
+    let compareModalUrl = "http://localhost:5068/";
+    let compareModalProducts = []; // Store loaded products data
+    let compareModalSelectedConfigs = {}; // Store selected configurations {product1: configId, product2: configId}
+    
+    // Get API base URL
+    if (window.CART_API_BASE && window.CART_API_BASE.trim()) {
+        compareModalUrl = window.CART_API_BASE.trim();
+    } else if (window.location && window.location.origin) {
+        const origin = window.location.origin;
+        if (origin.includes('localhost')) {
+            compareModalUrl = 'http://localhost:5068';
+        } else {
+            compareModalUrl = origin;
+        }
+    }
+
+    // Load selected configurations from sessionStorage
+    function loadSelectedConfigs() {
+        try {
+            const configsStr = sessionStorage.getItem('compareSelectedConfigs');
+            compareModalSelectedConfigs = configsStr ? JSON.parse(configsStr) : {};
+        } catch (e) {
+            compareModalSelectedConfigs = {};
+        }
+    }
+
+    // Save selected configurations to sessionStorage
+    function saveSelectedConfigs() {
+        sessionStorage.setItem('compareSelectedConfigs', JSON.stringify(compareModalSelectedConfigs));
+    }
+
+    function getBackendImageUrlForModal(fileName) {
+        const defaultProductImage = "/imageProducts/default-laptop.jpg";
+        if (!fileName || typeof fileName !== "string" || !fileName.trim()) {
+            return defaultProductImage;
+        }
+        return compareModalUrl + "/imageProducts/" + encodeURIComponent(fileName.trim());
+    }
+
+    function formatCurrencyForModal(amount) {
+        if (amount == null || amount === undefined) return 'Liên hệ';
+        try {
+            return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+        } catch (e) {
+            return amount.toString() + ' VND';
+        }
+    }
+
+    function getCompareListForModal() {
+        try {
+            const compareStr = sessionStorage.getItem('compareProducts');
+            return compareStr ? JSON.parse(compareStr) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function saveCompareListForModal(products) {
+        sessionStorage.setItem('compareProducts', JSON.stringify(products));
+        if (typeof window.updateCompareBadge === 'function') {
+            window.updateCompareBadge();
+        }
+    }
+
+    function removeFromCompareModal(productKey) {
+        const compareList = getCompareListForModal();
+        if (productKey === 'product1' && compareList.length > 0) {
+            compareList.shift();
+            // Remove config for product1, shift product2 config to product1
+            if (compareModalSelectedConfigs.product2) {
+                compareModalSelectedConfigs.product1 = compareModalSelectedConfigs.product2;
+                delete compareModalSelectedConfigs.product2;
+            } else {
+                delete compareModalSelectedConfigs.product1;
+            }
+        } else if (productKey === 'product2' && compareList.length > 1) {
+            compareList.pop();
+            delete compareModalSelectedConfigs.product2;
+        }
+        saveCompareListForModal(compareList);
+        saveSelectedConfigs();
+        loadComparisonModal();
+    }
+
+    function clearCompareModal() {
+        if (confirm('Bạn có chắc chắn muốn xóa tất cả sản phẩm khỏi danh sách so sánh?')) {
+            sessionStorage.removeItem('compareProducts');
+            sessionStorage.removeItem('compareSelectedConfigs');
+            compareModalSelectedConfigs = {};
+            if (typeof window.updateCompareBadge === 'function') {
+                window.updateCompareBadge();
+            }
+            loadComparisonModal();
+        }
+    }
+
+    async function loadComparisonModal() {
+        const compareList = getCompareListForModal();
+        
+        $('#compareModalLoading').show();
+        $('#compareModalContent').hide();
+        $('#compareModalEmpty').hide();
+        $('#clearCompareBtn').hide();
+
+        if (compareList.length === 0) {
+            $('#compareModalLoading').hide();
+            $('#compareModalEmpty').show();
+            $('#compareModalContent').hide();
+            return;
+        }
+
+        try {
+            const products = [];
+            
+            // Load product details
+            for (let i = 0; i < compareList.length && i < 2; i++) {
+                const productId = compareList[i].id;
+                try {
+                    const response = await fetch(compareModalUrl + '/api/ListProductAPI/detail/' + encodeURIComponent(productId));
+                    if (response.ok) {
+                        const data = await response.json();
+                        products.push(data);
+                    }
+                } catch (err) {
+                    console.error('Error loading product:', productId, err);
+                }
+            }
+
+            if (products.length === 0) {
+                $('#compareModalLoading').hide();
+                $('#compareModalEmpty').show();
+                $('#compareModalContent').hide();
+                return;
+            }
+
+            // Store products data globally
+            compareModalProducts = products;
+            
+            // Load selected configurations
+            loadSelectedConfigs();
+            
+            // Set default configurations (first config) if not selected
+            if (products[0] && products[0].configurations && products[0].configurations.length > 0) {
+                if (!compareModalSelectedConfigs.product1) {
+                    const firstConfigId = products[0].configurations[0].configurationId || 'config_0';
+                    compareModalSelectedConfigs.product1 = firstConfigId;
+                }
+            }
+            if (products[1] && products[1].configurations && products[1].configurations.length > 0) {
+                if (!compareModalSelectedConfigs.product2) {
+                    const firstConfigId = products[1].configurations[0].configurationId || 'config_0';
+                    compareModalSelectedConfigs.product2 = firstConfigId;
+                }
+            }
+            saveSelectedConfigs();
+            
+            // Display products
+            displayComparisonModal(products);
+
+        } catch (error) {
+            console.error('Error loading comparison:', error);
+            $('#compareModalLoading').hide();
+            $('#compareModalEmpty').show();
+            $('#compareModalContent').hide();
+        }
+    }
+
+    function displayComparisonModal(products) {
+        // Hide product2 column if only one product
+        if (products.length === 1) {
+            $('#modalProduct2Column').hide();
+        } else {
+            $('#modalProduct2Column').show();
+        }
+
+        // Product 1
+        if (products[0]) {
+            const p1 = products[0].product;
+            const configs1 = products[0].configurations || [];
+            const image1 = getBackendImageUrlForModal(p1.avatar);
+            $('#modalProduct1Image').html(`<img src="${image1}" class="product-image img-fluid rounded" alt="${p1.productName || ''}">`);
+            const productName1 = (p1.productName || 'Chưa có tên') + (p1.productModel ? ' | ' + p1.productModel : '');
+            $('#modalProduct1Name').text(productName1);
+            
+            // Configuration dropdown for product 1
+            if (configs1.length > 0) {
+                $('#modalProduct1ConfigSelect').show();
+                let configOptions1 = '';
+                configs1.forEach(function(config, index) {
+                    const configId = config.configurationId || 'config_' + index;
+                    const configText = [config.cpu, config.ram, config.rom || config.storage || config.disk, config.card || config.gpu]
+                        .filter(Boolean)
+                        .join(' / ') || 'Cấu hình ' + (index + 1);
+                    const selected = compareModalSelectedConfigs.product1 === configId ? 'selected' : '';
+                    configOptions1 += `<option value="${configId}" ${selected}>${configText}</option>`;
+                });
+                $('#modalProduct1Config').html(configOptions1);
+            } else {
+                $('#modalProduct1ConfigSelect').hide();
+            }
+            
+            updateProductPriceInModal('product1', p1, configs1);
+            $('#modalProduct1Link').attr('href', '/Home/ProductDetail?id=' + encodeURIComponent(p1.productId));
+        }
+
+        // Product 2
+        if (products[1]) {
+            const p2 = products[1].product;
+            const configs2 = products[1].configurations || [];
+            const image2 = getBackendImageUrlForModal(p2.avatar);
+            $('#modalProduct2Image').html(`<img src="${image2}" class="product-image img-fluid rounded" alt="${p2.productName || ''}">`);
+            const productName2 = (p2.productName || 'Chưa có tên') + (p2.productModel ? ' | ' + p2.productModel : '');
+            $('#modalProduct2Name').text(productName2);
+            
+            // Configuration dropdown for product 2
+            if (configs2.length > 0) {
+                $('#modalProduct2ConfigSelect').show();
+                let configOptions2 = '';
+                configs2.forEach(function(config, index) {
+                    const configId = config.configurationId || 'config_' + index;
+                    const configText = [config.cpu, config.ram, config.rom || config.storage || config.disk, config.card || config.gpu]
+                        .filter(Boolean)
+                        .join(' / ') || 'Cấu hình ' + (index + 1);
+                    const selected = compareModalSelectedConfigs.product2 === configId ? 'selected' : '';
+                    configOptions2 += `<option value="${configId}" ${selected}>${configText}</option>`;
+                });
+                $('#modalProduct2Config').html(configOptions2);
+            } else {
+                $('#modalProduct2ConfigSelect').hide();
+            }
+            
+            updateProductPriceInModal('product2', p2, configs2);
+            $('#modalProduct2Link').attr('href', '/Home/ProductDetail?id=' + encodeURIComponent(p2.productId));
+        } else {
+            $('#modalProduct2Image').html('');
+            $('#modalProduct2Name').text('');
+            $('#modalProduct2ConfigSelect').hide();
+            $('#modalProduct2Price').html('');
+            $('#modalProduct2Link').attr('href', '#');
+        }
+
+        // Get selected configurations
+        const selectedConfig1 = getSelectedConfig('product1', products[0]);
+        const selectedConfig2 = getSelectedConfig('product2', products[1]);
+        
+        // Build comparison table
+        const productName1 = (products[0]?.product?.productName || '') + (products[0]?.product?.productModel ? ' | ' + products[0]?.product?.productModel : '');
+        const productName2 = (products[1]?.product?.productName || '') + (products[1]?.product?.productModel ? ' | ' + products[1]?.product?.productModel : '');
+        
+        // Format connect (split by comma and add line breaks)
+        const formatConnect = (connectStr) => {
+            if (!connectStr || connectStr === 'N/A') return 'N/A';
+            if (connectStr.includes(',')) {
+                return connectStr.split(',').map(item => item.trim()).join('<br>');
+            }
+            return connectStr;
+        };
+        
+        const specs = [
+            { label: 'Tên sản phẩm', key: 'productName', p1: productName1, p2: productName2 },
+            { label: 'Thương hiệu', key: 'brand', p1: products[0]?.product?.brand?.brandName, p2: products[1]?.product?.brand?.brandName },
+            { label: 'Giá bán', key: 'sellingPrice', p1: getProductPrice(products[0], selectedConfig1), p2: getProductPrice(products[1], selectedConfig2), format: 'currency' },
+            { label: 'Giá gốc', key: 'originalSellingPrice', p1: getProductOriginalPrice(products[0], selectedConfig1), p2: getProductOriginalPrice(products[1], selectedConfig2), format: 'currency' },
+            { label: 'Bộ vi xử lý (CPU)', key: 'cpu', p1: selectedConfig1?.cpu || products[0]?.product?.cpu, p2: selectedConfig2?.cpu || products[1]?.product?.cpu },
+            { label: 'Bộ nhớ RAM', key: 'ram', p1: selectedConfig1?.ram || products[0]?.product?.ram, p2: selectedConfig2?.ram || products[1]?.product?.ram },
+            { label: 'Ổ cứng', key: 'rom', p1: selectedConfig1?.rom || selectedConfig1?.storage || selectedConfig1?.disk || products[0]?.product?.rom || products[0]?.product?.storage, p2: selectedConfig2?.rom || selectedConfig2?.storage || selectedConfig2?.disk || products[1]?.product?.rom || products[1]?.product?.storage },
+            { label: 'Card đồ họa', key: 'card', p1: selectedConfig1?.card || selectedConfig1?.gpu || products[0]?.product?.card || products[0]?.product?.gpu, p2: selectedConfig2?.card || selectedConfig2?.gpu || products[1]?.product?.card || products[1]?.product?.gpu },
+            { label: 'Màn hình', key: 'screen', p1: products[0]?.product?.screen, p2: products[1]?.product?.screen },
+            { label: 'Camera', key: 'camera', p1: products[0]?.product?.camera, p2: products[1]?.product?.camera },
+            { label: 'Trọng lượng', key: 'weight', p1: products[0]?.product?.weight, p2: products[1]?.product?.weight, format: 'weight' },
+            { label: 'Pin', key: 'pin', p1: products[0]?.product?.pin, p2: products[1]?.product?.pin },
+            { label: 'Cổng kết nối', key: 'connect', p1: formatConnect(products[0]?.product?.connect), p2: formatConnect(products[1]?.product?.connect), format: 'html' },
+            { label: 'Bảo hành', key: 'warranty', p1: products[0]?.product?.warrantyPeriod, p2: products[1]?.product?.warrantyPeriod, format: 'warranty' }
+        ];
+
+        let tableBody = '';
+        specs.forEach(spec => {
+            let p1Value = spec.p1 || 'N/A';
+            let p2Value = spec.p2 || 'N/A';
+
+            if (spec.format === 'currency') {
+                p1Value = p1Value && p1Value !== 'N/A' ? formatCurrencyForModal(p1Value) : 'N/A';
+                p2Value = p2Value && p2Value !== 'N/A' ? formatCurrencyForModal(p2Value) : 'N/A';
+            } else if (spec.format === 'weight') {
+                p1Value = p1Value && p1Value !== 'N/A' ? p1Value + ' kg' : 'N/A';
+                p2Value = p2Value && p2Value !== 'N/A' ? p2Value + ' kg' : 'N/A';
+            } else if (spec.format === 'warranty') {
+                p1Value = p1Value && p1Value !== 'N/A' ? p1Value + ' tháng' : 'N/A';
+                p2Value = p2Value && p2Value !== 'N/A' ? p2Value + ' tháng' : 'N/A';
+            }
+
+            // Use HTML format for connect field
+            const useHtml = spec.format === 'html';
+            const p1Display = useHtml ? p1Value : (p1Value || 'N/A');
+            const p2Display = useHtml ? p2Value : (p2Value || 'N/A');
+
+            tableBody += `
+                <tr>
+                    <td class="spec-label">${spec.label}</td>
+                    <td>${useHtml ? p1Display : p1Value}</td>
+                    <td>${useHtml ? p2Display : p2Value}</td>
+                </tr>
+            `;
+        });
+
+        $('#modalComparisonBody').html(tableBody);
+
+        $('#compareModalLoading').hide();
+        $('#compareModalEmpty').hide();
+        $('#compareModalContent').show();
+        $('#clearCompareBtn').show();
+    }
+
+    // Get selected configuration for a product
+    function getSelectedConfig(productKey, productData) {
+        if (!productData || !productData.configurations || productData.configurations.length === 0) return null;
+        const selectedConfigId = compareModalSelectedConfigs[productKey];
+        if (!selectedConfigId) {
+            // Return first config as default
+            return productData.configurations[0] || null;
+        }
+        return productData.configurations.find(c => (c.configurationId || 'config_' + productData.configurations.indexOf(c)) === selectedConfigId) || productData.configurations[0] || null;
+    }
+
+    // Get product price (base + config price)
+    function getProductPrice(productData, selectedConfig) {
+        if (!productData || !productData.product) return 0;
+        const basePrice = productData.product.sellingPrice || 0;
+        const configPrice = selectedConfig?.price || 0;
+        return basePrice + configPrice;
+    }
+
+    // Get product original price (base + config price)
+    function getProductOriginalPrice(productData, selectedConfig) {
+        if (!productData || !productData.product) return 0;
+        const basePrice = productData.product.originalSellingPrice || 0;
+        const configPrice = selectedConfig?.price || 0;
+        return basePrice + configPrice;
+    }
+
+    // Update product price display in modal
+    function updateProductPriceInModal(productKey, product, configs) {
+        const selectedConfigId = compareModalSelectedConfigs[productKey];
+        let selectedConfig = null;
+        if (selectedConfigId && configs) {
+            selectedConfig = configs.find(c => (c.configurationId || 'config_' + configs.indexOf(c)) === selectedConfigId);
+        }
+        
+        const basePrice = product.sellingPrice || 0;
+        const baseOriginalPrice = product.originalSellingPrice || 0;
+        const configPrice = selectedConfig?.price || 0;
+        const totalPrice = basePrice + configPrice;
+        const totalOriginalPrice = baseOriginalPrice + configPrice;
+        
+        let priceHtml = '';
+        if (totalOriginalPrice > 0 && totalPrice > 0 && totalOriginalPrice > totalPrice) {
+            priceHtml += `<span class="text-muted text-decoration-line-through me-2" style="font-size: 0.85em;">${formatCurrencyForModal(totalOriginalPrice)}</span>`;
+        }
+        priceHtml += `<span>${formatCurrencyForModal(totalPrice)}</span>`;
+        
+        $(`#modal${productKey.charAt(0).toUpperCase() + productKey.slice(1)}Price`).html(priceHtml);
+    }
+
+    // Update configuration selection
+    function updateCompareModalConfig(productKey, configId) {
+        if (configId) {
+            compareModalSelectedConfigs[productKey] = configId;
+        } else {
+            delete compareModalSelectedConfigs[productKey];
+        }
+        saveSelectedConfigs();
+        
+        // Update price and comparison table
+        if (compareModalProducts.length > 0) {
+            const productIndex = productKey === 'product1' ? 0 : 1;
+            if (compareModalProducts[productIndex]) {
+                const product = compareModalProducts[productIndex].product;
+                const configs = compareModalProducts[productIndex].configurations || [];
+                updateProductPriceInModal(productKey, product, configs);
+                
+                // Refresh comparison table
+                displayComparisonModal(compareModalProducts);
+            }
+        }
+    }
+
+    function openCompareModal() {
+        const modalElement = document.getElementById('compareModal');
+        if (modalElement) {
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+            loadComparisonModal();
+        }
+    }
+
+    // Make openCompareModal available globally
+    window.openCompareModal = openCompareModal;
+
+    // Reload comparison when modal is shown
+    const compareModalElement = document.getElementById('compareModal');
+    if (compareModalElement) {
+        compareModalElement.addEventListener('show.bs.modal', function() {
+            loadComparisonModal();
+        });
+    }
+
+    // Product Search Functionality
+    (function() {
+        const searchInput = document.getElementById('productSearchInput');
+        const searchBtn = document.getElementById('productSearchBtn');
+        const searchResultsDropdown = document.getElementById('searchResultsDropdown');
+        let searchTimeout = null;
+        let currentSearchResults = [];
+
+        if (!searchInput || !searchResultsDropdown) return;
+
+        // Get API base URL
+        let apiBase = 'http://localhost:5068';
+        if (window.CART_API_BASE && window.CART_API_BASE.trim()) {
+            apiBase = window.CART_API_BASE.trim();
+        } else if (window.location && window.location.origin) {
+            const origin = window.location.origin;
+            if (origin.includes('localhost')) {
+                apiBase = 'http://localhost:5068';
+            } else {
+                apiBase = origin;
+            }
+        }
+
+        // Get product image URL
+        function getProductImageUrl(avatar) {
+            if (!avatar || !avatar.trim()) {
+                return '/imageProducts/default-laptop.jpg';
+            }
+            return apiBase + '/imageProducts/' + encodeURIComponent(avatar.trim());
+        }
+
+        // Format currency
+        function formatCurrency(amount) {
+            if (!amount) return 'Liên hệ';
+            try {
+                return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+            } catch (e) {
+                return amount.toString() + ' VND';
+            }
+        }
+
+        // Search products
+        async function searchProducts(keyword) {
+            if (!keyword || keyword.trim().length < 2) {
+                searchResultsDropdown.style.display = 'none';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${apiBase}/api/ListProductAPI/search?keyword=${encodeURIComponent(keyword)}&limit=8`, {
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) {
+                    searchResultsDropdown.style.display = 'none';
+                    return;
+                }
+
+                const products = await response.json();
+                currentSearchResults = products || [];
+
+                if (currentSearchResults.length === 0) {
+                    searchResultsDropdown.innerHTML = '<div class="search-result-item p-3 text-center text-muted">Không tìm thấy sản phẩm nào</div>';
+                    searchResultsDropdown.style.display = 'block';
+                    return;
+                }
+
+                // Build results HTML
+                let resultsHtml = '';
+                currentSearchResults.forEach(product => {
+                    const productId = product.productId || product.ProductId || '';
+                    const productName = product.productName || product.ProductName || 'N/A';
+                    const productModel = product.productModel || product.ProductModel || '';
+                    const avatar = product.avatar || product.Avatar || '';
+                    const sellingPrice = product.sellingPrice || product.SellingPrice || 0;
+                    const originalPrice = product.originalSellingPrice || product.OriginalSellingPrice || 0;
+                    const brandName = product.brand?.brandName || product.Brand?.BrandName || '';
+
+                    const imageUrl = getProductImageUrl(avatar);
+                    const displayName = productModel ? `${productName} | ${productModel}` : productName;
+                    const priceDisplay = sellingPrice > 0 ? formatCurrency(sellingPrice) : 'Liên hệ';
+                    
+                    let priceHtml = '';
+                    if (originalPrice > sellingPrice && sellingPrice > 0) {
+                        priceHtml = `<span class="text-muted text-decoration-line-through me-2" style="font-size: 0.85em;">${formatCurrency(originalPrice)}</span>`;
+                    }
+                    priceHtml += `<span class="text-primary fw-bold">${priceDisplay}</span>`;
+
+                    resultsHtml += `
+                        <a href="/Home/ProductDetail?id=${encodeURIComponent(productId)}" class="search-result-item">
+                            <div class="d-flex align-items-center">
+                                <img src="${imageUrl}" 
+                                     alt="${productName}" 
+                                     class="search-result-image me-3"
+                                     onerror="this.onerror=null; this.src='/imageProducts/default-laptop.jpg';">
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="search-result-name fw-semibold">${displayName}</div>
+                                    ${brandName ? `<div class="search-result-brand text-muted small">${brandName}</div>` : ''}
+                                    <div class="search-result-price mt-1">${priceHtml}</div>
+                                </div>
+                            </div>
+                        </a>
+                    `;
+                });
+
+                searchResultsDropdown.innerHTML = resultsHtml;
+                searchResultsDropdown.style.display = 'block';
+            } catch (err) {
+                searchResultsDropdown.style.display = 'none';
+            }
+        }
+
+        // Handle input
+        searchInput.addEventListener('input', function(e) {
+            const keyword = e.target.value.trim();
+            
+            clearTimeout(searchTimeout);
+            
+            if (keyword.length < 2) {
+                searchResultsDropdown.style.display = 'none';
+                return;
+            }
+
+            searchTimeout = setTimeout(() => {
+                searchProducts(keyword);
+            }, 300);
+        });
+
+        // Handle search button click
+        if (searchBtn) {
+            searchBtn.addEventListener('click', function() {
+                const keyword = searchInput.value.trim();
+                if (keyword.length >= 1) {
+                    window.location.href = `/Home/Shop?search=${encodeURIComponent(keyword)}`;
+                }
+            });
+        }
+
+        // Handle Enter key
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const keyword = searchInput.value.trim();
+                if (keyword.length >= 1) {
+                    window.location.href = `/Home/Shop?search=${encodeURIComponent(keyword)}`;
+                }
+            }
+        });
+
+        // Hide dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!searchInput.contains(e.target) && !searchResultsDropdown.contains(e.target) && !searchBtn.contains(e.target)) {
+                searchResultsDropdown.style.display = 'none';
+            }
+        });
+
+        // Hide dropdown on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                searchResultsDropdown.style.display = 'none';
+            }
+        });
+    })();
+</script>
+
+<style>
+    .search-results-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 0.5rem;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        max-height: 500px;
+        overflow-y: auto;
+        z-index: 1000;
+        margin-top: 0.5rem;
+    }
+
+    .search-result-item {
+        display: block;
+        padding: 0.75rem 1rem;
+        text-decoration: none;
+        color: inherit;
+        border-bottom: 1px solid #f0f0f0;
+        transition: background-color 0.2s;
+    }
+
+    .search-result-item:last-child {
+        border-bottom: none;
+    }
+
+    .search-result-item:hover {
+        background-color: #f8f9fa;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .search-result-image {
+        width: 60px;
+        height: 60px;
+        object-fit: contain;
+        border-radius: 0.25rem;
+        flex-shrink: 0;
+    }
+
+    .search-result-name {
+        font-size: 0.95rem;
+        color: #212529;
+        margin-bottom: 0.25rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .search-result-brand {
+        font-size: 0.85rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .search-result-price {
+        font-size: 0.9rem;
+    }
+
+    @@media (max-width: 991.98px) {
+        .search-results-dropdown {
+            max-height: 400px;
+        }
+    }
+</style>

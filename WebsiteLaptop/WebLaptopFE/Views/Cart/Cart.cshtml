@@ -249,6 +249,24 @@
             }
         }
 
+        // Lấy số lượng có sẵn từ API
+        async function getAvailableQuantity(productId, specifications, configurationId) {
+            try {
+                const response = await fetch(
+                    `${CART_API_BASE}/available-quantity?productId=${encodeURIComponent(productId)}&specifications=${encodeURIComponent(specifications || '')}&configurationId=${encodeURIComponent(configurationId || '')}`,
+                    { credentials: 'same-origin' }
+                );
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.availableQuantity || 999;
+                }
+            } catch (err) {
+                console.error('getAvailableQuantity error:', err);
+            }
+            return 999; // Fallback
+        }
+
         // Render giỏ hàng
         async function renderCart(items, totalAmount) {
             const $body = $('#cartTableBody');
@@ -277,29 +295,54 @@
                 const currentConfigPrice = currentConfig?.price || 0;
                 const currentPrice = basePrice + currentConfigPrice;
                 
+                // Lấy số lượng có sẵn từ API
+                const specifications = item.specifications || '';
+                let maxQuantity = 999;
+                if (currentConfig && currentConfig.configurationId) {
+                    // Ưu tiên sử dụng availableQuantity từ config (đã được tính sẵn từ API)
+                    if (currentConfig.availableQuantity != null) {
+                        maxQuantity = currentConfig.availableQuantity;
+                    } else {
+                        // Nếu không có, gọi API để lấy
+                        maxQuantity = await getAvailableQuantity(item.productId, specifications, currentConfig.configurationId);
+                    }
+                } else if (currentConfig) {
+                    maxQuantity = (currentConfig.availableQuantity != null ? currentConfig.availableQuantity : currentConfig.quantity) || 999;
+                }
+                
                 // Tạo dropdown cấu hình
                 let configSelectHtml = '';
-                const maxQuantity = currentConfig?.quantity || 999;
                 
                 if (configs.length > 0) {
+                    // Lấy availableQuantity cho tất cả configs
+                    const configOptions = await Promise.all(configs.map(async (config) => {
+                        const configId = config.configurationId || '';
+                        const configText = [
+                            config.cpu, 
+                            config.ram, 
+                            config.rom || config.storage, 
+                            config.card || config.gpu
+                        ].filter(Boolean).join(' / ') || 'Cấu hình';
+                        const selected = configId === currentConfigId ? 'selected' : '';
+                        const specifications = configText;
+                        // Ưu tiên sử dụng availableQuantity từ config (đã được tính sẵn từ API)
+                        let availableQty = 999;
+                        if (config.availableQuantity != null) {
+                            availableQty = config.availableQuantity;
+                        } else {
+                            // Nếu không có, gọi API để lấy
+                            availableQty = await getAvailableQuantity(item.productId, specifications, configId);
+                        }
+                        return `<option value="${configId}" data-config-price="${config.price || 0}" data-config-quantity="${availableQty}" ${selected}>${configText}</option>`;
+                    }));
+                    
                     configSelectHtml = `
                         <select class="form-select form-select-sm config-select" 
                                 data-cart-detail-id="${item.cartDetailId}" 
                                 data-product-id="${item.productId}"
                                 data-base-price="${basePrice}"
                                 style="font-size: 0.9rem; min-width: 200px;">
-                            ${configs.map(config => {
-                                const configId = config.configurationId || '';
-                                const configText = [
-                                    config.cpu, 
-                                    config.ram, 
-                                    config.rom || config.storage, 
-                                    config.card || config.gpu
-                                ].filter(Boolean).join(' / ') || 'Cấu hình';
-                                const selected = configId === currentConfigId ? 'selected' : '';
-                                const configQuantity = config.quantity || 999;
-                                return `<option value="${configId}" data-config-price="${config.price || 0}" data-config-quantity="${configQuantity}" ${selected}>${configText}</option>`;
-                            }).join('')}
+                            ${configOptions.join('')}
                         </select>`;
                 } else {
                     configSelectHtml = '<span class="text-muted">Không có cấu hình</span>';
@@ -469,7 +512,17 @@
             const $input = $(`.quantity-input[data-cart-detail-id="${cartDetailId}"]`);
             let quantity = parseInt($input.val()) || 1;
             const newPrice = basePrice + (configPrice || 0);
-            const maxQuantity = configQuantity || 999;
+            
+            // Lấy số lượng có sẵn từ API
+            let maxQuantity = 999;
+            if (configurationId) {
+                const $select = $(`.config-select[data-cart-detail-id="${cartDetailId}"]`);
+                const selectedOption = $select.find('option:selected');
+                const specifications = selectedOption.text() || '';
+                maxQuantity = await getAvailableQuantity(productId, specifications, configurationId);
+            } else {
+                maxQuantity = configQuantity || 999;
+            }
 
             // Cập nhật max quantity
             $row.data('max-quantity', maxQuantity);
@@ -777,18 +830,68 @@
         });
 
         // Xử lý nút thanh toán
-        function handleCheckout() {
+        async function handleCheckout() {
+            const customerId = getCustomerId();
+            if (!customerId) {
+                showAlert('warning', 'Vui lòng đăng nhập để tiếp tục');
+                return;
+            }
+
             const selectedItems = getSelectedItems();
             if (selectedItems.length === 0) {
                 showAlert('warning', 'Vui lòng chọn ít nhất một sản phẩm để thanh toán');
                 return;
             }
             
-            // Lưu danh sách sản phẩm đã chọn vào sessionStorage để sử dụng ở trang checkout
-            sessionStorage.setItem('selectedCartItems', JSON.stringify(selectedItems.map(item => item.cartDetailId)));
-            
-            // Chuyển đến trang checkout
-            window.location.href = '/Cart/Checkout';
+            // Kiểm tra số lượng tồn kho trước khi chuyển sang trang checkout
+            try {
+                const response = await fetch(`${CART_API_BASE}/check-stock`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        customerId: customerId,
+                        cartDetailIds: selectedItems.map(item => item.cartDetailId)
+                    })
+                });
+                
+                const responseText = await response.text();
+                let data = {};
+                if (responseText && responseText.trim()) {
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (parseErr) {
+                        console.error('JSON parse error:', parseErr);
+                    }
+                }
+                
+                if (!response.ok) {
+                    // Có lỗi về số lượng
+                    if (data.hasError && data.outOfStockItems && data.outOfStockItems.length > 0) {
+                        let errorMessage = data.message || 'Sản phẩm không đủ số lượng:\n';
+                        data.outOfStockItems.forEach((item, index) => {
+                            errorMessage += `\n. ${item.message || 'Sản phẩm đã hết hàng'}`;
+                        });
+                        showAlert('danger', errorMessage);
+                        return;
+                    } else {
+                        showAlert('danger', data.message || 'Không thể kiểm tra số lượng. Vui lòng thử lại.');
+                        return;
+                    }
+                }
+                
+                // Tất cả sản phẩm đều đủ số lượng, tiếp tục thanh toán
+                // Lưu danh sách sản phẩm đã chọn vào sessionStorage để sử dụng ở trang checkout
+                sessionStorage.setItem('selectedCartItems', JSON.stringify(selectedItems.map(item => item.cartDetailId)));
+                
+                // Chuyển đến trang checkout
+                window.location.href = '/Cart/Checkout';
+            } catch (err) {
+                console.error('checkStock error:', err);
+                showAlert('danger', 'Không thể kiểm tra số lượng. Vui lòng thử lại.');
+            }
         }
         
         // Initialize
@@ -818,6 +921,7 @@
         max-width: 400px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         margin-bottom: 10px;
+        background-color: #ffffff;
     }
     
     .toast-notification .toast-header {
@@ -826,6 +930,7 @@
     
     .toast-notification .toast-body {
         padding: 0.75rem;
+        background-color: #ffffff;
     }
     
     .toast-success .toast-header {

@@ -78,11 +78,13 @@ namespace WebLaptopBE.Controllers
                 // Chỉ lấy đơn hàng có trạng thái "Chờ xử lý" hoặc "Đang xử lý"
                 var orders = _db.SaleInvoices
                     .AsNoTracking()
+                    .Include(si => si.SaleInvoiceDetails)
+                        .ThenInclude(d => d.Product)
                     .Where(si => si.CustomerId == customerId &&
                                  si.Status != null &&
-                                 (si.Status.ToLower().Contains("Chờ xử lý") ||
-                                  si.Status.ToLower().Contains("Đang xử lý") ||
-                                  si.Status.ToLower().Contains("Đang vận chuyển")))
+                                 (si.Status.Contains("Chờ xử lý") ||
+                                  si.Status.Contains("Đang xử lý") ||
+                                  si.Status.Contains("Đang vận chuyển")))
                     .OrderByDescending(si => si.TimeCreate)
                     .Select(si => new
                     {
@@ -93,7 +95,19 @@ namespace WebLaptopBE.Controllers
                         si.PaymentMethod,
                         si.DeliveryAddress,
                         si.DeliveryFee,
-                        si.Discount
+                        si.Discount,
+                        Products = si.SaleInvoiceDetails
+                            .Where(d => d.Product != null)
+                            .OrderBy(d => d.SaleInvoiceDetailId)
+                            .Select(d => new
+                            {
+                                ProductName = d.Product.ProductName ?? "N/A",
+                                ProductModel = d.Product.ProductModel ?? "",
+                                Avatar = d.Product.Avatar ?? "",
+                                Specifications = d.Specifications ?? "",
+                                Quantity = d.Quantity ?? 0
+                            })
+                            .ToList()
                     })
                     .ToList();
 
@@ -119,10 +133,12 @@ namespace WebLaptopBE.Controllers
                 // Chỉ lấy đơn hàng có trạng thái "Hoàn thành" hoặc "Đã hủy"
                 var orders = _db.SaleInvoices
                     .AsNoTracking()
+                    .Include(si => si.SaleInvoiceDetails)
+                        .ThenInclude(d => d.Product)
                     .Where(si => si.CustomerId == customerId &&
                                  si.Status != null &&
-                                 (si.Status.ToLower().Contains("Hoàn thành") ||
-                                  si.Status.ToLower().Contains("Đã hủy")))
+                                 (si.Status.Contains("Hoàn thành") ||
+                                  si.Status.Contains("Đã hủy")))
                     .OrderByDescending(si => si.TimeCreate)
                     .Select(si => new
                     {
@@ -133,7 +149,19 @@ namespace WebLaptopBE.Controllers
                         si.PaymentMethod,
                         si.DeliveryAddress,
                         si.DeliveryFee,
-                        si.Discount
+                        si.Discount,
+                        Products = si.SaleInvoiceDetails
+                            .Where(d => d.Product != null)
+                            .OrderBy(d => d.SaleInvoiceDetailId)
+                            .Select(d => new
+                            {
+                                ProductName = d.Product.ProductName ?? "N/A",
+                                ProductModel = d.Product.ProductModel ?? "",
+                                Avatar = d.Product.Avatar ?? "",
+                                Specifications = d.Specifications ?? "",
+                                Quantity = d.Quantity ?? 0
+                            })
+                            .ToList()
                     })
                     .ToList();
 
@@ -175,6 +203,7 @@ namespace WebLaptopBE.Controllers
                         {
                             d.SaleInvoiceDetailId,
                             ProductName = d.Product != null ? d.Product.ProductName : "N/A",
+                            ProductModel = d.Product != null ? (d.Product.ProductModel ?? "") : "",
                             d.Quantity,
                             d.UnitPrice,
                             d.Specifications,
@@ -314,16 +343,24 @@ namespace WebLaptopBE.Controllers
 
                 // Kiểm tra trạng thái hiện tại
                 var currentStatus = order.Status?.Trim() ?? "";
-                var statusLower = currentStatus.ToLower();
+               
+                
+                // Kiểm tra xem đơn hàng đã bị hủy chưa
+                if (currentStatus.Contains("Đã hủy"))
+                {
+                    return BadRequest(new { message = "Đơn hàng này đã bị hủy" });
+                }
                 
                 // Chỉ cho phép hủy khi trạng thái là "Chờ xử lý"
-                if (!statusLower.Contains("Chờ xử lý"))
+                if (!currentStatus.Contains("Chờ xử lý"))
                 {
                     return BadRequest(new { message = "Chỉ có thể hủy đơn hàng khi trạng thái là 'Chờ xử lý'" });
                 }
 
-                // Cập nhật trạng thái thành "Đã hủy"
+                // Cập nhật trạng thái thành "Đã hủy" và lưu thời gian hủy vào TimeCreate
+                // (Sử dụng TimeCreate để lưu thời gian hủy cho đơn hàng đã hủy)
                 order.Status = "Đã hủy";
+                order.TimeCreate = DateTime.Now; // Cập nhật thời gian hủy
                 _db.SaveChanges();
 
                 return Ok(new { message = "Hủy đơn hàng thành công" });
