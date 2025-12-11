@@ -59,8 +59,8 @@ namespace WebLaptopFE.Areas.Admin.Controllers
                 return false;
             }
 
-            // Dashboard, ManageProfile và History: Tất cả nhân viên đều có quyền truy cập
-            if (controllerName == "Dashboard" || controllerName == "ManageProfile" || controllerName == "History")
+            // Dashboard, ManageProfile, History và Chat: Tất cả nhân viên đều có quyền truy cập
+            if (controllerName == "Dashboard" || controllerName == "ManageProfile" )
             {
                 return true;
             }
@@ -86,7 +86,7 @@ namespace WebLaptopFE.Areas.Admin.Controllers
             // SL (Nhân viên bán hàng): Quyền truy cập Quản lý hóa đơn
             if (roleId == "SL")
             {
-                return controllerName == "ManageSaleInvoice";
+                return controllerName == "ManageSaleInvoice" || controllerName == "Chat";
             }
 
             // Các RoleId khác không có quyền truy cập

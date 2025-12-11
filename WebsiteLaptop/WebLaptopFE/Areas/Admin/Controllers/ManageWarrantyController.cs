@@ -14,7 +14,7 @@ namespace WebLaptopFE.Areas.Admin.Controllers
             ViewBag.EmployeeId = employeeId;
             ViewBag.EmployeeName = employeeName;
             
-            return View("ManageWarranty");
+            return View("~/Areas/Admin/Views/AllViews/ManageWarranty.cshtml");
         }
     }
 }

@@ -15,7 +15,7 @@ namespace WebLaptopFE.Areas.Admin.Controllers
             ViewBag.EmployeeId = employeeId ?? "";
             ViewBag.EmployeeName = employeeName ?? "";
             
-            return View("ManageSaleInvoice");
+            return View("~/Areas/Admin/Views/AllViews/ManageSaleInvoice.cshtml");
         }
     }
 }

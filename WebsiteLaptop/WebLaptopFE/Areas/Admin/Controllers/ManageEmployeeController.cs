@@ -8,7 +8,7 @@ namespace WebLaptopFE.Areas.Admin.Controllers
         // GET: Admin/ManageEmployee
         public IActionResult Index()
         {
-            return View("ManageEmployee");
+            return View("~/Areas/Admin/Views/AllViews/ManageEmployee.cshtml");
         }
     }
 }

@@ -513,7 +513,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     Email = employee.Email,
                     Avatar = employee.Avatar,
                     Username = employee.Username,
-                    BranchesId = employee.BranchesId,
                     RoleId = employee.RoleId,
                     Active = employee.Active,
                     PasswordLength = !string.IsNullOrEmpty(employee.Password) ? employee.Password.Length : (int?)null
@@ -564,7 +563,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     Email = employee?.Email,
                     Avatar = employee?.Avatar,
                     Username = employee?.Username,
-                    BranchesId = employee?.BranchesId,
                     RoleId = employee?.RoleId,
                     Active = employee?.Active,
                     PasswordLength = !string.IsNullOrEmpty(employee?.Password) ? employee.Password.Length : (int?)null

@@ -8,7 +8,7 @@ namespace WebLaptopFE.Areas.Admin.Controllers
         // GET: Admin/Dashboard
         public IActionResult Index()
         {
-            return View("Dashboard");
+            return View("~/Areas/Admin/Views/AllViews/Dashboard.cshtml");
         }
     }
 }

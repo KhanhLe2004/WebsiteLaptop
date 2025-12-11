@@ -32,8 +32,6 @@ namespace WebLaptopBE.DTOs
         public string? Avatar { get; set; }
         public string? RoleId { get; set; }
         public string? RoleName { get; set; }
-        public string? BranchesId { get; set; }
-        public string? BranchesName { get; set; }
         public bool? Active { get; set; }
     }
 }

@@ -7,7 +7,7 @@ namespace WebLaptopFE.Areas.Admin.Controllers
     {
         public IActionResult Index()
         {
-            return View("ManageBrand");
+            return View("~/Areas/Admin/Views/AllViews/ManageBrand.cshtml");
         }
     }
 }

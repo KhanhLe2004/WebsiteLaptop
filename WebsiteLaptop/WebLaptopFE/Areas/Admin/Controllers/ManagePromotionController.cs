@@ -7,7 +7,7 @@ namespace WebLaptopFE.Areas.Admin.Controllers
     {
         public IActionResult Index()
         {
-            return View("ManagePromotion");
+            return View("~/Areas/Admin/Views/AllViews/ManagePromotion.cshtml");
         }
     }
 }

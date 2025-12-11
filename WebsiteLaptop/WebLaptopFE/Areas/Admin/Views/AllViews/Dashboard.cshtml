@@ -1,6 +1,6 @@
 ﻿@{
     ViewData["Title"] = "Dashboard";
-    Layout = "~/Areas/Admin/Views/Shared/_LayoutDashboard.cshtml";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutAdmin.cshtml";
 }
 
 <div class="container-fluid py-4">
@@ -485,7 +485,8 @@
                 tbody.innerHTML = data.map(order => {
                     const date = order.timeCreate ? new Date(order.timeCreate).toLocaleString('vi-VN') : 'Chưa xác định';
                     const statusClass = order.status === 'Hoàn thành' ? 'badge bg-gradient-success' :
-                                      order.status === 'Đang xử lý' ? 'badge bg-gradient-warning' :
+                                      order.status === 'Chờ xử lý' ? 'badge bg-gradient-warning' :
+                                      order.status === 'Đang xử lý' ? 'badge bg-gradient-info' :
                                       order.status === 'Đã hủy' ? 'badge bg-gradient-danger' :
                                       'badge bg-gradient-secondary';
                     

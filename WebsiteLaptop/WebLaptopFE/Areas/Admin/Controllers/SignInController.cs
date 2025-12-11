@@ -13,7 +13,7 @@ namespace WebLaptopFE.Areas.Admin.Controllers
             {
                 return RedirectToAction("Index", "Dashboard", new { area = "Admin" });
             }
-            return View("SignIn");
+            return View("~/Areas/Admin/Views/AllViews/SignIn.cshtml");
         }
 
         // POST: Admin/SignIn/SetSession
@@ -46,12 +46,6 @@ namespace WebLaptopFE.Areas.Admin.Controllers
                     
                     if (employeeData.TryGetProperty("roleName", out var roleNameElement))
                         HttpContext.Session.SetString("RoleName", roleNameElement.GetString() ?? "");
-                    
-                    if (employeeData.TryGetProperty("branchesId", out var branchesIdElement))
-                        HttpContext.Session.SetString("BranchesId", branchesIdElement.GetString() ?? "");
-                    
-                    if (employeeData.TryGetProperty("branchesName", out var branchesNameElement))
-                        HttpContext.Session.SetString("BranchesName", branchesNameElement.GetString() ?? "");
 
                     return Ok(new { success = true, message = "Session đã được thiết lập" });
                 }

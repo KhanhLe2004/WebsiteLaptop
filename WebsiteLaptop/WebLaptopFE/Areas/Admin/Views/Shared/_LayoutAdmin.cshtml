@@ -1,18 +1,4 @@
-﻿<!--
-=========================================================
-* Material Dashboard 2 - v3.1.0
-=========================================================
-
-* Product Page: https://www.creative-tim.com/product/material-dashboard
-* Copyright 2023 Creative Tim (https://www.creative-tim.com)
-* Licensed under MIT (https://www.creative-tim.com/license)
-* Coded by Creative Tim
-
-=========================================================
-
-* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
--->
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -21,21 +7,14 @@
     <link rel="apple-touch-icon" sizes="76x76" href="/LayoutAdmin/assets/img/apple-icon.png">
     <link rel="icon" type="image/png" href="/LayoutAdmin/assets/img/favicon.png">
     <title>
-        Admin
+        @ViewBag.Title ?? "Admin"
     </title>
-    <!--     Fonts and icons     -->
     <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,900|Roboto+Slab:400,700" />
-    <!-- Nucleo Icons -->
     <link href="/LayoutAdmin/assets/css/nucleo-icons.css" rel="stylesheet" />
     <link href="/LayoutAdmin/assets/css/nucleo-svg.css" rel="stylesheet" />
-    <!-- Font Awesome Icons -->
     <script src="https://kit.fontawesome.com/42d5adcbca.js" crossorigin="anonymous"></script>
-    <!-- Material Icons -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
-    <!-- CSS Files -->
     <link id="pagestyle" href="/LayoutAdmin/assets/css/material-dashboard.css?v=3.1.0" rel="stylesheet" />
-    <!-- Nepcha Analytics (nepcha.com) -->
-    <!-- Nepcha is a easy-to-use web analytics. No cookies and fully compliant with GDPR, CCPA and PECR. -->
     <script defer data-site="YOUR_DOMAIN_HERE" src="https://api.nepcha.com/js/nepcha-analytics.js"></script>
 </head>
 
@@ -44,6 +23,7 @@
         <hr class="horizontal light mt-0 mb-2">
             @{
                 var roleIdMenu = Context.Session.GetString("RoleId");
+                var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
                 // Helper function để kiểm tra quyền
                 Func<string, bool> HasPermissionMenu = (controllerName) =>
                 {
@@ -63,14 +43,20 @@
                         return controllerName == "ManageWarranty";
                     
                     if (roleIdMenu == "SL")
-                        return controllerName == "ManageSaleInvoice";
+                        return controllerName == "ManageSaleInvoice" || controllerName == "Chat";
                     
                     return false;
+                };
+                
+                // Helper function để kiểm tra menu item có active không
+                Func<string, string> GetMenuClass = (controllerName) =>
+                {
+                    return currentController == controllerName ? "nav-link text-white active bg-gradient-primary" : "nav-link text-white";
                 };
             }
             <ul class="navbar-nav">
                 <li class="nav-item">
-                    <a class="nav-link text-white" asp-area="Admin" asp-controller="Dashboard" asp-action="Index">
+                    <a class="@GetMenuClass("Dashboard")" asp-area="Admin" asp-controller="Dashboard" asp-action="Index">
                         <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                             <i class="material-icons opacity-10">dashboard</i>
                         </div>
@@ -80,7 +66,7 @@
                 <li class="nav-item">
                     @if (HasPermissionMenu("ManageProduct"))
                     {
-                        <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageProduct" asp-action="Index">
+                        <a class="@GetMenuClass("ManageProduct")" asp-area="Admin" asp-controller="ManageProduct" asp-action="Index">
                             <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                                 <i class="material-icons opacity-10">inventory_2</i>
                             </div>
@@ -101,7 +87,7 @@
                 <li class="nav-item">
                     @if (HasPermissionMenu("ManageCustomer"))
                     {
-                        <a class="nav-link text-white active bg-gradient-primary" asp-area="Admin" asp-controller="ManageCustomer" asp-action="Index">
+                        <a class="@GetMenuClass("ManageCustomer")" asp-area="Admin" asp-controller="ManageCustomer" asp-action="Index">
                             <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                                 <i class="material-icons opacity-10">people</i>
                             </div>
@@ -122,7 +108,7 @@
                 <li class="nav-item">
                     @if (HasPermissionMenu("ManageEmployee"))
                     {
-                        <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageEmployee" asp-action="Index">
+                        <a class="@GetMenuClass("ManageEmployee")" asp-area="Admin" asp-controller="ManageEmployee" asp-action="Index">
                             <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                                 <i class="material-icons opacity-10">badge</i>
                             </div>
@@ -143,7 +129,7 @@
                 <li class="nav-item">
                     @if (HasPermissionMenu("ManageSaleInvoice"))
                     {
-                        <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageSaleInvoice" asp-action="Index">
+                        <a class="@GetMenuClass("ManageSaleInvoice")" asp-area="Admin" asp-controller="ManageSaleInvoice" asp-action="Index">
                             <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                                 <i class="material-icons opacity-10">receipt</i>
                             </div>
@@ -164,7 +150,7 @@
                 <li class="nav-item">
                     @if (HasPermissionMenu("ManageStockImport"))
                     {
-                        <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageStockImport" asp-action="Index">
+                        <a class="@GetMenuClass("ManageStockImport")" asp-area="Admin" asp-controller="ManageStockImport" asp-action="Index">
                             <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                                 <i class="material-icons opacity-10">inventory</i>
                             </div>
@@ -185,7 +171,7 @@
                 <li class="nav-item">
                     @if (HasPermissionMenu("ManageStockExport"))
                     {
-                        <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageStockExport" asp-action="Index">
+                        <a class="@GetMenuClass("ManageStockExport")" asp-area="Admin" asp-controller="ManageStockExport" asp-action="Index">
                             <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                                 <i class="material-icons opacity-10">inventory_2</i>
                             </div>
@@ -206,7 +192,7 @@
                 <li class="nav-item">
                     @if (HasPermissionMenu("ManageWarranty"))
                     {
-                        <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageWarranty" asp-action="Index">
+                        <a class="@GetMenuClass("ManageWarranty")" asp-area="Admin" asp-controller="ManageWarranty" asp-action="Index">
                             <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                                 <i class="material-icons opacity-10">build</i>
                             </div>
@@ -227,7 +213,7 @@
                 <li class="nav-item">
                     @if (HasPermissionMenu("ManageBrand"))
                     {
-                        <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageBrand" asp-action="Index">
+                        <a class="@GetMenuClass("ManageBrand")" asp-area="Admin" asp-controller="ManageBrand" asp-action="Index">
                             <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                                 <i class="material-icons opacity-10">branding_watermark</i>
                             </div>
@@ -248,7 +234,7 @@
                 <li class="nav-item">
                     @if (HasPermissionMenu("ManageSupplier"))
                     {
-                        <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageSupplier" asp-action="Index">
+                        <a class="@GetMenuClass("ManageSupplier")" asp-area="Admin" asp-controller="ManageSupplier" asp-action="Index">
                             <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                                 <i class="material-icons opacity-10">local_shipping</i>
                             </div>
@@ -269,7 +255,7 @@
                 <li class="nav-item">
                     @if (HasPermissionMenu("ManagePromotion"))
                     {
-                        <a class="nav-link text-white" asp-area="Admin" asp-controller="ManagePromotion" asp-action="Index">
+                        <a class="@GetMenuClass("ManagePromotion")" asp-area="Admin" asp-controller="ManagePromotion" asp-action="Index">
                             <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                                 <i class="material-icons opacity-10">local_offer</i>
                             </div>
@@ -290,7 +276,7 @@
                 <li class="nav-item">
                     @if (HasPermissionMenu("StatisticalReport"))
                     {
-                        <a class="nav-link text-white" asp-area="Admin" asp-controller="StatisticalReport" asp-action="Index">
+                        <a class="@GetMenuClass("StatisticalReport")" asp-area="Admin" asp-controller="StatisticalReport" asp-action="Index">
                             <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                                 <i class="material-icons opacity-10">bar_chart</i>
                             </div>
@@ -311,7 +297,7 @@
                 <li class="nav-item">
                     @if (HasPermissionMenu("History"))
                     {
-                        <a class="nav-link text-white" asp-area="Admin" asp-controller="History" asp-action="Index">
+                        <a class="@GetMenuClass("History")" asp-area="Admin" asp-controller="History" asp-action="Index">
                             <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                                 <i class="material-icons opacity-10">history</i>
                             </div>
@@ -332,7 +318,7 @@
                 <li class="nav-item">
                     @if (HasPermissionMenu("Chat"))
                     {
-                        <a class="nav-link text-white" asp-area="Admin" asp-controller="Chat" asp-action="Index">
+                        <a class="@GetMenuClass("Chat")" asp-area="Admin" asp-controller="Chat" asp-action="Index">
                             <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                                 <i class="material-icons opacity-10">chat</i>
                             </div>
@@ -354,7 +340,7 @@
                     <h6 class="ps-4 ms-2 text-uppercase text-xs text-white font-weight-bolder opacity-8">Account pages</h6>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white" asp-area="Admin" asp-controller="ManageProfile" asp-action="Index">
+                    <a class="@GetMenuClass("ManageProfile")" asp-area="Admin" asp-controller="ManageProfile" asp-action="Index">
                         <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
                             @{
                                 var avatar = Context.Session.GetString("Avatar");
@@ -385,7 +371,7 @@
             </ul>
     </aside>
     <main class="main-content position-relative max-height-vh-100 h-100 border-radius-lg ">
-        @RenderBody() 
+        @RenderBody()
     </main>
     <!--   Core JS Files   -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -393,12 +379,9 @@
     <script src="/LayoutAdmin/assets/js/core/bootstrap.min.js"></script>
     <script src="/LayoutAdmin/assets/js/plugins/perfect-scrollbar.min.js"></script>
     <script src="/LayoutAdmin/assets/js/plugins/smooth-scrollbar.min.js"></script>
-    <!-- Github buttons -->
+    <script src="/LayoutAdmin/assets/js/plugins/chartjs.min.js"></script>
     <script async defer src="https://buttons.github.io/buttons.js"></script>
-    <!-- Control Center for Material Dashboard: parallax effects, scripts for the example pages etc -->
     <script src="/LayoutAdmin/assets/js/material-dashboard.min.js?v=3.1.0"></script>
-    
-    <!-- Setup AJAX để tự động thêm EmployeeId header -->
     <script>
         $(document).ready(function() {
             var employeeId = '@Context.Session.GetString("EmployeeId")';
@@ -416,4 +399,3 @@
 </body>
 
 </html>
-

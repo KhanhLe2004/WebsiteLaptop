@@ -7,7 +7,7 @@ namespace WebLaptopFE.Areas.Admin.Controllers
     {
         public IActionResult Index()
         {
-            return View("ManageSupplier");
+            return View("~/Areas/Admin/Views/AllViews/ManageSupplier.cshtml");
         }
     }
 }

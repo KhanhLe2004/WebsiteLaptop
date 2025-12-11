@@ -17,8 +17,6 @@ public partial class Employee
 
     public string? Address { get; set; }
 
-    public string? BranchesId { get; set; }
-
     public string? RoleId { get; set; }
 
     public string? Avatar { get; set; }
@@ -28,8 +26,6 @@ public partial class Employee
     public string? Password { get; set; }
 
     public bool? Active { get; set; }
-
-    public virtual Branch? Branches { get; set; }
 
     public virtual ICollection<Chat> Chats { get; set; } = new List<Chat>();
 

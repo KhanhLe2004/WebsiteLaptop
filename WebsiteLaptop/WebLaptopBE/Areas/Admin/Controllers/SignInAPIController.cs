@@ -39,7 +39,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 // Tìm nhân viên theo username hoặc email
                 var employee = await _context.Employees
                     .Include(e => e.Role)
-                    .Include(e => e.Branches)
                     .FirstOrDefaultAsync(e => 
                         (e.Username != null && e.Username == request.UsernameOrEmail) ||
                         (e.Email != null && e.Email == request.UsernameOrEmail));
@@ -88,8 +87,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         Avatar = employee.Avatar,
                         RoleId = employee.RoleId,
                         RoleName = employee.Role?.RoleName,
-                        BranchesId = employee.BranchesId,
-                        BranchesName = employee.Branches?.BranchesName,
                         Active = employee.Active
                     }
                 };

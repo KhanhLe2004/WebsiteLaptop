@@ -50,12 +50,12 @@ namespace WebLaptopFE.Areas.Admin.Controllers
                     TempData["ErrorMessage"] = "Không thể tải thông tin cá nhân";
                 }
 
-                return View("ManageProfile");
+                return View("~/Areas/Admin/Views/AllViews/ManageProfile.cshtml");
             }
             catch (Exception ex)
             {
                 TempData["ErrorMessage"] = "Đã xảy ra lỗi: " + ex.Message;
-                return View("ManageProfile");
+                return View("~/Areas/Admin/Views/AllViews/ManageProfile.cshtml");
             }
         }
 

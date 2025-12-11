@@ -870,7 +870,7 @@
                 if (!response.ok) {
                     // Có lỗi về số lượng
                     if (data.hasError && data.outOfStockItems && data.outOfStockItems.length > 0) {
-                        let errorMessage = data.message || 'Sản phẩm không đủ số lượng:\n';
+                        let errorMessage = data.message || 'Sản phẩm không đủ số lượng\n';
                         data.outOfStockItems.forEach((item, index) => {
                             errorMessage += `\n. ${item.message || 'Sản phẩm đã hết hàng'}`;
                         });

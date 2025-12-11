@@ -120,12 +120,12 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     .Select(si => new
                     {
                         saleInvoiceId = si.SaleInvoiceId,
-                        customerName = si.Customer != null ? si.Customer.CustomerName : "Khách vãng lai",
-                        employeeName = si.Employee != null ? si.Employee.EmployeeName : "Chưa xác định",
+                        customerName = si.Customer != null ? si.Customer.CustomerName : "-",
+                        employeeName = si.Employee != null ? si.Employee.EmployeeName : "-",
                         totalAmount = si.TotalAmount ?? 0,
-                        status = si.Status ?? "Chưa xác định",
+                        status = si.Status ?? "-",
                         timeCreate = si.TimeCreate,
-                        paymentMethod = si.PaymentMethod ?? "Chưa xác định"
+                        paymentMethod = si.PaymentMethod ?? "-"
                     })
                     .ToListAsync();
 

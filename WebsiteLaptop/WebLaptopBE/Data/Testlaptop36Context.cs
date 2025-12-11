@@ -15,8 +15,6 @@ public partial class Testlaptop36Context : DbContext
     {
     }
 
-    public virtual DbSet<Branch> Branches { get; set; }
-
     public virtual DbSet<Brand> Brands { get; set; }
 
     public virtual DbSet<Cart> Carts { get; set; }
@@ -67,24 +65,6 @@ public partial class Testlaptop36Context : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Branch>(entity =>
-        {
-            entity.HasKey(e => e.BranchesId);
-
-            entity.Property(e => e.BranchesId)
-                .HasMaxLength(20)
-                .HasColumnName("branches_id");
-            entity.Property(e => e.Address)
-                .HasMaxLength(100)
-                .HasColumnName("address");
-            entity.Property(e => e.BranchesName)
-                .HasMaxLength(100)
-                .HasColumnName("branches_name");
-            entity.Property(e => e.PhoneNumber)
-                .HasMaxLength(20)
-                .HasColumnName("phone_number");
-        });
-
         modelBuilder.Entity<Brand>(entity =>
         {
             entity.Property(e => e.BrandId)
@@ -184,7 +164,7 @@ public partial class Testlaptop36Context : DbContext
                 .HasColumnName("customer_id");
             entity.Property(e => e.Active).HasColumnName("active");
             entity.Property(e => e.Address)
-                .HasMaxLength(100)
+                .HasMaxLength(500)
                 .HasColumnName("address");
             entity.Property(e => e.Avatar)
                 .HasMaxLength(500)
@@ -221,9 +201,6 @@ public partial class Testlaptop36Context : DbContext
             entity.Property(e => e.Avatar)
                 .HasMaxLength(100)
                 .HasColumnName("avatar");
-            entity.Property(e => e.BranchesId)
-                .HasMaxLength(20)
-                .HasColumnName("branches_id");
             entity.Property(e => e.DateOfBirth).HasColumnName("date_of_birth");
             entity.Property(e => e.Email)
                 .HasMaxLength(100)
@@ -243,10 +220,6 @@ public partial class Testlaptop36Context : DbContext
             entity.Property(e => e.Username)
                 .HasMaxLength(100)
                 .HasColumnName("username");
-
-            entity.HasOne(d => d.Branches).WithMany(p => p.Employees)
-                .HasForeignKey(d => d.BranchesId)
-                .HasConstraintName("FK_Employee_Branches");
 
             entity.HasOne(d => d.Role).WithMany(p => p.Employees)
                 .HasForeignKey(d => d.RoleId)

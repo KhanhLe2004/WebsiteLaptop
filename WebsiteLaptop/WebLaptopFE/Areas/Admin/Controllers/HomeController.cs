@@ -16,6 +16,7 @@ namespace WebLaptopFE.Areas.Admin.Controllers
             // Chưa đăng nhập, chuyển đến trang đăng nhập
             return RedirectToAction("Index", "SignIn", new { area = "Admin" });
         }
+
     }
 }
 

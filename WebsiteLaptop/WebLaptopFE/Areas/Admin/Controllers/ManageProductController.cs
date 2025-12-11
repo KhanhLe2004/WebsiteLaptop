@@ -8,7 +8,7 @@ namespace WebLaptopFE.Areas.Admin.Controllers
         // GET: Admin/ManageProduct
         public IActionResult Index()
         {
-            return View("ManageProduct");
+            return View("~/Areas/Admin/Views/AllViews/ManageProduct.cshtml");
         }
     }
 }

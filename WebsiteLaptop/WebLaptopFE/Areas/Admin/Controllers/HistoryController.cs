@@ -8,7 +8,7 @@ namespace WebLaptopFE.Areas.Admin.Controllers
         // GET: Admin/History
         public IActionResult Index()
         {
-            return View("History");
+            return View("~/Areas/Admin/Views/AllViews/History.cshtml");
         }
     }
 }

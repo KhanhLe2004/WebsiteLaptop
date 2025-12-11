@@ -18,7 +18,7 @@ namespace WebLaptopFE.Areas.Admin.Controllers
 
         public IActionResult Index()
         {
-            return View("ForgetPassword");
+            return View("~/Areas/Admin/Views/AllViews/ForgetPassword.cshtml");
         }
 
         [HttpPost]
@@ -30,7 +30,7 @@ namespace WebLaptopFE.Areas.Admin.Controllers
                 if (string.IsNullOrWhiteSpace(email))
                 {
                     TempData["ErrorMessage"] = "Vui lòng nhập email";
-                    return View("ForgetPassword");
+                    return View("~/Areas/Admin/Views/AllViews/ForgetPassword.cshtml");
                 }
 
                 // Lấy base URL của API từ configuration
@@ -61,20 +61,20 @@ namespace WebLaptopFE.Areas.Admin.Controllers
                 if (response.IsSuccessStatusCode && response.StatusCode == System.Net.HttpStatusCode.OK && success)
                 {
                     TempData["SuccessMessage"] = message ?? "Mật khẩu mới đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.";
-                    return View("ForgetPassword");
+                    return View("~/Areas/Admin/Views/AllViews/ForgetPassword.cshtml");
                 }
                 else
                 {
                     // Xử lý các trường hợp lỗi (404, 400, 500, etc.)
                     var errorMessage = message ?? "Đã xảy ra lỗi. Vui lòng thử lại.";
                     TempData["ErrorMessage"] = errorMessage;
-                    return View("ForgetPassword");
+                    return View("~/Areas/Admin/Views/AllViews/ForgetPassword.cshtml");
                 }
             }
             catch (Exception ex)
             {
                 TempData["ErrorMessage"] = "Đã xảy ra lỗi: " + ex.Message;
-                return View("ForgetPassword");
+                return View("~/Areas/Admin/Views/AllViews/ForgetPassword.cshtml");
             }
         }
     }

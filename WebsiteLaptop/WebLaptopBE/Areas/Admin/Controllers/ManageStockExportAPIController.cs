@@ -804,60 +804,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
         }
 
-        // DELETE: api/admin/stock-exports/{id}
-        // Xóa phiếu xuất hàng
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteStockExport(string id)
-        {
-            try
-            {
-                var stockExport = await _context.StockExports
-                    .Include(se => se.StockExportDetails)
-                    .FirstOrDefaultAsync(se => se.StockExportId == id);
-
-                if (stockExport == null)
-                {
-                    return NotFound(new { message = "Không tìm thấy phiếu xuất hàng" });
-                }
-
-                // Khôi phục ProductSerial và cộng lại Quantity của ProductConfiguration từ chi tiết trước khi xóa
-                // Chỉ khôi phục nếu status là "Hoàn thành" (vì chỉ khi đó quantity mới bị trừ)
-                if (stockExport.Status == "Hoàn thành" && 
-                    stockExport.StockExportDetails != null && 
-                    stockExport.StockExportDetails.Any())
-                {
-                    foreach (var detail in stockExport.StockExportDetails)
-                    {
-                        if (!string.IsNullOrEmpty(detail.StockExportDetailId))
-                        {
-                            // RestoreProductSerials sẽ tự động cộng lại quantity
-                            await RestoreProductSerials(detail.StockExportDetailId);
-                        }
-                    }
-                }
-
-                // Xóa chi tiết trước
-                _context.StockExportDetails.RemoveRange(stockExport.StockExportDetails);
-                // Xóa phiếu xuất
-                _context.StockExports.Remove(stockExport);
-
-                await _context.SaveChangesAsync();
-
-                // Ghi log lịch sử
-                var employeeId = GetEmployeeId();
-                if (!string.IsNullOrEmpty(employeeId))
-                {
-                    await _historyService.LogHistoryAsync(employeeId, $"Xóa phiếu xuất hàng: {id}");
-                }
-
-                return Ok(new { message = "Xóa phiếu xuất hàng thành công" });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Lỗi khi xóa phiếu xuất hàng", error = ex.Message });
-            }
-        }
-
         // Helper methods
         private string GenerateStockExportId()
         {

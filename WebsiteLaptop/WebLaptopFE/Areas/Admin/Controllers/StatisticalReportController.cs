@@ -7,7 +7,7 @@ namespace WebLaptopFE.Areas.Admin.Controllers
     {
         public IActionResult Index()
         {
-            return View("StatisticalReport");
+            return View("~/Areas/Admin/Views/AllViews/StatisticalReport.cshtml");
         }
     }
 }

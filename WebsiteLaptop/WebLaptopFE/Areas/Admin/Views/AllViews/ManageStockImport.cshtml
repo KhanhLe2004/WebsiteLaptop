@@ -1,6 +1,6 @@
 ﻿@{
     ViewData["Title"] = "Quản lý nhập hàng";
-    Layout = "~/Areas/Admin/Views/Shared/_LayoutManageStockImport.cshtml";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutAdmin.cshtml";
 }
 
 <div class="container-fluid py-4">
@@ -172,24 +172,6 @@
     </div>
 </div>
 
-<!-- Modal Xác nhận xóa -->
-<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-gradient-danger">
-                <h5 class="modal-title text-white" id="deleteModalLabel">Xác nhận xóa</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>Bạn có chắc chắn muốn xóa phiếu nhập hàng <strong id="deleteStockImportId"></strong>?</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                <button type="button" class="btn btn-danger" onclick="confirmDelete()">Xóa</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 @section Scripts {
     <!-- Select2 CSS -->
@@ -203,7 +185,6 @@
         let pageSize = 10;
         let searchDebounceTimer = null;
         const SEARCH_DEBOUNCE_DELAY = 300;
-        let deleteStockImportId = null;
         let detailRowIndex = 0;
         let suppliersList = [];
         let productsList = [];
@@ -342,9 +323,6 @@
                             </button>
                             <button class="btn btn-warning action-btn" onclick='editStockImport("${stockImport.stockImportId}")' title="Sửa">
                                 <i class="material-icons text-sm">edit</i>
-                            </button>
-                            <button class="btn btn-danger action-btn" onclick='deleteStockImport("${stockImport.stockImportId}")' title="Xóa">
-                                <i class="material-icons text-sm">delete</i>
                             </button>
                         </td>
                     </tr>
@@ -1371,40 +1349,6 @@
             });
         }
 
-        // Xóa phiếu nhập hàng
-        function deleteStockImport(stockImportId) {
-            deleteStockImportId = stockImportId;
-            $('#deleteStockImportId').text(stockImportId);
-            const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
-            modal.show();
-        }
-
-        // Xác nhận xóa
-        function confirmDelete() {
-            if (!deleteStockImportId) return;
-
-            $.ajax({
-                url: `${API_URL}/${deleteStockImportId}`,
-                type: 'DELETE',
-                success: function(response) {
-                    showNotification('Xóa phiếu nhập hàng thành công', 'success');
-                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
-                    if (modalInstance) {
-                        modalInstance.hide();
-                    }
-                    loadStockImports();
-                    deleteStockImportId = null;
-                },
-                error: function(xhr) {
-                    console.error('Error deleting stock import:', xhr);
-                    let message = 'Có lỗi xảy ra khi xóa phiếu nhập hàng';
-                    if (xhr.responseJSON && xhr.responseJSON.message) {
-                        message = xhr.responseJSON.message;
-                    }
-                    showNotification(message, 'error');
-                }
-            });
-        }
 
         // Hiển thị thông báo
         function showNotification(message, type) {
