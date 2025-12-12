@@ -1307,6 +1307,7 @@
             
             // Xác định màu badge dựa trên status (so sánh với text đã lowercase)
             let badgeClass = 'bg-secondary text-white'; // Mặc định
+            let inlineStyle = ''; // Style inline nếu cần
             
             // Kiểm tra "Đã hủy" trước tiên vì đây là trạng thái quan trọng cần hiển thị màu đỏ
             if (statusText.includes('Đã hủy')) {
@@ -1316,7 +1317,8 @@
             } else if (statusText.includes('Đang xử lý')) {
                 badgeClass = 'bg-info text-white';
             } else if (statusText.includes('Chờ vận chuyển')) {
-                badgeClass = 'bg-secondary text-white';
+                badgeClass = 'text-white';
+                inlineStyle = 'style="background-color: #e91e63;"';
             } else if (statusText.includes('Đang vận chuyển')) {
                 badgeClass = 'bg-dark text-white';
             } else if (statusText.includes('Hoàn thành')) {
@@ -1324,7 +1326,7 @@
             }
             
             // Hiển thị đúng status từ database với màu badge tương ứng
-            return `<span class="badge ${badgeClass}">${statusText}</span>`;
+            return `<span class="badge ${badgeClass}" ${inlineStyle}>${statusText}</span>`;
         }
 
         /* ------------ Orders ------------ */
