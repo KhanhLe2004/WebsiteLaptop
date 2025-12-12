@@ -9,9 +9,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class StatisticalReportAPIController : ControllerBase
     {
-        private readonly Testlaptop36Context _context;
+        private readonly Testlaptop37Context _context;
 
-        public StatisticalReportAPIController(Testlaptop36Context context)
+        public StatisticalReportAPIController(Testlaptop37Context context)
         {
             _context = context;
         }

@@ -14,7 +14,7 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class LoginAPIController : ControllerBase
     {
-        private readonly Testlaptop36Context _db = new();
+        private readonly Testlaptop37Context _db = new();
         private readonly IConfiguration _configuration;
         public LoginAPIController(IConfiguration configuration)
         {

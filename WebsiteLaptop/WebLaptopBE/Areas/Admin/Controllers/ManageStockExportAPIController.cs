@@ -14,14 +14,12 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageStockExportAPIController : ControllerBase
     {
-        private readonly Testlaptop36Context _context;
-        private readonly NotificationService _notificationService;
+        private readonly Testlaptop37Context _context;
         private readonly HistoryService _historyService;
 
-        public ManageStockExportAPIController(Testlaptop36Context context, NotificationService notificationService, HistoryService historyService)
+        public ManageStockExportAPIController(Testlaptop37Context context, HistoryService historyService)
         {
             _context = context;
-            _notificationService = notificationService;
             _historyService = historyService;
         }
 
@@ -501,8 +499,29 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 
                 // Cập nhật thông tin chung
                 stockExport.SaleInvoiceId = dto.SaleInvoiceId ?? stockExport.SaleInvoiceId;
-                stockExport.EmployeeId = dto.EmployeeId ?? stockExport.EmployeeId;
+                
+                // Cập nhật EmployeeId: ưu tiên từ dto, nếu không có thì lấy từ header, nếu không có thì giữ nguyên
+                if (!string.IsNullOrEmpty(dto.EmployeeId))
+                {
+                    stockExport.EmployeeId = dto.EmployeeId;
+                }
+                else
+                {
+                    var employeeIdFromHeader = GetEmployeeId();
+                    if (!string.IsNullOrEmpty(employeeIdFromHeader))
+                    {
+                        stockExport.EmployeeId = employeeIdFromHeader;
+                    }
+                    // Nếu không có cả hai, giữ nguyên EmployeeId hiện tại
+                }
+                
                 stockExport.Status = dto.Status ?? stockExport.Status;
+                
+                // Cập nhật thời gian khi trạng thái chuyển sang "Hoàn thành"
+                if (oldStatus != stockExport.Status && stockExport.Status == "Hoàn thành")
+                {
+                    stockExport.Time = DateTime.Now;
+                }
                 
                 // Xử lý ProductSerial khi thay đổi status (không có thay đổi chi tiết)
                 bool statusChanged = oldStatus != stockExport.Status;
@@ -540,6 +559,26 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                                         detail.Quantity.Value,
                                         detail.StockExportDetailId,
                                         exportDate);
+                                }
+                            }
+                        }
+                        
+                        // Cập nhật trạng thái đơn hàng thành "Chờ vận chuyển" khi phiếu xuất hàng hoàn thành
+                        if (!string.IsNullOrEmpty(stockExport.SaleInvoiceId))
+                        {
+                            var saleInvoice = await _context.SaleInvoices
+                                .FirstOrDefaultAsync(si => si.SaleInvoiceId == stockExport.SaleInvoiceId);
+                            
+                            if (saleInvoice != null && saleInvoice.Status == "Đang xử lý")
+                            {
+                                saleInvoice.Status = "Chờ vận chuyển";
+                                
+                                // Ghi log lịch sử cho đơn hàng
+                                var employeeIdForInvoice = GetEmployeeId() ?? stockExport.EmployeeId;
+                                if (!string.IsNullOrEmpty(employeeIdForInvoice))
+                                {
+                                    await _historyService.LogHistoryAsync(employeeIdForInvoice, 
+                                        $"Cập nhật trạng thái đơn hàng tự động: {saleInvoice.SaleInvoiceId} - Đang xử lý → Chờ vận chuyển (do phiếu xuất hàng {stockExport.StockExportId} hoàn thành)");
                                 }
                             }
                         }
@@ -682,6 +721,29 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         detailIndex++;
                     }
                 }
+                
+                // Cập nhật trạng thái đơn hàng thành "Chờ vận chuyển" khi phiếu xuất hàng chuyển thành "Hoàn thành"
+                if (statusChanged && oldStatus == "Chờ xử lý" && stockExport.Status == "Hoàn thành")
+                {
+                    if (!string.IsNullOrEmpty(stockExport.SaleInvoiceId))
+                    {
+                        var saleInvoice = await _context.SaleInvoices
+                            .FirstOrDefaultAsync(si => si.SaleInvoiceId == stockExport.SaleInvoiceId);
+                        
+                        if (saleInvoice != null && saleInvoice.Status == "Đang xử lý")
+                        {
+                            saleInvoice.Status = "Chờ vận chuyển";
+                            
+                            // Ghi log lịch sử cho đơn hàng
+                            var employeeIdForInvoice = GetEmployeeId() ?? stockExport.EmployeeId;
+                            if (!string.IsNullOrEmpty(employeeIdForInvoice))
+                            {
+                                await _historyService.LogHistoryAsync(employeeIdForInvoice, 
+                                    $"Cập nhật trạng thái đơn hàng tự động: {saleInvoice.SaleInvoiceId} - Đang xử lý → Chờ vận chuyển (do phiếu xuất hàng {stockExport.StockExportId} hoàn thành)");
+                            }
+                        }
+                    }
+                }
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
@@ -696,12 +758,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         logMessage += $" - Trạng thái: {oldStatus} → {stockExport.Status}";
                     }
                     await _historyService.LogHistoryAsync(employeeId, logMessage);
-                }
-
-                // Tạo thông báo khi cập nhật trạng thái thành "Hoàn thành"
-                if (statusChanged && oldStatus == "Chờ xử lý" && stockExport.Status == "Hoàn thành" && !string.IsNullOrEmpty(stockExport.SaleInvoiceId))
-                {
-                    CreateNotificationForStockExportCompleted(stockExport.StockExportId, stockExport.SaleInvoiceId);
                 }
 
                 // Load lại để lấy thông tin đầy đủ
@@ -1286,20 +1342,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error restoring ProductSerials: {ex.Message}");
-            }
-        }
-
-        // Tạo thông báo khi phiếu xuất hàng hoàn thành
-        private void CreateNotificationForStockExportCompleted(string stockExportId, string saleInvoiceId)
-        {
-            try
-            {
-                string message = $"Phiếu xuất hàng {stockExportId} đã hoàn thành cho hóa đơn {saleInvoiceId}";
-                _notificationService.CreateNotification(saleInvoiceId, stockExportId, message, "StockExportCompleted");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error creating notification: {ex.Message}");
             }
         }
 

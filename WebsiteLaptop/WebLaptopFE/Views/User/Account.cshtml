@@ -177,7 +177,7 @@
                     <tr>
                       <th class="text-center">Mã đơn hàng</th>
                       <th class="text-center">Sản phẩm</th>
-                      <th class="text-center">Ngày hủy</th>
+                      <th class="text-center">Thời gian</th>
                       <th class="text-center">Trạng thái</th>
                       <th class="text-center">Tổng</th>
                       <th class="text-center">Hành động</th>
@@ -1315,6 +1315,8 @@
                 badgeClass = 'bg-warning text-white';
             } else if (statusText.includes('Đang xử lý')) {
                 badgeClass = 'bg-info text-white';
+            } else if (statusText.includes('Chờ vận chuyển')) {
+                badgeClass = 'bg-secondary text-white';
             } else if (statusText.includes('Đang vận chuyển')) {
                 badgeClass = 'bg-dark text-white';
             } else if (statusText.includes('Hoàn thành')) {
@@ -1386,8 +1388,32 @@
                 const orderId = order.saleInvoiceId || order.SaleInvoiceId || '';
                 const statusValue = order.status || order.Status || '';
                 const statusText = statusValue.toString().trim().toLowerCase();
-                // Với lịch sử mua hàng, hiển thị "Ngày hủy" (sử dụng TimeCreate đã được cập nhật khi hủy)
-                const date = formatDate(order.timeCreate || order.TimeCreate);
+                
+                // Xác định thời gian hiển thị dựa trên tab và trạng thái
+                let displayDate;
+                if (isHistoryTab) {
+                    // Tab "Lịch sử mua hàng"
+                    if (statusText.includes('Hoàn thành')) {
+                        // Đơn hàng "Hoàn thành" → hiển thị TimeShip
+                        displayDate = order.timeShip || order.TimeShip;
+                    } else if (statusText.includes('Đã hủy')) {
+                        // Đơn hàng "Đã hủy" → hiển thị TimeCreate (đã được cập nhật thành thời gian hủy)
+                        displayDate = order.timeCreate || order.TimeCreate;
+                    } else {
+                        // Các trạng thái khác → hiển thị TimeCreate
+                        displayDate = order.timeCreate || order.TimeCreate;
+                    }
+                } else {
+                    // Tab "Đơn hàng của tôi"
+                    if (statusText.includes('Đã hủy')) {
+                        // Đơn hàng "Đã hủy" → hiển thị TimeCreate (đã được cập nhật thành thời gian hủy)
+                        displayDate = order.timeCreate || order.TimeCreate;
+                    } else {
+                        // Các trạng thái khác → hiển thị TimeCreate (thời gian tạo đơn hàng)
+                        displayDate = order.timeCreate || order.TimeCreate;
+                    }
+                }
+                const date = formatDate(displayDate);
                 const statusBadge = buildStatusBadge(statusValue);
                 const total = formatCurrency(order.totalAmount || order.TotalAmount);
                 const payload = {

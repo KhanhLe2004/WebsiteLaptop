@@ -12,7 +12,7 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class ProductsController : ControllerBase
     {
-        private readonly Testlaptop36Context _db = new();
+        private readonly Testlaptop37Context _db = new();
 
         // GET /api/products/category/{brandId}?productName={productName}
         [HttpGet("category/{brandId}")]

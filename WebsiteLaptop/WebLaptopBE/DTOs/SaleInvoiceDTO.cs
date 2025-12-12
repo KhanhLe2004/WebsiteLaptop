@@ -17,6 +17,10 @@ namespace WebLaptopBE.DTOs
         public string? EmployeeName { get; set; }
         public string? CustomerId { get; set; }
         public string? CustomerName { get; set; }
+        public string? CustomerPhone { get; set; }
+        public string? EmployeeShip { get; set; }
+        public string? EmployeeShipName { get; set; }
+        public DateTime? TimeShip { get; set; }
         public List<SaleInvoiceDetailDTO>? Details { get; set; }
     }
 
@@ -29,6 +33,7 @@ namespace WebLaptopBE.DTOs
         public decimal? UnitPrice { get; set; }
         public string? ProductId { get; set; }
         public string? ProductName { get; set; }
+        public string? ProductModel { get; set; }
         public string? Specifications { get; set; }
     }
 

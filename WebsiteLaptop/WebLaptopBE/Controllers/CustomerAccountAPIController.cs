@@ -14,10 +14,10 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class CustomerAccountAPIController : ControllerBase
     {
-        private readonly Testlaptop36Context _db;
+        private readonly Testlaptop37Context _db;
         private readonly IWebHostEnvironment _environment;
 
-        public CustomerAccountAPIController(Testlaptop36Context db, IWebHostEnvironment environment)
+        public CustomerAccountAPIController(Testlaptop37Context db, IWebHostEnvironment environment)
         {
             _db = db;
             _environment = environment;
@@ -75,7 +75,7 @@ namespace WebLaptopBE.Controllers
                     return BadRequest(new { message = "CustomerId không hợp lệ" });
                 }
 
-                // Chỉ lấy đơn hàng có trạng thái "Chờ xử lý" hoặc "Đang xử lý"
+                // Chỉ lấy đơn hàng có trạng thái "Chờ xử lý", "Đang xử lý", "Chờ vận chuyển" hoặc "Đang vận chuyển"
                 var orders = _db.SaleInvoices
                     .AsNoTracking()
                     .Include(si => si.SaleInvoiceDetails)
@@ -84,6 +84,7 @@ namespace WebLaptopBE.Controllers
                                  si.Status != null &&
                                  (si.Status.Contains("Chờ xử lý") ||
                                   si.Status.Contains("Đang xử lý") ||
+                                  si.Status.Contains("Chờ vận chuyển") ||
                                   si.Status.Contains("Đang vận chuyển")))
                     .OrderByDescending(si => si.TimeCreate)
                     .Select(si => new
@@ -131,7 +132,7 @@ namespace WebLaptopBE.Controllers
                 }
 
                 // Chỉ lấy đơn hàng có trạng thái "Hoàn thành" hoặc "Đã hủy"
-                var orders = _db.SaleInvoices
+                var allOrders = _db.SaleInvoices
                     .AsNoTracking()
                     .Include(si => si.SaleInvoiceDetails)
                         .ThenInclude(d => d.Product)
@@ -139,11 +140,28 @@ namespace WebLaptopBE.Controllers
                                  si.Status != null &&
                                  (si.Status.Contains("Hoàn thành") ||
                                   si.Status.Contains("Đã hủy")))
-                    .OrderByDescending(si => si.TimeCreate)
-                    .Select(si => new
+                    .ToList();
+
+                // Sắp xếp theo thời gian phù hợp
+                var sortedOrders = allOrders.OrderByDescending(si => 
+                {
+                    if (si.Status != null && si.Status.Contains("Hoàn thành"))
+                    {
+                        return si.TimeShip ?? si.TimeCreate ?? DateTime.MinValue;
+                    }
+                    else if (si.Status != null && si.Status.Contains("Đã hủy"))
+                    {
+                        // Đơn hàng đã hủy: TimeCreate đã được cập nhật thành thời gian hủy
+                        return si.TimeCreate ?? DateTime.MinValue;
+                    }
+                    return si.TimeCreate ?? DateTime.MinValue;
+                });
+
+                var orders = sortedOrders.Select(si => new
                     {
                         si.SaleInvoiceId,
                         si.TimeCreate,
+                        si.TimeShip,
                         si.Status, // Lấy trực tiếp từ database, không thay đổi
                         si.TotalAmount,
                         si.PaymentMethod,
@@ -357,10 +375,9 @@ namespace WebLaptopBE.Controllers
                     return BadRequest(new { message = "Chỉ có thể hủy đơn hàng khi trạng thái là 'Chờ xử lý'" });
                 }
 
-                // Cập nhật trạng thái thành "Đã hủy" và lưu thời gian hủy vào TimeCreate
-                // (Sử dụng TimeCreate để lưu thời gian hủy cho đơn hàng đã hủy)
+                // Cập nhật trạng thái thành "Đã hủy" và cập nhật TimeCreate thành thời gian hủy
                 order.Status = "Đã hủy";
-                order.TimeCreate = DateTime.Now; // Cập nhật thời gian hủy
+                order.TimeCreate = DateTime.Now; // Cập nhật thời gian hủy thay cho thời gian tạo đơn hàng
                 _db.SaveChanges();
 
                 return Ok(new { message = "Hủy đơn hàng thành công" });

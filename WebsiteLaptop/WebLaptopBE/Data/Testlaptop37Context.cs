@@ -5,13 +5,14 @@ using WebLaptopBE.Models;
 
 namespace WebLaptopBE.Data;
 
-public partial class Testlaptop36Context : DbContext
+public partial class Testlaptop37Context : DbContext
 {
-    public Testlaptop36Context()
+    public Testlaptop37Context()
     {
     }
 
-    public Testlaptop36Context(DbContextOptions<Testlaptop36Context> options): base(options)
+    public Testlaptop37Context(DbContextOptions<Testlaptop37Context> options)
+        : base(options)
     {
     }
 
@@ -60,8 +61,8 @@ public partial class Testlaptop36Context : DbContext
     public virtual DbSet<Warranty> Warranties { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-        => optionsBuilder.UseSqlServer("Data Source=DESKTOP-GDN4V8P;Initial Catalog=testlaptop36;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False");
-
+#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
+        => optionsBuilder.UseSqlServer("Data Source=DESKTOP-GDN4V8P;Initial Catalog=testlaptop37;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -164,7 +165,7 @@ public partial class Testlaptop36Context : DbContext
                 .HasColumnName("customer_id");
             entity.Property(e => e.Active).HasColumnName("active");
             entity.Property(e => e.Address)
-                .HasMaxLength(500)
+                .HasMaxLength(1000)
                 .HasColumnName("address");
             entity.Property(e => e.Avatar)
                 .HasMaxLength(500)
@@ -196,7 +197,7 @@ public partial class Testlaptop36Context : DbContext
                 .HasColumnName("employee_id");
             entity.Property(e => e.Active).HasColumnName("active");
             entity.Property(e => e.Address)
-                .HasMaxLength(100)
+                .HasMaxLength(1000)
                 .HasColumnName("address");
             entity.Property(e => e.Avatar)
                 .HasMaxLength(100)
@@ -467,7 +468,7 @@ public partial class Testlaptop36Context : DbContext
                 .HasMaxLength(20)
                 .HasColumnName("customer_id");
             entity.Property(e => e.DeliveryAddress)
-                .HasMaxLength(100)
+                .HasMaxLength(1000)
                 .HasColumnName("delivery_address");
             entity.Property(e => e.DeliveryFee)
                 .HasColumnType("decimal(18, 2)")
@@ -478,15 +479,24 @@ public partial class Testlaptop36Context : DbContext
             entity.Property(e => e.EmployeeId)
                 .HasMaxLength(20)
                 .HasColumnName("employee_id");
+            entity.Property(e => e.EmployeeShip)
+                .HasMaxLength(20)
+                .HasColumnName("employee_ship");
             entity.Property(e => e.PaymentMethod)
                 .HasMaxLength(50)
                 .HasColumnName("payment_method");
+            entity.Property(e => e.Phone)
+                .HasMaxLength(20)
+                .HasColumnName("phone");
             entity.Property(e => e.Status)
                 .HasMaxLength(50)
                 .HasColumnName("status");
             entity.Property(e => e.TimeCreate)
                 .HasColumnType("datetime")
                 .HasColumnName("time_create");
+            entity.Property(e => e.TimeShip)
+                .HasColumnType("datetime")
+                .HasColumnName("time_ship");
             entity.Property(e => e.TotalAmount)
                 .HasColumnType("decimal(18, 2)")
                 .HasColumnName("total_amount");
@@ -650,7 +660,7 @@ public partial class Testlaptop36Context : DbContext
                 .HasColumnName("supplier_id");
             entity.Property(e => e.Active).HasColumnName("active");
             entity.Property(e => e.Address)
-                .HasMaxLength(100)
+                .HasMaxLength(1000)
                 .HasColumnName("address");
             entity.Property(e => e.Email)
                 .HasMaxLength(100)

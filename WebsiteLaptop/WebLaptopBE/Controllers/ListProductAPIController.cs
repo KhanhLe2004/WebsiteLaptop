@@ -10,7 +10,7 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class ListProductAPIController : ControllerBase
     {
-        private readonly Testlaptop36Context _db = new();
+        private readonly Testlaptop37Context _db = new();
         
         [HttpGet("all")]
         public IActionResult GetAllProducts()

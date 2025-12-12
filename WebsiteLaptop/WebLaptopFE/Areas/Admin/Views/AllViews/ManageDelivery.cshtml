@@ -1,5 +1,5 @@
 ﻿@{
-    ViewData["Title"] = "Quản lý hóa đơn";
+    ViewData["Title"] = "Quản lý vận chuyển";
     Layout = "~/Areas/Admin/Views/Shared/_LayoutAdmin.cshtml";
 }
 
@@ -9,7 +9,7 @@
             <div class="card my-4">
                 <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
                     <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
-                        <h6 class="text-white text-capitalize ps-3 mb-0">Quản lý hóa đơn bán</h6>
+                        <h6 class="text-white text-capitalize ps-3 mb-0">Quản lý vận chuyển</h6>
                     </div>
                 </div>
                 <div class="card-body px-3 pb-2">
@@ -17,37 +17,34 @@
                     <div class="row mb-3 g-2 align-items-end">
                         <div class="col-lg-4 col-md-6">
                             <div class="input-group input-group-outline">
-                                <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm hóa đơn...">
+                                <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm đơn hàng...">
                             </div>
                         </div>
                         <div class="col-lg-2 col-md-3">
                             <select id="statusFilter" class="form-select">
                                 <option value="">Tất cả trạng thái</option>
-                                <option value="Chờ xử lý">Chờ xử lý</option>
-                                <option value="Đang xử lý">Đang xử lý</option>
                                 <option value="Chờ vận chuyển">Chờ vận chuyển</option>
                                 <option value="Đang vận chuyển">Đang vận chuyển</option>
-                                <option value="Hoàn thành">Hoàn thành</option>
-                                <option value="Đã hủy">Đã hủy</option>
                             </select>
                         </div>
                     </div>
 
-                    <!-- Bảng hóa đơn -->
+                    <!-- Bảng đơn hàng -->
                     <div class="table-responsive p-0">
                         <table class="table align-items-center mb-0" style="table-layout: fixed; width: 100%;">
                             <thead>
                                 <tr>
-                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Mã hóa đơn</th>
-                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 20%;">Khách hàng</th>
-                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Nhân viên</th>
-                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 12%;">Tổng tiền</th>
-                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 12%;">Ngày tạo</th>
-                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Trạng thái</th>
-                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 11%;">Thao tác</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 12%;">Mã đơn hàng</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 15%;">Khách hàng</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 10%;">Số điện thoại</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 10%;">Trạng thái</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 10%;">Tổng tiền</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 10%;">Ngày tạo</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 13%;">Địa chỉ giao hàng</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 10%;">Thao tác</th>
                                 </tr>
                             </thead>
-                            <tbody id="invoiceTableBody">
+                            <tbody id="deliveryTableBody">
                                 <!-- Dữ liệu sẽ được load bằng AJAX -->
                             </tbody>
                         </table>
@@ -77,7 +74,7 @@
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header bg-gradient-info">
-                <h5 class="modal-title text-white" id="viewModalLabel">Chi tiết hóa đơn</h5>
+                <h5 class="modal-title text-white" id="viewModalLabel">Chi tiết đơn hàng</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="viewModalBody">
@@ -101,16 +98,14 @@
             <div class="modal-body">
                 <form id="statusForm">
                     <input type="hidden" id="statusInvoiceId" value="">
+                    <input type="hidden" id="currentStatus" value="">
                     <div class="input-group input-group-outline mb-3">
                         <label class="form-label">Trạng thái *</label>
                         <select class="form-control" id="statusSelect" required>
-                            <option value="">Tất cả trạng thái</option>
-                            <option value="Chờ xử lý">Chờ xử lý</option>
-                            <option value="Đang xử lý">Đang xử lý</option>
+                            <option value=""></option>
                             <option value="Chờ vận chuyển">Chờ vận chuyển</option>
                             <option value="Đang vận chuyển">Đang vận chuyển</option>
                             <option value="Hoàn thành">Hoàn thành</option>
-                            <option value="Đã hủy">Đã hủy</option>
                         </select>
                     </div>
                     <div class="text-danger mb-3" id="statusErrorMessage" style="display:none;"></div>
@@ -127,13 +122,8 @@
 </div>
 
 @section Scripts {
-    <!-- Select2 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
-    <!-- Select2 JS -->
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
-        const API_URL = 'http://localhost:5068/api/admin/sale-invoices';
+        const API_URL = 'http://localhost:5068/api/admin/deliveries';
         let currentPage = 1;
         let pageSize = 10;
         let searchDebounceTimer = null;
@@ -142,7 +132,7 @@
         const currentEmployeeName = @Html.Raw(Json.Serialize(ViewBag.EmployeeName ?? ""));
 
         $(document).ready(function() {
-            loadSaleInvoices();
+            loadDeliveries();
 
             // Tìm kiếm tự động
             $('#searchInput').on('input', function() {
@@ -151,7 +141,8 @@
 
             // Lọc theo trạng thái
             $('#statusFilter').on('change', function() {
-                triggerAutoSearch();
+                currentPage = 1;
+                loadDeliveries();
             });
 
             // Xử lý label cho Material Dashboard inputs
@@ -200,12 +191,12 @@
                 clearTimeout(searchDebounceTimer);
             }
             searchDebounceTimer = setTimeout(() => {
-                loadSaleInvoices();
+                loadDeliveries();
             }, SEARCH_DEBOUNCE_DELAY);
         }
 
-        // Load danh sách hóa đơn
-        function loadSaleInvoices(page = currentPage) {
+        // Load danh sách đơn hàng
+        function loadDeliveries(page = currentPage) {
             currentPage = page;
             const searchTerm = $('#searchInput').val().trim();
             const statusFilter = $('#statusFilter').val();
@@ -213,61 +204,64 @@
             const dataParams = {
                 pageNumber: currentPage,
                 pageSize: pageSize,
-                searchTerm: searchTerm
+                searchTerm: searchTerm,
+                status: statusFilter || null
             };
-
-            if (statusFilter !== '') {
-                dataParams.status = statusFilter;
-            }
 
             $.ajax({
                 url: API_URL,
                 type: 'GET',
                 data: dataParams,
                 success: function(response) {
-                    displaySaleInvoices(response.items);
+                    displayDeliveries(response.items);
                     displayPagination(response);
                     updatePageInfo(response);
                 },
                 error: function(xhr) {
-                    console.error('Lỗi khi tải hóa đơn:', xhr);
-                    showNotification('Lỗi khi tải dữ liệu hóa đơn', 'error');
+                    console.error('Lỗi khi tải đơn hàng:', xhr);
+                    showNotification('Lỗi khi tải dữ liệu đơn hàng', 'error');
                 }
             });
         }
 
-        // Hiển thị hóa đơn
-        function displaySaleInvoices(invoices) {
-            const tbody = $('#invoiceTableBody');
+        // Hiển thị đơn hàng
+        function displayDeliveries(deliveries) {
+            const tbody = $('#deliveryTableBody');
             tbody.empty();
 
-            if (invoices.length === 0) {
+            if (deliveries.length === 0) {
                 tbody.append(`
                     <tr>
-                        <td colspan="7" class="text-center text-secondary py-4">
-                            Không có hóa đơn nào
+                        <td colspan="8" class="text-center text-secondary py-4">
+                            Không có đơn hàng nào
                         </td>
                     </tr>
                 `);
                 return;
             }
 
-            $.each(invoices, function(index, invoice) {
-                const timeCreate = invoice.timeCreate ? new Date(invoice.timeCreate).toLocaleString('vi-VN') : '-';
-                const totalAmount = invoice.totalAmount ? formatCurrency(invoice.totalAmount) : '0';
-                const status = invoice.status || 'Pending';
+            $.each(deliveries, function(index, delivery) {
+                const timeCreate = delivery.timeCreate ? new Date(delivery.timeCreate).toLocaleString('vi-VN') : '-';
+                const totalAmount = delivery.totalAmount ? formatCurrency(delivery.totalAmount) : '0';
+                const deliveryAddress = delivery.deliveryAddress || '-';
+                const customerPhone = delivery.customerPhone || '-';
+                const status = delivery.status || 'Chờ vận chuyển';
                 const statusBadge = getStatusBadge(status);
+                const canUpdate = status === 'Chờ vận chuyển' || status === 'Đang vận chuyển';
 
                 tbody.append(`
                     <tr>
                         <td style="vertical-align: middle;">
-                            <span class="text-xs font-weight-bold">${invoice.saleInvoiceId}</span>
+                            <span class="text-xs font-weight-bold">${delivery.saleInvoiceId}</span>
                         </td>
                         <td style="vertical-align: middle;">
-                            <span class="text-xs font-weight-bold">${invoice.customerName || '-'}</span>
+                            <span class="text-xs font-weight-bold">${delivery.customerName || '-'}</span>
                         </td>
                         <td style="vertical-align: middle; text-align: center;">
-                            <span class="text-xs font-weight-bold">${invoice.employeeName || '-'}</span>
+                            <span class="text-xs font-weight-bold">${customerPhone}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            ${statusBadge}
                         </td>
                         <td style="vertical-align: middle; text-align: center;">
                             <span class="text-xs font-weight-bold">${totalAmount}</span>
@@ -276,15 +270,15 @@
                             <span class="text-xs font-weight-bold">${timeCreate}</span>
                         </td>
                         <td style="vertical-align: middle; text-align: center;">
-                            ${statusBadge}
+                            <span class="text-xs font-weight-bold" title="${deliveryAddress}">${deliveryAddress.length > 30 ? deliveryAddress.substring(0, 30) + '...' : deliveryAddress}</span>
                         </td>
                         <td style="vertical-align: middle; text-align: center;" class="table-actions">
-                            <button class="btn btn-info action-btn" onclick='viewSaleInvoice("${invoice.saleInvoiceId}")' title="Xem">
+                            <button class="btn btn-info action-btn" onclick='viewDelivery("${delivery.saleInvoiceId}")' title="Xem">
                                 <i class="material-icons text-sm">visibility</i>
                             </button>
-                            ${status !== 'Hoàn thành' && status !== 'Đã hủy' ? `
-                            <button class="btn btn-warning action-btn" onclick='updateStatus("${invoice.saleInvoiceId}", "${status}")' title="Cập nhật trạng thái">
-                                <i class="material-icons text-sm">edit</i>
+                            ${canUpdate ? `
+                            <button class="btn btn-success action-btn" onclick='updateStatus("${delivery.saleInvoiceId}", "${status}")' title="Cập nhật trạng thái">
+                                <i class="material-icons text-sm">local_shipping</i>
                             </button>
                             ` : ''}
                         </td>
@@ -302,7 +296,7 @@
 
             pagination.append(`
                 <li class="page-item ${response.hasPreviousPage ? '' : 'disabled'}">
-                    <a class="page-link" href="javascript:void(0)" onclick="loadSaleInvoices(${currentPage - 1})">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadDeliveries(${currentPage - 1})">
                         <i class="material-icons text-sm">chevron_left</i>
                     </a>
                 </li>
@@ -312,7 +306,7 @@
             let endPage = Math.min(response.totalPages, currentPage + 2);
 
             if (startPage > 1) {
-                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadSaleInvoices(1)">1</a></li>`);
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadDeliveries(1)">1</a></li>`);
                 if (startPage > 2) {
                     pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
                 }
@@ -321,7 +315,7 @@
             for (let i = startPage; i <= endPage; i++) {
                 pagination.append(`
                     <li class="page-item ${i === currentPage ? 'active' : ''}">
-                        <a class="page-link" href="javascript:void(0)" onclick="loadSaleInvoices(${i})">${i}</a>
+                        <a class="page-link" href="javascript:void(0)" onclick="loadDeliveries(${i})">${i}</a>
                     </li>
                 `);
             }
@@ -330,12 +324,12 @@
                 if (endPage < response.totalPages - 1) {
                     pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
                 }
-                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadSaleInvoices(${response.totalPages})">${response.totalPages}</a></li>`);
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadDeliveries(${response.totalPages})">${response.totalPages}</a></li>`);
             }
 
             pagination.append(`
                 <li class="page-item ${response.hasNextPage ? '' : 'disabled'}">
-                    <a class="page-link" href="javascript:void(0)" onclick="loadSaleInvoices(${currentPage + 1})">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadDeliveries(${currentPage + 1})">
                         <i class="material-icons text-sm">chevron_right</i>
                     </a>
                 </li>
@@ -346,11 +340,11 @@
         function updatePageInfo(response) {
             const start = (response.pageNumber - 1) * response.pageSize + 1;
             const end = Math.min(response.pageNumber * response.pageSize, response.totalItems);
-            $('#pageInfo').text(`Hiển thị ${start} - ${end} trong tổng số ${response.totalItems} hóa đơn`);
+            $('#pageInfo').text(`Hiển thị ${start} - ${end} trong tổng số ${response.totalItems} đơn hàng`);
         }
 
-        // Xem chi tiết hóa đơn
-        function viewSaleInvoice(invoiceId) {
+        // Xem chi tiết đơn hàng
+        function viewDelivery(invoiceId) {
             $.ajax({
                 url: `${API_URL}/${invoiceId}`,
                 type: 'GET',
@@ -358,7 +352,7 @@
                     let html = `
                         <div class="row mb-3">
                             <div class="col-md-6">
-                                <strong>Mã hóa đơn:</strong> ${invoice.saleInvoiceId}
+                                <strong>Mã đơn hàng:</strong> ${invoice.saleInvoiceId}
                             </div>
                             <div class="col-md-6">
                                 <strong>Ngày tạo:</strong> ${invoice.timeCreate ? new Date(invoice.timeCreate).toLocaleString('vi-VN') : '-'}
@@ -377,7 +371,7 @@
                                 <strong>Nhân viên:</strong> ${invoice.employeeName || '-'}
                             </div>
                             <div class="col-md-6">
-                                <strong>Trạng thái:</strong> ${getStatusBadge(invoice.status || 'Pending')}
+                                <strong>Trạng thái:</strong> ${getStatusBadge(invoice.status || 'Chờ vận chuyển')}
                             </div>
                         </div>
                         <div class="row mb-3">
@@ -407,26 +401,22 @@
                             <div class="col-md-6">
                                 <strong>Nhân viên giao hàng:</strong> ${invoice.employeeShipName || '-'}
                             </div>
-                            <div class="col-md-6">
-                                <strong>Thời gian giao hàng:</strong> ${invoice.timeShip ? new Date(invoice.timeShip).toLocaleString('vi-VN') : '-'}
-                            </div>
                         </div>
-
                         <hr>
-                        <h6>Chi tiết hóa đơn:</h6>
+                        <h6>Chi tiết đơn hàng:</h6>
                         <div class="table-responsive">
                             <table class="table table-bordered table-sm" style="font-size: 0.875rem;">
-                            <thead>
-                                <tr>
+                                <thead>
+                                    <tr>
                                         <th style="width: 30%;">Sản phẩm</th>
                                         <th style="width: 25%;">Thông số</th>
                                         <th style="width: 10%;" class="text-center">Số lượng</th>
                                         <th style="width: 15%;" class="text-end">Đơn giá</th>
                                         <th style="width: 20%;" class="text-end">Thành tiền</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                    `;
+                                    </tr>
+                                </thead>
+                                <tbody>
+                        `;
 
                     if (invoice.details && invoice.details.length > 0) {
                         invoice.details.forEach(function(detail) {
@@ -449,8 +439,8 @@
                     }
 
                     html += `
-                            </tbody>
-                        </table>
+                                </tbody>
+                            </table>
                         </div>
                     `;
 
@@ -459,17 +449,17 @@
                     modal.show();
                 },
                 error: function(xhr) {
-                    console.error('Error loading invoice:', xhr);
-                    showNotification('Lỗi khi tải thông tin hóa đơn', 'error');
+                    console.error('Error loading delivery:', xhr);
+                    showNotification('Lỗi khi tải thông tin đơn hàng', 'error');
                 }
             });
         }
 
         // Cập nhật trạng thái
         function updateStatus(invoiceId, currentStatus) {
-            // Kiểm tra nếu trạng thái là "Hoàn thành" hoặc "Đã hủy" thì không cho cập nhật
-            if (currentStatus === 'Hoàn thành' || currentStatus === 'Đã hủy') {
-                showNotification('Không thể cập nhật trạng thái cho đơn hàng đã hoàn thành hoặc đã hủy', 'error');
+            // Kiểm tra nếu trạng thái là "Hoàn thành" thì không cho cập nhật
+            if (currentStatus === 'Hoàn thành') {
+                showNotification('Không thể cập nhật trạng thái cho đơn hàng đã hoàn thành', 'error');
                 return;
             }
             
@@ -482,10 +472,6 @@
             // Enable select và nút lưu
             $('#statusSelect').prop('disabled', false);
             $('.modal-footer .btn-primary').prop('disabled', false);
-            
-            setTimeout(function() {
-                updateInputLabels();
-            }, 100);
 
             const modal = new bootstrap.Modal(document.getElementById('statusModal'));
             modal.show();
@@ -503,10 +489,10 @@
                 return;
             }
 
-            // Kiểm tra nếu trạng thái ban đầu là "Hoàn thành" hoặc "Đã hủy" thì không cho cập nhật
+            // Kiểm tra nếu trạng thái ban đầu là "Hoàn thành" thì không cho cập nhật
             const originalStatus = $('#statusSelect').data('original-status');
-            if (originalStatus === 'Hoàn thành' || originalStatus === 'Đã hủy') {
-                showStatusError('Không thể cập nhật trạng thái cho đơn hàng đã hoàn thành hoặc đã hủy');
+            if (originalStatus === 'Hoàn thành') {
+                showStatusError('Không thể cập nhật trạng thái cho đơn hàng đã hoàn thành');
                 return;
             }
 
@@ -524,7 +510,7 @@
                     if (modalInstance) {
                         modalInstance.hide();
                     }
-                    loadSaleInvoices();
+                    loadDeliveries();
                 },
                 error: function(xhr) {
                     console.error('Error updating status:', xhr);
@@ -535,6 +521,16 @@
                     showStatusError(message);
                 }
             });
+        }
+        
+        // Lấy badge trạng thái
+        function getStatusBadge(status) {
+            const badges = {
+                'Chờ vận chuyển': '<span class="badge bg-gradient-secondary">Chờ vận chuyển</span>',
+                'Đang vận chuyển': '<span class="badge bg-gradient-dark">Đang vận chuyển</span>',
+                'Hoàn thành': '<span class="badge bg-gradient-success">Hoàn thành</span>'
+            };
+            return badges[status] || '<span class="badge bg-gradient-secondary">' + status + '</span>';
         }
 
         // Hiển thị thông báo
@@ -561,31 +557,15 @@
             return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
         }
 
-        // Lấy badge trạng thái
-        function getStatusBadge(status) {
-            const badges = {
-                'Chờ xử lý': '<span class="badge bg-gradient-warning">Chờ xử lý</span>',
-                'Đang xử lý': '<span class="badge bg-gradient-info">Đang xử lý</span>',
-                'Chờ vận chuyển': '<span class="badge bg-gradient-secondary">Chờ vận chuyển</span>',
-                'Đang vận chuyển': '<span class="badge bg-gradient-dark">Đang vận chuyển</span>',
-                'Hoàn thành': '<span class="badge bg-gradient-success">Hoàn thành</span>',
-                'Đã hủy': '<span class="badge bg-gradient-danger">Đã hủy</span>'
-            };
-            return badges[status] || '<span class="badge bg-gradient-secondary">' + status + '</span>';
-        }
-
         // Reset khi đóng modal
         $(document).on('hidden.bs.modal', '#statusModal', function() {
             $('#statusForm')[0].reset();
             $('#statusInvoiceId').val('');
+            $('#statusSelect').val('');
+            $('#statusSelect').removeData('original-status');
             $('#statusErrorMessage').hide();
             
             $('.input-group-outline').removeClass('is-filled is-focused');
-            if (typeof updateInputLabels === 'function') {
-                setTimeout(function() {
-                    updateInputLabels();
-                }, 50);
-            }
         });
     </script>
 }
@@ -691,7 +671,7 @@
         white-space: nowrap;
     }
 
-    #invoiceTableBody tr td {
+    #deliveryTableBody tr td {
         vertical-align: middle !important;
         padding: 1rem 0.75rem !important;
         border: none;
@@ -711,45 +691,5 @@
         text-align: center;
         color: #6c757d;
         font-style: italic;
-    }
-
-    /* Select2 styling */
-    .select2-container--bootstrap-5 .select2-selection {
-        min-height: 40px;
-        border: 1px solid #d2d6da;
-        border-radius: 0.375rem;
-    }
-
-    .select2-container--bootstrap-5 .select2-selection--single {
-        height: 40px;
-    }
-
-    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
-        line-height: 38px;
-        padding-left: 0.75rem;
-    }
-
-    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
-        height: 38px;
-    }
-
-    .select2-dropdown {
-        border: 1px solid #d2d6da;
-        border-radius: 0.375rem;
-    }
-
-    .select2-search--dropdown .select2-search__field {
-        border: 1px solid #d2d6da;
-        border-radius: 0.375rem;
-        padding: 0.5rem;
-    }
-
-    /* Select2 dropdown trong modal */
-    .modal .select2-container {
-        z-index: 9999;
-    }
-
-    .modal .select2-dropdown {
-        z-index: 10000;
     }
 </style>

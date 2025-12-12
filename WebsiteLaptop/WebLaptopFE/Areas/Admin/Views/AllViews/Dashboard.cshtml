@@ -487,6 +487,8 @@
                     const statusClass = order.status === 'Hoàn thành' ? 'badge bg-gradient-success' :
                                       order.status === 'Chờ xử lý' ? 'badge bg-gradient-warning' :
                                       order.status === 'Đang xử lý' ? 'badge bg-gradient-info' :
+                                      order.status === 'Chờ vận chuyển' ? 'badge bg-gradient-secondary' :
+                                      order.status === 'Đang vận chuyển' ? 'badge bg-gradient-dark' :
                                       order.status === 'Đã hủy' ? 'badge bg-gradient-danger' :
                                       'badge bg-gradient-secondary';
                     

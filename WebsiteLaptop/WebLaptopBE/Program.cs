@@ -7,7 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 
 // Đăng ký DbContext
-builder.Services.AddDbContext<Testlaptop36Context>(options =>
+builder.Services.AddDbContext<Testlaptop37Context>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection") 
         ?? "Data Source=DESKTOP-GDN4V8P;Initial Catalog=testlaptop36;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False"));
 
@@ -29,9 +29,6 @@ builder.Services.AddSwaggerGen();
 
 // Add HttpClientFactory
 builder.Services.AddHttpClient();
-
-// Đăng ký NotificationService như singleton
-builder.Services.AddSingleton<WebLaptopBE.Services.NotificationService>();
 
 // Đăng ký EmailService như singleton
 builder.Services.AddSingleton<WebLaptopBE.Services.EmailService>();

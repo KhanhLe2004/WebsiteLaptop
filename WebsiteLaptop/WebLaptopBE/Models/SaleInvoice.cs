@@ -25,6 +25,12 @@ public partial class SaleInvoice
 
     public string? CustomerId { get; set; }
 
+    public string? Phone { get; set; }
+
+    public string? EmployeeShip { get; set; }
+
+    public DateTime? TimeShip { get; set; }
+
     public virtual Customer? Customer { get; set; }
 
     public virtual Employee? Employee { get; set; }

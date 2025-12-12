@@ -14,7 +14,7 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class CheckoutAPIController : ControllerBase
     {
-        private readonly Testlaptop36Context _db = new();
+        private readonly Testlaptop37Context _db = new();
         private readonly EmailService _emailService;
         private readonly IVnPayService _vnPayService;
         private readonly IConfiguration _configuration;
@@ -43,6 +43,8 @@ namespace WebLaptopBE.Controllers
                 {
                     return NotFound(new { message = "Không tìm thấy khách hàng" });
                 }
+
+                // Không cập nhật số điện thoại vào database - chỉ sử dụng số điện thoại từ request cho đơn hàng
 
                 // Lấy giỏ hàng
                 var cart = _db.Carts
@@ -196,7 +198,7 @@ namespace WebLaptopBE.Controllers
                         DeliveryAddress = request.DeliveryAddress,
                         PaymentMethod = request.PaymentMethod,
                         DeliveryFee = deliveryFee,
-                        Note = request.Note,
+                        Note = null, // Đã xóa ghi chú đơn hàng
                         SelectedCartDetailIds = request.SelectedCartDetailIds ?? cartDetailsToProcess.Select(cd => cd.CartDetailId).ToList(),
                         TotalAmount = totalAmount,
                         SelectedDiscountPromotions = request.SelectedDiscountPromotions,
@@ -222,7 +224,7 @@ namespace WebLaptopBE.Controllers
                         DeliveryAddress = request.DeliveryAddress,
                         PaymentMethod = request.PaymentMethod,
                         DeliveryFee = deliveryFee,
-                        Note = request.Note,
+                        Note = null, // Đã xóa ghi chú đơn hàng
                         SelectedCartDetailIds = request.SelectedCartDetailIds ?? cartDetailsToProcess.Select(cd => cd.CartDetailId).ToList(),
                         TotalAmount = totalAmount,
                         SelectedDiscountPromotions = request.SelectedDiscountPromotions,
@@ -666,6 +668,8 @@ namespace WebLaptopBE.Controllers
                             var pendingOrder = System.Text.Json.JsonSerializer.Deserialize<PendingOrderWithTxnRef>(pendingOrderJson);
                             if (pendingOrder != null)
                             {
+                                // Không cập nhật số điện thoại vào database - chỉ sử dụng số điện thoại từ pendingOrder cho đơn hàng
+                                
                                 // Lấy lại thông tin giỏ hàng
                                 var cart = _db.Carts
                                     .Include(c => c.CartDetails)
@@ -784,7 +788,8 @@ namespace WebLaptopBE.Controllers
                     TotalAmount = totalAmount,
                     Discount = totalDiscountAmount,
                     Status = "Chờ xử lý",
-                    TimeCreate = DateTime.Now
+                    TimeCreate = DateTime.Now,
+                    Phone = request.Phone // Lưu số điện thoại từ form checkout
                 };
 
                 // Tạo mã đơn hàng unique
@@ -842,7 +847,8 @@ namespace WebLaptopBE.Controllers
                     TotalAmount = pendingOrder.TotalAmount,
                     Discount = totalDiscountAmount,
                     Status = "Chờ xử lý",
-                    TimeCreate = DateTime.Now
+                    TimeCreate = DateTime.Now,
+                    Phone = pendingOrder.Phone // Lưu số điện thoại từ form checkout
                 };
 
                 // Tạo mã đơn hàng unique

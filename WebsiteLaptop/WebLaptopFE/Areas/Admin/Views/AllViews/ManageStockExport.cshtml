@@ -84,6 +84,37 @@
     </div>
 </div>
 
+<!-- Modal Cập nhật trạng thái -->
+<div class="modal fade" id="updateStatusModal" tabindex="-1" aria-labelledby="updateStatusModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-warning">
+                <h5 class="modal-title text-white" id="updateStatusModalLabel">Cập nhật trạng thái</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="updateStatusForm">
+                    <input type="hidden" id="updateStatusStockExportId" value="">
+                    <div class="input-group input-group-outline mb-3">
+                        <label class="form-label">Trạng thái *</label>
+                        <select class="form-control" id="updateStatusSelect" required>
+                            <option value="Chờ xử lý">Chờ xử lý</option>
+                            <option value="Hoàn thành">Hoàn thành</option>
+                        </select>
+                    </div>
+                    <div class="text-danger mb-3" id="updateStatusErrorMessage" style="display:none;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-warning" onclick="saveStatusUpdate()">
+                    <i class="material-icons text-sm">save</i> Cập nhật
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Thêm/Sửa -->
 <div class="modal fade" id="createEditModal" tabindex="-1" aria-labelledby="createEditModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl">
@@ -190,7 +221,6 @@
          let detailRowIndex = 0;
          let SaleInvoicesList = [];
          let productsList = [];
-         let originalDetails = null; // Lưu chi tiết ban đầu khi edit để so sánh
          
          // Lấy thông tin nhân viên đang đăng nhập (sử dụng Json.Encode để tránh lỗi encoding và escape JavaScript)
          const currentEmployeeId = @Html.Raw(Json.Serialize(ViewBag.EmployeeId ?? ""));
@@ -258,34 +288,19 @@
                 }
             });
 
-            $(document).on('click', '.action-btn[data-action="edit"]', function(e) {
+            $(document).on('click', '.action-btn[data-action="updateStatus"]', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
                 const $btn = $(this);
                 const stockExportId = $btn.attr('data-id');
-                console.log('Edit button clicked');
-                console.log('Button element:', $btn);
-                console.log('StockExportId from data-id:', stockExportId);
-                console.log('editStockExport function exists:', typeof editStockExport === 'function');
+                const currentStatus = $btn.attr('data-status') || 'Chờ xử lý';
                 
                 if (!stockExportId) {
-                    console.error('StockExportId is empty or undefined');
                     showNotification('Không tìm thấy mã phiếu xuất hàng', 'error');
                     return;
                 }
                 
-                if (typeof editStockExport !== 'function') {
-                    console.error('editStockExport function is not defined');
-                    showNotification('Lỗi: Hàm sửa không được định nghĩa', 'error');
-                    return;
-                }
-                
-                try {
-                    editStockExport(stockExportId);
-                } catch (error) {
-                    console.error('Error in editStockExport:', error);
-                    showNotification('Lỗi khi mở form sửa: ' + (error.message || error), 'error');
-                }
+                updateStockExportStatus(stockExportId, currentStatus);
             });
 
         });
@@ -374,9 +389,11 @@
                             <button type="button" class="btn btn-info action-btn" data-action="view" data-id="${String(stockExport.stockExportId || '').replace(/"/g, '&quot;')}" title="Xem">
                                 <i class="material-icons text-sm">visibility</i>
                             </button>
-                            <button type="button" class="btn btn-warning action-btn" data-action="edit" data-id="${String(stockExport.stockExportId || '').replace(/"/g, '&quot;')}" title="Sửa">
+                            ${status !== 'Hoàn thành' ? `
+                            <button type="button" class="btn btn-warning action-btn" data-action="updateStatus" data-id="${String(stockExport.stockExportId || '').replace(/"/g, '&quot;')}" data-status="${String(stockExport.status || '').replace(/"/g, '&quot;')}" title="Cập nhật trạng thái">
                                 <i class="material-icons text-sm">edit</i>
                             </button>
+                            ` : ''}
                         </td>
                     </tr>
                 `);
@@ -598,108 +615,62 @@
              });
         }
 
-        // Sửa phiếu xuất hàng
-        function editStockExport(stockExportId) {
-            console.log('editStockExport called with ID:', stockExportId);
+        // Cập nhật trạng thái phiếu xuất hàng
+        function updateStockExportStatus(stockExportId, currentStatus) {
             if (!stockExportId) {
                 showNotification('Không tìm thấy mã phiếu xuất hàng', 'error');
                 return;
             }
             
+            $('#updateStatusStockExportId').val(stockExportId);
+            $('#updateStatusSelect').val(currentStatus || 'Chờ xử lý');
+            $('#updateStatusErrorMessage').hide();
+            
+            const modal = new bootstrap.Modal(document.getElementById('updateStatusModal'));
+            modal.show();
+        }
+
+        // Lưu cập nhật trạng thái
+        function saveStatusUpdate() {
+            const stockExportId = $('#updateStatusStockExportId').val();
+            const newStatus = $('#updateStatusSelect').val();
+                    
+            if (!stockExportId) {
+                showNotification('Không tìm thấy mã phiếu xuất hàng', 'error');
+                return;
+            }
+            
+            if (!newStatus) {
+                $('#updateStatusErrorMessage').text('Vui lòng chọn trạng thái').show();
+                return;
+                    }
+                    
+            // Lấy EmployeeId từ biến global hoặc từ hidden input
+            const employeeId = currentEmployeeId || $('#employeeIdValue').val() || '';
+            
             $.ajax({
                 url: `${API_URL}/${stockExportId}`,
-                type: 'GET',
-                success: function(stockExport) {
-                    console.log('Stock export data loaded:', stockExport);
-                    $('#createEditModalLabel').text('Sửa phiếu xuất hàng');
-                     $('#StockExportId').val(stockExport.stockExportId);
-                     $('#StockExportIdInput').val(stockExport.stockExportId);
-                     $('#StockExportIdInput').prop('readonly', true);
-                     const savedSaleInvoiceId = stockExport.saleInvoiceId || '';
-                     // Tự động lấy nhân viên đang đăng nhập khi sửa phiếu xuất hàng
-                     const employeeIdToUse = currentEmployeeId || stockExport.employeeId || '';
-                     const employeeNameToUse = currentEmployeeName || stockExport.employeeName || employeeIdToUse;
-                     $('#employeeIdInput').val(employeeNameToUse);
-                     $('#employeeIdValue').val(employeeIdToUse);
-                     if (employeeIdToUse) {
-                         $('#employeeIdInput').closest('.input-group-outline').addClass('is-filled');
-                     }
-                     $('#statusInput').val(stockExport.status || 'Chờ xử lý');
-                    
-                    if (stockExport.time) {
-                        // Parse time từ server (có thể là UTC hoặc local time string)
-                        const time = new Date(stockExport.time);
-                        // Convert về local time để hiển thị trong datetime-local input
-                        // datetime-local input cần format "YYYY-MM-DDTHH:mm" (local time)
-                        const year = time.getFullYear();
-                        const month = String(time.getMonth() + 1).padStart(2, '0');
-                        const day = String(time.getDate()).padStart(2, '0');
-                        const hours = String(time.getHours()).padStart(2, '0');
-                        const minutes = String(time.getMinutes()).padStart(2, '0');
-                        $('#timeInput').val(`${year}-${month}-${day}T${hours}:${minutes}`);
-                    }
-                    
-                    // Lưu chi tiết ban đầu để so sánh khi save
-                    originalDetails = stockExport.details ? JSON.parse(JSON.stringify(stockExport.details)) : [];
-                    console.log('Saved original details:', originalDetails);
-                    
-                    // Load chi tiết
-                    $('#detailTableBody').empty();
-                    detailRowIndex = 0;
-                    if (stockExport.details && stockExport.details.length > 0) {
-                        // Load từng detail một cách tuần tự để đảm bảo combobox được load đúng
-                        let detailIndex = 0;
-                        function loadNextDetail() {
-                            if (detailIndex < stockExport.details.length) {
-                                const detail = stockExport.details[detailIndex];
-                                addDetailRow(detail);
-                                detailIndex++;
-                                // Đợi một chút để DOM được cập nhật
-                                setTimeout(loadNextDetail, 100);
-                            } else {
-                                setTimeout(function() {
-                                    updateInputLabels();
-                                }, 100);
-                            }
-                        }
-                        loadNextDetail();
-                    } else {
-                        setTimeout(function() {
-                            updateInputLabels();
-                        }, 100);
-                    }
-                    
-                    $('#formErrorMessage').hide();
-
-                     const modal = new bootstrap.Modal(document.getElementById('createEditModal'));
-                     modal.show();
-                     
-                     // Load lại SaleInvoices và set giá trị sau khi modal hiển thị
-                     loadSaleInvoices(function() {
-                         // Đợi modal hiển thị xong và populate xong rồi mới set giá trị
-                         setTimeout(function() {
-                             populateSaleInvoiceSelect(savedSaleInvoiceId);
-                             updateInputLabels();
-                         }, 300);
-                     });
+                type: 'PUT',
+                contentType: 'application/json',
+                headers: {
+                    'X-Employee-Id': employeeId || ''
                 },
-                error: function(xhr, status, error) {
-                    console.error('Error loading stock export:', {
-                        status: status,
-                        error: error,
-                        response: xhr.responseText,
-                        statusCode: xhr.status,
-                        responseJSON: xhr.responseJSON
-                    });
-                    let errorMessage = 'Lỗi khi tải thông tin phiếu xuất hàng';
+                data: JSON.stringify({
+                    status: newStatus,
+                    employeeId: employeeId || null
+                }),
+                success: function(response) {
+                    showNotification('Cập nhật trạng thái thành công', 'success');
+                    $('#updateStatusModal').modal('hide');
+                    loadStockExports();
+                },
+                error: function(xhr) {
+                    console.error('Error updating status:', xhr);
+                    let errorMessage = 'Lỗi khi cập nhật trạng thái';
                     if (xhr.responseJSON && xhr.responseJSON.message) {
                         errorMessage = xhr.responseJSON.message;
-                    } else if (xhr.status === 404) {
-                        errorMessage = 'Không tìm thấy phiếu xuất hàng';
-                    } else if (xhr.status === 0) {
-                        errorMessage = 'Không thể kết nối đến server. Vui lòng kiểm tra lại kết nối.';
                     }
-                    showNotification(errorMessage, 'error');
+                    $('#updateStatusErrorMessage').text(errorMessage).show();
                 }
             });
         }

@@ -13,10 +13,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageSaleInvoiceAPIController : ControllerBase
     {
-        private readonly Testlaptop36Context _context;
+        private readonly Testlaptop37Context _context;
         private readonly HistoryService _historyService;
 
-        public ManageSaleInvoiceAPIController(Testlaptop36Context context, HistoryService historyService)
+        public ManageSaleInvoiceAPIController(Testlaptop37Context context, HistoryService historyService)
         {
             _context = context;
             _historyService = historyService;
@@ -87,7 +87,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     EmployeeId = si.EmployeeId,
                     EmployeeName = si.Employee?.EmployeeName,
                     CustomerId = si.CustomerId,
-                    CustomerName = si.Customer?.CustomerName
+                    CustomerName = si.Customer?.CustomerName,
+                    CustomerPhone = si.Phone ?? si.Customer?.PhoneNumber // Ưu tiên lấy từ SaleInvoice.Phone
                 }).ToList();
 
                 var result = new PagedResult<SaleInvoiceDTO>
@@ -102,7 +103,14 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Lỗi khi lấy danh sách hóa đơn", error = ex.Message });
+                // Log chi tiết lỗi để debug
+                System.Diagnostics.Debug.WriteLine($"Error in GetSaleInvoices: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
+                return StatusCode(500, new { message = "Lỗi khi lấy danh sách hóa đơn", error = ex.Message, details = ex.InnerException?.Message });
             }
         }
 
@@ -125,6 +133,14 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     return NotFound(new { message = "Không tìm thấy hóa đơn" });
                 }
 
+                // Load EmployeeShip nếu có
+                Employee? employeeShip = null;
+                if (!string.IsNullOrEmpty(saleInvoice.EmployeeShip))
+                {
+                    employeeShip = await _context.Employees
+                        .FirstOrDefaultAsync(e => e.EmployeeId == saleInvoice.EmployeeShip);
+                }
+
                 var saleInvoiceDTO = new SaleInvoiceDTO
                 {
                     SaleInvoiceId = saleInvoice.SaleInvoiceId,
@@ -139,6 +155,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     EmployeeName = saleInvoice.Employee?.EmployeeName,
                     CustomerId = saleInvoice.CustomerId,
                     CustomerName = saleInvoice.Customer?.CustomerName,
+                    CustomerPhone = saleInvoice.Phone ?? saleInvoice.Customer?.PhoneNumber, // Ưu tiên lấy từ SaleInvoice.Phone
+                    EmployeeShip = saleInvoice.EmployeeShip,
+                    EmployeeShipName = employeeShip?.EmployeeName,
+                    TimeShip = saleInvoice.TimeShip,
                     Details = saleInvoice.SaleInvoiceDetails?.Select(detail => new SaleInvoiceDetailDTO
                     {
                         SaleInvoiceDetailId = detail.SaleInvoiceDetailId,
@@ -147,6 +167,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         UnitPrice = detail.UnitPrice,
                         ProductId = detail.ProductId,
                         ProductName = detail.Product?.ProductName,
+                        ProductModel = detail.Product?.ProductModel,
                         Specifications = detail.Specifications
                     }).ToList()
                 };
@@ -200,8 +221,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 }
                 await _context.SaveChangesAsync();
 
-                // Tạo phiếu xuất hàng khi trạng thái chuyển thành "Đang xử lý"
-                if (oldStatus != "Đang xử lý" && dto.Status == "Đang xử lý")
+                // Tạo phiếu xuất hàng khi trạng thái chuyển từ "Chờ xử lý" sang "Đang xử lý"
+                if (oldStatus == "Chờ xử lý" && dto.Status == "Đang xử lý")
                 {
                     await CreateStockExportForSaleInvoice(saleInvoice);
                 }
@@ -233,7 +254,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     EmployeeId = saleInvoice.EmployeeId,
                     EmployeeName = saleInvoice.Employee?.EmployeeName,
                     CustomerId = saleInvoice.CustomerId,
-                    CustomerName = saleInvoice.Customer?.CustomerName
+                    CustomerName = saleInvoice.Customer?.CustomerName,
+                    CustomerPhone = saleInvoice.Phone ?? saleInvoice.Customer?.PhoneNumber // Ưu tiên lấy từ SaleInvoice.Phone
                 };
 
                 return Ok(result);

@@ -862,44 +862,19 @@
             }
         }
 
-        // Hiển thị lỗi validation dưới từng ô
-        function showFieldError(fieldId, message) {
-            const $field = $(fieldId);
-            const errorId = fieldId.substring(1) + '-error';
-            const $error = $('#' + errorId);
-            if ($error.length) {
-                $error.remove();
-            }
-            if (message) {
-                $field.after(`<div class="text-danger small mt-1" id="${errorId}">${message}</div>`);
-                $field.addClass('is-invalid');
-            } else {
-                $field.removeClass('is-invalid');
-            }
-        }
-
-        // Hiển thị lỗi cho phương thức thanh toán
-        function showPaymentMethodError(message) {
-            const errorId = 'payment-method-error';
-            const $error = $('#' + errorId);
-            if ($error.length) {
-                $error.remove();
-            }
-            if (message) {
-                $('.form-check').last().after(`<div class="text-danger small mt-1" id="${errorId}">${message}</div>`);
-            }
-        }
-
         // Xóa tất cả lỗi validation
         function clearAllErrors() {
             $('.is-invalid').removeClass('is-invalid');
-            $('[id$="-error"]').remove();
-            showPaymentMethodError('');
         }
 
         // Xử lý submit form
         async function handleCheckout(e) {
             e.preventDefault();
+            
+            // Lấy button và lưu trạng thái ban đầu
+            const btn = $('#btnPlaceOrder');
+            const original = btn.html();
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...');
             
             // Xóa tất cả lỗi cũ
             clearAllErrors();
@@ -915,65 +890,70 @@
             const wardName = $('#checkoutWard').val()?.toString().trim();
             const wardCode = $('#checkoutWardValue').val()?.toString().trim();
             const paymentMethod = $('input[name="PaymentMethod"]:checked').val();
-            const note = $('#checkoutNote').val()?.toString().trim();
+            // const note = $('#checkoutNote').val()?.toString().trim(); // Đã xóa ghi chú đơn hàng
 
             let hasError = false;
 
             // Validate từng trường
             if (!lastName) {
-                showFieldError('#checkoutLastName', 'Vui lòng nhập họ');
+                $('#checkoutLastName').addClass('is-invalid');
                 hasError = true;
             }
             
             if (!firstName) {
-                showFieldError('#checkoutFirstName', 'Vui lòng nhập tên');
+                $('#checkoutFirstName').addClass('is-invalid');
                 hasError = true;
             }
 
             if (!phone) {
-                showFieldError('#checkoutPhone', 'Vui lòng nhập số điện thoại');
+                $('#checkoutPhone').addClass('is-invalid');
                 hasError = true;
             } else if (!new RegExp('^\\d{9,15}$').test(phone)) {
-                showFieldError('#checkoutPhone', 'Số điện thoại không hợp lệ (9-15 chữ số)');
+                $('#checkoutPhone').addClass('is-invalid');
                 hasError = true;
             }
 
             if (!email) {
-                showFieldError('#checkoutEmail', 'Vui lòng nhập email');
+                $('#checkoutEmail').addClass('is-invalid');
                 hasError = true;
             } else {
                 const atSymbol = String.fromCharCode(64);
                 const atIndex = email.indexOf(atSymbol);
                 const dotIndex = email.lastIndexOf('.');
                 if (atIndex <= 0 || dotIndex <= atIndex + 1 || dotIndex >= email.length - 1) {
-                    showFieldError('#checkoutEmail', 'Email không hợp lệ');
+                    $('#checkoutEmail').addClass('is-invalid');
                     hasError = true;
                 }
             }
 
             if (!detailAddress) {
-                showFieldError('#checkoutAddress', 'Vui lòng nhập địa chỉ chi tiết');
+                $('#checkoutAddress').addClass('is-invalid');
                 hasError = true;
             }
 
             if (!provinceName || !provinceCode) {
-                showFieldError('#checkoutProvince', 'Vui lòng chọn tỉnh/thành phố');
+                $('#checkoutProvince').addClass('is-invalid');
                 hasError = true;
             }
 
             if (!wardName || !wardCode) {
-                showFieldError('#checkoutWard', 'Vui lòng chọn xã/phường');
+                $('#checkoutWard').addClass('is-invalid');
                 hasError = true;
             }
 
             if (!paymentMethod) {
-                showPaymentMethodError('Vui lòng chọn phương thức thanh toán');
+                $('input[name="PaymentMethod"]').closest('.form-check').addClass('is-invalid');
                 hasError = true;
-            } else {
-                showPaymentMethodError('');
             }
 
             if (hasError) {
+                // Kiểm tra nếu chưa chọn phương thức thanh toán thì hiển thị thông báo riêng
+                if (!paymentMethod) {
+                    showAlert('danger', 'Vui lòng chọn phương thức thanh toán');
+                } else {
+                    showAlert('danger', 'Vui lòng kiểm tra lại các trường bắt buộc');
+                }
+                btn.prop('disabled', false).html(original);
                 return;
             }
 
@@ -985,10 +965,6 @@
             if (provinceName && provinceName !== '') {
                 deliveryAddress = deliveryAddress ? `${deliveryAddress}, ${provinceName}` : provinceName;
             }
-
-            const btn = $('#btnPlaceOrder');
-            const original = btn.html();
-            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...');
 
             // Lấy danh sách cartDetailId đã chọn từ sessionStorage
             const selectedCartItemsJson = sessionStorage.getItem('selectedCartItems');
@@ -1008,7 +984,7 @@
                     deliveryAddress: deliveryAddress,
                     paymentMethod: paymentMethod,
                     deliveryFee: appliedPromotion && appliedPromotion.data.finalDeliveryFee !== undefined ? appliedPromotion.data.finalDeliveryFee : 30000,
-                    note: note || null,
+                    // note: note || null, // Đã xóa ghi chú đơn hàng
                     selectedCartDetailIds: selectedCartDetailIds,
                     selectedDiscountPromotions: appliedPromotion ? appliedPromotion.selectedDiscountPromotions : null,
                     selectedFreeshipPromotions: appliedPromotion ? appliedPromotion.selectedFreeshipPromotions : null,
@@ -1353,11 +1329,6 @@
                             <div class="form-item">
                                 <label class="form-label my-3">Địa chỉ giao hàng <sup>*</sup></label>
                                 <input type="text" id="checkoutAddress" class="form-control" placeholder="Số nhà, tên đường" required>
-                            </div>
-                            
-                            <div class="form-item">
-                                <label class="form-label my-3"></label>
-                                <textarea id="checkoutNote" class="form-control" spellcheck="false" cols="30" rows="9" placeholder="Ghi chú đơn hàng (Tùy chọn)"></textarea>
                             </div>
                         </div>
                         <div class="col-md-12 col-lg-6 col-xl-6">

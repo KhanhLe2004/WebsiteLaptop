@@ -7,7 +7,7 @@
     <link rel="apple-touch-icon" sizes="76x76" href="/LayoutAdmin/assets/img/apple-icon.png">
     <link rel="icon" type="image/png" href="/LayoutAdmin/assets/img/favicon.png">
     <title>
-        @ViewBag.Title ?? "Admin"
+        @ViewBag.Title
     </title>
     <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,900|Roboto+Slab:400,700" />
     <link href="/LayoutAdmin/assets/css/nucleo-icons.css" rel="stylesheet" />
@@ -144,6 +144,27 @@
                                 <i class="material-icons opacity-10 ms-1" style="font-size: 16px;">lock</i>
                             </div>
                             <span class="nav-link-text ms-1">Quản lí hóa đơn</span>
+                        </span>
+                    }
+                </li>
+                <li class="nav-item">
+                    @if (HasPermissionMenu("ManageDelivery"))
+                    {
+                        <a class="@GetMenuClass("ManageDelivery")" asp-area="Admin" asp-controller="ManageDelivery" asp-action="Index">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">local_shipping</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí vận chuyển</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="nav-link text-white" style="opacity: 0.5; cursor: not-allowed;">
+                            <div class="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                                <i class="material-icons opacity-10">local_shipping</i>
+                                <i class="material-icons opacity-10 ms-1" style="font-size: 16px;">lock</i>
+                            </div>
+                            <span class="nav-link-text ms-1">Quản lí vận chuyển</span>
                         </span>
                     }
                 </li>

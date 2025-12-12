@@ -12,7 +12,7 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class ProductReviewAPIController : ControllerBase
     {
-        private readonly Testlaptop36Context _db = new();
+        private readonly Testlaptop37Context _db = new();
 
         // POST: api/ProductReviewAPI/create
         [HttpPost("create")]
