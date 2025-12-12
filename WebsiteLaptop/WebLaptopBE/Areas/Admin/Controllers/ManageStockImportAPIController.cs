@@ -34,7 +34,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
         public async Task<ActionResult<PagedResult<StockImportDTO>>> GetStockImports(
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
-            [FromQuery] string? searchTerm = null)
+            [FromQuery] string? searchTerm = null,
+            [FromQuery] DateTime? dateFrom = null,
+            [FromQuery] DateTime? dateTo = null)
         {
             try
             {
@@ -55,6 +57,16 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         si.StockImportId.ToLower().Contains(searchTerm) ||
                         (si.Supplier != null && si.Supplier.SupplierName != null && si.Supplier.SupplierName.ToLower().Contains(searchTerm)) ||
                         (si.Employee != null && si.Employee.EmployeeName != null && si.Employee.EmployeeName.ToLower().Contains(searchTerm)));
+                }
+
+                // Lọc theo ngày
+                if (dateFrom.HasValue)
+                {
+                    query = query.Where(si => si.Time.HasValue && si.Time.Value.Date >= dateFrom.Value.Date);
+                }
+                if (dateTo.HasValue)
+                {
+                    query = query.Where(si => si.Time.HasValue && si.Time.Value.Date <= dateTo.Value.Date);
                 }
 
                 // Đếm tổng số

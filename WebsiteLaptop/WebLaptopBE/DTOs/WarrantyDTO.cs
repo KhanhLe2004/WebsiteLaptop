@@ -19,6 +19,7 @@ namespace WebLaptopBE.DTOs
         public string? ContentDetail { get; set; }
         public string? Status { get; set; }
         public decimal? TotalAmount { get; set; }
+        public DateTime? Time { get; set; }
     }
 
     // DTO cho tạo mới bảo hành

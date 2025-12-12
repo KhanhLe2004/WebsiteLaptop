@@ -2,6 +2,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
+using System.Text.Json;
+using System.Threading;
 using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
@@ -16,10 +18,15 @@ namespace WebLaptopBE.Areas.Admin.Controllers
         private readonly Testlaptop37Context _context;
         private readonly HistoryService _historyService;
 
-        public ManageSaleInvoiceAPIController(Testlaptop37Context context, HistoryService historyService)
+        private readonly HttpClient _httpClient;
+        private const string ADDRESS_API_BASE_URL = "https://production.cas.so/address-kit/2025-07-01";
+
+        public ManageSaleInvoiceAPIController(Testlaptop37Context context, HistoryService historyService, IHttpClientFactory httpClientFactory)
         {
             _context = context;
             _historyService = historyService;
+            _httpClient = httpClientFactory.CreateClient();
+            _httpClient.Timeout = TimeSpan.FromSeconds(30);
         }
 
         // Helper method để lấy EmployeeId từ header
@@ -35,7 +42,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
             [FromQuery] string? searchTerm = null,
-            [FromQuery] string? status = null)
+            [FromQuery] string? status = null,
+            [FromQuery] DateTime? dateFrom = null,
+            [FromQuery] DateTime? dateTo = null)
         {
             try
             {
@@ -62,6 +71,16 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 if (!string.IsNullOrWhiteSpace(status))
                 {
                     query = query.Where(si => si.Status == status);
+                }
+
+                // Lọc theo ngày
+                if (dateFrom.HasValue)
+                {
+                    query = query.Where(si => si.TimeCreate.HasValue && si.TimeCreate.Value.Date >= dateFrom.Value.Date);
+                }
+                if (dateTo.HasValue)
+                {
+                    query = query.Where(si => si.TimeCreate.HasValue && si.TimeCreate.Value.Date <= dateTo.Value.Date);
                 }
 
                 // Đếm tổng số
@@ -177,6 +196,785 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi khi lấy thông tin hóa đơn", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/sale-invoices/customer-by-phone/{phoneNumber}
+        // Tìm khách hàng theo số điện thoại
+        [HttpGet("customer-by-phone/{phoneNumber}")]
+        public async Task<ActionResult<CustomerSelectDTO>> GetCustomerByPhone(string phoneNumber)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(phoneNumber))
+                {
+                    return BadRequest(new { message = "Số điện thoại không được để trống" });
+                }
+
+                // Tìm khách hàng theo số điện thoại
+                var customer = await _context.Customers
+                    .Where(c => c.PhoneNumber != null && c.PhoneNumber.Trim() == phoneNumber.Trim())
+                    .FirstOrDefaultAsync();
+
+                if (customer == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy khách hàng với số điện thoại này" });
+                }
+
+                var result = new CustomerSelectDTO
+                {
+                    CustomerId = customer.CustomerId,
+                    CustomerName = customer.CustomerName,
+                    PhoneNumber = customer.PhoneNumber
+                };
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi tìm khách hàng theo số điện thoại", error = ex.Message });
+            }
+        }
+
+        // POST: api/admin/sale-invoices
+        // Tạo mới hóa đơn
+        [HttpPost]
+        public async Task<ActionResult<SaleInvoiceDTO>> CreateSaleInvoice([FromBody] SaleInvoiceCreateDTO dto)
+        {
+            try
+            {
+                if (dto == null)
+                {
+                    return BadRequest(new { message = "Dữ liệu không hợp lệ" });
+                }
+
+                // Tạo mã hóa đơn nếu chưa có
+                string saleInvoiceId = dto.SaleInvoiceId ?? GenerateSaleInvoiceId();
+
+                // Kiểm tra mã đã tồn tại chưa
+                var existing = await _context.SaleInvoices
+                    .FirstOrDefaultAsync(si => si.SaleInvoiceId == saleInvoiceId);
+                if (existing != null)
+                {
+                    return BadRequest(new { message = "Mã hóa đơn đã tồn tại" });
+                }
+
+                // Xử lý khách hàng: nếu không có customerId nhưng có customerName và phoneNumber, tạo khách hàng mới
+                string customerId = dto.CustomerId;
+                if (string.IsNullOrWhiteSpace(customerId) && !string.IsNullOrWhiteSpace(dto.CustomerName) && !string.IsNullOrWhiteSpace(dto.PhoneNumber))
+                {
+                    // Tạo khách hàng mới
+                    customerId = await CreateNewCustomer(dto.CustomerName, dto.PhoneNumber);
+                }
+
+                if (string.IsNullOrWhiteSpace(customerId))
+                {
+                    return BadRequest(new { message = "Không thể xác định khách hàng. Vui lòng nhập số điện thoại hoặc tên khách hàng" });
+                }
+
+                // Xử lý địa chỉ: lấy tên tỉnh/thành và phường/xã từ API
+                string? provinceName = null;
+                string? communeName = null;
+                
+                if (!string.IsNullOrWhiteSpace(dto.ProvinceCode))
+                {
+                    try
+                    {
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                        var provinceResponse = await _httpClient.GetAsync($"{ADDRESS_API_BASE_URL}/provinces", cts.Token);
+                        if (provinceResponse.IsSuccessStatusCode)
+                        {
+                            var provinceJson = await provinceResponse.Content.ReadAsStringAsync(cts.Token);
+                            var provinceDoc = JsonDocument.Parse(provinceJson);
+                            if (provinceDoc.RootElement.TryGetProperty("provinces", out var provincesElement))
+                            {
+                                foreach (var province in provincesElement.EnumerateArray())
+                                {
+                                    if (province.TryGetProperty("code", out var code) && code.GetString() == dto.ProvinceCode)
+                                    {
+                                        if (province.TryGetProperty("name", out var name))
+                                        {
+                                            provinceName = name.GetString();
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception apiEx)
+                    {
+                        Console.WriteLine($"Warning: Could not fetch province name from API: {apiEx.Message}");
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(dto.ProvinceCode) && !string.IsNullOrWhiteSpace(dto.CommuneCode))
+                {
+                    try
+                    {
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                        var communeResponse = await _httpClient.GetAsync($"{ADDRESS_API_BASE_URL}/provinces/{dto.ProvinceCode}/communes", cts.Token);
+                        if (communeResponse.IsSuccessStatusCode)
+                        {
+                            var communeJson = await communeResponse.Content.ReadAsStringAsync(cts.Token);
+                            var communeDoc = JsonDocument.Parse(communeJson);
+                            if (communeDoc.RootElement.TryGetProperty("communes", out var communesElement))
+                            {
+                                foreach (var commune in communesElement.EnumerateArray())
+                                {
+                                    if (commune.TryGetProperty("code", out var code) && code.GetString() == dto.CommuneCode)
+                                    {
+                                        if (commune.TryGetProperty("name", out var name))
+                                        {
+                                            communeName = name.GetString();
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception apiEx)
+                    {
+                        Console.WriteLine($"Warning: Could not fetch commune name from API: {apiEx.Message}");
+                    }
+                }
+
+                // Xử lý địa chỉ: ghép từ các thành phần
+                string? fullAddress = BuildFullAddress(dto.AddressDetail, communeName, provinceName);
+                if (string.IsNullOrWhiteSpace(fullAddress) && !string.IsNullOrWhiteSpace(dto.DeliveryAddress))
+                {
+                    fullAddress = dto.DeliveryAddress; // Giữ nguyên DeliveryAddress cũ nếu không có thông tin mới
+                }
+
+                // Lưu thông tin địa chỉ chi tiết vào DeliveryAddress dưới dạng JSON (giới hạn độ dài)
+                string? finalAddress = fullAddress;
+                if (!string.IsNullOrWhiteSpace(dto.ProvinceCode) || !string.IsNullOrWhiteSpace(dto.CommuneCode) || !string.IsNullOrWhiteSpace(dto.AddressDetail))
+                {
+                    try
+                    {
+                        finalAddress = SerializeAddress(dto.ProvinceCode, provinceName, dto.CommuneCode, communeName, dto.AddressDetail, fullAddress);
+                        if (string.IsNullOrWhiteSpace(finalAddress))
+                        {
+                            finalAddress = fullAddress;
+                        }
+                    }
+                    catch (Exception jsonEx)
+                    {
+                        Console.WriteLine($"Error serializing address JSON: {jsonEx.Message}");
+                        finalAddress = fullAddress;
+                    }
+                }
+
+                // Tính tổng tiền từ chi tiết nếu có
+                decimal subtotal = 0;
+                if (dto.Details != null && dto.Details.Any())
+                {
+                    subtotal = dto.Details.Sum(d => (d.Quantity ?? 0) * (d.UnitPrice ?? 0));
+                }
+                
+                // Áp dụng khuyến mại nếu có
+                decimal discount = dto.Discount ?? 0;
+                decimal shippingDiscount = dto.ShippingDiscount ?? 0;
+                decimal discountedSubtotal = subtotal - discount;
+                decimal finalDeliveryFee = Math.Max(0, (dto.DeliveryFee ?? 0) - shippingDiscount);
+                decimal totalAmount = discountedSubtotal + finalDeliveryFee;
+
+                // Xử lý TimeCreate: Parse time từ client (có thể là string hoặc DateTime)
+                DateTime? invoiceTime = dto.TimeCreate;
+                if (invoiceTime.HasValue)
+                {
+                    // Nếu là UTC, convert về local time
+                    if (invoiceTime.Value.Kind == DateTimeKind.Utc)
+                    {
+                        invoiceTime = invoiceTime.Value.ToLocalTime();
+                    }
+                    // Nếu là Unspecified (từ string parse), giữ nguyên (đã là local time)
+                    else if (invoiceTime.Value.Kind == DateTimeKind.Unspecified)
+                    {
+                        // Giữ nguyên, coi như local time
+                        invoiceTime = DateTime.SpecifyKind(invoiceTime.Value, DateTimeKind.Local);
+                    }
+                }
+                else
+                {
+                    invoiceTime = DateTime.Now;
+                }
+
+                // Tạo hóa đơn mới
+                var saleInvoice = new SaleInvoice
+                {
+                    SaleInvoiceId = saleInvoiceId,
+                    PaymentMethod = dto.PaymentMethod,
+                    TotalAmount = totalAmount,
+                    TimeCreate = invoiceTime.Value,
+                    Status = dto.Status ?? "Chờ xử lý",
+                    DeliveryFee = finalDeliveryFee,
+                    Discount = discount,
+                    DeliveryAddress = finalAddress,
+                    EmployeeId = dto.EmployeeId,
+                    CustomerId = customerId,
+                    Phone = dto.PhoneNumber // Lưu số điện thoại vào SaleInvoice.Phone
+                };
+
+                _context.SaleInvoices.Add(saleInvoice);
+
+                // Tạo chi tiết hóa đơn nếu có
+                if (dto.Details != null && dto.Details.Any())
+                {
+                    int detailIndex = 1;
+                    foreach (var detailDto in dto.Details)
+                    {
+                        string detailId = $"SID{detailIndex:D4}";
+                        
+                        // Kiểm tra và tạo ID duy nhất
+                        while (await _context.SaleInvoiceDetails.AnyAsync(d => d.SaleInvoiceDetailId == detailId))
+                        {
+                            detailIndex++;
+                            detailId = $"SID{detailIndex:D4}";
+                        }
+
+                        var detail = new SaleInvoiceDetail
+                        {
+                            SaleInvoiceDetailId = detailId,
+                            SaleInvoiceId = saleInvoice.SaleInvoiceId,
+                            ProductId = detailDto.ProductId,
+                            Quantity = detailDto.Quantity ?? 1,
+                            UnitPrice = detailDto.UnitPrice ?? 0,
+                            Specifications = detailDto.Specifications
+                        };
+
+                        _context.SaleInvoiceDetails.Add(detail);
+                        detailIndex++;
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+
+                // Log history
+                var employeeId = GetEmployeeId() ?? dto.EmployeeId;
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Thêm hóa đơn: {saleInvoice.SaleInvoiceId}");
+                }
+
+                // Load lại để lấy thông tin đầy đủ
+                await _context.Entry(saleInvoice)
+                    .Reference(si => si.Customer)
+                    .LoadAsync();
+                await _context.Entry(saleInvoice)
+                    .Reference(si => si.Employee)
+                    .LoadAsync();
+                await _context.Entry(saleInvoice)
+                    .Collection(si => si.SaleInvoiceDetails)
+                    .LoadAsync();
+
+                var result = new SaleInvoiceDTO
+                {
+                    SaleInvoiceId = saleInvoice.SaleInvoiceId,
+                    PaymentMethod = saleInvoice.PaymentMethod,
+                    TotalAmount = saleInvoice.TotalAmount,
+                    TimeCreate = saleInvoice.TimeCreate,
+                    Status = saleInvoice.Status,
+                    DeliveryFee = saleInvoice.DeliveryFee,
+                    DeliveryAddress = saleInvoice.DeliveryAddress,
+                    EmployeeId = saleInvoice.EmployeeId,
+                    EmployeeName = saleInvoice.Employee?.EmployeeName,
+                    CustomerId = saleInvoice.CustomerId,
+                    CustomerName = saleInvoice.Customer?.CustomerName,
+                    CustomerPhone = saleInvoice.Phone ?? saleInvoice.Customer?.PhoneNumber
+                };
+
+                return CreatedAtAction(nameof(GetSaleInvoice), new { id = saleInvoice.SaleInvoiceId }, result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi tạo hóa đơn", error = ex.Message });
+            }
+        }
+
+        // Helper method để tạo khách hàng mới
+        private async Task<string> CreateNewCustomer(string customerName, string phoneNumber)
+        {
+            // Tạo mã khách hàng mới
+            var allCustomerIds = await _context.Customers
+                .Where(c => c.CustomerId.StartsWith("C") && c.CustomerId.Length == 4)
+                .Select(c => c.CustomerId)
+                .ToListAsync();
+
+            int maxNumber = 0;
+            foreach (var id in allCustomerIds)
+            {
+                if (id.Length >= 2 && int.TryParse(id.Substring(1), out int num))
+                {
+                    maxNumber = Math.Max(maxNumber, num);
+                }
+            }
+
+            string newCustomerId = $"C{(maxNumber + 1):D3}";
+
+            // Tạo khách hàng mới
+            var newCustomer = new Customer
+            {
+                CustomerId = newCustomerId,
+                CustomerName = customerName,
+                PhoneNumber = phoneNumber,
+                Active = true
+            };
+
+            _context.Customers.Add(newCustomer);
+            await _context.SaveChangesAsync();
+
+            return newCustomerId;
+        }
+
+        // GET: api/admin/sale-invoices/next-id
+        // Lấy mã hóa đơn tiếp theo
+        [HttpGet("next-id")]
+        public ActionResult<object> GetNextSaleInvoiceId()
+        {
+            try
+            {
+                string nextId = GenerateSaleInvoiceId();
+                return Ok(new { saleInvoiceId = nextId });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi tạo mã hóa đơn", error = ex.Message });
+            }
+        }
+
+        // Helper method để tạo mã hóa đơn
+        private string GenerateSaleInvoiceId()
+        {
+            try
+            {
+                var allIds = _context.SaleInvoices
+                    .Where(si => si.SaleInvoiceId != null && 
+                                 si.SaleInvoiceId.StartsWith("SI") && 
+                                 si.SaleInvoiceId.Length == 5)
+                    .Select(si => si.SaleInvoiceId)
+                    .ToList();
+
+                int maxNumber = 0;
+                foreach (var id in allIds)
+                {
+                    if (id.Length >= 3 && int.TryParse(id.Substring(2), out int num))
+                    {
+                        maxNumber = Math.Max(maxNumber, num);
+                    }
+                }
+
+                return $"SI{(maxNumber + 1):D3}";
+            }
+            catch
+            {
+                return "SI001";
+            }
+        }
+
+        // GET: api/admin/sale-invoices/provinces
+        // Lấy danh sách tỉnh/thành
+        [HttpGet("provinces")]
+        public async Task<ActionResult<List<ProvinceDTO>>> GetProvinces()
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync($"{ADDRESS_API_BASE_URL}/provinces");
+                response.EnsureSuccessStatusCode();
+
+                var jsonString = await response.Content.ReadAsStringAsync();
+                var jsonDoc = JsonDocument.Parse(jsonString);
+                
+                var provinces = new List<ProvinceDTO>();
+                if (jsonDoc.RootElement.TryGetProperty("provinces", out var provincesElement))
+                {
+                    foreach (var province in provincesElement.EnumerateArray())
+                    {
+                        provinces.Add(new ProvinceDTO
+                        {
+                            Code = province.TryGetProperty("code", out var code) ? code.GetString() ?? "" : "",
+                            Name = province.TryGetProperty("name", out var name) ? name.GetString() : null,
+                            EnglishName = province.TryGetProperty("englishName", out var englishName) ? englishName.GetString() : null,
+                            AdministrativeLevel = province.TryGetProperty("administrativeLevel", out var level) ? level.GetString() : null
+                        });
+                    }
+                }
+
+                return Ok(provinces.OrderBy(p => p.Name).ToList());
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy danh sách tỉnh/thành", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/sale-invoices/product-configurations/{productId}
+        // Lấy danh sách cấu hình sản phẩm
+        [HttpGet("product-configurations/{productId}")]
+        public async Task<ActionResult<List<object>>> GetProductConfigurations(string productId)
+        {
+            try
+            {
+                var configurations = await _context.ProductConfigurations
+                    .Where(pc => pc.ProductId == productId)
+                    .OrderBy(pc => pc.ConfigurationId)
+                    .Select(pc => new
+                    {
+                        configurationId = pc.ConfigurationId,
+                        productId = pc.ProductId,
+                        cpu = pc.Cpu,
+                        ram = pc.Ram,
+                        rom = pc.Rom,
+                        card = pc.Card,
+                        quantity = pc.Quantity,
+                        price = pc.Price
+                    })
+                    .ToListAsync();
+
+                return Ok(configurations);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy danh sách cấu hình sản phẩm", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/sale-invoices/promotions
+        // Lấy danh sách khuyến mại dựa trên danh sách sản phẩm
+        [HttpGet("promotions")]
+        public async Task<ActionResult<object>> GetPromotions([FromQuery] string[] productIds)
+        {
+            try
+            {
+                if (productIds == null || productIds.Length == 0)
+                {
+                    return Ok(new
+                    {
+                        discountPromotions = new List<object>(),
+                        freeshipPromotions = new List<object>()
+                    });
+                }
+
+                // Lấy tất cả khuyến mại cho các sản phẩm đã chọn
+                var promotions = await _context.Promotions
+                    .Include(p => p.Product)
+                    .Where(p => productIds.Contains(p.ProductId) && !string.IsNullOrEmpty(p.Type))
+                    .ToListAsync();
+
+                // Phân loại khuyến mại
+                var discountPromotions = promotions
+                    .Where(p => p.Type != null && (p.Type.ToLower().Contains("giảm") || p.Type.Contains("%")))
+                    .Select(p => {
+                        var discountPercent = ExtractDiscountPercent(p.ContentDetail);
+                        var displayText = discountPercent > 0 
+                            ? $"Giảm giá {discountPercent}% - {p.Product?.ProductName}"
+                            : $"{p.Type} - {p.Product?.ProductName}";
+                        
+                        return new {
+                            promotionId = p.PromotionId,
+                            productId = p.ProductId,
+                            productName = p.Product?.ProductName,
+                            productModel = p.Product?.ProductModel,
+                            type = p.Type,
+                            contentDetail = p.ContentDetail,
+                            displayText = displayText
+                        };
+                    })
+                    .ToList();
+
+                var freeshipPromotions = promotions
+                    .Where(p => p.Type != null && p.Type.ToLower().Contains("freeship"))
+                    .Select(p => new {
+                        promotionId = p.PromotionId,
+                        productId = p.ProductId,
+                        productName = p.Product?.ProductName,
+                        productModel = p.Product?.ProductModel,
+                        type = p.Type,
+                        contentDetail = p.ContentDetail,
+                        displayText = "Freeship"
+                    })
+                    .ToList();
+
+                return Ok(new
+                {
+                    discountPromotions = discountPromotions,
+                    freeshipPromotions = freeshipPromotions
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy danh sách khuyến mại", error = ex.Message });
+            }
+        }
+
+        // POST: api/admin/sale-invoices/apply-promotion
+        // Áp dụng khuyến mại cho hóa đơn
+        [HttpPost("apply-promotion")]
+        public async Task<ActionResult<object>> ApplyPromotion([FromBody] ApplyPromotionRequest request)
+        {
+            try
+            {
+                if (request == null || (request.SelectedDiscountPromotions == null || !request.SelectedDiscountPromotions.Any()) &&
+                    (request.SelectedFreeshipPromotions == null || !request.SelectedFreeshipPromotions.Any()))
+                {
+                    return BadRequest(new { message = "Vui lòng chọn ít nhất một khuyến mại" });
+                }
+
+                if (request.InvoiceDetails == null || !request.InvoiceDetails.Any())
+                {
+                    return BadRequest(new { message = "Vui lòng thêm sản phẩm vào hóa đơn" });
+                }
+
+                // Lấy tất cả khuyến mại được chọn
+                var allSelectedPromotionIds = new List<string>();
+                if (request.SelectedDiscountPromotions != null)
+                    allSelectedPromotionIds.AddRange(request.SelectedDiscountPromotions);
+                if (request.SelectedFreeshipPromotions != null)
+                    allSelectedPromotionIds.AddRange(request.SelectedFreeshipPromotions);
+
+                var promotions = await _context.Promotions
+                    .Include(p => p.Product)
+                    .Where(p => allSelectedPromotionIds.Contains(p.PromotionId))
+                    .ToListAsync();
+
+                if (!promotions.Any())
+                {
+                    return BadRequest(new { message = "Không tìm thấy khuyến mại được chọn" });
+                }
+
+                // Tính toán khuyến mại
+                decimal originalSubtotal = 0;
+                decimal discountedSubtotal = 0;
+                decimal deliveryFee = request.DeliveryFee ?? 0;
+                decimal finalDeliveryFee = deliveryFee;
+                var promotionDetails = new List<object>();
+                var hasFreeship = false;
+
+                foreach (var item in request.InvoiceDetails)
+                {
+                    if (item == null) continue;
+                    var price = item.UnitPrice ?? 0;
+                    var quantity = item.Quantity ?? 0;
+                    if (quantity > 0 && price > 0)
+                    {
+                        var itemTotal = price * quantity;
+                        originalSubtotal += itemTotal;
+
+                        // Tìm khuyến mại giảm giá cho sản phẩm này
+                        var discountPromotion = promotions.FirstOrDefault(p =>
+                            p.ProductId == item.ProductId &&
+                            request.SelectedDiscountPromotions != null &&
+                            request.SelectedDiscountPromotions.Contains(p.PromotionId) &&
+                            p.Type != null && (p.Type.ToLower().Contains("giảm") || p.Type.Contains("%")));
+
+                        if (discountPromotion != null)
+                        {
+                            // Lấy phần trăm từ ContentDetail
+                            var discountPercent = ExtractDiscountPercent(discountPromotion.ContentDetail);
+                            if (discountPercent > 0)
+                            {
+                                var discountedPrice = itemTotal * (1 - discountPercent / 100m);
+                                var discountAmount = itemTotal - discountedPrice;
+                                discountedSubtotal += discountedPrice;
+
+                                promotionDetails.Add(new
+                                {
+                                    type = "discount",
+                                    productName = discountPromotion.Product?.ProductName,
+                                    discountPercent = discountPercent,
+                                    discountAmount = discountAmount,
+                                    displayText = $"Giảm giá {discountPercent}% - {discountPromotion.Product?.ProductName}"
+                                });
+                            }
+                            else
+                            {
+                                discountedSubtotal += itemTotal;
+                            }
+                        }
+                        else
+                        {
+                            discountedSubtotal += itemTotal;
+                        }
+
+                        // Kiểm tra freeship cho sản phẩm này
+                        var freeshipPromotion = promotions.FirstOrDefault(p =>
+                            p.ProductId == item.ProductId &&
+                            request.SelectedFreeshipPromotions != null &&
+                            request.SelectedFreeshipPromotions.Contains(p.PromotionId) &&
+                            p.Type != null && p.Type.ToLower().Contains("freeship"));
+
+                        if (freeshipPromotion != null && !hasFreeship)
+                        {
+                            hasFreeship = true;
+                            finalDeliveryFee = 0;
+                        }
+                    }
+                }
+
+                var discount = originalSubtotal - discountedSubtotal;
+                var shippingDiscount = deliveryFee - finalDeliveryFee;
+                var totalDiscount = discount + shippingDiscount;
+                var finalTotal = discountedSubtotal + finalDeliveryFee;
+
+                // Thêm thông báo freeship nếu có
+                if (hasFreeship)
+                {
+                    promotionDetails.Add(new
+                    {
+                        type = "freeship",
+                        discountAmount = shippingDiscount,
+                        displayText = "Freeship cho toàn bộ đơn hàng"
+                    });
+                }
+
+                return Ok(new
+                {
+                    message = "Áp dụng khuyến mại thành công",
+                    promotionDetails = promotionDetails,
+                    originalSubtotal = originalSubtotal,
+                    discountedSubtotal = discountedSubtotal,
+                    discount = discount,
+                    originalDeliveryFee = deliveryFee,
+                    finalDeliveryFee = finalDeliveryFee,
+                    shippingDiscount = shippingDiscount,
+                    totalDiscount = totalDiscount,
+                    finalTotal = finalTotal,
+                    selectedDiscountPromotions = request.SelectedDiscountPromotions,
+                    selectedFreeshipPromotions = request.SelectedFreeshipPromotions,
+                    hasFreeship = hasFreeship
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi áp dụng khuyến mại", error = ex.Message });
+            }
+        }
+
+        // Helper method để lấy phần trăm giảm giá từ ContentDetail
+        private decimal ExtractDiscountPercent(string? contentDetail)
+        {
+            if (string.IsNullOrWhiteSpace(contentDetail))
+                return 0;
+
+            try
+            {
+                // Tìm số phần trăm trong chuỗi (ví dụ: "Giảm 15% giá bán" -> 15)
+                var match = System.Text.RegularExpressions.Regex.Match(contentDetail, @"(\d+)%");
+                if (match.Success && decimal.TryParse(match.Groups[1].Value, out decimal percent))
+                {
+                    return percent;
+                }
+            }
+            catch
+            {
+                // Ignore parsing errors
+            }
+
+            return 0;
+        }
+
+        // GET: api/admin/sale-invoices/provinces/{provinceCode}/communes
+        // Lấy danh sách phường/xã theo tỉnh/thành
+        [HttpGet("provinces/{provinceCode}/communes")]
+        public async Task<ActionResult<List<CommuneDTO>>> GetCommunes(string provinceCode)
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync($"{ADDRESS_API_BASE_URL}/provinces/{provinceCode}/communes");
+                response.EnsureSuccessStatusCode();
+
+                var jsonString = await response.Content.ReadAsStringAsync();
+                var jsonDoc = JsonDocument.Parse(jsonString);
+                
+                var communes = new List<CommuneDTO>();
+                if (jsonDoc.RootElement.TryGetProperty("communes", out var communesElement))
+                {
+                    foreach (var commune in communesElement.EnumerateArray())
+                    {
+                        communes.Add(new CommuneDTO
+                        {
+                            Code = commune.TryGetProperty("code", out var code) ? code.GetString() ?? "" : "",
+                            Name = commune.TryGetProperty("name", out var name) ? name.GetString() : null,
+                            EnglishName = commune.TryGetProperty("englishName", out var englishName) ? englishName.GetString() : null,
+                            AdministrativeLevel = commune.TryGetProperty("administrativeLevel", out var level) ? level.GetString() : null,
+                            ProvinceCode = commune.TryGetProperty("provinceCode", out var provCode) ? provCode.GetString() : null,
+                            ProvinceName = commune.TryGetProperty("provinceName", out var provName) ? provName.GetString() : null
+                        });
+                    }
+                }
+
+                return Ok(communes.OrderBy(c => c.Name).ToList());
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy danh sách phường/xã", error = ex.Message });
+            }
+        }
+
+        // Helper method để ghép địa chỉ đầy đủ từ các thành phần
+        private string? BuildFullAddress(string? addressDetail, string? communeName, string? provinceName)
+        {
+            var parts = new List<string>();
+            
+            if (!string.IsNullOrWhiteSpace(addressDetail))
+            {
+                parts.Add(addressDetail.Trim());
+            }
+            
+            if (!string.IsNullOrWhiteSpace(communeName))
+            {
+                parts.Add(communeName);
+            }
+            
+            if (!string.IsNullOrWhiteSpace(provinceName))
+            {
+                parts.Add(provinceName);
+            }
+            
+            return parts.Count > 0 ? string.Join(", ", parts) : null;
+        }
+
+        // Helper method để serialize địa chỉ thành JSON
+        private string? SerializeAddress(string? provinceCode, string? provinceName, string? communeCode, string? communeName, string? addressDetail, string? fullAddress)
+        {
+            try
+            {
+                var addressObj = new Dictionary<string, string?>();
+                
+                if (!string.IsNullOrWhiteSpace(provinceCode))
+                    addressObj["p"] = provinceCode;
+                if (!string.IsNullOrWhiteSpace(provinceName))
+                    addressObj["pn"] = provinceName;
+                if (!string.IsNullOrWhiteSpace(communeCode))
+                    addressObj["c"] = communeCode;
+                if (!string.IsNullOrWhiteSpace(communeName))
+                    addressObj["cn"] = communeName;
+                if (!string.IsNullOrWhiteSpace(addressDetail))
+                    addressObj["ad"] = addressDetail;
+                if (!string.IsNullOrWhiteSpace(fullAddress))
+                    addressObj["fa"] = fullAddress;
+
+                if (addressObj.Count == 0)
+                    return null;
+
+                var jsonString = JsonSerializer.Serialize(addressObj);
+                
+                // Kiểm tra độ dài (giới hạn 200 ký tự)
+                if (jsonString.Length <= 200)
+                {
+                    return jsonString;
+                }
+                else
+                {
+                    // Nếu quá dài, chỉ lưu fullAddress
+                    return fullAddress;
+                }
+            }
+            catch
+            {
+                // Nếu serialize lỗi, trả về fullAddress
+                return fullAddress;
             }
         }
 
@@ -412,11 +1210,5 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
         }
 
-        // DTO cho cập nhật trạng thái
-        public class UpdateStatusDTO
-        {
-            public string Status { get; set; } = null!;
-            public string? EmployeeId { get; set; }
-        }
     }
 }

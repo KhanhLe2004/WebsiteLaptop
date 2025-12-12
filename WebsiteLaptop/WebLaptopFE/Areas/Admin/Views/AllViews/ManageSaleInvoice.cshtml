@@ -9,13 +9,18 @@
             <div class="card my-4">
                 <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
                     <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
-                        <h6 class="text-white text-capitalize ps-3 mb-0">Quản lý hóa đơn bán</h6>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="text-white text-capitalize ps-3 mb-0">Quản lý hóa đơn bán</h6>
+                            <button type="button" class="btn btn-white btn-sm me-3" onclick="showCreateModal()">
+                                <i class="material-icons text-sm">add</i> Thêm hóa đơn
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="card-body px-3 pb-2">
                     <!-- Bộ lọc và tìm kiếm -->
                     <div class="row mb-3 g-2 align-items-end">
-                        <div class="col-lg-4 col-md-6">
+                        <div class="col-lg-3 col-md-6">
                             <div class="input-group input-group-outline">
                                 <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm hóa đơn...">
                             </div>
@@ -30,6 +35,23 @@
                                 <option value="Hoàn thành">Hoàn thành</option>
                                 <option value="Đã hủy">Đã hủy</option>
                             </select>
+                        </div>
+                        <div class="col-lg-2 col-md-3">
+                            <div class="input-group input-group-outline">
+                                <label class="form-label">Từ ngày</label>
+                                <input type="date" id="dateFromInput" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-lg-2 col-md-3">
+                            <div class="input-group input-group-outline">
+                                <label class="form-label">Đến ngày</label>
+                                <input type="date" id="dateToInput" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-lg-1 col-md-3 d-flex align-items-end">
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearDateFilters()" title="Xóa bộ lọc ngày" style="height: 40px; min-width: 40px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                                <i class="material-icons" style="font-size: 18px;">clear</i>
+                            </button>
                         </div>
                     </div>
 
@@ -90,6 +112,209 @@
     </div>
 </div>
 
+<!-- Modal Thêm hóa đơn -->
+<div class="modal fade" id="createModal" tabindex="-1" aria-labelledby="createModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-primary">
+                <h5 class="modal-title text-white" id="createModalLabel">Thêm hóa đơn</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createForm">
+                    <input type="hidden" id="customerIdInput" value="">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Mã hóa đơn</label>
+                                <input type="text" class="form-control" id="saleInvoiceIdInput" readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Trạng thái *</label>
+                                <select class="form-control" id="statusInput" required>
+                                    <option value=""></option>
+                                    <option value="Chờ xử lý" selected>Chờ xử lý</option>
+                                    <option value="Đang xử lý">Đang xử lý</option>
+                                    <option value="Chờ vận chuyển">Chờ vận chuyển</option>
+                                    <option value="Đang vận chuyển">Đang vận chuyển</option>
+                                    <option value="Hoàn thành">Hoàn thành</option>
+                                    <option value="Đã hủy">Đã hủy</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Số điện thoại *</label>
+                                <input type="text" class="form-control" id="phoneNumberInput" onblur="handlePhoneNumberChange()">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Tên khách hàng *</label>
+                                <input type="text" class="form-control" id="customerNameInput">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Phương thức thanh toán</label>
+                                <select class="form-control" id="paymentMethodInput">
+                                    <option value=""></option>
+                                    <option value="Thanh toán khi nhận hàng">Thanh toán khi nhận hàng</option>
+                                    <option value="Chuyển khoản ngân hàng">Chuyển khoản ngân hàng</option>
+
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Tổng tiền</label>
+                                <input type="number" class="form-control" id="totalAmountInput" min="0" step="0.01">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Phí vận chuyển</label>
+                                <input type="number" class="form-control" id="deliveryFeeInput" min="0" step="0.01">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Nhân viên</label>
+                                <select class="form-control" id="employeeIdInput">
+                                    <option value=""></option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3 autocomplete-wrapper position-relative w-100">
+                                <label class="form-label">Tỉnh/Thành</label>
+                                <input type="text" id="provinceCode" class="form-control" autocomplete="off">
+                                <input type="hidden" id="provinceCodeValue" value="">
+                                <div id="provinceCodeDropdown" class="autocomplete-dropdown"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3 autocomplete-wrapper position-relative w-100">
+                                <label class="form-label">Phường/Xã</label>
+                                <input type="text" id="communeCode" class="form-control" autocomplete="off" disabled>
+                                <input type="hidden" id="communeCodeValue" value="">
+                                <div id="communeCodeDropdown" class="autocomplete-dropdown"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Địa chỉ cụ thể (Số nhà, tên đường, v.v.)</label>
+                                <input type="text" class="form-control" id="addressDetailInput">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Thời gian tạo hóa đơn *</label>
+                                <input type="datetime-local" class="form-control" id="timeCreateInput" required>
+                            </div>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6>Chi tiết sản phẩm</h6>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="addDetailRow()">
+                            <i class="material-icons text-sm">add</i> Thêm sản phẩm
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Sản phẩm</th>
+                                    <th>Thông số</th>
+                                    <th>Số lượng</th>
+                                    <th>Đơn giá</th>
+                                    <th>Thành tiền</th>
+                                    <th>Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detailTableBody">
+                                <!-- Chi tiết sẽ được thêm bằng JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <hr>
+                    <h6 class="mb-3">Khuyến mại</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Khuyến mại giảm giá</label>
+                                <select class="form-control" id="discountPromotionSelect">
+                                    <option value=""></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Khuyến mại freeship</label>
+                                <select class="form-control" id="freeshipPromotionSelect">
+                                    <option value=""></option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyPromotion()">
+                                <i class="material-icons text-sm">local_offer</i> Áp dụng khuyến mại
+                            </button>
+                        </div>
+                    </div>
+                    <div id="promotion-message" class="mb-3"></div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-md-6 offset-md-6">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong>Tổng tiền sản phẩm:</strong>
+                                <strong id="subtotalAmount">0 VNĐ</strong>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-2" id="discount-row" style="display:none;">
+                                <strong class="text-success">Giảm giá:</strong>
+                                <strong class="text-success" id="discountAmount">0 VNĐ</strong>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong>Phí vận chuyển:</strong>
+                                <strong id="deliveryFeeDisplay">0 VNĐ</strong>
+                            </div>
+                            <hr>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong>Tổng tiền:</strong>
+                                <strong id="calculatedTotalAmount">0 VNĐ</strong>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-danger mb-3" id="formErrorMessage" style="display:none;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" onclick="saveSaleInvoice()">
+                    <i class="material-icons text-sm">save</i> Lưu
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Cập nhật trạng thái -->
 <div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog">
@@ -134,15 +359,27 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         const API_URL = 'http://localhost:5068/api/admin/sale-invoices';
+        const PRODUCT_API_URL = 'http://localhost:5068/api/admin/products';
         let currentPage = 1;
         let pageSize = 10;
         let searchDebounceTimer = null;
         const SEARCH_DEBOUNCE_DELAY = 300;
         const currentEmployeeId = @Html.Raw(Json.Serialize(ViewBag.EmployeeId ?? ""));
         const currentEmployeeName = @Html.Raw(Json.Serialize(ViewBag.EmployeeName ?? ""));
+        
+        let productsList = [];
+        let provincesList = [];
+        let communesList = [];
+        let provincesPromise = null;
+        let communesCache = {};
+        let detailRowIndex = 0;
+        let appliedPromotion = null;
+        let promotionDiscount = 0;
+        let promotionShippingDiscount = 0;
 
         $(document).ready(function() {
             loadSaleInvoices();
+            loadProvinces();
 
             // Tìm kiếm tự động
             $('#searchInput').on('input', function() {
@@ -152,6 +389,27 @@
             // Lọc theo trạng thái
             $('#statusFilter').on('change', function() {
                 triggerAutoSearch();
+            });
+
+            // Lọc theo ngày
+            $('#dateFromInput, #dateToInput').on('change', function() {
+                triggerAutoSearch();
+            });
+
+            // Reset địa chỉ khi đóng modal
+            $('#createModal').on('hidden.bs.modal', function() {
+                $('#provinceCodeDropdown').hide();
+                $('#communeCodeDropdown').hide();
+                $('#provinceCode').val('');
+                $('#provinceCodeValue').val('');
+                $('#provinceCode').closest('.input-group-outline').removeClass('is-filled');
+                $('#communeCode').val('');
+                $('#communeCodeValue').val('');
+                $('#communeCode').prop('disabled', true);
+                $('#communeCode').closest('.input-group-outline').removeClass('is-filled');
+                $('#addressDetailInput').val('');
+                $('#deliveryAddressInput').val('');
+                communesList = [];
             });
 
             // Xử lý label cho Material Dashboard inputs
@@ -204,11 +462,52 @@
             }, SEARCH_DEBOUNCE_DELAY);
         }
 
+        // Hàm xóa bộ lọc ngày
+        function clearDateFilters() {
+            $('#dateFromInput').val('').removeAttr('value').removeAttr('data-has-input');
+            $('#dateToInput').val('').removeAttr('value').removeAttr('data-has-input');
+            updateInputLabels();
+            triggerAutoSearch();
+        }
+
+        // Xử lý input date để hiển thị dd/mm/yyyy khi có giá trị
+        $(document).on('input change', 'input[type="date"]', function() {
+            const $input = $(this);
+            const value = $input.val();
+            if (value && value.trim() !== '') {
+                $input.attr('value', value).attr('data-has-input', 'true');
+            } else {
+                $input.removeAttr('value').removeAttr('data-has-input');
+            }
+        });
+
+        // Xử lý khi focus vào input date
+        $(document).on('focus', 'input[type="date"]', function() {
+            const $input = $(this);
+            const value = $input.val();
+            if (value && value.trim() !== '') {
+                $input.attr('data-has-input', 'true');
+            }
+        });
+
+        // Xử lý khi blur khỏi input date
+        $(document).on('blur', 'input[type="date"]', function() {
+            const $input = $(this);
+            const value = $input.val();
+            if (!value || value.trim() === '') {
+                $input.removeAttr('data-has-input');
+            } else {
+                $input.attr('value', value).attr('data-has-input', 'true');
+            }
+        });
+
         // Load danh sách hóa đơn
         function loadSaleInvoices(page = currentPage) {
             currentPage = page;
             const searchTerm = $('#searchInput').val().trim();
             const statusFilter = $('#statusFilter').val();
+            const dateFrom = $('#dateFromInput').val();
+            const dateTo = $('#dateToInput').val();
 
             const dataParams = {
                 pageNumber: currentPage,
@@ -218,6 +517,14 @@
 
             if (statusFilter !== '') {
                 dataParams.status = statusFilter;
+            }
+
+            if (dateFrom) {
+                dataParams.dateFrom = dateFrom;
+            }
+
+            if (dateTo) {
+                dataParams.dateTo = dateTo;
             }
 
             $.ajax({
@@ -556,6 +863,26 @@
             $('#statusErrorMessage').html(message).show();
         }
 
+        // Hiển thị lỗi trong form
+        function showFormError(message) {
+            $('#formErrorMessage').html(message).show();
+        }
+
+        // Cập nhật label cho input Material Dashboard
+        function updateInputLabels() {
+            $('.input-group-outline input, .input-group-outline select, .input-group-outline textarea').each(function() {
+                const $input = $(this);
+                const $group = $input.closest('.input-group-outline');
+                const value = $input.val();
+                
+                if (value && value.toString().trim() !== '') {
+                    $group.addClass('is-filled');
+                } else {
+                    $group.removeClass('is-filled');
+                }
+            });
+        }
+
         // Format tiền tệ
         function formatCurrency(amount) {
             return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
@@ -573,6 +900,1263 @@
             };
             return badges[status] || '<span class="badge bg-gradient-secondary">' + status + '</span>';
         }
+
+        // Load danh sách nhân viên
+        let employeesList = [];
+        function loadEmployees() {
+            $.ajax({
+                url: 'http://localhost:5068/api/admin/employees',
+                type: 'GET',
+                data: { pageNumber: 1, pageSize: 1000 },
+                success: function(empResponse) {
+                    if (empResponse && empResponse.items) {
+                        employeesList = empResponse.items.map(e => ({
+                            employeeId: e.employeeId,
+                            employeeName: e.employeeName
+                        })) || [];
+                    } else {
+                        employeesList = [];
+                    }
+                    populateEmployeeSelect();
+                },
+                error: function(xhr) {
+                    console.error('Error loading employees:', xhr);
+                    employeesList = [];
+                    populateEmployeeSelect();
+                }
+            });
+        }
+
+        // Populate combobox nhân viên
+        function populateEmployeeSelect(selectedId = '') {
+            const select = $('#employeeIdInput');
+            select.empty();
+            select.append('<option value=""></option>');
+            
+            if (employeesList && employeesList.length > 0) {
+                employeesList.forEach(function(employee) {
+                    const employeeId = employee.employeeId || employee.EmployeeId;
+                    const employeeName = employee.employeeName || employee.EmployeeName || employeeId;
+                    const selected = (selectedId && employeeId === selectedId) ? 'selected' : '';
+                    select.append(`<option value="${employeeId}" ${selected}>${employeeName}</option>`);
+                });
+            }
+            
+            // Nếu không có selectedId và đang thêm mới, tự động chọn nhân viên đang đăng nhập
+            if (!selectedId && currentEmployeeId) {
+                select.val(currentEmployeeId).trigger('change');
+            } else if (selectedId) {
+                select.val(selectedId).trigger('change');
+            } else {
+                select.trigger('change');
+            }
+        }
+
+        // Tạo ID tự động
+        function generateNextSaleInvoiceId() {
+            $.ajax({
+                url: API_URL,
+                type: 'GET',
+                data: { pageNumber: 1, pageSize: 1000 },
+                success: function(response) {
+                    let nextId = 'SI001';
+                    if (response.items && response.items.length > 0) {
+                        let maxNumber = 0;
+                        response.items.forEach(function(item) {
+                            const id = item.saleInvoiceId;
+                            if (id && id.startsWith('SI') && id.length === 5) {
+                                const number = parseInt(id.substring(2)) || 0;
+                                maxNumber = Math.max(maxNumber, number);
+                            }
+                        });
+                        nextId = 'SI' + String(maxNumber + 1).padStart(3, '0');
+                    }
+                    $('#saleInvoiceIdInput').val(nextId);
+                    updateInputLabels();
+                },
+                error: function() {
+                    $('#saleInvoiceIdInput').val('SI001');
+                    updateInputLabels();
+                }
+            });
+        }
+
+        // Xử lý thay đổi số điện thoại
+        function handlePhoneNumberChange() {
+            searchCustomerByPhone();
+        }
+
+        // Tìm khách hàng theo số điện thoại
+        function searchCustomerByPhone() {
+            const phoneNumber = $('#phoneNumberInput').val().trim();
+            
+            if (!phoneNumber) {
+                $('#customerIdInput').val('');
+                $('#customerNameInput').val('');
+                updateInputLabels();
+                return;
+            }
+
+            $.ajax({
+                url: `${API_URL}/customer-by-phone/${encodeURIComponent(phoneNumber)}`,
+                type: 'GET',
+                success: function(response) {
+                    if (response && response.customerId) {
+                        $('#customerIdInput').val(response.customerId);
+                        $('#customerNameInput').val(response.customerName || '');
+                        updateInputLabels();
+                        showNotification('Đã tìm thấy khách hàng', 'success');
+                    } else {
+                        $('#customerIdInput').val('');
+                        $('#customerNameInput').val('');
+                        updateInputLabels();
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Error searching customer:', xhr);
+                    $('#customerIdInput').val('');
+                    // Nếu không tìm thấy (404), cho phép nhập tên khách hàng mới
+                    if (xhr.status === 404) {
+                        $('#customerNameInput').val('').prop('readonly', false);
+                        showNotification('Không tìm thấy khách hàng. Vui lòng nhập tên khách hàng để tạo mới', 'info');
+                    } else {
+                        $('#customerNameInput').val('');
+                        showNotification('Lỗi khi tìm kiếm khách hàng', 'error');
+                    }
+                    updateInputLabels();
+                }
+            });
+        }
+
+        // Load danh sách sản phẩm
+        function loadProducts() {
+            $.ajax({
+                url: PRODUCT_API_URL,
+                type: 'GET',
+                data: { pageNumber: 1, pageSize: 1000, active: true },
+                success: function(response) {
+                    if (response && response.items) {
+                        productsList = response.items || [];
+                    } else {
+                        productsList = [];
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Error loading products:', xhr);
+                    productsList = [];
+                }
+            });
+        }
+
+        // Load danh sách tỉnh/thành
+        function loadProvinces(force = false) {
+            if (provincesPromise && !force) {
+                return provincesPromise;
+            }
+
+            provincesPromise = $.ajax({
+                url: `${API_URL}/provinces`,
+                type: 'GET'
+            }).then(function(provinces) {
+                provincesList = provinces || [];
+                initializeProvinceAutocomplete();
+                return provincesList;
+            }).catch(function(xhr) {
+                console.error('Lỗi khi tải danh sách tỉnh/thành:', xhr);
+                showNotification('Lỗi khi tải danh sách tỉnh/thành', 'error');
+                provincesList = [];
+                initializeProvinceAutocomplete();
+                return provincesList;
+            });
+
+            return provincesPromise;
+        }
+
+        // Load danh sách phường/xã theo tỉnh/thành
+        function loadCommunes(provinceCode, force = false) {
+            if (!provinceCode) {
+                resetCommuneInput();
+                const deferred = $.Deferred();
+                deferred.resolve([]);
+                return deferred.promise();
+            }
+
+            if (communesCache[provinceCode] && !force) {
+                const cached = communesCache[provinceCode];
+                cached.then && cached.then(function(list) {
+                    communesList = list || [];
+                    initializeCommuneAutocomplete();
+                });
+                return cached;
+            }
+
+            const request = $.ajax({
+                url: `${API_URL}/provinces/${provinceCode}/communes`,
+                type: 'GET'
+            }).then(function(communes) {
+                communesList = communes || [];
+                $('#communeCode').prop('disabled', false);
+                initializeCommuneAutocomplete();
+                communesCache[provinceCode] = $.Deferred().resolve(communesList).promise();
+                return communesList;
+            }).catch(function(xhr) {
+                console.error('Lỗi khi tải danh sách phường/xã:', xhr);
+                showNotification('Lỗi khi tải danh sách phường/xã', 'error');
+                communesList = [];
+                $('#communeCode').prop('disabled', true);
+                communesCache[provinceCode] = $.Deferred().resolve([]).promise();
+                return [];
+            });
+
+            communesCache[provinceCode] = request;
+            return request;
+        }
+
+        function resetCommuneInput() {
+            $('#communeCode').val('').prop('disabled', true);
+            $('#communeCodeValue').val('');
+            $('#communeCode').closest('.input-group-outline').removeClass('is-filled');
+        }
+
+        // Khởi tạo autocomplete cho tỉnh/thành
+        function initializeProvinceAutocomplete() {
+            const provinceInput = $('#provinceCode');
+            const provinceValue = $('#provinceCodeValue');
+            const dropdown = $('#provinceCodeDropdown');
+            let selectedIndex = -1;
+            let filteredProvinces = [];
+
+            function showDropdown(provinces) {
+                if (!provinces || provinces.length === 0) {
+                    dropdown.html('<div class="autocomplete-item" style="color: #6c757d; cursor: default;">Không tìm thấy tỉnh/thành</div>').show();
+                    selectedIndex = -1;
+                    return;
+                }
+
+                let html = '';
+                provinces.forEach((province, index) => {
+                    const provinceName = province.name || province.code;
+                    const provinceNameEscaped = (provinceName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    html += `<div class="autocomplete-item" data-index="${index}" data-province-code="${province.code}" data-province-name="${provinceNameEscaped}">${provinceName}</div>`;
+                });
+                dropdown.html(html).show();
+                selectedIndex = -1;
+            }
+
+            function updateSelectedItem() {
+                $('#provinceCodeDropdown .autocomplete-item').removeClass('selected');
+                if (selectedIndex >= 0 && selectedIndex < filteredProvinces.length) {
+                    $('#provinceCodeDropdown .autocomplete-item').eq(selectedIndex).addClass('selected');
+                }
+            }
+
+            provinceInput.off('input.province').on('input.province', function() {
+                const searchTerm = $(this).val().toLowerCase().trim();
+                
+                if (searchTerm) {
+                    $(this).closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    $(this).closest('.input-group-outline').removeClass('is-filled');
+                }
+                
+                if (searchTerm === '') {
+                    dropdown.hide();
+                    provinceValue.val('');
+                    loadCommunes('');
+                    updateDeliveryAddress();
+                    return;
+                }
+
+                filteredProvinces = provincesList.filter(province => {
+                    const provinceName = (province.name || province.code || '').toLowerCase();
+                    return provinceName.includes(searchTerm);
+                });
+
+                showDropdown(filteredProvinces);
+            });
+
+            $(document).off('click.province-item').on('click.province-item', '#provinceCodeDropdown .autocomplete-item', function() {
+                const provinceCode = $(this).data('province-code');
+                const provinceName = $(this).data('province-name');
+                
+                if (provinceCode && provinceName) {
+                    provinceInput.val(provinceName);
+                    provinceValue.val(provinceCode);
+                    provinceInput.closest('.input-group-outline').addClass('is-filled');
+                    dropdown.hide();
+                    
+                    loadCommunes(provinceCode);
+                    updateDeliveryAddress();
+                }
+            });
+
+            provinceInput.off('keydown.province').on('keydown.province', function(e) {
+                if (dropdown.is(':visible') && filteredProvinces.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        selectedIndex = Math.min(selectedIndex + 1, filteredProvinces.length - 1);
+                        updateSelectedItem();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        selectedIndex = Math.max(selectedIndex - 1, -1);
+                        updateSelectedItem();
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (selectedIndex >= 0 && selectedIndex < filteredProvinces.length) {
+                            const province = filteredProvinces[selectedIndex];
+                            provinceInput.val(province.name || province.code);
+                            provinceValue.val(province.code);
+                            provinceInput.closest('.input-group-outline').addClass('is-filled');
+                            dropdown.hide();
+                            loadCommunes(province.code);
+                            updateDeliveryAddress();
+                        }
+                    } else if (e.key === 'Escape') {
+                        dropdown.hide();
+                        selectedIndex = -1;
+                    }
+                }
+            });
+
+            $(document).off('click.province-close').on('click.province-close', function(e) {
+                if (!$(e.target).closest('#provinceCode').closest('.autocomplete-wrapper').length) {
+                    dropdown.hide();
+                    selectedIndex = -1;
+                }
+            });
+
+            provinceInput.off('focus.province').on('focus.province', function() {
+                $(this).closest('.input-group-outline').addClass('is-filled');
+                
+                const val = $(this).val().trim();
+                if (val) {
+                    $(this).trigger('input.province');
+                } else {
+                    if (provincesList.length > 0) {
+                        filteredProvinces = provincesList;
+                        showDropdown(filteredProvinces);
+                    }
+                }
+            });
+
+            provinceInput.off('blur.province').on('blur.province', function() {
+                const val = $(this).val().trim();
+                if (!val) {
+                    $(this).closest('.input-group-outline').removeClass('is-filled');
+                }
+            });
+        }
+
+        // Khởi tạo autocomplete cho phường/xã
+        function initializeCommuneAutocomplete() {
+            const communeInput = $('#communeCode');
+            const communeValue = $('#communeCodeValue');
+            const dropdown = $('#communeCodeDropdown');
+            let selectedIndex = -1;
+            let filteredCommunes = [];
+
+            function showDropdown(communes) {
+                if (!communes || communes.length === 0) {
+                    dropdown.html('<div class="autocomplete-item" style="color: #6c757d; cursor: default;">Không tìm thấy phường/xã</div>').show();
+                    selectedIndex = -1;
+                    return;
+                }
+
+                let html = '';
+                communes.forEach((commune, index) => {
+                    const communeName = commune.name || commune.code;
+                    const communeNameEscaped = (communeName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    html += `<div class="autocomplete-item" data-index="${index}" data-commune-code="${commune.code}" data-commune-name="${communeNameEscaped}">${communeName}</div>`;
+                });
+                dropdown.html(html).show();
+                selectedIndex = -1;
+            }
+
+            function updateSelectedItem() {
+                $('#communeCodeDropdown .autocomplete-item').removeClass('selected');
+                if (selectedIndex >= 0 && selectedIndex < filteredCommunes.length) {
+                    $('#communeCodeDropdown .autocomplete-item').eq(selectedIndex).addClass('selected');
+                }
+            }
+
+            communeInput.off('input.commune').on('input.commune', function() {
+                const searchTerm = $(this).val().toLowerCase().trim();
+                
+                if (searchTerm) {
+                    $(this).closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    $(this).closest('.input-group-outline').removeClass('is-filled');
+                }
+                
+                if (searchTerm === '') {
+                    dropdown.hide();
+                    communeValue.val('');
+                    updateDeliveryAddress();
+                    return;
+                }
+
+                filteredCommunes = communesList.filter(commune => {
+                    const communeName = (commune.name || commune.code || '').toLowerCase();
+                    return communeName.includes(searchTerm);
+                });
+
+                showDropdown(filteredCommunes);
+            });
+
+            $(document).off('click.commune-item').on('click.commune-item', '#communeCodeDropdown .autocomplete-item', function() {
+                const communeCode = $(this).data('commune-code');
+                const communeName = $(this).data('commune-name');
+                
+                if (communeCode && communeName) {
+                    communeInput.val(communeName);
+                    communeValue.val(communeCode);
+                    communeInput.closest('.input-group-outline').addClass('is-filled');
+                    dropdown.hide();
+                    updateDeliveryAddress();
+                }
+            });
+
+            communeInput.off('keydown.commune').on('keydown.commune', function(e) {
+                if (dropdown.is(':visible') && filteredCommunes.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        selectedIndex = Math.min(selectedIndex + 1, filteredCommunes.length - 1);
+                        updateSelectedItem();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        selectedIndex = Math.max(selectedIndex - 1, -1);
+                        updateSelectedItem();
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (selectedIndex >= 0 && selectedIndex < filteredCommunes.length) {
+                            const commune = filteredCommunes[selectedIndex];
+                            communeInput.val(commune.name || commune.code);
+                            communeValue.val(commune.code);
+                            communeInput.closest('.input-group-outline').addClass('is-filled');
+                            dropdown.hide();
+                            updateDeliveryAddress();
+                        }
+                    } else if (e.key === 'Escape') {
+                        dropdown.hide();
+                        selectedIndex = -1;
+                    }
+                }
+            });
+
+            $(document).off('click.commune-close').on('click.commune-close', function(e) {
+                if (!$(e.target).closest('#communeCode').closest('.autocomplete-wrapper').length) {
+                    dropdown.hide();
+                    selectedIndex = -1;
+                }
+            });
+
+            communeInput.off('focus.commune').on('focus.commune', function() {
+                $(this).closest('.input-group-outline').addClass('is-filled');
+                
+                const val = $(this).val().trim();
+                if (val) {
+                    $(this).trigger('input.commune');
+                } else {
+                    if (communesList.length > 0) {
+                        filteredCommunes = communesList;
+                        showDropdown(filteredCommunes);
+                    }
+                }
+            });
+
+            communeInput.off('blur.commune').on('blur.commune', function() {
+                const val = $(this).val().trim();
+                if (!val) {
+                    $(this).closest('.input-group-outline').removeClass('is-filled');
+                }
+            });
+        }
+
+        // Cập nhật địa chỉ giao hàng tự động (không hiển thị nữa nhưng vẫn tính toán để gửi lên server)
+        function updateDeliveryAddress() {
+            const addressDetail = $('#addressDetailInput').val().trim();
+            const communeName = $('#communeCode').val().trim();
+            const provinceName = $('#provinceCode').val().trim();
+            
+            const parts = [];
+            if (addressDetail) parts.push(addressDetail);
+            if (communeName) parts.push(communeName);
+            if (provinceName) parts.push(provinceName);
+            
+            const fullAddress = parts.length > 0 ? parts.join(', ') : '';
+            // Không hiển thị nữa, chỉ lưu vào biến để gửi lên server
+            window.deliveryAddressValue = fullAddress;
+        }
+
+        // Thêm sự kiện cho addressDetailInput
+        $(document).on('input', '#addressDetailInput', function() {
+            updateDeliveryAddress();
+        });
+
+        // Load danh sách khuyến mại dựa trên các sản phẩm đã chọn
+        function loadPromotions() {
+            // Lấy danh sách productId từ bảng chi tiết
+            const productIds = [];
+            $('#detailTableBody tr').each(function() {
+                const productId = $(this).find('.detail-product').val();
+                if (productId) {
+                    productIds.push(productId);
+                }
+            });
+            
+            if (productIds.length === 0) {
+                $('#discountPromotionSelect').html('<option value="">Vui lòng chọn sản phẩm trước</option>');
+                $('#freeshipPromotionSelect').html('<option value="">Vui lòng chọn sản phẩm trước</option>');
+                return;
+            }
+            
+            // Gọi API để lấy promotions
+            const queryParams = productIds.map(id => `productIds=${encodeURIComponent(id)}`).join('&');
+            $.ajax({
+                url: `${API_URL}/promotions?${queryParams}`,
+                type: 'GET',
+                success: function(response) {
+                    // Load khuyến mại giảm giá
+                    const $discountSelect = $('#discountPromotionSelect');
+                    $discountSelect.html('<option value=""></option>');
+                    
+                    if (response.discountPromotions && response.discountPromotions.length > 0) {
+                        response.discountPromotions.forEach(promo => {
+                            $discountSelect.append(`<option value="${promo.promotionId}" data-product-id="${promo.productId}">${promo.displayText}</option>`);
+                        });
+                    }
+                    
+                    // Load khuyến mại freeship
+                    const $freeshipSelect = $('#freeshipPromotionSelect');
+                    $freeshipSelect.html('<option value=""></option>');
+                    
+                    if (response.freeshipPromotions && response.freeshipPromotions.length > 0) {
+                        response.freeshipPromotions.forEach(promo => {
+                            $freeshipSelect.append(`<option value="${promo.promotionId}" data-product-id="${promo.productId}">${promo.displayText}</option>`);
+                        });
+                    }
+                    
+                    updateInputLabels();
+                },
+                error: function(xhr) {
+                    console.error('Error loading promotions:', xhr);
+                    $('#discountPromotionSelect').html('<option value="">Lỗi khi tải khuyến mại</option>');
+                    $('#freeshipPromotionSelect').html('<option value="">Lỗi khi tải khuyến mại</option>');
+                }
+            });
+        }
+
+        // Áp dụng khuyến mại
+        function applyPromotion() {
+            const selectedDiscountPromotion = $('#discountPromotionSelect').val();
+            const selectedFreeshipPromotion = $('#freeshipPromotionSelect').val();
+            
+            if (!selectedDiscountPromotion && !selectedFreeshipPromotion) {
+                showNotification('Vui lòng chọn ít nhất một loại khuyến mại', 'warning');
+                return;
+            }
+            
+            // Lấy danh sách sản phẩm và giá từ bảng chi tiết
+            const invoiceDetails = [];
+            $('#detailTableBody tr').each(function() {
+                const productId = $(this).find('.detail-product').val();
+                const quantity = parseInt($(this).find('.detail-quantity').val()) || 0;
+                const unitPrice = parseFloat($(this).find('.detail-price').val()) || 0;
+                
+                if (productId && quantity > 0 && unitPrice > 0) {
+                    invoiceDetails.push({
+                        productId: productId,
+                        quantity: quantity,
+                        unitPrice: unitPrice
+                    });
+                }
+            });
+            
+            if (invoiceDetails.length === 0) {
+                showNotification('Vui lòng thêm sản phẩm vào hóa đơn trước', 'warning');
+                return;
+            }
+            
+            const deliveryFee = parseFloat($('#deliveryFeeInput').val()) || 0;
+            
+            const requestBody = {
+                customerId: $('#customerIdInput').val() || '',
+                selectedDiscountPromotions: selectedDiscountPromotion ? [selectedDiscountPromotion] : [],
+                selectedFreeshipPromotions: selectedFreeshipPromotion ? [selectedFreeshipPromotion] : [],
+                invoiceDetails: invoiceDetails,
+                deliveryFee: deliveryFee
+            };
+            
+            $.ajax({
+                url: `${API_URL}/apply-promotion`,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(requestBody),
+                success: function(response) {
+                    appliedPromotion = {
+                        selectedDiscountPromotions: response.selectedDiscountPromotions || [],
+                        selectedFreeshipPromotions: response.selectedFreeshipPromotions || [],
+                        data: response
+                    };
+                    
+                    promotionDiscount = response.discount || 0;
+                    promotionShippingDiscount = response.shippingDiscount || 0;
+                    
+                    // Cập nhật tổng tiền
+                    calculateTotalAmount();
+                    
+                    // Hiển thị thông báo khuyến mại
+                    let promotionInfo = '';
+                    if (response.promotionDetails && response.promotionDetails.length > 0) {
+                        const discountPromotions = response.promotionDetails.filter(p => p.type === 'discount');
+                        const freeshipPromotions = response.promotionDetails.filter(p => p.type === 'freeship');
+                        
+                        if (discountPromotions.length > 0) {
+                            promotionInfo += '<strong>Sản phẩm được giảm giá:</strong><br>';
+                            discountPromotions.forEach(promo => {
+                                promotionInfo += `${promo.displayText}: -${formatCurrency(promo.discountAmount)}<br>`;
+                            });
+                        }
+                        
+                        if (freeshipPromotions.length > 0) {
+                            if (promotionInfo) promotionInfo += '<br>';
+                            promotionInfo += '<strong>Khuyến mại vận chuyển:</strong><br>';
+                            freeshipPromotions.forEach(promo => {
+                                promotionInfo += `${promo.displayText}: -${formatCurrency(promo.discountAmount)}`;
+                            });
+                        }
+                    }
+                    
+                    if (promotionInfo) {
+                        $('#promotion-message').html(`<div class="alert alert-info small">${promotionInfo}</div>`);
+                    }
+                    
+                    showNotification('Áp dụng khuyến mại thành công', 'success');
+                },
+                error: function(xhr) {
+                    console.error('Error applying promotion:', xhr);
+                    let message = 'Có lỗi xảy ra khi áp dụng khuyến mại';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showNotification(message, 'error');
+                    $('#promotion-message').html('');
+                    promotionDiscount = 0;
+                    promotionShippingDiscount = 0;
+                    calculateTotalAmount();
+                }
+            });
+        }
+
+        // Load cấu hình sản phẩm
+        function loadProductConfigurations(productId, selectElement, selectedValue = '', callback = null) {
+            if (!productId) {
+                selectElement.empty();
+                selectElement.append('<option value="">-- Chọn sản phẩm trước --</option>');
+                if (callback) callback();
+                return;
+            }
+
+            $.ajax({
+                url: `${API_URL}/product-configurations/${productId}`,
+                type: 'GET',
+                success: function(configurations) {
+                    selectElement.empty();
+                    selectElement.append('<option value="">-- Chọn thông số --</option>');
+                    
+                    if (configurations && configurations.length > 0) {
+                        configurations.forEach(function(config) {
+                            // Tạo chuỗi hiển thị thông số theo format: Core i7-10750H / 16GB / 1TB SSD / NVIDIA® GeForce RTX™ 3060 6GB GDDR6
+                            const specParts = [];
+                            if (config.cpu) specParts.push(config.cpu);
+                            if (config.ram) specParts.push(config.ram);
+                            if (config.rom) specParts.push(config.rom);
+                            if (config.card) specParts.push(config.card);
+                            
+                            const specText = specParts.length > 0 ? specParts.join(' / ') : config.configurationId;
+                            const optionValue = JSON.stringify({
+                                configurationId: config.configurationId,
+                                cpu: config.cpu || '',
+                                ram: config.ram || '',
+                                rom: config.rom || '',
+                                card: config.card || '',
+                                price: config.price || null
+                            });
+                            
+                            // Dùng jQuery để tạo option element, tự động xử lý escape
+                            const $option = $('<option></option>')
+                                .attr('value', optionValue)
+                                .text(specText);
+                            
+                            // So sánh với selectedValue để set selected
+                            if (selectedValue) {
+                                // So sánh cả escaped và unescaped (jQuery có thể unescape khi lấy value)
+                                const normalizedSelected = selectedValue.replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+                                if (selectedValue === optionValue || normalizedSelected === optionValue) {
+                                    $option.prop('selected', true);
+                                }
+                            }
+                            
+                            selectElement.append($option);
+                        });
+                    } else {
+                        selectElement.append('<option value="">Không có thông số</option>');
+                    }
+                    
+                    // Khởi tạo Select2 nếu chưa có
+                    if (!selectElement.hasClass('select2-hidden-accessible')) {
+                        selectElement.select2({
+                            theme: 'bootstrap-5',
+                            placeholder: '-- Chọn thông số --',
+                            allowClear: true,
+                            minimumResultsForSearch: 0,
+                            dropdownParent: $('#createModal'),
+                            language: {
+                                noResults: function() {
+                                    return "Không tìm thấy kết quả";
+                                },
+                                searching: function() {
+                                    return "Đang tìm kiếm...";
+                                }
+                            }
+                        });
+                    } else {
+                        selectElement.trigger('change');
+                    }
+                    
+                    if (callback) callback();
+                },
+                error: function(xhr) {
+                    console.error('Error loading configurations:', xhr);
+                    selectElement.empty();
+                    selectElement.append('<option value="">Lỗi khi tải thông số</option>');
+                    if (callback) callback();
+                }
+            });
+        }
+
+        // Thêm dòng chi tiết
+        function addDetailRow(detail = null) {
+            const index = detailRowIndex++;
+            
+            // Tạo select cho sản phẩm
+            let productSelect = '<select class="form-control form-control-sm detail-product" data-index="' + index + '" onchange="onProductChange(' + index + ')"><option value="">-- Chọn sản phẩm --</option>';
+            productsList.forEach(function(product) {
+                const productId = product.productId || product.ProductId;
+                const productName = product.productName || product.ProductName || '';
+                const productModel = product.productModel || product.ProductModel || '';
+                const displayName = productModel ? `${productName} | ${productModel}` : productName || productId;
+                const selected = detail && detail.productId === productId ? 'selected' : '';
+                productSelect += `<option value="${productId}" ${selected}>${displayName}</option>`;
+            });
+            productSelect += '</select>';
+
+            // Tạo select cho thông số
+            let specSelect = '<select class="form-control form-control-sm detail-spec" data-index="' + index + '"><option value="">-- Chọn sản phẩm trước --</option></select>';
+
+            const row = `
+                <tr data-index="${index}">
+                    <td>
+                        ${productSelect}
+                    </td>
+                    <td>
+                        ${specSelect}
+                    </td>
+                    <td>
+                        <input type="number" class="form-control form-control-sm detail-quantity" 
+                               value="${detail ? (detail.quantity || '') : ''}" 
+                               min="1" placeholder="Số lượng" onchange="calculateDetailTotal(${index})">
+                    </td>
+                    <td>
+                        <input type="number" step="0.01" class="form-control form-control-sm detail-price" 
+                               value="${detail ? (detail.unitPrice || '') : ''}" 
+                               min="0" placeholder="Đơn giá" onchange="calculateDetailTotal(${index})">
+                    </td>
+                    <td>
+                        <input type="text" class="form-control form-control-sm detail-total" 
+                               value="${detail ? formatCurrency((detail.quantity || 0) * (detail.unitPrice || 0)) : '0'}" 
+                               readonly>
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="removeDetailRow(${index})">
+                            <i class="material-icons text-sm">delete</i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+            $('#detailTableBody').append(row);
+            
+            // Khởi tạo Select2 cho product select
+            setTimeout(function() {
+                const productSelectElement = $(`tr[data-index="${index}"] .detail-product`);
+                if (productSelectElement.length > 0 && !productSelectElement.hasClass('select2-hidden-accessible')) {
+                    productSelectElement.select2({
+                        theme: 'bootstrap-5',
+                        placeholder: '-- Chọn sản phẩm --',
+                        allowClear: true,
+                        minimumResultsForSearch: 0,
+                        dropdownParent: $('#createModal'),
+                        language: {
+                            noResults: function() {
+                                return "Không tìm thấy kết quả";
+                            },
+                            searching: function() {
+                                return "Đang tìm kiếm...";
+                            }
+                        }
+                    });
+                }
+                
+                // Khởi tạo Select2 cho spec select
+                const specSelectElement = $(`tr[data-index="${index}"] .detail-spec`);
+                if (specSelectElement.length > 0 && !specSelectElement.hasClass('select2-hidden-accessible')) {
+                    specSelectElement.select2({
+                        theme: 'bootstrap-5',
+                        placeholder: '-- Chọn sản phẩm trước --',
+                        allowClear: true,
+                        minimumResultsForSearch: 0,
+                        dropdownParent: $('#createModal'),
+                        language: {
+                            noResults: function() {
+                                return "Không tìm thấy kết quả";
+                            },
+                            searching: function() {
+                                return "Đang tìm kiếm...";
+                            }
+                        }
+                    });
+                }
+            }, 100);
+            
+            // Load lại promotions sau khi thêm sản phẩm
+            setTimeout(function() {
+                loadPromotions();
+            }, 200);
+            
+            // Nếu có detail và productId, load lại cấu hình sau khi append và tìm thông số tương ứng
+            if (detail && detail.productId) {
+                const savedSpec = (detail.specifications || '').trim();
+                
+                // Đợi một chút để DOM được render xong
+                setTimeout(function() {
+                    const specSelectElement = $(`tr[data-index="${index}"] .detail-spec`);
+                    
+                    if (specSelectElement.length === 0) {
+                        console.error('Spec select element not found for index:', index);
+                        return;
+                    }
+                    
+                    // Load cấu hình và sau đó tìm match
+                    loadProductConfigurations(detail.productId, specSelectElement, '', function() {
+                        // Sau khi load xong, tìm option phù hợp với savedSpec
+                        if (savedSpec) {
+                            let found = false;
+                            specSelectElement.find('option').each(function() {
+                                const optionValue = $(this).val();
+                                if (optionValue && optionValue !== '') {
+                                    try {
+                                        const config = JSON.parse(optionValue);
+                                        const specParts = [];
+                                        if (config.cpu) specParts.push(config.cpu);
+                                        if (config.ram) specParts.push(config.ram);
+                                        if (config.rom) specParts.push(config.rom);
+                                        if (config.card) specParts.push(config.card);
+                                        const specText = specParts.join(' / ');
+                                        
+                                        if (specText === savedSpec || savedSpec.includes(specText) || specText.includes(savedSpec)) {
+                                            specSelectElement.val(optionValue).trigger('change');
+                                            // Cập nhật giá = giá gốc + giá cấu hình
+                                            const product = productsList.find(p => (p.productId || p.ProductId) === detail.productId);
+                                            if (product) {
+                                                const originalPrice = product.originalSellingPrice || product.OriginalSellingPrice || 0;
+                                                const configPrice = config.price || 0;
+                                                const unitPrice = originalPrice + configPrice;
+                                                $(`tr[data-index="${index}"] .detail-price`).val(unitPrice);
+                                                calculateDetailTotal(index);
+                                            }
+                                            found = true;
+                                            return false; // break
+                                        }
+                                    } catch (e) {
+                                        // Ignore parse errors
+                                    }
+                                }
+                            });
+                            
+                            if (!found) {
+                                // Nếu không tìm thấy, thử tìm theo configurationId
+                                specSelectElement.find('option').each(function() {
+                                    const optionValue = $(this).val();
+                                    if (optionValue && optionValue !== '') {
+                                        try {
+                                            const config = JSON.parse(optionValue);
+                                            if (config.configurationId === savedSpec) {
+                                                specSelectElement.val(optionValue).trigger('change');
+                                                // Cập nhật giá = giá gốc + giá cấu hình
+                                                const product = productsList.find(p => (p.productId || p.ProductId) === detail.productId);
+                                                if (product) {
+                                                    const originalPrice = product.originalSellingPrice || product.OriginalSellingPrice || 0;
+                                                    const configPrice = config.price || 0;
+                                                    const unitPrice = originalPrice + configPrice;
+                                                    $(`tr[data-index="${index}"] .detail-price`).val(unitPrice);
+                                                    calculateDetailTotal(index);
+                                                }
+                                                return false; // break
+                                            }
+                                        } catch (e) {
+                                            // Ignore parse errors
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    });
+                }, 200);
+            }
+            
+            updateInputLabels();
+        }
+
+        // Xử lý khi chọn sản phẩm
+        function onProductChange(index) {
+            const productSelect = $(`tr[data-index="${index}"] .detail-product`);
+            const specSelect = $(`tr[data-index="${index}"] .detail-spec`);
+            const productId = productSelect.val();
+            
+            if (productId) {
+                // Load cấu hình sản phẩm
+                loadProductConfigurations(productId, specSelect, '', function() {
+                    // Sau khi load xong, reset giá và thông số
+                    $(`tr[data-index="${index}"] .detail-price`).val('');
+                    $(`tr[data-index="${index}"] .detail-total`).val('0');
+                    calculateTotalAmount();
+                    // Load lại promotions
+                    loadPromotions();
+                });
+            } else {
+                specSelect.empty();
+                specSelect.append('<option value="">-- Chọn sản phẩm trước --</option>');
+                specSelect.trigger('change');
+                // Reset giá khi bỏ chọn sản phẩm
+                $(`tr[data-index="${index}"] .detail-price`).val('');
+                $(`tr[data-index="${index}"] .detail-total`).val('0');
+                calculateTotalAmount();
+            }
+        }
+
+        // Xử lý khi chọn cấu hình (thông số) - chỉ cập nhật giá sau khi chọn cấu hình
+        $(document).on('change', '.detail-spec', function() {
+            const index = $(this).data('index');
+            const specValue = $(this).val();
+            const productSelect = $(`tr[data-index="${index}"] .detail-product`);
+            const productId = productSelect.val();
+            
+            if (specValue && productId) {
+                try {
+                    const config = JSON.parse(specValue);
+                    
+                    // Tìm sản phẩm để lấy giá gốc
+                    const product = productsList.find(p => (p.productId || p.ProductId) === productId);
+                    if (!product) {
+                        console.error('Product not found:', productId);
+                        return;
+                    }
+                    
+                    // Lấy giá gốc của sản phẩm
+                    const originalPrice = product.originalSellingPrice || product.OriginalSellingPrice || 0;
+                    
+                    // Lấy giá cấu hình (nếu có)
+                    const configPrice = config.price || 0;
+                    
+                    // Đơn giá = giá gốc + giá cấu hình
+                    const unitPrice = originalPrice + configPrice;
+                    
+                    $(`tr[data-index="${index}"] .detail-price`).val(unitPrice);
+                    calculateDetailTotal(index);
+                } catch (e) {
+                    console.error('Error parsing spec value:', e);
+                    // Fallback: chỉ lấy giá gốc sản phẩm
+                    const product = productsList.find(p => (p.productId || p.ProductId) === productId);
+                    if (product) {
+                        const originalPrice = product.originalSellingPrice || product.OriginalSellingPrice || 0;
+                        $(`tr[data-index="${index}"] .detail-price`).val(originalPrice);
+                        calculateDetailTotal(index);
+                    }
+                }
+            } else {
+                // Reset giá khi bỏ chọn cấu hình
+                $(`tr[data-index="${index}"] .detail-price`).val('');
+                $(`tr[data-index="${index}"] .detail-total`).val('0');
+                calculateTotalAmount();
+            }
+        });
+
+        // Tính thành tiền cho một dòng
+        function calculateDetailTotal(index) {
+            const quantity = parseFloat($(`tr[data-index="${index}"] .detail-quantity`).val()) || 0;
+            const price = parseFloat($(`tr[data-index="${index}"] .detail-price`).val()) || 0;
+            const total = quantity * price;
+            $(`tr[data-index="${index}"] .detail-total`).val(formatCurrency(total));
+            calculateTotalAmount();
+        }
+
+        // Tính tổng tiền
+        function calculateTotalAmount() {
+            let subtotal = 0;
+            $('#detailTableBody tr').each(function() {
+                const quantity = parseFloat($(this).find('.detail-quantity').val()) || 0;
+                const price = parseFloat($(this).find('.detail-price').val()) || 0;
+                subtotal += quantity * price;
+            });
+            
+            // Áp dụng discount nếu có
+            const discountedSubtotal = subtotal - promotionDiscount;
+            const deliveryFee = parseFloat($('#deliveryFeeInput').val()) || 0;
+            const finalDeliveryFee = Math.max(0, deliveryFee - promotionShippingDiscount);
+            const total = discountedSubtotal + finalDeliveryFee;
+            
+            $('#subtotalAmount').text(formatCurrency(subtotal));
+            $('#calculatedTotalAmount').text(formatCurrency(total));
+            $('#totalAmountInput').val(total);
+            
+            // Hiển thị discount nếu có
+            if (promotionDiscount > 0 || promotionShippingDiscount > 0) {
+                const totalDiscount = promotionDiscount + promotionShippingDiscount;
+                $('#discountAmount').text(`-${formatCurrency(totalDiscount)}`);
+                $('#discount-row').show();
+            } else {
+                $('#discount-row').hide();
+            }
+            
+            // Hiển thị phí vận chuyển
+            $('#deliveryFeeDisplay').text(formatCurrency(finalDeliveryFee));
+        }
+
+        // Xóa dòng chi tiết
+        function removeDetailRow(index) {
+            $(`tr[data-index="${index}"]`).remove();
+            calculateTotalAmount();
+            // Load lại promotions sau khi xóa sản phẩm
+            loadPromotions();
+        }
+
+        // Tạo ID tự động cho hóa đơn
+        function generateNextSaleInvoiceId() {
+            $.ajax({
+                url: `${API_URL}/next-id`,
+                type: 'GET',
+                success: function(response) {
+                    if (response && response.saleInvoiceId) {
+                        $('#saleInvoiceIdInput').val(response.saleInvoiceId);
+                        updateInputLabels();
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Error fetching next sale invoice ID:', xhr);
+                    showNotification('Lỗi khi lấy mã hóa đơn mới', 'error');
+                    $('#saleInvoiceIdInput').val('SI001'); // Fallback
+                    updateInputLabels();
+                }
+            });
+        }
+
+        // Hiển thị modal thêm mới
+        function showCreateModal() {
+            $('#createModalLabel').text('Thêm hóa đơn');
+            $('#createForm')[0].reset();
+            $('#customerIdInput').val('');
+            $('#saleInvoiceIdInput').val('');
+            $('#saleInvoiceIdInput').prop('readonly', true);
+            $('#phoneNumberInput').val('');
+            $('#customerNameInput').val('').prop('readonly', false);
+            $('#statusInput').val('Chờ xử lý');
+            $('#detailTableBody').empty();
+            detailRowIndex = 0;
+            $('#calculatedTotalAmount').text('0 VNĐ');
+            $('#subtotalAmount').text('0 VNĐ');
+            $('#totalAmountInput').val('0');
+            $('#discountPromotionSelect').html('<option value=""></option>');
+            $('#freeshipPromotionSelect').html('<option value=""></option>');
+            $('#promotion-message').html('');
+            $('#discount-row').hide();
+            appliedPromotion = null;
+            promotionDiscount = 0;
+            promotionShippingDiscount = 0;
+            $('#formErrorMessage').hide();
+            
+            // Set thời gian tạo hóa đơn
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            $('#timeCreateInput').val(now.toISOString().slice(0, 16));
+            
+            generateNextSaleInvoiceId();
+            // Tự động set nhân viên đang đăng nhập khi thêm mới
+            populateEmployeeSelect(currentEmployeeId || '');
+            loadEmployees();
+            loadProducts();
+
+            const modal = new bootstrap.Modal(document.getElementById('createModal'));
+            modal.show();
+        }
+
+        // Lưu hóa đơn
+        function saveSaleInvoice() {
+            $('#formErrorMessage').hide();
+
+            const saleInvoiceId = $('#saleInvoiceIdInput').val().trim();
+            const customerId = $('#customerIdInput').val().trim();
+            const customerName = $('#customerNameInput').val().trim();
+            const phoneNumber = $('#phoneNumberInput').val().trim();
+            const paymentMethod = $('#paymentMethodInput').val().trim();
+            const totalAmount = parseFloat($('#totalAmountInput').val()) || 0;
+            const deliveryFee = parseFloat($('#deliveryFeeInput').val()) || 0;
+            const deliveryAddress = $('#deliveryAddressInput').val().trim();
+            const provinceCode = $('#provinceCodeValue').val().trim();
+            const communeCode = $('#communeCodeValue').val().trim();
+            const addressDetail = $('#addressDetailInput').val().trim();
+            const status = $('#statusInput').val().trim();
+            let employeeId = $('#employeeIdInput').val().trim();
+            if (!employeeId && currentEmployeeId) {
+                employeeId = currentEmployeeId;
+            }
+
+            // Validation
+            if (!phoneNumber) {
+                showFormError('Vui lòng nhập số điện thoại');
+                return;
+            }
+            
+            if (!customerName) {
+                showFormError('Vui lòng nhập tên khách hàng');
+                return;
+            }
+            
+            if (!status) {
+                showFormError('Vui lòng chọn trạng thái');
+                return;
+            }
+
+            // Lấy chi tiết sản phẩm
+            const details = [];
+            $('#detailTableBody tr').each(function() {
+                const productId = $(this).find('.detail-product').val();
+                const specValue = $(this).find('.detail-spec').val();
+                const quantity = parseInt($(this).find('.detail-quantity').val()) || 0;
+                const unitPrice = parseFloat($(this).find('.detail-price').val()) || 0;
+                
+                let specifications = '';
+                if (specValue) {
+                    try {
+                        const config = JSON.parse(specValue);
+                        const specParts = [];
+                        if (config.cpu) specParts.push(config.cpu);
+                        if (config.ram) specParts.push(config.ram);
+                        if (config.rom) specParts.push(config.rom);
+                        if (config.card) specParts.push(config.card);
+                        specifications = specParts.join(' / ');
+                    } catch (e) {
+                        specifications = specValue;
+                    }
+                }
+                
+                if (productId && quantity > 0 && unitPrice > 0) {
+                    details.push({
+                        productId: productId,
+                        quantity: quantity,
+                        unitPrice: unitPrice,
+                        specifications: specifications
+                    });
+                }
+            });
+
+            // Validation: phải có ít nhất 1 sản phẩm
+            if (details.length === 0) {
+                showFormError('Vui lòng thêm ít nhất một sản phẩm vào hóa đơn');
+                return;
+            }
+
+            // Tính địa chỉ giao hàng từ các thành phần
+            updateDeliveryAddress();
+            const finalDeliveryAddress = window.deliveryAddressValue || deliveryAddress || null;
+            
+            // Lấy thời gian tạo hóa đơn
+            const timeCreate = $('#timeCreateInput').val();
+            if (!timeCreate) {
+                showFormError('Vui lòng nhập thời gian tạo hóa đơn');
+                return;
+            }
+
+            // Lấy thông tin promotion nếu có
+            const selectedDiscountPromotions = appliedPromotion ? (appliedPromotion.selectedDiscountPromotions || []) : [];
+            const selectedFreeshipPromotions = appliedPromotion ? (appliedPromotion.selectedFreeshipPromotions || []) : [];
+            
+            const data = {
+                saleInvoiceId: saleInvoiceId || null,
+                customerId: customerId || null,
+                customerName: customerName || null,
+                phoneNumber: phoneNumber || null,
+                paymentMethod: paymentMethod || null,
+                totalAmount: totalAmount,
+                deliveryFee: deliveryFee,
+                deliveryAddress: finalDeliveryAddress,
+                provinceCode: provinceCode || null,
+                communeCode: communeCode || null,
+                addressDetail: addressDetail || null,
+                employeeId: employeeId || null,
+                status: status,
+                timeCreate: timeCreate,
+                discount: promotionDiscount,
+                shippingDiscount: promotionShippingDiscount,
+                selectedDiscountPromotions: selectedDiscountPromotions,
+                selectedFreeshipPromotions: selectedFreeshipPromotions,
+                details: details
+            };
+
+            $.ajax({
+                url: API_URL,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                success: function(response) {
+                    showNotification('Thêm hóa đơn thành công', 'success');
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('createModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                    loadSaleInvoices();
+                },
+                error: function(xhr) {
+                    console.error('Error saving sale invoice:', xhr);
+                    let message = 'Có lỗi xảy ra khi lưu hóa đơn';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showFormError(message);
+                }
+            });
+        }
+
+        // Hiển thị lỗi trong form
+        function showFormError(message) {
+            $('#formErrorMessage').html(message).show();
+        }
+
+        // Reset khi đóng modal
+        $(document).on('hidden.bs.modal', '#createModal', function() {
+            $('#createForm')[0].reset();
+            $('#customerIdInput').val('');
+            $('#saleInvoiceIdInput').val('');
+            $('#saleInvoiceIdInput').prop('readonly', false);
+            $('#customerNameInput').prop('readonly', false);
+            $('#formErrorMessage').hide();
+            
+            $('.input-group-outline').removeClass('is-filled is-focused');
+            if (typeof updateInputLabels === 'function') {
+                setTimeout(function() {
+                    updateInputLabels();
+                }, 50);
+            }
+        });
 
         // Reset khi đóng modal
         $(document).on('hidden.bs.modal', '#statusModal', function() {
@@ -751,5 +2335,205 @@
 
     .modal .select2-dropdown {
         z-index: 10000;
+    }
+
+    /* Modal styling */
+    .modal-xl {
+        max-width: 90%;
+    }
+
+    @@media (min-width: 1200px) {
+        .modal-xl {
+            max-width: 1140px;
+        }
+    }
+
+    .modal-dialog-scrollable .modal-body {
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+    }
+
+    /* Table styling trong modal - giống quản lí nhập hàng */
+    #createModal .table-responsive {
+        max-width: 100%;
+        overflow-x: auto;
+        overflow-y: visible;
+    }
+
+    #createModal table {
+        table-layout: fixed;
+        width: 100%;
+        min-width: 800px;
+    }
+
+    #createModal .table {
+        margin-bottom: 1rem;
+        background-color: #fff;
+    }
+
+    #createModal .table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    #createModal .table thead th {
+        color: #fff !important;
+        font-weight: 600;
+        font-size: 0.875rem;
+        padding: 0.5rem;
+        text-align: center;
+        vertical-align: middle;
+        white-space: nowrap;
+        border: none;
+    }
+
+    #createModal .table tbody td {
+        padding: 0.5rem;
+        vertical-align: middle;
+        font-size: 0.875rem;
+    }
+
+    #createModal .table tbody tr:hover {
+        background-color: #f8f9fa;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Đảm bảo các cột có width hợp lý */
+    #createModal table thead th:nth-child(1),
+    #createModal table tbody td:nth-child(1) {
+        width: 25%;
+    }
+
+    #createModal table thead th:nth-child(2),
+    #createModal table tbody td:nth-child(2) {
+        width: 25%;
+    }
+
+    #createModal table thead th:nth-child(3),
+    #createModal table tbody td:nth-child(3) {
+        width: 12%;
+    }
+
+    #createModal table thead th:nth-child(4),
+    #createModal table tbody td:nth-child(4) {
+        width: 15%;
+    }
+
+    #createModal table thead th:nth-child(5),
+    #createModal table tbody td:nth-child(5) {
+        width: 15%;
+    }
+
+    #createModal table thead th:nth-child(6),
+    #createModal table tbody td:nth-child(6) {
+        width: 8%;
+    }
+
+    /* Input styling trong table */
+    #createModal .table .form-control-sm,
+    #createModal .table .detail-product,
+    #createModal .table .detail-spec {
+        font-size: 0.875rem;
+        padding: 0.25rem 0.5rem;
+    }
+
+    /* Đảm bảo select và input không bị tràn */
+    #createModal table tbody td select,
+    #createModal table tbody td input {
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Autocomplete styles */
+    .autocomplete-wrapper {
+        position: relative;
+    }
+
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #d2d6da;
+        border-radius: 0.375rem;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+        display: none;
+        margin-top: 2px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .autocomplete-item {
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom: none;
+    }
+
+    .autocomplete-item:hover,
+    .autocomplete-item.selected {
+        background-color: #e9ecef;
+    }
+
+    .autocomplete-item:first-child {
+        border-top-left-radius: 0.375rem;
+        border-top-right-radius: 0.375rem;
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom-left-radius: 0.375rem;
+        border-bottom-right-radius: 0.375rem;
+    }
+
+    /* Xử lý đặc biệt cho input date - ẩn label trống */
+    .input-group-outline:has(input[type="date"]) .form-label:empty {
+        display: none;
+    }
+
+    .input-group-outline input[type="date"] {
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+
+    /* Ẩn placeholder dd/mm/yyyy trong input date */
+    input[type="date"]::placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]::-webkit-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]::-moz-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]:-ms-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    /* Ẩn text placeholder mặc định của input date (dd/mm/yyyy) khi KHÔNG có dữ liệu và KHÔNG đang nhập */
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input])::-webkit-datetime-edit,
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input]):invalid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input]):valid::-webkit-datetime-edit {
+        color: transparent !important;
+    }
+
+    /* Hiển thị dd/mm/yyyy khi CÓ dữ liệu ngày được nhập vào (có attribute value) hoặc đang nhập (có data-has-input) */
+    .input-group-outline input[type="date"][value]::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][value]:valid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]:invalid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]:valid::-webkit-datetime-edit {
+        color: #495057 !important;
     }
 </style>

@@ -23,7 +23,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
             [FromQuery] string? searchTerm = null,
-            [FromQuery] string? employeeId = null)
+            [FromQuery] string? employeeId = null,
+            [FromQuery] DateTime? dateFrom = null, // Thêm filter ngày bắt đầu
+            [FromQuery] DateTime? dateTo = null) // Thêm filter ngày kết thúc
         {
             try
             {
@@ -49,6 +51,16 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 if (!string.IsNullOrWhiteSpace(employeeId))
                 {
                     query = query.Where(h => h.EmployeeId == employeeId);
+                }
+
+                // Lọc theo ngày
+                if (dateFrom.HasValue)
+                {
+                    query = query.Where(h => h.Time != null && h.Time.Value.Date >= dateFrom.Value.Date);
+                }
+                if (dateTo.HasValue)
+                {
+                    query = query.Where(h => h.Time != null && h.Time.Value.Date <= dateTo.Value.Date);
                 }
 
                 // Đếm tổng số

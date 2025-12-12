@@ -698,6 +698,9 @@ public partial class Testlaptop37Context : DbContext
             entity.Property(e => e.Status)
                 .HasMaxLength(50)
                 .HasColumnName("status");
+            entity.Property(e => e.Time)
+                .HasColumnType("datetime")
+                .HasColumnName("time");
             entity.Property(e => e.TotalAmount)
                 .HasColumnType("decimal(18, 2)")
                 .HasColumnName("total_amount");

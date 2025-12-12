@@ -25,7 +25,7 @@
                                 <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm bảo hành...">
                             </div>
                         </div>
-                        <div class="col-lg-3 col-md-6">
+                        <div class="col-lg-2 col-md-3">
                             <div class="input-group input-group-outline">
                                 <select class="form-control" id="statusFilter">
                                     <option value="">Tất cả</option>
@@ -35,6 +35,23 @@
                                     <option value="Đã hủy">Đã hủy</option>
                                 </select>
                             </div>
+                        </div>
+                        <div class="col-lg-2 col-md-3">
+                            <div class="input-group input-group-outline">
+                                <label class="form-label">Từ ngày</label>
+                                <input type="date" id="dateFromInput" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-lg-2 col-md-3">
+                            <div class="input-group input-group-outline">
+                                <label class="form-label">Đến ngày</label>
+                                <input type="date" id="dateToInput" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-lg-1 col-md-3 d-flex align-items-end">
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearDateFilters()" title="Xóa bộ lọc ngày" style="height: 40px; min-width: 40px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                                <i class="material-icons" style="font-size: 18px;">clear</i>
+                            </button>
                         </div>
                     </div>
 
@@ -159,7 +176,6 @@
                         </div>
                     </div>
                     <div class="row">
-                        
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
                                 <label class="form-label">Trạng thái *</label>
@@ -170,6 +186,12 @@
                                     <option value="Hoàn thành">Hoàn thành</option>
                                     <option value="Đã hủy">Đã hủy</option>
                                 </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Thời gian</label>
+                                <input type="datetime-local" class="form-control" id="timeInput" readonly>
                             </div>
                         </div>
                     </div>
@@ -238,6 +260,11 @@
                 loadWarranties();
             });
 
+            // Event listeners cho date filters
+            $('#dateFromInput, #dateToInput').on('change', function() {
+                triggerAutoSearch();
+            });
+
             // Xử lý label cho Material Dashboard inputs
             window.updateInputLabels = function() {
                 $('.input-group-outline input, .input-group-outline select, .input-group-outline textarea').each(function() {
@@ -278,6 +305,23 @@
             });
         });
 
+        // Hàm format thời gian với giờ phút giây
+        function formatDateTime(dateTimeString) {
+            if (!dateTimeString) return '-';
+            const date = new Date(dateTimeString);
+            if (isNaN(date.getTime())) return '-';
+            
+            // Format: dd/mm/yyyy HH:mm:ss
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            
+            return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+        }
+
         function triggerAutoSearch() {
             currentPage = 1;
             if (searchDebounceTimer) {
@@ -288,11 +332,52 @@
             }, SEARCH_DEBOUNCE_DELAY);
         }
 
+        // Hàm xóa bộ lọc ngày
+        function clearDateFilters() {
+            $('#dateFromInput').val('').removeAttr('value').removeAttr('data-has-input');
+            $('#dateToInput').val('').removeAttr('value').removeAttr('data-has-input');
+            updateInputLabels();
+            triggerAutoSearch();
+        }
+
+        // Xử lý input date để hiển thị dd/mm/yyyy khi có giá trị
+        $(document).on('input change', 'input[type="date"]', function() {
+            const $input = $(this);
+            const value = $input.val();
+            if (value && value.trim() !== '') {
+                $input.attr('value', value).attr('data-has-input', 'true');
+            } else {
+                $input.removeAttr('value').removeAttr('data-has-input');
+            }
+        });
+
+        // Xử lý khi focus vào input date
+        $(document).on('focus', 'input[type="date"]', function() {
+            const $input = $(this);
+            const value = $input.val();
+            if (value && value.trim() !== '') {
+                $input.attr('data-has-input', 'true');
+            }
+        });
+
+        // Xử lý khi blur khỏi input date
+        $(document).on('blur', 'input[type="date"]', function() {
+            const $input = $(this);
+            const value = $input.val();
+            if (!value || value.trim() === '') {
+                $input.removeAttr('data-has-input');
+            } else {
+                $input.attr('value', value).attr('data-has-input', 'true');
+            }
+        });
+
         // Load danh sách bảo hành
         function loadWarranties(page = currentPage) {
             currentPage = page;
             const searchTerm = $('#searchInput').val().trim();
             const status = $('#statusFilter').val();
+            const dateFrom = $('#dateFromInput').val();
+            const dateTo = $('#dateToInput').val();
 
             const dataParams = {
                 pageNumber: currentPage,
@@ -300,6 +385,13 @@
                 searchTerm: searchTerm || null,
                 status: status || null
             };
+
+            if (dateFrom) {
+                dataParams.dateFrom = dateFrom;
+            }
+            if (dateTo) {
+                dataParams.dateTo = dateTo;
+            }
 
             $.ajax({
                 url: API_URL,
@@ -509,6 +601,9 @@
                             <div class="col-md-6">
                                 <strong>Tổng tiền:</strong> ${totalAmount}
                             </div>
+                            <div class="col-md-6">
+                                <strong>Thời gian:</strong> ${warranty.time ? formatDateTime(warranty.time) : '-'}
+                            </div>
                         </div>
                         <div class="row mb-3">
                             <div class="col-md-12">
@@ -713,6 +808,15 @@
             $('#customerNameInput').val('').prop('readonly', true);
             $('#serialIdInput').empty().append('<option value="">-</option>').prop('disabled', false);
             $('#totalAmountInput').val('').prop('readonly', false);
+            // Set thời gian hiện tại khi tạo mới (chỉ để hiển thị, backend sẽ set chính xác)
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const timeString = `${year}-${month}-${day}T${hours}:${minutes}`;
+            $('#timeInput').val(timeString).attr('value', timeString);
             $('#formErrorMessage').hide();
             
             generateNextWarrantyId();
@@ -748,6 +852,7 @@
                     const savedContentDetail = warranty.contentDetail || '';
                     const savedTotalAmount = warranty.totalAmount || '';
                     const savedSerialId = warranty.serialId || '';
+                    const savedTime = warranty.time || warranty.Time || null;
                     
                     // Populate employee select với EmployeeId từ dữ liệu (giữ nguyên nhân viên đã tạo)
                     populateEmployeeSelect(savedEmployeeId);
@@ -767,6 +872,16 @@
                                 $('#statusInput').val(savedStatus);
                                 $('#contentDetailInput').val(savedContentDetail);
                                 $('#totalAmountInput').val(savedTotalAmount);
+                                
+                                // Set thời gian hiện tại khi sửa (luôn lấy thời gian hiện tại)
+                                const now = new Date();
+                                const year = now.getFullYear();
+                                const month = String(now.getMonth() + 1).padStart(2, '0');
+                                const day = String(now.getDate()).padStart(2, '0');
+                                const hours = String(now.getHours()).padStart(2, '0');
+                                const minutes = String(now.getMinutes()).padStart(2, '0');
+                                const timeString = `${year}-${month}-${day}T${hours}:${minutes}`;
+                                $('#timeInput').val(timeString).attr('value', timeString);
                                 
                                 // Xử lý form theo loại nhưng không reset thông tin khách hàng
                                 handleTypeChangeForEdit(savedType);
@@ -793,6 +908,16 @@
                             $('#statusInput').val(savedStatus);
                             $('#contentDetailInput').val(savedContentDetail);
                             $('#totalAmountInput').val(savedTotalAmount);
+                            
+                            // Set thời gian hiện tại khi sửa (luôn lấy thời gian hiện tại)
+                            const now = new Date();
+                            const year = now.getFullYear();
+                            const month = String(now.getMonth() + 1).padStart(2, '0');
+                            const day = String(now.getDate()).padStart(2, '0');
+                            const hours = String(now.getHours()).padStart(2, '0');
+                            const minutes = String(now.getMinutes()).padStart(2, '0');
+                            const timeString = `${year}-${month}-${day}T${hours}:${minutes}`;
+                            $('#timeInput').val(timeString).attr('value', timeString);
                             
                             // Xử lý form theo loại nhưng không reset thông tin khách hàng
                             handleTypeChangeForEdit(savedType);
@@ -1273,5 +1398,63 @@
         text-align: center;
         color: #6c757d;
         font-style: italic;
+    }
+
+    /* Styling cho datetime-local input */
+    input[type="datetime-local"] {
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+
+    input[type="datetime-local"]:read-only {
+        background-color: #f8f9fa;
+        cursor: not-allowed;
+    }
+
+    /* Xử lý đặc biệt cho input date - ẩn label trống */
+    .input-group-outline:has(input[type="date"]) .form-label:empty {
+        display: none;
+    }
+
+    .input-group-outline input[type="date"] {
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+
+    /* Ẩn placeholder dd/mm/yyyy trong input date */
+    input[type="date"]::placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]::-webkit-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]::-moz-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]:-ms-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    /* Ẩn text placeholder mặc định của input date (dd/mm/yyyy) khi KHÔNG có dữ liệu và KHÔNG đang nhập */
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input])::-webkit-datetime-edit,
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input]):invalid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input]):valid::-webkit-datetime-edit {
+        color: transparent !important;
+    }
+
+    /* Hiển thị dd/mm/yyyy khi CÓ dữ liệu ngày được nhập vào (có attribute value) hoặc đang nhập (có data-has-input) */
+    .input-group-outline input[type="date"][value]::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][value]:valid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]:invalid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]:valid::-webkit-datetime-edit {
+        color: #495057 !important;
     }
 </style>

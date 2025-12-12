@@ -35,7 +35,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
             [FromQuery] string? searchTerm = null,
-            [FromQuery] string? status = null)
+            [FromQuery] string? status = null,
+            [FromQuery] DateTime? dateFrom = null, // Thêm filter ngày bắt đầu
+            [FromQuery] DateTime? dateTo = null) // Thêm filter ngày kết thúc
         {
             try
             {
@@ -69,12 +71,23 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     query = query.Where(w => w.Status == status);
                 }
 
+                // Lọc theo ngày
+                if (dateFrom.HasValue)
+                {
+                    query = query.Where(w => w.Time != null && w.Time.Value.Date >= dateFrom.Value.Date);
+                }
+                if (dateTo.HasValue)
+                {
+                    query = query.Where(w => w.Time != null && w.Time.Value.Date <= dateTo.Value.Date);
+                }
+
                 // Đếm tổng số
                 var totalItems = await query.CountAsync();
 
                 // Lấy dữ liệu theo trang
                 var warranties = await query
-                    .OrderByDescending(w => w.WarrantyId)
+                    .OrderByDescending(w => w.Time)
+                    .ThenByDescending(w => w.WarrantyId)
                     .Skip((pageNumber - 1) * pageSize)
                     .Take(pageSize)
                     .ToListAsync();
@@ -94,7 +107,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     Type = w.Type,
                     ContentDetail = w.ContentDetail,
                     Status = w.Status,
-                    TotalAmount = w.TotalAmount
+                    TotalAmount = w.TotalAmount,
+                    Time = w.Time
                 }).ToList();
 
                 var result = new PagedResult<WarrantyDTO>
@@ -339,7 +353,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     Type = warranty.Type,
                     ContentDetail = warranty.ContentDetail,
                     Status = warranty.Status,
-                    TotalAmount = warranty.TotalAmount
+                    TotalAmount = warranty.TotalAmount,
+                    Time = warranty.Time
                 };
 
                 return Ok(warrantyDTO);
@@ -405,7 +420,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     Type = dto.Type,
                     ContentDetail = dto.ContentDetail,
                     Status = dto.Status ?? "Đang xử lý",
-                    TotalAmount = totalAmount
+                    TotalAmount = totalAmount,
+                    Time = DateTime.Now // Thêm thời gian khi tạo mới
                 };
 
                 _context.Warranties.Add(warranty);
@@ -449,7 +465,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     Type = warranty.Type,
                     ContentDetail = warranty.ContentDetail,
                     Status = warranty.Status,
-                    TotalAmount = warranty.TotalAmount
+                    TotalAmount = warranty.TotalAmount,
+                    Time = warranty.Time
                 };
 
                 return CreatedAtAction(nameof(GetWarranty), new { id = warranty.WarrantyId }, result);
@@ -511,7 +528,20 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 warranty.EmployeeId = dto.EmployeeId ?? warranty.EmployeeId;
                 warranty.Type = type;
                 warranty.ContentDetail = dto.ContentDetail ?? warranty.ContentDetail;
-                warranty.Status = dto.Status ?? warranty.Status;
+                
+                // Cập nhật thời gian khi trạng thái thay đổi hoặc khi sửa
+                if (dto.Status != null && dto.Status != warranty.Status)
+                {
+                    warranty.Status = dto.Status;
+                    warranty.Time = DateTime.Now; // Cập nhật thời gian khi thay đổi trạng thái
+                }
+                else
+                {
+                    warranty.Status = dto.Status ?? warranty.Status;
+                    // Luôn cập nhật thời gian khi sửa phiếu bảo hành
+                    warranty.Time = DateTime.Now;
+                }
+                
                 warranty.TotalAmount = totalAmount;
 
                 await _context.SaveChangesAsync();
@@ -554,7 +584,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     Type = warranty.Type,
                     ContentDetail = warranty.ContentDetail,
                     Status = warranty.Status,
-                    TotalAmount = warranty.TotalAmount
+                    TotalAmount = warranty.TotalAmount,
+                    Time = warranty.Time
                 };
 
                 return Ok(result);

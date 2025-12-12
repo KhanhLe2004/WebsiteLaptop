@@ -23,6 +23,8 @@ public partial class Warranty
 
     public decimal? TotalAmount { get; set; }
 
+    public DateTime? Time { get; set; }
+
     public virtual Customer? Customer { get; set; }
 
     public virtual Employee? Employee { get; set; }

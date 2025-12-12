@@ -11,7 +11,12 @@
             <div class="card my-4">
                 <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
                     <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
-                        <h6 class="text-white text-capitalize ps-3">Quản lý khách hàng</h6>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="text-white text-capitalize ps-3 mb-0">Quản lý khách hàng</h6>
+                            <button type="button" class="btn btn-white btn-sm me-3" onclick="addCustomer()">
+                                <i class="material-icons text-sm">add</i> Thêm khách hàng
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="card-body px-3 pb-2">
@@ -86,17 +91,17 @@
     </div>
 </div>
 
-<!-- Modal Sửa Khách hàng -->
+<!-- Modal Thêm/Sửa Khách hàng -->
 <div class="modal fade" id="customerModal" tabindex="-1" aria-labelledby="customerModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-gradient-primary">
-                <h5 class="modal-title text-white" id="customerModalLabel">Cập nhật khách hàng</h5>
+                <h5 class="modal-title text-white" id="customerModalLabel">Thêm khách hàng</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <form id="customerForm">
-                    <input type="hidden" id="isEditMode" value="true">
+                    <input type="hidden" id="isEditMode" value="false">
                     <div class="row">
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
@@ -307,6 +312,29 @@
                         const savedLength = parseInt($(this).data('saved-star-length')) || 8;
                         $(this).attr('type', 'text').val('*'.repeat(savedLength)).data('password-length', savedLength);
                     }
+                }
+            });
+
+            // Xử lý date input: set data-has-input khi user tương tác
+            $('#dateOfBirth').on('focus', function() {
+                $(this).attr('data-has-input', 'true');
+            });
+
+            $('#dateOfBirth').on('change', function() {
+                const value = $(this).val();
+                if (value && value.trim() !== '') {
+                    $(this).attr('value', value).attr('data-has-input', 'true');
+                } else {
+                    $(this).removeAttr('value').removeAttr('data-has-input');
+                }
+            });
+
+            $('#dateOfBirth').on('blur', function() {
+                const value = $(this).val();
+                if (value && value.trim() !== '') {
+                    $(this).attr('value', value);
+                } else {
+                    $(this).removeAttr('value').removeAttr('data-has-input');
                 }
             });
         });
@@ -1080,14 +1108,16 @@
             $('#customerName').val(customer.customerName || '');
             
             // Format date for input[type="date"]
+            const $dateOfBirth = $('#dateOfBirth');
             if (customer.dateOfBirth) {
                 const date = new Date(customer.dateOfBirth);
                 const year = date.getFullYear();
                 const month = String(date.getMonth() + 1).padStart(2, '0');
                 const day = String(date.getDate()).padStart(2, '0');
-                $('#dateOfBirth').val(`${year}-${month}-${day}`);
+                const dateValue = `${year}-${month}-${day}`;
+                $dateOfBirth.val(dateValue).attr('value', dateValue);
             } else {
-                $('#dateOfBirth').val('');
+                $dateOfBirth.val('').removeAttr('value');
             }
             
             $('#phoneNumber').val(customer.phoneNumber || '');
@@ -1336,23 +1366,75 @@
             }
         }
 
-        // Lưu khách hàng (chỉ cập nhật, không tạo mới)
+        // Thêm khách hàng mới
+        function addCustomer() {
+            $('#isEditMode').val('false');
+            $('#customerModalLabel').text('Thêm khách hàng');
+            
+            // Reset form
+            $('#customerForm')[0].reset();
+            
+            // Load customerId tự động
+            $.ajax({
+                url: `${API_URL}/next-id`,
+                type: 'GET',
+                success: function(response) {
+                    if (response && response.customerId) {
+                        $('#customerId').val(response.customerId);
+                        $('#customerId').closest('.input-group-outline').addClass('is-filled');
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Error loading next customer ID:', xhr);
+                    // Vẫn cho phép mở modal, customerId sẽ được tạo tự động ở backend
+                }
+            });
+            
+            // Enable tất cả inputs
+            $('#customerForm input:not([type="hidden"]):not([type="file"]), #customerForm select').prop('disabled', false);
+            $('#customerForm input[type="file"]').prop('disabled', false).css('pointer-events', 'auto');
+            
+            // Reset password
+            $('#password').attr('type', 'password').val('').data('password-length', 0);
+            
+            // Reset input date: xóa attribute value và data-has-input để ẩn dd/mm/yyyy
+            $('#dateOfBirth').removeAttr('value').removeAttr('data-has-input');
+            
+            // Reset address fields
+            $('#provinceCode').val('');
+            $('#provinceCodeValue').val('');
+            $('#provinceCode').closest('.input-group-outline').removeClass('is-filled');
+            $('#communeCode').val('');
+            $('#communeCodeValue').val('');
+            $('#communeCode').prop('disabled', true);
+            $('#communeCode').closest('.input-group-outline').removeClass('is-filled');
+            $('#addressDetail').val('');
+            communesList = [];
+            
+            // Clear preview
+            $('#imagePreview').hide();
+            $('#avatarFile').val('');
+            
+            // Clear error message
+            $('#errorMessage').hide();
+            
+            // Remove is-filled classes
+            $('.input-group-outline').removeClass('is-filled');
+            
+            // Show save button
+            $('.modal-footer .btn-primary').show();
+            
+            const modal = new bootstrap.Modal(document.getElementById('customerModal'));
+            modal.show();
+        }
+
+        // Lưu khách hàng (thêm mới hoặc cập nhật)
         function saveCustomer() {
             // Clear error message
             $('#errorMessage').hide();
             
             const isEdit = $('#isEditMode').val() === 'true';
             const customerId = $('#customerId').val().trim();
-
-            if (!isEdit) {
-                showError('Chức năng thêm khách hàng đã bị vô hiệu hóa');
-                return;
-            }
-
-            if (!customerId) {
-                showError('Không tìm thấy mã khách hàng');
-                return;
-            }
 
             const customerName = $('#customerName').val().trim();
             if (!customerName) {
@@ -1362,6 +1444,14 @@
             }
 
             const formData = new FormData();
+            
+            // Nếu là thêm mới, gửi CustomerId (nếu có)
+            if (!isEdit) {
+                if (customerId) {
+                    formData.append('CustomerId', customerId);
+                }
+            }
+            
             formData.append('CustomerName', customerName);
             formData.append('DateOfBirth', $('#dateOfBirth').val() || '');
             formData.append('PhoneNumber', $('#phoneNumber').val() || '');
@@ -1371,9 +1461,9 @@
             formData.append('AddressDetail', $('#addressDetail').val() || '');
             formData.append('Username', $('#username').val() || '');
             
-            // Chỉ gửi password nếu có giá trị (khi muốn đổi mật khẩu)
+            // Chỉ gửi password nếu có giá trị
             const password = $('#password').val();
-            if (password) {
+            if (password && password.trim() !== '') {
                 formData.append('Password', password);
             }
 
@@ -1382,8 +1472,18 @@
                 formData.append('AvatarFile', avatarFile);
             }
 
-            const url = `${API_URL}/${customerId}`;
-            const method = 'PUT';
+            let url, method;
+            if (isEdit) {
+                if (!customerId) {
+                    showError('Không tìm thấy mã khách hàng');
+                    return;
+                }
+                url = `${API_URL}/${customerId}`;
+                method = 'PUT';
+            } else {
+                url = API_URL;
+                method = 'POST';
+            }
 
             $.ajax({
                 url: url,
@@ -1392,7 +1492,8 @@
                 processData: false,
                 contentType: false,
                 success: function(response) {
-                    showNotification('Cập nhật khách hàng thành công', 'success');
+                    const message = isEdit ? 'Cập nhật khách hàng thành công' : 'Thêm khách hàng thành công';
+                    showNotification(message, 'success');
                     
                     // Cập nhật passwordLength nếu có trong response
                     if (response && response.passwordLength !== undefined) {
@@ -1415,7 +1516,7 @@
                     console.error('Response Text:', xhr.responseText);
                     console.error('Response JSON:', xhr.responseJSON);
                     
-                    let message = 'Có lỗi xảy ra khi lưu khách hàng';
+                    let message = isEdit ? 'Có lỗi xảy ra khi cập nhật khách hàng' : 'Có lỗi xảy ra khi thêm khách hàng';
                     let errorDetails = '';
                     
                     if (xhr.responseJSON) {
@@ -1549,6 +1650,8 @@
             $('#customerForm')[0].reset();
             // Reset password về type="password" và clear data
             $('#password').attr('type', 'password').val('').data('password-length', 0);
+            // Reset input date: xóa attribute value và data-has-input để ẩn dd/mm/yyyy
+            $('#dateOfBirth').removeAttr('value').removeAttr('data-has-input');
             $('#errorMessage').hide();
             
             // Remove is-filled classes
@@ -1763,6 +1866,53 @@
     #password:-ms-input-placeholder {
         color: transparent !important;
         opacity: 0 !important;
+    }
+
+    /* Xử lý đặc biệt cho input date - ẩn label trống */
+    .input-group-outline:has(input[type="date"]) .form-label:empty {
+        display: none;
+    }
+
+    .input-group-outline input[type="date"] {
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+
+    /* Ẩn placeholder dd/mm/yyyy trong input date */
+    input[type="date"]::placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]::-webkit-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]::-moz-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]:-ms-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    /* Ẩn text placeholder mặc định của input date (dd/mm/yyyy) khi KHÔNG có dữ liệu và KHÔNG đang nhập */
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input])::-webkit-datetime-edit,
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input]):invalid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input]):valid::-webkit-datetime-edit {
+        color: transparent !important;
+    }
+
+    /* Hiển thị dd/mm/yyyy khi CÓ dữ liệu ngày được nhập vào (có attribute value) hoặc đang nhập (có data-has-input) */
+    .input-group-outline input[type="date"][value]::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][value]:valid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]:invalid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]:valid::-webkit-datetime-edit {
+        color: #495057 !important;
     }
 
     /* Select2 styling */

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 using WebLaptopBE.Data;
 using WebLaptopBE.Hubs;
 
@@ -25,7 +26,16 @@ builder.Services.AddControllers()
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "WebLaptop API",
+        Version = "v1"
+    });
+    // Xử lý nested types trong controllers
+    c.CustomSchemaIds(type => type.FullName?.Replace("+", "."));
+});
 
 // Add HttpClientFactory
 builder.Services.AddHttpClient();

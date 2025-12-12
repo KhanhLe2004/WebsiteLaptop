@@ -54,9 +54,30 @@ namespace WebLaptopBE.DTOs
         [StringLength(200, ErrorMessage = "Địa chỉ giao hàng không được quá 200 ký tự")]
         public string? DeliveryAddress { get; set; }
         
+        public string? ProvinceCode { get; set; } // Mã tỉnh/thành
+        public string? CommuneCode { get; set; } // Mã phường/xã
+        [StringLength(200, ErrorMessage = "Địa chỉ cụ thể không được quá 200 ký tự")]
+        public string? AddressDetail { get; set; } // Địa chỉ cụ thể (số nhà, tên đường, v.v.)
+        
         public string? EmployeeId { get; set; }
         
         public string? CustomerId { get; set; }
+        
+        [StringLength(200, ErrorMessage = "Tên khách hàng không được quá 200 ký tự")]
+        public string? CustomerName { get; set; }
+        
+        [StringLength(15, ErrorMessage = "Số điện thoại không được quá 15 ký tự")]
+        public string? PhoneNumber { get; set; }
+        
+        public DateTime? TimeCreate { get; set; }
+        
+        public decimal? Discount { get; set; }
+        
+        public decimal? ShippingDiscount { get; set; }
+        
+        public List<string>? SelectedDiscountPromotions { get; set; }
+        
+        public List<string>? SelectedFreeshipPromotions { get; set; }
         
         public List<SaleInvoiceDetailCreateDTO>? Details { get; set; }
     }
@@ -67,6 +88,7 @@ namespace WebLaptopBE.DTOs
         public int? Quantity { get; set; }
         public decimal? UnitPrice { get; set; }
         public string? ProductId { get; set; }
+        public string? ConfigurationId { get; set; }
         [StringLength(100, ErrorMessage = "Thông số kỹ thuật không được quá 100 ký tự")]
         public string? Specifications { get; set; }
     }
@@ -91,6 +113,31 @@ namespace WebLaptopBE.DTOs
         public string? CustomerId { get; set; }
         
         public List<SaleInvoiceDetailCreateDTO>? Details { get; set; }
+    }
+
+    // DTO cho apply promotion request
+    public class ApplyPromotionRequest
+    {
+        public string? CustomerId { get; set; }
+        public List<string>? SelectedDiscountPromotions { get; set; }
+        public List<string>? SelectedFreeshipPromotions { get; set; }
+        public List<InvoiceDetailDTO>? InvoiceDetails { get; set; }
+        public decimal? DeliveryFee { get; set; }
+    }
+
+    // DTO cho invoice detail trong apply promotion
+    public class InvoiceDetailDTO
+    {
+        public string? ProductId { get; set; }
+        public int? Quantity { get; set; }
+        public decimal? UnitPrice { get; set; }
+    }
+
+    // DTO cho cập nhật trạng thái
+    public class UpdateStatusDTO
+    {
+        public string Status { get; set; } = null!;
+        public string? EmployeeId { get; set; }
     }
 }
 

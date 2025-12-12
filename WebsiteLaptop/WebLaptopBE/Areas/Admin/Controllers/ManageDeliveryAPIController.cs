@@ -35,7 +35,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
             [FromQuery] string? searchTerm = null,
-            [FromQuery] string? status = null)
+            [FromQuery] string? status = null,
+            [FromQuery] DateTime? dateFrom = null, // Thêm filter ngày bắt đầu
+            [FromQuery] DateTime? dateTo = null) // Thêm filter ngày kết thúc
         {
             try
             {
@@ -67,6 +69,16 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         si.SaleInvoiceId.ToLower().Contains(searchTerm) ||
                         (si.Customer != null && si.Customer.CustomerName != null && si.Customer.CustomerName.ToLower().Contains(searchTerm)) ||
                         (si.Employee != null && si.Employee.EmployeeName != null && si.Employee.EmployeeName.ToLower().Contains(searchTerm)));
+                }
+
+                // Lọc theo ngày tạo
+                if (dateFrom.HasValue)
+                {
+                    query = query.Where(si => si.TimeCreate != null && si.TimeCreate.Value.Date >= dateFrom.Value.Date);
+                }
+                if (dateTo.HasValue)
+                {
+                    query = query.Where(si => si.TimeCreate != null && si.TimeCreate.Value.Date <= dateTo.Value.Date);
                 }
 
                 // Đếm tổng số

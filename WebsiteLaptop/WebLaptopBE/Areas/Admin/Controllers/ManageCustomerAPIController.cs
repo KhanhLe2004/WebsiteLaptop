@@ -123,6 +123,208 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
         }
 
+        // POST: api/admin/customers
+        // Tạo mới khách hàng
+        [HttpPost]
+        public async Task<ActionResult<CustomerDTO>> CreateCustomer([FromForm] CustomerCreateDTO dto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                // Kiểm tra username đã tồn tại
+                if (!string.IsNullOrWhiteSpace(dto.Username))
+                {
+                    if (await _context.Customers.AnyAsync(c => c.Username == dto.Username))
+                    {
+                        return Conflict(new { message = "Tên đăng nhập đã tồn tại" });
+                    }
+                }
+
+                // Kiểm tra email đã tồn tại
+                if (!string.IsNullOrWhiteSpace(dto.Email))
+                {
+                    if (await _context.Customers.AnyAsync(c => c.Email == dto.Email))
+                    {
+                        return Conflict(new { message = "Email đã tồn tại" });
+                    }
+                }
+
+                // Tạo mã khách hàng mới (tự động generate nếu chưa có)
+                string newCustomerId;
+                if (!string.IsNullOrWhiteSpace(dto.CustomerId))
+                {
+                    // Sử dụng CustomerId từ frontend (đã được generate tự động)
+                    newCustomerId = dto.CustomerId.Trim();
+                    
+                    // Kiểm tra mã đã tồn tại chưa
+                    if (await _context.Customers.AnyAsync(c => c.CustomerId == newCustomerId))
+                    {
+                        // Nếu đã tồn tại, tạo mã mới
+                        newCustomerId = await GenerateCustomerIdAsync();
+                    }
+                }
+                else
+                {
+                    // Tự động tạo mã mới
+                    newCustomerId = await GenerateCustomerIdAsync();
+                }
+
+                // Xử lý upload ảnh
+                string? avatarFileName = null;
+                if (dto.AvatarFile != null && dto.AvatarFile.Length > 0)
+                {
+                    avatarFileName = await SaveImageAsync(dto.AvatarFile);
+                }
+
+                // Lấy tên tỉnh/thành và phường/xã từ API (không bắt buộc, nếu lỗi thì bỏ qua)
+                string? provinceName = null;
+                string? communeName = null;
+                
+                // Chỉ lấy tên nếu có mã, nhưng không block nếu API lỗi
+                if (!string.IsNullOrWhiteSpace(dto.ProvinceCode))
+                {
+                    try
+                    {
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3)); // Timeout 3 giây
+                        var provinceResponse = await _httpClient.GetAsync($"{ADDRESS_API_BASE_URL}/provinces", cts.Token);
+                        if (provinceResponse.IsSuccessStatusCode)
+                        {
+                            var provinceJson = await provinceResponse.Content.ReadAsStringAsync(cts.Token);
+                            var provinceDoc = JsonDocument.Parse(provinceJson);
+                            if (provinceDoc.RootElement.TryGetProperty("provinces", out var provincesElement))
+                            {
+                                foreach (var province in provincesElement.EnumerateArray())
+                                {
+                                    if (province.TryGetProperty("code", out var code) && code.GetString() == dto.ProvinceCode)
+                                    {
+                                        if (province.TryGetProperty("name", out var name))
+                                        {
+                                            provinceName = name.GetString();
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception apiEx)
+                    {
+                        // Log nhưng không throw - chỉ lưu mã, không lưu tên
+                        Console.WriteLine($"Warning: Could not fetch province name from API: {apiEx.Message}");
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(dto.ProvinceCode) && !string.IsNullOrWhiteSpace(dto.CommuneCode))
+                {
+                    try
+                    {
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3)); // Timeout 3 giây
+                        var communeResponse = await _httpClient.GetAsync($"{ADDRESS_API_BASE_URL}/provinces/{dto.ProvinceCode}/communes", cts.Token);
+                        if (communeResponse.IsSuccessStatusCode)
+                        {
+                            var communeJson = await communeResponse.Content.ReadAsStringAsync(cts.Token);
+                            var communeDoc = JsonDocument.Parse(communeJson);
+                            if (communeDoc.RootElement.TryGetProperty("communes", out var communesElement))
+                            {
+                                foreach (var commune in communesElement.EnumerateArray())
+                                {
+                                    if (commune.TryGetProperty("code", out var code) && code.GetString() == dto.CommuneCode)
+                                    {
+                                        if (commune.TryGetProperty("name", out var name))
+                                        {
+                                            communeName = name.GetString();
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception apiEx)
+                    {
+                        // Log nhưng không throw - chỉ lưu mã, không lưu tên
+                        Console.WriteLine($"Warning: Could not fetch commune name from API: {apiEx.Message}");
+                    }
+                }
+
+                // Xử lý địa chỉ: ghép từ các thành phần
+                string? fullAddress = BuildFullAddress(dto.AddressDetail, communeName, provinceName);
+                if (string.IsNullOrWhiteSpace(fullAddress) && !string.IsNullOrWhiteSpace(dto.Address))
+                {
+                    fullAddress = dto.Address; // Giữ nguyên Address cũ nếu không có thông tin mới
+                }
+
+                // Lưu thông tin địa chỉ chi tiết vào Address dưới dạng JSON
+                // Nhưng nếu JSON quá dài (> 200 ký tự), chỉ lưu FullAddress
+                string? finalAddress = fullAddress;
+                if (!string.IsNullOrWhiteSpace(dto.ProvinceCode) || !string.IsNullOrWhiteSpace(dto.CommuneCode) || !string.IsNullOrWhiteSpace(dto.AddressDetail))
+                {
+                    try
+                    {
+                        finalAddress = SerializeAddress(dto.ProvinceCode, provinceName, dto.CommuneCode, communeName, dto.AddressDetail, fullAddress);
+                        if (string.IsNullOrWhiteSpace(finalAddress))
+                        {
+                            finalAddress = fullAddress;
+                        }
+                    }
+                    catch (Exception jsonEx)
+                    {
+                        // Nếu có lỗi khi serialize JSON, chỉ lưu FullAddress
+                        Console.WriteLine($"Error serializing address JSON: {jsonEx.Message}");
+                        finalAddress = fullAddress;
+                    }
+                }
+
+                // Tạo khách hàng mới
+                var customer = new Customer
+                {
+                    CustomerId = newCustomerId,
+                    CustomerName = dto.CustomerName,
+                    DateOfBirth = dto.DateOfBirth,
+                    PhoneNumber = dto.PhoneNumber,
+                    Address = finalAddress,
+                    Email = dto.Email,
+                    Username = dto.Username,
+                    Password = dto.Password, // Lưu mật khẩu dạng plain text (nên hash trong production)
+                    Avatar = avatarFileName,
+                    Active = true // Mặc định active = true
+                };
+
+                _context.Customers.Add(customer);
+                await _context.SaveChangesAsync();
+
+                var result = ParseCustomerAddress(customer);
+
+                // Ghi log lịch sử
+                var employeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(employeeId))
+                {
+                    await _historyService.LogHistoryAsync(employeeId, $"Thêm khách hàng: {customer.CustomerId} - {customer.CustomerName}");
+                }
+
+                return CreatedAtAction(nameof(GetCustomer), new { id = customer.CustomerId }, result);
+            }
+            catch (Exception ex)
+            {
+                // Log inner exception để debug
+                var errorMessage = ex.Message;
+                if (ex.InnerException != null)
+                {
+                    errorMessage += $" | Inner: {ex.InnerException.Message}";
+                }
+                
+                // Log stack trace để debug
+                Console.WriteLine($"Error creating customer: {errorMessage}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                
+                return StatusCode(500, new { message = "Lỗi khi tạo khách hàng", error = errorMessage });
+            }
+        }
+
         // PUT: api/admin/customers/{id}
         // Cập nhật khách hàng
         [HttpPut("{id}")]
@@ -787,6 +989,54 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
             
             return parts.Count > 0 ? string.Join(", ", parts) : null;
+        }
+
+        // Helper method để tạo mã khách hàng mới
+        private async Task<string> GenerateCustomerIdAsync()
+        {
+            // Lấy mã khách hàng lớn nhất hiện có theo format C
+            var lastCustomer = await _context.Customers
+                .Where(c => c.CustomerId.StartsWith("C") && c.CustomerId.Length == 4)
+                .OrderByDescending(c => c.CustomerId)
+                .FirstOrDefaultAsync();
+
+            if (lastCustomer == null)
+            {
+                return "C001";
+            }
+
+            // Tách số từ mã khách hàng (ví dụ: C001 -> 001)
+            string lastId = lastCustomer.CustomerId;
+            if (lastId.StartsWith("C") && lastId.Length > 1)
+            {
+                string numberPart = lastId.Substring(1);
+                if (int.TryParse(numberPart, out int number))
+                {
+                    number++;
+                    return $"C{number:D3}";
+                }
+            }
+
+            // Nếu không parse được, tạo mã mới dựa trên số lượng khách hàng có format C
+            int count = await _context.Customers
+                .CountAsync(c => c.CustomerId.StartsWith("C") && c.CustomerId.Length == 4);
+            return $"C{(count + 1):D3}";
+        }
+
+        // GET: api/admin/customers/next-id
+        // Lấy CustomerId tiếp theo (tự động generate)
+        [HttpGet("next-id")]
+        public async Task<ActionResult> GetNextCustomerId()
+        {
+            try
+            {
+                var nextId = await GenerateCustomerIdAsync();
+                return Ok(new { customerId = nextId });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi tạo CustomerId", error = ex.Message });
+            }
         }
 
         // Helper method để serialize địa chỉ thành JSON
