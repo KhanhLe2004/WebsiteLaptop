@@ -351,6 +351,30 @@
     </div>
 </div>
 
+<!-- Modal Chọn loại file xuất -->
+<div class="modal fade" id="exportModal" tabindex="-1" aria-labelledby="exportModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-primary">
+                <h5 class="modal-title text-white" id="exportModalLabel">Chọn loại file xuất</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <input type="hidden" id="exportInvoiceId" value="">
+                <button type="button" class="btn btn-success w-100 mb-3" onclick="exportToExcelFromModal()">
+                    <i class="material-icons text-sm me-2">file_download</i> Xuất Excel
+                </button>
+                <button type="button" class="btn btn-danger w-100" onclick="exportToPdfFromModal()">
+                    <i class="material-icons text-sm me-2">picture_as_pdf</i> Xuất PDF
+                </button>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <!-- Select2 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -564,6 +588,7 @@
                 const totalAmount = invoice.totalAmount ? formatCurrency(invoice.totalAmount) : '0';
                 const status = invoice.status || 'Pending';
                 const statusBadge = getStatusBadge(status);
+                const invoiceId = (invoice.saleInvoiceId || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
                 tbody.append(`
                     <tr>
@@ -586,12 +611,17 @@
                             ${statusBadge}
                         </td>
                         <td style="vertical-align: middle; text-align: center;" class="table-actions">
-                            <button class="btn btn-info action-btn" onclick='viewSaleInvoice("${invoice.saleInvoiceId}")' title="Xem">
+                            <button class="btn btn-info action-btn" onclick='viewSaleInvoice("${invoiceId}")' title="Xem">
                                 <i class="material-icons text-sm">visibility</i>
                             </button>
                             ${status !== 'Hoàn thành' && status !== 'Đã hủy' ? `
-                            <button class="btn btn-warning action-btn" onclick='updateStatus("${invoice.saleInvoiceId}", "${status}")' title="Cập nhật trạng thái">
+                            <button class="btn btn-warning action-btn" onclick='updateStatus("${invoiceId}", "${status}")' title="Cập nhật trạng thái">
                                 <i class="material-icons text-sm">edit</i>
+                            </button>
+                            ` : ''}
+                            ${status !== 'Chờ xử lý' ? `
+                            <button class="btn btn-primary action-btn" onclick='showExportModal("${invoiceId}")' title="In hóa đơn">
+                                <i class="material-icons text-sm">print</i>
                             </button>
                             ` : ''}
                         </td>
@@ -796,6 +826,61 @@
 
             const modal = new bootstrap.Modal(document.getElementById('statusModal'));
             modal.show();
+        }
+
+        // Hiển thị modal chọn loại xuất file
+        function showExportModal(invoiceId) {
+            $('#exportInvoiceId').val(invoiceId);
+            const modal = new bootstrap.Modal(document.getElementById('exportModal'));
+            modal.show();
+        }
+
+        // Xuất hóa đơn ra Excel từ modal
+        function exportToExcelFromModal() {
+            try {
+                const invoiceId = $('#exportInvoiceId').val();
+                if (!invoiceId) {
+                    showNotification('Không tìm thấy mã hóa đơn', 'error');
+                    return;
+                }
+                
+                // Đóng modal
+                const modalInstance = bootstrap.Modal.getInstance(document.getElementById('exportModal'));
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+                
+                const url = `${API_URL}/${invoiceId}/export-excel`;
+                window.open(url, '_blank');
+                showNotification('Đang tải file Excel...', 'success');
+            } catch (error) {
+                console.error('Error exporting to Excel:', error);
+                showNotification('Lỗi khi xuất file Excel', 'error');
+            }
+        }
+
+        // Xuất hóa đơn ra PDF từ modal
+        function exportToPdfFromModal() {
+            try {
+                const invoiceId = $('#exportInvoiceId').val();
+                if (!invoiceId) {
+                    showNotification('Không tìm thấy mã hóa đơn', 'error');
+                    return;
+                }
+                
+                // Đóng modal
+                const modalInstance = bootstrap.Modal.getInstance(document.getElementById('exportModal'));
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+                
+                const url = `${API_URL}/${invoiceId}/export-pdf`;
+                window.open(url, '_blank');
+                showNotification('Đang tải file PDF...', 'success');
+            } catch (error) {
+                console.error('Error exporting to PDF:', error);
+                showNotification('Lỗi khi xuất file PDF', 'error');
+            }
         }
 
         // Lưu trạng thái

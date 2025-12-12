@@ -108,6 +108,30 @@
     </div>
 </div>
 
+<!-- Modal Chọn loại file xuất -->
+<div class="modal fade" id="exportOptionsModal" tabindex="-1" aria-labelledby="exportOptionsModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-primary">
+                <h5 class="modal-title text-white" id="exportOptionsModalLabel">Chọn loại file xuất</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <input type="hidden" id="currentStockExportIdForExport" value="">
+                <button type="button" class="btn btn-success w-100 mb-3" onclick="exportToExcelFromModal()">
+                    <i class="material-icons text-sm me-2">file_download</i> Xuất Excel
+                </button>
+                <button type="button" class="btn btn-danger w-100" onclick="exportToPdfFromModal()">
+                    <i class="material-icons text-sm me-2">picture_as_pdf</i> Xuất PDF
+                </button>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Cập nhật trạng thái -->
 <div class="modal fade" id="updateStatusModal" tabindex="-1" aria-labelledby="updateStatusModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog">
@@ -483,6 +507,9 @@
                                 <i class="material-icons text-sm">edit</i>
                             </button>
                             ` : ''}
+                            <button type="button" class="btn btn-primary action-btn" onclick='showExportModal("${stockExport.stockExportId}")' title="In phiếu xuất hàng">
+                                <i class="material-icons text-sm">print</i>
+                            </button>
                         </td>
                     </tr>
                 `);
@@ -1585,6 +1612,61 @@
         // Format tiền tệ
         function formatCurrency(amount) {
             return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+        }
+
+        // Hiển thị modal chọn loại xuất file
+        function showExportModal(stockExportId) {
+            $('#currentStockExportIdForExport').val(stockExportId);
+            const modal = new bootstrap.Modal(document.getElementById('exportOptionsModal'));
+            modal.show();
+        }
+
+        // Xuất phiếu xuất hàng ra Excel từ modal
+        function exportToExcelFromModal() {
+            try {
+                const stockExportId = $('#currentStockExportIdForExport').val();
+                if (!stockExportId) {
+                    showNotification('Không tìm thấy mã phiếu xuất hàng', 'error');
+                    return;
+                }
+                
+                // Đóng modal
+                const modalInstance = bootstrap.Modal.getInstance(document.getElementById('exportOptionsModal'));
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+                
+                const url = `${API_URL}/${stockExportId}/export-excel`;
+                window.open(url, '_blank');
+                showNotification('Đang tải file Excel...', 'success');
+            } catch (error) {
+                console.error('Error exporting to Excel:', error);
+                showNotification('Lỗi khi xuất file Excel', 'error');
+            }
+        }
+
+        // Xuất phiếu xuất hàng ra PDF từ modal
+        function exportToPdfFromModal() {
+            try {
+                const stockExportId = $('#currentStockExportIdForExport').val();
+                if (!stockExportId) {
+                    showNotification('Không tìm thấy mã phiếu xuất hàng', 'error');
+                    return;
+                }
+                
+                // Đóng modal
+                const modalInstance = bootstrap.Modal.getInstance(document.getElementById('exportOptionsModal'));
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+                
+                const url = `${API_URL}/${stockExportId}/export-pdf`;
+                window.open(url, '_blank');
+                showNotification('Đang tải file PDF...', 'success');
+            } catch (error) {
+                console.error('Error exporting to PDF:', error);
+                showNotification('Lỗi khi xuất file PDF', 'error');
+            }
         }
 
         // Reset khi đóng modal

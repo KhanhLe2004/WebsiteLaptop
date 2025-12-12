@@ -7,6 +7,10 @@ using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
 using WebLaptopBE.Services;
+using OfficeOpenXml;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
 
 namespace WebLaptopBE.Areas.Admin.Controllers
 {
@@ -882,6 +886,356 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             {
                 System.Diagnostics.Debug.WriteLine($"Error deleting ProductSerials: {ex.Message}");
             }
+        }
+
+        // GET: api/admin/stock-imports/{id}/export-excel
+        // Xuất phiếu nhập hàng ra Excel
+        [HttpGet("{id}/export-excel")]
+        public async Task<IActionResult> ExportToExcel(string id)
+        {
+            try
+            {
+                var stockImport = await _context.StockImports
+                    .Include(si => si.Supplier)
+                    .Include(si => si.Employee)
+                    .Include(si => si.StockImportDetails)
+                        .ThenInclude(detail => detail.Product)
+                    .FirstOrDefaultAsync(si => si.StockImportId == id);
+
+                if (stockImport == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy phiếu nhập hàng" });
+                }
+
+                ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+                using var package = new ExcelPackage();
+                var worksheet = package.Workbook.Worksheets.Add("Phiếu nhập hàng");
+
+                // Header TenTech
+                worksheet.Cells[1, 1].Value = "TenTech";
+                worksheet.Cells[1, 1, 1, 5].Merge = true;
+                worksheet.Cells[1, 1].Style.Font.Size = 20;
+                worksheet.Cells[1, 1].Style.Font.Bold = true;
+                worksheet.Cells[1, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                worksheet.Cells[1, 1].Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+                worksheet.Cells[1, 1].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(129, 196, 8)); // #81C408
+                worksheet.Cells[1, 1].Style.Font.Color.SetColor(System.Drawing.Color.White);
+                worksheet.Row(1).Height = 30;
+
+                // Thông tin phiếu nhập
+                int row = 3;
+                worksheet.Cells[row, 1].Value = "PHIẾU NHẬP HÀNG";
+                worksheet.Cells[row, 1, row, 5].Merge = true;
+                worksheet.Cells[row, 1].Style.Font.Size = 14;
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                row++;
+
+                worksheet.Cells[row, 1].Value = $"SỐ {stockImport.StockImportId}";
+                worksheet.Cells[row, 1, row, 5].Merge = true;
+                worksheet.Cells[row, 1].Style.Font.Size = 16;
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 1].Style.Font.Color.SetColor(System.Drawing.Color.FromArgb(220, 53, 69)); // #dc3545
+                worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                row++;
+
+                worksheet.Cells[row, 1].Value = $"Thời gian: {DateTime.Now:dd/MM/yyyy HH:mm}";
+                worksheet.Cells[row, 1, row, 5].Merge = true;
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                row++;
+                row++;
+
+                // Thông tin nhà cung cấp và nhân viên
+                worksheet.Cells[row, 1].Value = "1. Thông tin phiếu nhập";
+                worksheet.Cells[row, 1, row, 5].Merge = true;
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 1].Style.Font.Size = 12;
+                worksheet.Cells[row, 1].Style.Border.Bottom.Style = OfficeOpenXml.Style.ExcelBorderStyle.Thin;
+                worksheet.Cells[row, 1].Style.Border.Bottom.Color.SetColor(System.Drawing.Color.FromArgb(129, 196, 8));
+                row++;
+
+                worksheet.Cells[row, 1].Value = "Nhà cung cấp:";
+                worksheet.Cells[row, 2].Value = stockImport.Supplier?.SupplierName ?? "-";
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                row++;
+
+                worksheet.Cells[row, 1].Value = "Nhân viên:";
+                worksheet.Cells[row, 2].Value = stockImport.Employee?.EmployeeName ?? "-";
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                row++;
+
+                row++;
+
+                // Chi tiết sản phẩm
+                worksheet.Cells[row, 1].Value = "2. Sản phẩm nhập hàng";
+                worksheet.Cells[row, 1, row, 5].Merge = true;
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 1].Style.Font.Size = 12;
+                worksheet.Cells[row, 1].Style.Border.Bottom.Style = OfficeOpenXml.Style.ExcelBorderStyle.Thin;
+                worksheet.Cells[row, 1].Style.Border.Bottom.Color.SetColor(System.Drawing.Color.FromArgb(129, 196, 8));
+                row++;
+
+                worksheet.Cells[row, 1].Value = "#";
+                worksheet.Cells[row, 2].Value = "Tên sản phẩm";
+                worksheet.Cells[row, 3].Value = "SL";
+                worksheet.Cells[row, 4].Value = "Giá tiền";
+                worksheet.Cells[row, 5].Value = "Tổng (SLxG)";
+                worksheet.Cells[row, 1, row, 5].Style.Font.Bold = true;
+                worksheet.Cells[row, 1, row, 5].Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+                worksheet.Cells[row, 1, row, 5].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.White);
+                worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                worksheet.Cells[row, 3].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                worksheet.Cells[row, 4].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                worksheet.Cells[row, 5].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                row++;
+
+                int stt = 1;
+                decimal subtotal = 0;
+                int totalQuantity = 0;
+                foreach (var detail in stockImport.StockImportDetails ?? new List<StockImportDetail>())
+                {
+                    worksheet.Cells[row, 1].Value = stt;
+                    worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                    worksheet.Cells[row, 2].Value = detail.Product?.ProductName ?? "-";
+                    if (!string.IsNullOrEmpty(detail.Specifications))
+                    {
+                        worksheet.Cells[row, 2].Value = $"{detail.Product?.ProductName ?? "-"}\n{detail.Specifications}";
+                    }
+                    worksheet.Cells[row, 3].Value = detail.Quantity ?? 0;
+                    worksheet.Cells[row, 3].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                    worksheet.Cells[row, 4].Value = detail.Price ?? 0;
+                    worksheet.Cells[row, 4].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                    var itemTotal = (detail.Quantity ?? 0) * (detail.Price ?? 0);
+                    worksheet.Cells[row, 5].Value = itemTotal;
+                    worksheet.Cells[row, 5].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                    subtotal += itemTotal;
+                    totalQuantity += detail.Quantity ?? 0;
+                    row++;
+                    stt++;
+                }
+
+                row++;
+                row++;
+
+                // Tổng số lượng (hàng trên)
+                worksheet.Cells[row, 3].Value = "Tổng số lượng:";
+                worksheet.Cells[row, 3].Style.Font.Bold = true;
+                worksheet.Cells[row, 3].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                worksheet.Cells[row, 5].Value = totalQuantity;
+                worksheet.Cells[row, 5].Style.Font.Bold = true;
+                worksheet.Cells[row, 5].Style.Font.Size = 14;
+                worksheet.Cells[row, 5].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                row++;
+
+                // Tổng tiền (hàng dưới)
+                worksheet.Cells[row, 3].Value = "Tổng tiền:";
+                worksheet.Cells[row, 3].Style.Font.Bold = true;
+                worksheet.Cells[row, 3].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                worksheet.Cells[row, 5].Value = stockImport.TotalAmount ?? subtotal;
+                worksheet.Cells[row, 5].Style.Font.Bold = true;
+                worksheet.Cells[row, 5].Style.Font.Size = 14;
+                worksheet.Cells[row, 5].Style.Font.Color.SetColor(System.Drawing.Color.FromArgb(220, 53, 69)); // #dc3545
+                worksheet.Cells[row, 5].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+
+                // Format số tiền
+                worksheet.Cells[3, 5, row, 5].Style.Numberformat.Format = "#,##0";
+
+                // Auto fit columns
+                worksheet.Cells.AutoFitColumns();
+
+                var stream = new MemoryStream();
+                package.SaveAs(stream);
+                stream.Position = 0;
+
+                var fileName = $"PhieuNhap_{stockImport.StockImportId}_{DateTime.Now:yyyyMMddHHmmss}.xlsx";
+                return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi xuất phiếu nhập hàng ra Excel", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/stock-imports/{id}/export-pdf
+        // Xuất phiếu nhập hàng ra PDF
+        [HttpGet("{id}/export-pdf")]
+        public async Task<IActionResult> ExportToPdf(string id)
+        {
+            try
+            {
+                var stockImport = await _context.StockImports
+                    .Include(si => si.Supplier)
+                    .Include(si => si.Employee)
+                    .Include(si => si.StockImportDetails)
+                        .ThenInclude(detail => detail.Product)
+                    .FirstOrDefaultAsync(si => si.StockImportId == id);
+
+                if (stockImport == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy phiếu nhập hàng" });
+                }
+
+                QuestPDF.Settings.License = LicenseType.Community;
+
+                var document = Document.Create(container =>
+                {
+                    container.Page(page =>
+                    {
+                        page.Size(PageSizes.A4);
+                        page.Margin(2, Unit.Centimetre);
+                        page.DefaultTextStyle(x => x.FontSize(10));
+
+                        page.Content()
+                            .Column(column =>
+                            {
+                                column.Spacing(0.5f, Unit.Centimetre);
+
+                                // TenTech header trong content
+                                column.Item()
+                                    .Background(Colors.Green.Lighten1)
+                                    .Padding(15)
+                                    .AlignCenter()
+                                    .Text("TenTech")
+                                    .FontSize(20)
+                                    .Bold()
+                                    .FontColor(Colors.White);
+
+                                column.Item().PaddingTop(0.5f, Unit.Centimetre);
+
+                                // Thông tin phiếu nhập
+                                column.Item().AlignCenter().Text("PHIẾU NHẬP HÀNG").FontSize(14).Bold();
+                                column.Item().AlignCenter().Text($"SỐ {stockImport.StockImportId ?? "-"}").FontSize(16).Bold().FontColor(Colors.Red.Darken1);
+                                column.Item().AlignCenter().Text($"Thời gian: {DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(10);
+                                column.Item().PaddingTop(0.5f, Unit.Centimetre);
+
+                                // Thông tin phiếu nhập
+                                column.Item().Text("1. Thông tin phiếu nhập").Bold().FontSize(12);
+                                column.Item().LineHorizontal(1).LineColor(Colors.Green.Lighten1);
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem().Text("Nhà cung cấp:").Bold();
+                                    row.RelativeItem(2).Text(stockImport.Supplier?.SupplierName ?? "-");
+                                });
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem().Text("Nhân viên:").Bold();
+                                    row.RelativeItem(2).Text(stockImport.Employee?.EmployeeName ?? "-");
+                                });
+
+                                column.Item().PaddingTop(0.5f, Unit.Centimetre);
+
+                                // Chi tiết sản phẩm
+                                column.Item().Text("2. Sản phẩm nhập hàng").Bold().FontSize(12);
+                                column.Item().LineHorizontal(1).LineColor(Colors.Green.Lighten1);
+                                
+                                // Tính subtotal và totalQuantity
+                                decimal subtotal = 0;
+                                int totalQuantity = 0;
+                                foreach (var detail in stockImport.StockImportDetails ?? new List<StockImportDetail>())
+                                {
+                                    var itemTotal = (detail.Quantity ?? 0) * (detail.Price ?? 0);
+                                    subtotal += itemTotal;
+                                    totalQuantity += detail.Quantity ?? 0;
+                                }
+
+                                column.Item().Table(table =>
+                                {
+                                    table.ColumnsDefinition(columns =>
+                                    {
+                                        columns.RelativeColumn(0.5f);
+                                        columns.RelativeColumn(2f);
+                                        columns.RelativeColumn(0.8f);
+                                        columns.RelativeColumn(1.2f);
+                                        columns.RelativeColumn(1.2f);
+                                    });
+
+                                    table.Header(header =>
+                                    {
+                                        header.Cell().Element(CellStyleHeader).Text("#").Bold();
+                                        header.Cell().Element(CellStyleHeader).Text("Tên sản phẩm").Bold();
+                                        header.Cell().Element(CellStyleHeader).AlignCenter().Text("SL").Bold();
+                                        header.Cell().Element(CellStyleHeader).AlignRight().Text("Giá tiền").Bold();
+                                        header.Cell().Element(CellStyleHeader).AlignRight().Text("Tổng (SLxG)").Bold();
+                                    });
+
+                                    int stt = 1;
+                                    foreach (var detail in stockImport.StockImportDetails ?? new List<StockImportDetail>())
+                                    {
+                                        var itemTotal = (detail.Quantity ?? 0) * (detail.Price ?? 0);
+                                        var productName = detail.Product?.ProductName ?? "-";
+                                        if (!string.IsNullOrEmpty(detail.Specifications))
+                                        {
+                                            productName = $"{productName}\n{detail.Specifications}";
+                                        }
+
+                                        table.Cell().Element(CellStyle).Text(stt.ToString());
+                                        table.Cell().Element(CellStyle).Text(productName);
+                                        table.Cell().Element(CellStyle).AlignCenter().Text((detail.Quantity ?? 0).ToString());
+                                        table.Cell().Element(CellStyle).AlignRight().Text(FormatCurrency(detail.Price ?? 0));
+                                        table.Cell().Element(CellStyle).AlignRight().Text(FormatCurrency(itemTotal));
+                                        stt++;
+                                    }
+                                });
+
+                                column.Item().PaddingTop(0.5f, Unit.Centimetre);
+
+                                // Tổng số lượng và Tổng tiền cùng một hàng
+                                decimal total = stockImport.TotalAmount ?? subtotal;
+
+                                column.Item().AlignRight().Row(row =>
+                                {
+                                    row.RelativeItem();
+                                    row.ConstantItem(9, Unit.Centimetre).Column(col =>
+                                    {
+                                        col.Item().Row(r =>
+                                        {
+                                            r.RelativeItem(3).Text("Tổng số lượng:").Bold().FontSize(14);
+                                            r.ConstantItem(5, Unit.Centimetre).AlignRight().Text(totalQuantity.ToString()).Bold().FontSize(14);
+                                        });
+                                        col.Item().Row(r =>
+                                        {
+                                            r.RelativeItem(3).Text("Tổng tiền:").Bold().FontSize(14);
+                                            r.ConstantItem(5, Unit.Centimetre).AlignRight().Text(FormatCurrency(total)).Bold().FontSize(14).FontColor(Colors.Red.Darken1);
+                                        });
+                                    });
+                                });
+                            });
+                    });
+                });
+
+                var stream = new MemoryStream();
+                document.GeneratePdf(stream);
+                stream.Position = 0;
+
+                var fileName = $"PhieuNhap_{stockImport.StockImportId}_{DateTime.Now:yyyyMMddHHmmss}.pdf";
+                return File(stream.ToArray(), "application/pdf", fileName);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi xuất phiếu nhập hàng ra PDF", error = ex.Message });
+            }
+        }
+
+        private static IContainer CellStyle(IContainer container)
+        {
+            return container
+                .Border(1)
+                .Padding(5)
+                .Background(Colors.White);
+        }
+
+        private static IContainer CellStyleHeader(IContainer container)
+        {
+            return container
+                .Border(1)
+                .Padding(5)
+                .Background(Colors.White);
+        }
+
+        private static string FormatCurrency(decimal amount)
+        {
+            return amount.ToString("N0") + " đ";
         }
 
     }

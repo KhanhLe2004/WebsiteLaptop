@@ -7,6 +7,10 @@ using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
 using WebLaptopBE.Services;
+using OfficeOpenXml;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
 
 namespace WebLaptopBE.Areas.Admin.Controllers
 {
@@ -651,6 +655,335 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             await _context.SaveChangesAsync();
 
             return newCustomerId;
+        }
+
+        // GET: api/admin/warranties/{id}/export-excel
+        // Xuất phiếu bảo hành ra Excel
+        [HttpGet("{id}/export-excel")]
+        public async Task<IActionResult> ExportToExcel(string id)
+        {
+            try
+            {
+                var warranty = await _context.Warranties
+                    .Include(w => w.Customer)
+                    .Include(w => w.Employee)
+                    .Include(w => w.Serial)
+                        .ThenInclude(s => s.Product)
+                    .FirstOrDefaultAsync(w => w.WarrantyId == id);
+
+                if (warranty == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy phiếu bảo hành" });
+                }
+
+                ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+                using (var package = new ExcelPackage())
+                {
+                    var worksheet = package.Workbook.Worksheets.Add("Phiếu bảo hành");
+
+                    int row = 1;
+
+                    // TenTech header
+                    worksheet.Cells[row, 1, row, 5].Merge = true;
+                    worksheet.Cells[row, 1].Value = "TenTech";
+                    worksheet.Cells[row, 1].Style.Font.Bold = true;
+                    worksheet.Cells[row, 1].Style.Font.Size = 20;
+                    worksheet.Cells[row, 1].Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+                    worksheet.Cells[row, 1].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(76, 175, 80)); // Green
+                    worksheet.Cells[row, 1].Style.Font.Color.SetColor(System.Drawing.Color.White);
+                    worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                    worksheet.Cells[row, 1].Style.VerticalAlignment = OfficeOpenXml.Style.ExcelVerticalAlignment.Center;
+                    worksheet.Row(row).Height = 30;
+
+                    row++;
+                    row++;
+
+                    // Tiêu đề (dựa trên loại)
+                    string title = warranty.Type == "Sửa chữa" ? "PHIẾU SỬA CHỮA" : "PHIẾU BẢO HÀNH";
+                    worksheet.Cells[row, 1, row, 5].Merge = true;
+                    worksheet.Cells[row, 1].Value = title;
+                    worksheet.Cells[row, 1].Style.Font.Bold = true;
+                    worksheet.Cells[row, 1].Style.Font.Size = 14;
+                    worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                    row++;
+
+                    // Số phiếu
+                    worksheet.Cells[row, 1, row, 5].Merge = true;
+                    worksheet.Cells[row, 1].Value = $"SỐ {warranty.WarrantyId}";
+                    worksheet.Cells[row, 1].Style.Font.Bold = true;
+                    worksheet.Cells[row, 1].Style.Font.Size = 16;
+                    worksheet.Cells[row, 1].Style.Font.Color.SetColor(System.Drawing.Color.FromArgb(220, 53, 69)); // Red
+                    worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                    row++;
+
+                    // Thời gian
+                    worksheet.Cells[row, 1, row, 5].Merge = true;
+                    worksheet.Cells[row, 1].Value = $"Thời gian: {DateTime.Now:dd/MM/yyyy HH:mm}";
+                    worksheet.Cells[row, 1].Style.Font.Bold = true;
+                    worksheet.Cells[row, 1].Style.Font.Size = 10;
+                    worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                    row++;
+                    row++;
+
+                    // 1. Thông tin phiếu bảo hành
+                    worksheet.Cells[row, 1].Value = "Thông tin phiếu bảo hành";
+                    worksheet.Cells[row, 1].Style.Font.Bold = true;
+                    worksheet.Cells[row, 1].Style.Font.Size = 12;
+                    row++;
+
+                    worksheet.Cells[row, 1].Value = "Khách hàng:";
+                    worksheet.Cells[row, 2].Value = warranty.Customer?.CustomerName ?? "-";
+                    row++;
+
+                    worksheet.Cells[row, 1].Value = "Số điện thoại:";
+                    worksheet.Cells[row, 2].Value = warranty.Customer?.PhoneNumber ?? "-";
+                    row++;
+
+                    worksheet.Cells[row, 1].Value = "Địa chỉ:";
+                    worksheet.Cells[row, 2].Value = warranty.Customer?.Address ?? "-";
+                    row++;
+
+                    worksheet.Cells[row, 1].Value = "Serial:";
+                    worksheet.Cells[row, 2].Value = warranty.SerialId ?? "-";
+                    row++;
+
+                    worksheet.Cells[row, 1].Value = "Sản phẩm:";
+                    string productName = warranty.Serial?.Product?.ProductName ?? "-";
+                    if (warranty.Serial?.Product?.ProductModel != null)
+                    {
+                        productName += $" - {warranty.Serial.Product.ProductModel}";
+                    }
+                    worksheet.Cells[row, 2].Value = productName;
+                    row++;
+
+                    if (!string.IsNullOrEmpty(warranty.Serial?.Specifications))
+                    {
+                        worksheet.Cells[row, 1].Value = "Thông số kỹ thuật:";
+                        worksheet.Cells[row, 2].Value = warranty.Serial.Specifications;
+                        row++;
+                    }
+
+                    worksheet.Cells[row, 1].Value = "Loại:";
+                    worksheet.Cells[row, 2].Value = warranty.Type ?? "-";
+                    row++;
+
+                    worksheet.Cells[row, 1].Value = "Trạng thái:";
+                    worksheet.Cells[row, 2].Value = warranty.Status ?? "-";
+                    row++;
+
+                    
+
+                    if (!string.IsNullOrEmpty(warranty.ContentDetail))
+                    {
+                        worksheet.Cells[row, 1].Value = "Nội dung chi tiết:";
+                        worksheet.Cells[row, 2].Value = warranty.ContentDetail;
+                        row++;
+                    }
+                    row++;
+                    worksheet.Cells[row, 1].Value = "Nhân viên kĩ thuật:";
+                    worksheet.Cells[row, 1].Style.Font.Bold = true;
+                    worksheet.Cells[row, 2].Value = warranty.Employee?.EmployeeName ?? "-";
+                    row++;
+                    row++;
+
+                    // Tổng tiền
+                    worksheet.Cells[row, 3].Value = "Tổng tiền:";
+                    worksheet.Cells[row, 3].Style.Font.Bold = true;
+                    worksheet.Cells[row, 3].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                    worksheet.Cells[row, 5].Value = warranty.TotalAmount ?? 0;
+                    worksheet.Cells[row, 5].Style.Font.Bold = true;
+                    worksheet.Cells[row, 5].Style.Font.Size = 14;
+                    worksheet.Cells[row, 5].Style.Font.Color.SetColor(System.Drawing.Color.FromArgb(220, 53, 69)); // Red
+                    worksheet.Cells[row, 5].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                    worksheet.Cells[row, 5].Style.Numberformat.Format = "#,##0";
+
+                    // Auto-fit columns
+                    worksheet.Cells[worksheet.Dimension.Address].AutoFitColumns();
+
+                    var stream = new MemoryStream();
+                    package.SaveAs(stream);
+                    stream.Position = 0;
+
+                    string fileName = $"PhieuBaoHanh_{warranty.WarrantyId}_{DateTime.Now:yyyyMMddHHmmss}.xlsx";
+                    return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi xuất file Excel", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/warranties/{id}/export-pdf
+        // Xuất phiếu bảo hành ra PDF
+        [HttpGet("{id}/export-pdf")]
+        public async Task<IActionResult> ExportToPdf(string id)
+        {
+            try
+            {
+                // Cấu hình license cho QuestPDF
+                QuestPDF.Settings.License = LicenseType.Community;
+
+                var warranty = await _context.Warranties
+                    .Include(w => w.Customer)
+                    .Include(w => w.Employee)
+                    .Include(w => w.Serial)
+                        .ThenInclude(s => s.Product)
+                    .FirstOrDefaultAsync(w => w.WarrantyId == id);
+
+                if (warranty == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy phiếu bảo hành" });
+                }
+
+                var document = Document.Create(container =>
+                {
+                    container.Page(page =>
+                    {
+                        page.Size(PageSizes.A4);
+                        page.Margin(2, Unit.Centimetre);
+
+                        page.Content()
+                            .Column(column =>
+                            {
+                                column.Item()
+                                    .Background(Colors.Green.Lighten1)
+                                    .Padding(15)
+                                    .AlignCenter()
+                                    .Text("TenTech")
+                                    .FontSize(20)
+                                    .Bold()
+                                    .FontColor(Colors.White);
+
+                                column.Item().PaddingTop(0.5f, Unit.Centimetre);
+
+                                // Tiêu đề (dựa trên loại)
+                                string title = warranty.Type == "Sửa chữa" ? "PHIẾU SỬA CHỮA" : "PHIẾU BẢO HÀNH";
+                                column.Item().AlignCenter().Text(title).Bold().FontSize(14);
+
+                                // Số phiếu
+                                column.Item().AlignCenter().Text($"SỐ {warranty.WarrantyId}").Bold().FontSize(16).FontColor(Colors.Red.Darken1);
+
+                                // Thời gian
+                                column.Item().AlignCenter().Text($"Thời gian: {DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(10);
+
+                                column.Item().PaddingTop(0.5f, Unit.Centimetre);
+
+                                // 1. Thông tin phiếu bảo hành
+                                column.Item().Text("Thông tin phiếu bảo hành").Bold().FontSize(12);
+                                column.Item().PaddingTop(0.2f, Unit.Centimetre);
+
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem(2).Text("Khách hàng:");
+                                    row.RelativeItem(3).Text(warranty.Customer?.CustomerName ?? "-");
+                                });
+
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem(2).Text("Số điện thoại:");
+                                    row.RelativeItem(3).Text(warranty.Customer?.PhoneNumber ?? "-");
+                                });
+
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem(2).Text("Địa chỉ:");
+                                    row.RelativeItem(3).Text(warranty.Customer?.Address ?? "-");
+                                });
+
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem(2).Text("Serial:");
+                                    row.RelativeItem(3).Text(warranty.SerialId ?? "-");
+                                });
+
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem(2).Text("Sản phẩm:");
+                                    string productName = warranty.Serial?.Product?.ProductName ?? "-";
+                                    if (warranty.Serial?.Product?.ProductModel != null)
+                                    {
+                                        productName += $" - {warranty.Serial.Product.ProductModel}";
+                                    }
+                                    row.RelativeItem(3).Text(productName);
+                                });
+
+                                if (!string.IsNullOrEmpty(warranty.Serial?.Specifications))
+                                {
+                                    column.Item().Row(row =>
+                                    {
+                                        row.RelativeItem(2).Text("Thông số kỹ thuật:");
+                                        row.RelativeItem(3).Text(warranty.Serial.Specifications);
+                                    });
+                                }
+
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem(2).Text("Loại:");
+                                    row.RelativeItem(3).Text(warranty.Type ?? "-");
+                                });
+
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem(2).Text("Trạng thái:");
+                                    row.RelativeItem(3).Text(warranty.Status ?? "-");
+                                });
+
+                                
+
+                                if (!string.IsNullOrEmpty(warranty.ContentDetail))
+                                {
+                                    column.Item().PaddingTop(0.2f, Unit.Centimetre);
+                                    column.Item().Row(row =>
+                                    {
+                                        row.RelativeItem(2).Text("Nội dung chi tiết:");
+                                        row.RelativeItem(3).Text(warranty.ContentDetail);
+                                    });
+                                }
+                                column.Item().PaddingTop(0.2f, Unit.Centimetre);
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem(2).Text("Nhân viên kĩ thuật:").Bold();
+                                    row.RelativeItem(3).Text(warranty.Employee?.EmployeeName ?? "-");
+                                }); 
+                                column.Item().PaddingTop(0.5f, Unit.Centimetre);
+                                column.Item().LineHorizontal(1).LineColor(Colors.Green.Darken1);
+
+                                column.Item().PaddingTop(0.5f, Unit.Centimetre);
+
+                                // Tổng tiền
+                                column.Item().AlignRight().Row(row =>
+                                {
+                                    row.RelativeItem();
+                                    row.ConstantItem(7, Unit.Centimetre).Column(col =>
+                                    {
+                                        col.Item().Row(r =>
+                                        {
+                                            r.RelativeItem(3).Text("Tổng tiền:").Bold().FontSize(14);
+                                            r.ConstantItem(4, Unit.Centimetre).AlignRight().Text(FormatCurrency(warranty.TotalAmount ?? 0)).Bold().FontSize(14).FontColor(Colors.Red.Darken1);
+                                        });
+                                    });
+                                });
+                            });
+                    });
+                });
+
+                var stream = new MemoryStream();
+                document.GeneratePdf(stream);
+                stream.Position = 0;
+
+                string fileName = $"PhieuBaoHanh_{warranty.WarrantyId}_{DateTime.Now:yyyyMMddHHmmss}.pdf";
+                return File(stream.ToArray(), "application/pdf", fileName);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi xuất file PDF", error = ex.Message });
+            }
+        }
+
+        private string FormatCurrency(decimal amount)
+        {
+            return $"{amount:N0} đ";
         }
     }
 }

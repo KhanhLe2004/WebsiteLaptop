@@ -7,6 +7,10 @@ using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
 using WebLaptopBE.Services;
+using OfficeOpenXml;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
 
 namespace WebLaptopBE.Areas.Admin.Controllers
 {
@@ -1362,6 +1366,315 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             {
                 System.Diagnostics.Debug.WriteLine($"Error restoring ProductSerials: {ex.Message}");
             }
+        }
+
+        // GET: api/admin/stock-exports/{id}/export-excel
+        // Xuất phiếu xuất hàng ra Excel
+        [HttpGet("{id}/export-excel")]
+        public async Task<IActionResult> ExportToExcel(string id)
+        {
+            try
+            {
+                var stockExport = await _context.StockExports
+                    .Include(se => se.SaleInvoice)
+                    .Include(se => se.Employee)
+                    .Include(se => se.StockExportDetails)
+                    .FirstOrDefaultAsync(se => se.StockExportId == id);
+
+                if (stockExport == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy phiếu xuất hàng" });
+                }
+
+                // Load Product và tính giá cho mỗi detail
+                var detailsList = new List<(StockExportDetail detail, Product? product, decimal? price)>();
+                decimal subtotal = 0;
+                
+                foreach (var detail in stockExport.StockExportDetails ?? new List<StockExportDetail>())
+                {
+                    Product? product = null;
+                    if (!string.IsNullOrEmpty(detail.ProductId))
+                    {
+                        product = await _context.Products
+                            .FirstOrDefaultAsync(p => p.ProductId == detail.ProductId);
+                    }
+                    
+                    var price = await GetProductPrice(detail.ProductId, detail.Specifications);
+                    var itemTotal = (detail.Quantity ?? 0) * (price ?? 0);
+                    subtotal += itemTotal;
+                    
+                    detailsList.Add((detail, product, price));
+                }
+
+                ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+                using var package = new ExcelPackage();
+                var worksheet = package.Workbook.Worksheets.Add("Phiếu xuất hàng");
+
+                // Header TenTech
+                worksheet.Cells[1, 1].Value = "TenTech";
+                worksheet.Cells[1, 1, 1, 5].Merge = true;
+                worksheet.Cells[1, 1].Style.Font.Size = 20;
+                worksheet.Cells[1, 1].Style.Font.Bold = true;
+                worksheet.Cells[1, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                worksheet.Cells[1, 1].Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+                worksheet.Cells[1, 1].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(129, 196, 8)); // #81C408
+                worksheet.Cells[1, 1].Style.Font.Color.SetColor(System.Drawing.Color.White);
+                worksheet.Row(1).Height = 30;
+
+                // Thông tin phiếu xuất
+                int row = 3;
+                worksheet.Cells[row, 1].Value = "PHIẾU XUẤT HÀNG";
+                worksheet.Cells[row, 1, row, 5].Merge = true;
+                worksheet.Cells[row, 1].Style.Font.Size = 14;
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                row++;
+
+                worksheet.Cells[row, 1].Value = $"SỐ {stockExport.StockExportId}";
+                worksheet.Cells[row, 1, row, 5].Merge = true;
+                worksheet.Cells[row, 1].Style.Font.Size = 16;
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 1].Style.Font.Color.SetColor(System.Drawing.Color.FromArgb(220, 53, 69)); // #dc3545
+                worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                row++;
+
+                worksheet.Cells[row, 1].Value = $"Thời gian: {DateTime.Now:dd/MM/yyyy HH:mm}";
+                worksheet.Cells[row, 1, row, 5].Merge = true;
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                row++;
+                row++;
+
+                // Thông tin phiếu xuất
+                worksheet.Cells[row, 1].Value = "1. Thông tin phiếu xuất";
+                worksheet.Cells[row, 1, row, 5].Merge = true;
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 1].Style.Font.Size = 12;
+                worksheet.Cells[row, 1].Style.Border.Bottom.Style = OfficeOpenXml.Style.ExcelBorderStyle.Thin;
+                worksheet.Cells[row, 1].Style.Border.Bottom.Color.SetColor(System.Drawing.Color.FromArgb(129, 196, 8));
+                row++;
+
+                worksheet.Cells[row, 1].Value = "Mã hóa đơn bán:";
+                worksheet.Cells[row, 2].Value = stockExport.SaleInvoiceId ?? "-";
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                row++;
+
+                worksheet.Cells[row, 1].Value = "Nhân viên:";
+                worksheet.Cells[row, 2].Value = stockExport.Employee?.EmployeeName ?? "-";
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                row++;
+
+                row++;
+
+                // Chi tiết sản phẩm
+                worksheet.Cells[row, 1].Value = "2. Sản phẩm xuất hàng";
+                worksheet.Cells[row, 1, row, 5].Merge = true;
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 1].Style.Font.Size = 12;
+                worksheet.Cells[row, 1].Style.Border.Bottom.Style = OfficeOpenXml.Style.ExcelBorderStyle.Thin;
+                worksheet.Cells[row, 1].Style.Border.Bottom.Color.SetColor(System.Drawing.Color.FromArgb(129, 196, 8));
+                row++;
+
+                worksheet.Cells[row, 1].Value = "#";
+                worksheet.Cells[row, 2].Value = "Tên sản phẩm";
+                worksheet.Cells[row, 3].Value = "SL";
+                worksheet.Cells[row, 1, row, 3].Style.Font.Bold = true;
+                worksheet.Cells[row, 1, row, 3].Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+                worksheet.Cells[row, 1, row, 3].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.White);
+                worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                worksheet.Cells[row, 3].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                row++;
+
+                int stt = 1;
+                foreach (var (detail, product, price) in detailsList)
+                {
+                    worksheet.Cells[row, 1].Value = stt;
+                    worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                    worksheet.Cells[row, 2].Value = product?.ProductName ?? "-";
+                    if (!string.IsNullOrEmpty(detail.Specifications))
+                    {
+                        worksheet.Cells[row, 2].Value = $"{product?.ProductName ?? "-"}\n{detail.Specifications}";
+                    }
+                    worksheet.Cells[row, 3].Value = detail.Quantity ?? 0;
+                    worksheet.Cells[row, 3].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                    row++;
+                    stt++;
+                }
+
+                // Auto fit columns
+                worksheet.Cells.AutoFitColumns();
+
+                var stream = new MemoryStream();
+                package.SaveAs(stream);
+                stream.Position = 0;
+
+                var fileName = $"PhieuXuat_{stockExport.StockExportId}_{DateTime.Now:yyyyMMddHHmmss}.xlsx";
+                return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi xuất phiếu xuất hàng ra Excel", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/stock-exports/{id}/export-pdf
+        // Xuất phiếu xuất hàng ra PDF
+        [HttpGet("{id}/export-pdf")]
+        public async Task<IActionResult> ExportToPdf(string id)
+        {
+            try
+            {
+                var stockExport = await _context.StockExports
+                    .Include(se => se.SaleInvoice)
+                    .Include(se => se.Employee)
+                    .Include(se => se.StockExportDetails)
+                    .FirstOrDefaultAsync(se => se.StockExportId == id);
+
+                if (stockExport == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy phiếu xuất hàng" });
+                }
+
+                // Load Product và tính giá cho mỗi detail
+                var detailsList = new List<(StockExportDetail detail, Product? product, decimal? price)>();
+                decimal subtotal = 0;
+                
+                foreach (var detail in stockExport.StockExportDetails ?? new List<StockExportDetail>())
+                {
+                    Product? product = null;
+                    if (!string.IsNullOrEmpty(detail.ProductId))
+                    {
+                        product = await _context.Products
+                            .FirstOrDefaultAsync(p => p.ProductId == detail.ProductId);
+                    }
+                    
+                    var price = await GetProductPrice(detail.ProductId, detail.Specifications);
+                    var itemTotal = (detail.Quantity ?? 0) * (price ?? 0);
+                    subtotal += itemTotal;
+                    
+                    detailsList.Add((detail, product, price));
+                }
+
+                QuestPDF.Settings.License = LicenseType.Community;
+
+                var document = Document.Create(container =>
+                {
+                    container.Page(page =>
+                    {
+                        page.Size(PageSizes.A4);
+                        page.Margin(2, Unit.Centimetre);
+                        page.DefaultTextStyle(x => x.FontSize(10));
+
+                        page.Content()
+                            .Column(column =>
+                            {
+                                column.Spacing(0.5f, Unit.Centimetre);
+
+                                // TenTech header trong content
+                                column.Item()
+                                    .Background(Colors.Green.Lighten1)
+                                    .Padding(15)
+                                    .AlignCenter()
+                                    .Text("TenTech")
+                                    .FontSize(20)
+                                    .Bold()
+                                    .FontColor(Colors.White);
+
+                                column.Item().PaddingTop(0.5f, Unit.Centimetre);
+
+                                // Thông tin phiếu xuất
+                                column.Item().AlignCenter().Text("PHIẾU XUẤT HÀNG").FontSize(14).Bold();
+                                column.Item().AlignCenter().Text($"SỐ {stockExport.StockExportId ?? "-"}").FontSize(16).Bold().FontColor(Colors.Red.Darken1);
+                                column.Item().AlignCenter().Text($"Thời gian: {DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(10);
+                                column.Item().PaddingTop(0.5f, Unit.Centimetre);
+
+                                // Thông tin phiếu xuất
+                                column.Item().Text("1. Thông tin phiếu xuất").Bold().FontSize(12);
+                                column.Item().LineHorizontal(1).LineColor(Colors.Green.Lighten1);
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem().Text("Mã hóa đơn bán:").Bold();
+                                    row.RelativeItem(2).Text(stockExport.SaleInvoiceId ?? "-");
+                                });
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem().Text("Nhân viên:").Bold();
+                                    row.RelativeItem(2).Text(stockExport.Employee?.EmployeeName ?? "-");
+                                });
+
+                                column.Item().PaddingTop(0.5f, Unit.Centimetre);
+
+                                // Chi tiết sản phẩm
+                                column.Item().Text("2. Sản phẩm xuất hàng").Bold().FontSize(12);
+                                column.Item().LineHorizontal(1).LineColor(Colors.Green.Lighten1);
+
+                                column.Item().Table(table =>
+                                {
+                                    table.ColumnsDefinition(columns =>
+                                    {
+                                        columns.RelativeColumn(0.5f);
+                                        columns.RelativeColumn(2.5f);
+                                        columns.RelativeColumn(1f);
+                                    });
+
+                                    table.Header(header =>
+                                    {
+                                        header.Cell().Element(CellStyleHeader).Text("#").Bold();
+                                        header.Cell().Element(CellStyleHeader).Text("Tên sản phẩm").Bold();
+                                        header.Cell().Element(CellStyleHeader).AlignCenter().Text("SL").Bold();
+                                    });
+
+                                    int stt = 1;
+                                    foreach (var (detail, product, price) in detailsList)
+                                    {
+                                        var productName = product?.ProductName ?? "-";
+                                        if (!string.IsNullOrEmpty(detail.Specifications))
+                                        {
+                                            productName = $"{productName}\n{detail.Specifications}";
+                                        }
+
+                                        table.Cell().Element(CellStyle).Text(stt.ToString());
+                                        table.Cell().Element(CellStyle).Text(productName);
+                                        table.Cell().Element(CellStyle).AlignCenter().Text((detail.Quantity ?? 0).ToString());
+                                        stt++;
+                                    }
+                                });
+                            });
+                    });
+                });
+
+                var stream = new MemoryStream();
+                document.GeneratePdf(stream);
+                stream.Position = 0;
+
+                var fileName = $"PhieuXuat_{stockExport.StockExportId}_{DateTime.Now:yyyyMMddHHmmss}.pdf";
+                return File(stream.ToArray(), "application/pdf", fileName);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi xuất phiếu xuất hàng ra PDF", error = ex.Message });
+            }
+        }
+
+        private static IContainer CellStyle(IContainer container)
+        {
+            return container
+                .Border(1)
+                .Padding(5)
+                .Background(Colors.White);
+        }
+
+        private static IContainer CellStyleHeader(IContainer container)
+        {
+            return container
+                .Border(1)
+                .Padding(5)
+                .Background(Colors.White);
+        }
+
+        private static string FormatCurrency(decimal amount)
+        {
+            return amount.ToString("N0") + " đ";
         }
 
     }

@@ -8,6 +8,10 @@ using WebLaptopBE.Data;
 using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
 using WebLaptopBE.Services;
+using OfficeOpenXml;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
 
 namespace WebLaptopBE.Areas.Admin.Controllers
 {
@@ -1208,6 +1212,426 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             {
                 return 0;
             }
+        }
+
+        // GET: api/admin/sale-invoices/{id}/export-excel
+        // Xuất hóa đơn ra Excel
+        [HttpGet("{id}/export-excel")]
+        public async Task<IActionResult> ExportToExcel(string id)
+        {
+            try
+            {
+                var saleInvoice = await _context.SaleInvoices
+                    .Include(si => si.Customer)
+                    .Include(si => si.Employee)
+                    .Include(si => si.SaleInvoiceDetails)
+                        .ThenInclude(detail => detail.Product)
+                    .FirstOrDefaultAsync(si => si.SaleInvoiceId == id);
+
+                if (saleInvoice == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy hóa đơn" });
+                }
+
+                ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+                using var package = new ExcelPackage();
+                var worksheet = package.Workbook.Worksheets.Add("Hóa đơn");
+
+                // Header TenTech
+                worksheet.Cells[1, 1].Value = "TenTech";
+                worksheet.Cells[1, 1, 1, 5].Merge = true;
+                worksheet.Cells[1, 1].Style.Font.Size = 20;
+                worksheet.Cells[1, 1].Style.Font.Bold = true;
+                worksheet.Cells[1, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                worksheet.Cells[1, 1].Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+                worksheet.Cells[1, 1].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(129, 196, 8)); // #81C408
+                worksheet.Cells[1, 1].Style.Font.Color.SetColor(System.Drawing.Color.White);
+                worksheet.Row(1).Height = 30;
+
+                // Thông tin đơn hàng
+                int row = 3;
+                worksheet.Cells[row, 1].Value = "HÓA ĐƠN";
+                worksheet.Cells[row, 1, row, 5].Merge = true;
+                worksheet.Cells[row, 1].Style.Font.Size = 14;
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                row++;
+
+                worksheet.Cells[row, 1].Value = $"SỐ {saleInvoice.SaleInvoiceId}";
+                worksheet.Cells[row, 1, row, 5].Merge = true;
+                worksheet.Cells[row, 1].Style.Font.Size = 16;
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 1].Style.Font.Color.SetColor(System.Drawing.Color.FromArgb(220, 53, 69)); // #dc3545
+                worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                row++;
+
+                worksheet.Cells[row, 1].Value = $"Thời gian: {DateTime.Now:dd/MM/yyyy HH:mm}";
+                worksheet.Cells[row, 1, row, 5].Merge = true;
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                row++;
+                row++;
+
+                // Thông tin khách hàng
+                worksheet.Cells[row, 1].Value = "1. Thông tin người đặt hàng";
+                worksheet.Cells[row, 1, row, 5].Merge = true;
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 1].Style.Font.Size = 12;
+                worksheet.Cells[row, 1].Style.Border.Bottom.Style = OfficeOpenXml.Style.ExcelBorderStyle.Thin;
+                worksheet.Cells[row, 1].Style.Border.Bottom.Color.SetColor(System.Drawing.Color.FromArgb(129, 196, 8));
+                row++;
+
+                worksheet.Cells[row, 1].Value = "Họ tên:";
+                worksheet.Cells[row, 2].Value = saleInvoice.Customer?.CustomerName ?? "-";
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                row++;
+
+                worksheet.Cells[row, 1].Value = "Điện thoại:";
+                worksheet.Cells[row, 2].Value = saleInvoice.Phone ?? saleInvoice.Customer?.PhoneNumber ?? "-";
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                row++;
+
+                worksheet.Cells[row, 1].Value = "Địa chỉ:";
+                worksheet.Cells[row, 2].Value = saleInvoice.DeliveryAddress ?? "-";
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                row++;
+
+                row++;
+
+                worksheet.Cells[row, 1].Value = "Phương thức thanh toán:";
+                worksheet.Cells[row, 2].Value = saleInvoice.PaymentMethod ?? "-";
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                row++;
+                worksheet.Cells[row, 1].Value = "Nhân viên:";
+                worksheet.Cells[row, 2].Value = saleInvoice.Employee?.EmployeeName ?? "-";
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                row++;
+
+                row++;
+
+                // Chi tiết sản phẩm
+                worksheet.Cells[row, 1].Value = "2. Sản phẩm đặt hàng";
+                worksheet.Cells[row, 1, row, 5].Merge = true;
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 1].Style.Font.Size = 12;
+                worksheet.Cells[row, 1].Style.Border.Bottom.Style = OfficeOpenXml.Style.ExcelBorderStyle.Thin;
+                worksheet.Cells[row, 1].Style.Border.Bottom.Color.SetColor(System.Drawing.Color.FromArgb(129, 196, 8));
+                row++;
+
+                worksheet.Cells[row, 1].Value = "#";
+                worksheet.Cells[row, 2].Value = "Tên sản phẩm";
+                worksheet.Cells[row, 3].Value = "SL";
+                worksheet.Cells[row, 4].Value = "Giá tiền";
+                worksheet.Cells[row, 5].Value = "Tổng (SLxG)";
+                worksheet.Cells[row, 1, row, 5].Style.Font.Bold = true;
+                worksheet.Cells[row, 1, row, 5].Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+                worksheet.Cells[row, 1, row, 5].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(248, 249, 250)); // #f8f9fa
+                worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                worksheet.Cells[row, 3].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                worksheet.Cells[row, 4].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                worksheet.Cells[row, 5].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                row++;
+
+                int stt = 1;
+                decimal subtotal = 0;
+                foreach (var detail in saleInvoice.SaleInvoiceDetails ?? new List<SaleInvoiceDetail>())
+                {
+                    worksheet.Cells[row, 1].Value = stt;
+                    worksheet.Cells[row, 1].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                    worksheet.Cells[row, 2].Value = detail.Product?.ProductName ?? "-";
+                    if (!string.IsNullOrEmpty(detail.Specifications))
+                    {
+                        worksheet.Cells[row, 2].Value = $"{detail.Product?.ProductName ?? "-"}\n{detail.Specifications}";
+                    }
+                    worksheet.Cells[row, 3].Value = detail.Quantity ?? 0;
+                    worksheet.Cells[row, 3].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                    worksheet.Cells[row, 4].Value = detail.UnitPrice ?? 0;
+                    worksheet.Cells[row, 4].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                    var itemTotal = (detail.Quantity ?? 0) * (detail.UnitPrice ?? 0);
+                    worksheet.Cells[row, 5].Value = itemTotal;
+                    worksheet.Cells[row, 5].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                    subtotal += itemTotal;
+                    row++;
+                    stt++;
+                }
+
+                row++;
+                row++;
+
+                // Tổng tiền
+                worksheet.Cells[row, 3].Value = "Tạm tính:";
+                worksheet.Cells[row, 3].Style.Font.Bold = true;
+                worksheet.Cells[row, 3].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                worksheet.Cells[row, 5].Value = subtotal;
+                worksheet.Cells[row, 5].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                row++;
+
+                worksheet.Cells[row, 3].Value = "Phí giao hàng:";
+                worksheet.Cells[row, 3].Style.Font.Bold = true;
+                worksheet.Cells[row, 3].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                worksheet.Cells[row, 5].Value = saleInvoice.DeliveryFee ?? 0;
+                worksheet.Cells[row, 5].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                row++;
+
+                if (saleInvoice.Discount > 0)
+                {
+                    worksheet.Cells[row, 3].Value = "Giảm giá:";
+                    worksheet.Cells[row, 3].Style.Font.Bold = true;
+                    worksheet.Cells[row, 3].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                    worksheet.Cells[row, 5].Value = -saleInvoice.Discount;
+                    worksheet.Cells[row, 5].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                    worksheet.Cells[row, 5].Style.Font.Color.SetColor(System.Drawing.Color.FromArgb(220, 53, 69)); // #dc3545
+                    row++;
+                }
+
+                // Border top cho tổng tiền
+                worksheet.Cells[row, 3, row, 5].Style.Border.Top.Style = OfficeOpenXml.Style.ExcelBorderStyle.Thick;
+                worksheet.Cells[row, 3, row, 5].Style.Border.Top.Color.SetColor(System.Drawing.Color.FromArgb(129, 196, 8));
+                worksheet.Cells[row, 3].Value = "Tổng tiền thanh toán:";
+                worksheet.Cells[row, 3].Style.Font.Bold = true;
+                worksheet.Cells[row, 3].Style.Font.Size = 14;
+                worksheet.Cells[row, 3].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+                worksheet.Cells[row, 5].Value = saleInvoice.TotalAmount ?? 0;
+                worksheet.Cells[row, 5].Style.Font.Bold = true;
+                worksheet.Cells[row, 5].Style.Font.Size = 14;
+                worksheet.Cells[row, 5].Style.Font.Color.SetColor(System.Drawing.Color.FromArgb(220, 53, 69)); // #dc3545
+                worksheet.Cells[row, 5].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+
+                // Format số tiền
+                worksheet.Cells[3, 5, row, 5].Style.Numberformat.Format = "#,##0";
+
+                // Auto fit columns
+                worksheet.Cells.AutoFitColumns();
+
+                var stream = new MemoryStream();
+                package.SaveAs(stream);
+                stream.Position = 0;
+
+                var fileName = $"HoaDon_{saleInvoice.SaleInvoiceId}_{DateTime.Now:yyyyMMddHHmmss}.xlsx";
+                return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi xuất hóa đơn ra Excel", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/sale-invoices/{id}/export-pdf
+        // Xuất hóa đơn ra PDF
+        [HttpGet("{id}/export-pdf")]
+        public async Task<IActionResult> ExportToPdf(string id)
+        {
+            try
+            {
+                var saleInvoice = await _context.SaleInvoices
+                    .Include(si => si.Customer)
+                    .Include(si => si.Employee)
+                    .Include(si => si.SaleInvoiceDetails)
+                        .ThenInclude(detail => detail.Product)
+                    .FirstOrDefaultAsync(si => si.SaleInvoiceId == id);
+
+                if (saleInvoice == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy hóa đơn" });
+                }
+
+                QuestPDF.Settings.License = LicenseType.Community;
+
+                var document = Document.Create(container =>
+                {
+                    container.Page(page =>
+                    {
+                        page.Size(PageSizes.A4);
+                        page.Margin(2, Unit.Centimetre);
+                        page.DefaultTextStyle(x => x.FontSize(10));
+
+                        page.Content()
+                            .Column(column =>
+                            {
+                                column.Spacing(0.5f, Unit.Centimetre);
+
+                                // TenTech header trong content
+                                column.Item()
+                                    .Background(Colors.Green.Lighten1)
+                                    .Padding(15)
+                                    .AlignCenter()
+                                    .Text("TenTech")
+                                    .FontSize(20)
+                                    .Bold()
+                                    .FontColor(Colors.White);
+
+                                column.Item().PaddingTop(0.5f, Unit.Centimetre);
+
+                                // Thông tin đơn hàng
+                                column.Item().AlignCenter().Text("HÓA ĐƠN").FontSize(14).Bold();
+                                column.Item().AlignCenter().Text($"SỐ {saleInvoice.SaleInvoiceId ?? "-"}").FontSize(16).Bold().FontColor(Colors.Red.Darken1);
+                                column.Item().AlignCenter().Text($"Thời gian: {DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(10);
+                                column.Item().PaddingTop(0.5f, Unit.Centimetre);
+
+                                // Thông tin khách hàng
+                                column.Item().Text("1. Thông tin người đặt hàng").Bold().FontSize(12);
+                                column.Item().LineHorizontal(1).LineColor(Colors.Green.Lighten1);
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem().Text("Họ tên:").Bold();
+                                    row.RelativeItem(2).Text(saleInvoice.Customer?.CustomerName ?? "-");
+                                });
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem().Text("Điện thoại:").Bold();
+                                    row.RelativeItem(2).Text(saleInvoice.Phone ?? saleInvoice.Customer?.PhoneNumber ?? "-");
+                                });
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem().Text("Địa chỉ:").Bold();
+                                    row.RelativeItem(2).Text(saleInvoice.DeliveryAddress ?? "-");
+                                });
+
+                                column.Item().PaddingTop(0.5f, Unit.Centimetre);
+
+                                // Phương thức thanh toán và nhân viên
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem().Text("Phương thức thanh toán:").Bold();
+                                    row.RelativeItem(2).Text(saleInvoice.PaymentMethod ?? "-");
+                                });
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem().Text("Nhân viên:").Bold();
+                                    row.RelativeItem(2).Text(saleInvoice.Employee?.EmployeeName ?? "-");
+                                });
+
+                                column.Item().PaddingTop(0.5f, Unit.Centimetre);
+
+                                // Chi tiết sản phẩm
+                                column.Item().Text("2. Sản phẩm đặt hàng").Bold().FontSize(12);
+                                column.Item().LineHorizontal(1).LineColor(Colors.Green.Lighten1);
+                                
+                                // Tính subtotal trước
+                                decimal subtotal = 0;
+                                foreach (var detail in saleInvoice.SaleInvoiceDetails ?? new List<SaleInvoiceDetail>())
+                                {
+                                    var itemTotal = (detail.Quantity ?? 0) * (detail.UnitPrice ?? 0);
+                                    subtotal += itemTotal;
+                                }
+
+                                column.Item().Table(table =>
+                                {
+                                    table.ColumnsDefinition(columns =>
+                                    {
+                                        columns.RelativeColumn(0.5f);
+                                        columns.RelativeColumn(2f);
+                                        columns.RelativeColumn(0.8f);
+                                        columns.RelativeColumn(1.2f);
+                                        columns.RelativeColumn(1.2f);
+                                    });
+
+                                    table.Header(header =>
+                                    {
+                                        header.Cell().Element(CellStyleHeader).Text("#").Bold();
+                                        header.Cell().Element(CellStyleHeader).Text("Tên sản phẩm").Bold();
+                                        header.Cell().Element(CellStyleHeader).AlignCenter().Text("SL").Bold();
+                                        header.Cell().Element(CellStyleHeader).AlignRight().Text("Giá tiền").Bold();
+                                        header.Cell().Element(CellStyleHeader).AlignRight().Text("Tổng (SLxG)").Bold();
+                                    });
+
+                                    int stt = 1;
+                                    foreach (var detail in saleInvoice.SaleInvoiceDetails ?? new List<SaleInvoiceDetail>())
+                                    {
+                                        var itemTotal = (detail.Quantity ?? 0) * (detail.UnitPrice ?? 0);
+                                        var productName = detail.Product?.ProductName ?? "-";
+                                        if (!string.IsNullOrEmpty(detail.Specifications))
+                                        {
+                                            productName = $"{productName}\n{detail.Specifications}";
+                                        }
+
+                                        table.Cell().Element(CellStyle).Text(stt.ToString());
+                                        table.Cell().Element(CellStyle).Text(productName);
+                                        table.Cell().Element(CellStyle).AlignCenter().Text((detail.Quantity ?? 0).ToString());
+                                        table.Cell().Element(CellStyle).AlignRight().Text(FormatCurrency(detail.UnitPrice ?? 0));
+                                        table.Cell().Element(CellStyle).AlignRight().Text(FormatCurrency(itemTotal));
+                                        stt++;
+                                    }
+                                });
+
+                                column.Item().PaddingTop(0.5f, Unit.Centimetre);
+
+                                // Tổng tiền
+                                decimal total = saleInvoice.TotalAmount ?? 0;
+                                decimal deliveryFee = saleInvoice.DeliveryFee ?? 0;
+                                decimal discount = saleInvoice.Discount ?? 0;
+
+                                // Tổng tiền - giống Excel, căn phải, mở rộng, không xuống dòng
+                                column.Item().AlignRight().Row(row =>
+                                {
+                                    row.RelativeItem(1);
+                                    row.ConstantItem(7, Unit.Centimetre).Column(col =>
+                                    {
+                                        col.Item().Row(r =>
+                                        {
+                                            r.RelativeItem(3).Text("Tạm tính:").Bold();
+                                            r.ConstantItem(4, Unit.Centimetre).AlignRight().Text(FormatCurrency(subtotal));
+                                        });
+                                        col.Item().Row(r =>
+                                        {
+                                            r.RelativeItem(3).Text("Phí giao hàng:").Bold();
+                                            r.ConstantItem(4, Unit.Centimetre).AlignRight().Text(FormatCurrency(deliveryFee));
+                                        });
+                                        if (discount > 0)
+                                        {
+                                            col.Item().Row(r =>
+                                            {
+                                                r.RelativeItem(3).Text("Giảm giá:").Bold();
+                                                r.ConstantItem(4, Unit.Centimetre).AlignRight().Text("-" + FormatCurrency(discount)).FontColor(Colors.Red.Darken1);
+                                            });
+                                        }
+                                        col.Item().PaddingTop(0.3f, Unit.Centimetre);
+                                        col.Item().LineHorizontal(2).LineColor(Colors.Green.Lighten1);
+                                        col.Item().Row(r =>
+                                        {
+                                            r.RelativeItem(3).Text("Tổng tiền thanh toán:").Bold().FontSize(14);
+                                            r.ConstantItem(4, Unit.Centimetre).AlignRight().Text(FormatCurrency(total)).Bold().FontSize(14).FontColor(Colors.Red.Darken1);
+                                        });
+                                    });
+                                });
+                            });
+
+                        
+                    });
+                });
+
+                var stream = new MemoryStream();
+                document.GeneratePdf(stream);
+                stream.Position = 0;
+
+                var fileName = $"HoaDon_{saleInvoice.SaleInvoiceId}_{DateTime.Now:yyyyMMddHHmmss}.pdf";
+                return File(stream.ToArray(), "application/pdf", fileName);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi xuất hóa đơn ra PDF", error = ex.Message });
+            }
+        }
+
+        private static IContainer CellStyle(IContainer container)
+        {
+            return container
+                .Border(1)
+                .Padding(5)
+                .Background(Colors.White);
+        }
+
+        private static IContainer CellStyleHeader(IContainer container)
+        {
+            return container
+                .Border(1)
+                .Padding(5)
+                .Background(Colors.White);
+        }
+
+        private static string FormatCurrency(decimal amount)
+        {
+            return amount.ToString("N0") + " đ";
         }
 
     }
