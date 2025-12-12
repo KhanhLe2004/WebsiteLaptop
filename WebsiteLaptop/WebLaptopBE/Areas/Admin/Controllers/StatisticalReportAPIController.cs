@@ -359,6 +359,50 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
         }
 
+        // GET: api/admin/statistical-report/import-amount-by-month
+        // Lấy số tiền nhập hàng theo tháng
+        [HttpGet("import-amount-by-month")]
+        public async Task<IActionResult> GetImportAmountByMonth([FromQuery] int year = 2025)
+        {
+            try
+            {
+                var startDate = new DateTime(year, 1, 1);
+                var endDate = new DateTime(year, 12, 31, 23, 59, 59);
+
+                var importAmountByMonth = await _context.StockImports
+                    .Where(si => si.Time != null && si.Time >= startDate && si.Time <= endDate && si.TotalAmount != null)
+                    .GroupBy(si => new { si.Time.Value.Year, si.Time.Value.Month })
+                    .Select(g => new
+                    {
+                        year = g.Key.Year,
+                        month = g.Key.Month,
+                        amount = g.Sum(si => si.TotalAmount ?? 0)
+                    })
+                    .OrderBy(x => x.year)
+                    .ThenBy(x => x.month)
+                    .ToListAsync();
+
+                // Tạo mảng đầy đủ 12 tháng
+                var result = new List<object>();
+                for (int month = 1; month <= 12; month++)
+                {
+                    var data = importAmountByMonth.FirstOrDefault(r => r.month == month);
+                    result.Add(new
+                    {
+                        month = month,
+                        monthName = $"Tháng {month}",
+                        amount = data?.amount ?? 0
+                    });
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy số tiền nhập hàng theo tháng", error = ex.Message });
+            }
+        }
+
         // GET: api/admin/statistical-report/stock-statistics
         // Lấy thống kê số lượng tồn kho (tính theo cấu hình)
         [HttpGet("stock-statistics")]
@@ -443,6 +487,37 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
         }
 
+        // GET: api/admin/statistical-report/exports-by-status
+        // Lấy số lượng phiếu xuất theo trạng thái
+        [HttpGet("exports-by-status")]
+        public async Task<IActionResult> GetExportsByStatus()
+        {
+            try
+            {
+                var exportsByStatus = await _context.StockExports
+                    .Where(se => !string.IsNullOrEmpty(se.Status))
+                    .GroupBy(se => se.Status)
+                    .Select(g => new
+                    {
+                        status = g.Key,
+                        count = g.Count()
+                    })
+                    .ToListAsync();
+
+                var result = exportsByStatus.Select(x => new
+                {
+                    status = x.status,
+                    count = x.count
+                }).ToList();
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy phiếu xuất theo trạng thái", error = ex.Message });
+            }
+        }
+
         // GET: api/admin/statistical-report/warranty-statistics
         // Lấy thống kê bảo hành và sửa chữa
         [HttpGet("warranty-statistics")]
@@ -493,6 +568,258 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi khi lấy thống kê bảo hành", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/statistical-report/revenue-by-brand
+        // Lấy doanh thu theo thương hiệu
+        [HttpGet("revenue-by-brand")]
+        public async Task<IActionResult> GetRevenueByBrand()
+        {
+            try
+            {
+                var revenueByBrand = await _context.SaleInvoiceDetails
+                    .Include(d => d.Product)
+                        .ThenInclude(p => p.Brand)
+                    .Include(d => d.SaleInvoice)
+                    .Where(d => d.SaleInvoice != null && 
+                                d.Quantity != null && 
+                                d.UnitPrice != null &&
+                                (d.SaleInvoice.Status == "Hoàn thành" || string.IsNullOrEmpty(d.SaleInvoice.Status)))
+                    .ToListAsync();
+
+                var grouped = revenueByBrand
+                    .GroupBy(d => new 
+                    { 
+                        BrandId = d.Product?.Brand?.BrandId ?? "Không xác định",
+                        BrandName = d.Product?.Brand?.BrandName ?? "Không xác định"
+                    })
+                    .Select(g => new
+                    {
+                        brandId = g.Key.BrandId,
+                        brandName = g.Key.BrandName,
+                        totalRevenue = g.Sum(d => (d.Quantity ?? 0) * (d.UnitPrice ?? 0)),
+                        totalSold = g.Sum(d => d.Quantity ?? 0)
+                    })
+                    .Where(x => x.totalRevenue > 0)
+                    .OrderByDescending(x => x.totalRevenue)
+                    .ToList();
+
+                return Ok(grouped);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy doanh thu theo thương hiệu", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/statistical-report/top-customers
+        // Lấy top khách hàng mua nhiều nhất
+        [HttpGet("top-customers")]
+        public async Task<IActionResult> GetTopCustomers([FromQuery] int top = 5)
+        {
+            try
+            {
+                var topCustomers = await _context.SaleInvoices
+                    .Include(si => si.Customer)
+                    .Where(si => si.Status == "Hoàn thành" && si.CustomerId != null)
+                    .GroupBy(si => new 
+                    { 
+                        si.CustomerId,
+                        CustomerName = si.Customer != null ? si.Customer.CustomerName : "Không xác định"
+                    })
+                    .Select(g => new
+                    {
+                        customerId = g.Key.CustomerId,
+                        customerName = g.Key.CustomerName,
+                        totalOrders = g.Count(),
+                        totalSpent = g.Sum(si => si.TotalAmount ?? 0)
+                    })
+                    .OrderByDescending(x => x.totalSpent)
+                    .Take(top)
+                    .ToListAsync();
+
+                return Ok(topCustomers);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy top khách hàng", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/statistical-report/sales-by-employee
+        // Lấy doanh số theo nhân viên
+        [HttpGet("sales-by-employee")]
+        public async Task<IActionResult> GetSalesByEmployee()
+        {
+            try
+            {
+                var invoices = await _context.SaleInvoices
+                    .Include(si => si.Employee)
+                    .Where(si => (si.Status == "Hoàn thành" || string.IsNullOrEmpty(si.Status)) && 
+                                si.EmployeeId != null &&
+                                si.TotalAmount != null &&
+                                si.TotalAmount > 0)
+                    .ToListAsync();
+
+                var salesByEmployee = invoices
+                    .GroupBy(si => new 
+                    { 
+                        si.EmployeeId,
+                        EmployeeName = si.Employee?.EmployeeName ?? "Không xác định"
+                    })
+                    .Select(g => new
+                    {
+                        employeeId = g.Key.EmployeeId,
+                        employeeName = g.Key.EmployeeName,
+                        totalOrders = g.Count(),
+                        totalRevenue = g.Sum(si => si.TotalAmount ?? 0)
+                    })
+                    .Where(x => x.totalRevenue > 0)
+                    .OrderByDescending(x => x.totalRevenue)
+                    .ToList();
+
+                return Ok(salesByEmployee);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy doanh số theo nhân viên", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/statistical-report/revenue-by-payment-method
+        // Lấy doanh thu theo phương thức thanh toán
+        [HttpGet("revenue-by-payment-method")]
+        public async Task<IActionResult> GetRevenueByPaymentMethod()
+        {
+            try
+            {
+                var invoices = await _context.SaleInvoices
+                    .Where(si => (si.Status == "Hoàn thành" || string.IsNullOrEmpty(si.Status)) && 
+                                !string.IsNullOrEmpty(si.PaymentMethod) &&
+                                si.TotalAmount != null &&
+                                si.TotalAmount > 0)
+                    .ToListAsync();
+
+                var revenueByPayment = invoices
+                    .GroupBy(si => si.PaymentMethod)
+                    .Select(g => new
+                    {
+                        paymentMethod = g.Key,
+                        totalRevenue = g.Sum(si => si.TotalAmount ?? 0),
+                        orderCount = g.Count()
+                    })
+                    .Where(x => x.totalRevenue > 0)
+                    .OrderByDescending(x => x.totalRevenue)
+                    .ToList();
+
+                return Ok(revenueByPayment);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy doanh thu theo phương thức thanh toán", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/statistical-report/import-vs-export
+        // So sánh nhập và xuất hàng
+        [HttpGet("import-vs-export")]
+        public async Task<IActionResult> GetImportVsExport([FromQuery] int year = 2025)
+        {
+            try
+            {
+                var startDate = new DateTime(year, 1, 1);
+                var endDate = new DateTime(year, 12, 31, 23, 59, 59);
+
+                // Tổng tiền nhập theo tháng
+                var importByMonth = await _context.StockImports
+                    .Where(si => si.Time != null && si.Time >= startDate && si.Time <= endDate && si.TotalAmount != null)
+                    .GroupBy(si => new { si.Time.Value.Year, si.Time.Value.Month })
+                    .Select(g => new
+                    {
+                        year = g.Key.Year,
+                        month = g.Key.Month,
+                        amount = g.Sum(si => si.TotalAmount ?? 0)
+                    })
+                    .ToListAsync();
+
+                // Tổng tiền xuất theo tháng (tính từ giá trị bán trong SaleInvoice)
+                // StockExport liên kết với SaleInvoice, nên tính từ giá bán của đơn hàng
+                // Nếu không có SaleInvoice, tính từ giá trị xuất hàng (có thể tính từ chi tiết)
+                var exportByMonth = await _context.StockExports
+                    .Include(se => se.SaleInvoice)
+                    .Where(se => se.Time != null && 
+                                 se.Time >= startDate && 
+                                 se.Time <= endDate)
+                    .GroupBy(se => new 
+                    { 
+                        se.Time.Value.Year, 
+                        se.Time.Value.Month 
+                    })
+                    .Select(g => new
+                    {
+                        year = g.Key.Year,
+                        month = g.Key.Month,
+                        amount = g.Sum(se => se.SaleInvoice != null && se.SaleInvoice.TotalAmount != null 
+                            ? se.SaleInvoice.TotalAmount.Value 
+                            : 0)
+                    })
+                    .ToListAsync();
+
+                // Tạo mảng đầy đủ 12 tháng
+                var result = new List<object>();
+                for (int month = 1; month <= 12; month++)
+                {
+                    var importData = importByMonth.FirstOrDefault(r => r.month == month);
+                    var exportData = exportByMonth.FirstOrDefault(r => r.month == month);
+                    result.Add(new
+                    {
+                        month = month,
+                        monthName = $"Tháng {month}",
+                        importAmount = importData?.amount ?? 0,
+                        exportAmount = exportData?.amount ?? 0
+                    });
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi so sánh nhập và xuất hàng", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/statistical-report/supplier-statistics
+        // Thống kê theo nhà cung cấp
+        [HttpGet("supplier-statistics")]
+        public async Task<IActionResult> GetSupplierStatistics()
+        {
+            try
+            {
+                var supplierStats = await _context.StockImports
+                    .Include(si => si.Supplier)
+                    .Where(si => si.SupplierId != null)
+                    .GroupBy(si => new 
+                    { 
+                        si.SupplierId,
+                        SupplierName = si.Supplier != null ? si.Supplier.SupplierName : "Không xác định"
+                    })
+                    .Select(g => new
+                    {
+                        supplierId = g.Key.SupplierId,
+                        supplierName = g.Key.SupplierName,
+                        totalImports = g.Count(),
+                        totalAmount = g.Sum(si => si.TotalAmount ?? 0)
+                    })
+                    .OrderByDescending(x => x.totalAmount)
+                    .Take(5)
+                    .ToListAsync();
+
+                return Ok(supplierStats);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy thống kê nhà cung cấp", error = ex.Message });
             }
         }
     }

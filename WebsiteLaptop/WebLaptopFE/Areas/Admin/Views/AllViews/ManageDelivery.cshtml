@@ -1,4 +1,4 @@
-﻿@{
+@{
     ViewData["Title"] = "Quản lý vận chuyển";
     Layout = "~/Areas/Admin/Views/Shared/_LayoutAdmin.cshtml";
 }
@@ -13,6 +13,7 @@
                     </div>
                 </div>
                 <div class="card-body px-3 pb-2">
+                    
                     <!-- Bộ lọc và tìm kiếm -->
                     <div class="row mb-3 g-2 align-items-end">
                         <div class="col-lg-4 col-md-6">
@@ -133,6 +134,33 @@
                 <button type="button" class="btn btn-primary" onclick="saveStatus()">
                     <i class="material-icons text-sm">save</i> Lưu
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Sản phẩm tồn kho thấp -->
+<div class="modal fade" id="lowStockModal" tabindex="-1" aria-labelledby="lowStockModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-warning">
+                <h5 class="modal-title text-white" id="lowStockModalLabel">
+                    <i class="material-icons text-sm">warning</i> Sản phẩm tồn kho thấp (≤3)
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="lowStockContent">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-warning" role="status">
+                            <span class="visually-hidden">Đang tải...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Đang tải dữ liệu...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
             </div>
         </div>
     </div>
@@ -626,6 +654,8 @@
         function formatCurrency(amount) {
             return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
         }
+
+      
 
         // Reset khi đóng modal
         $(document).on('hidden.bs.modal', '#statusModal', function() {

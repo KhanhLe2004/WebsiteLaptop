@@ -68,5 +68,19 @@ namespace WebLaptopBE.DTOs
         public string SaleInvoiceId { get; set; } = null!;
         public string DisplayName { get; set; } = null!;
     }
-}
 
+    // DTO cho sản phẩm tồn kho thấp
+    public class LowStockProductDTO
+    {
+        public string ProductId { get; set; } = null!;
+        public string? ProductName { get; set; }
+        public string? ProductModel { get; set; }
+        public string ConfigurationId { get; set; } = null!;
+        public string? Cpu { get; set; }
+        public string? Ram { get; set; }
+        public string? Rom { get; set; }
+        public string? Card { get; set; }
+        public int Quantity { get; set; }
+        public decimal? Price { get; set; }
+    }
+}

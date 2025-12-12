@@ -227,6 +227,63 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
         }
 
+        // GET: api/admin/stock-exports/total-stock-quantity
+        // Lấy tổng số lượng tồn kho
+        [HttpGet("total-stock-quantity")]
+        public async Task<ActionResult<int>> GetTotalStockQuantity()
+        {
+            try
+            {
+                var totalQuantity = await _context.ProductConfigurations
+                    .Where(pc => pc.Quantity.HasValue && pc.Quantity.Value > 0)
+                    .SumAsync(pc => pc.Quantity ?? 0);
+
+                return Ok(totalQuantity);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy tổng số lượng tồn kho", error = ex.Message });
+            }
+        }
+
+        // GET: api/admin/stock-exports/low-stock-products
+        // Lấy danh sách sản phẩm có số lượng <= 3
+        [HttpGet("low-stock-products")]
+        public async Task<ActionResult<List<LowStockProductDTO>>> GetLowStockProducts()
+        {
+            try
+            {
+                var productConfigs = await _context.ProductConfigurations
+                    .Where(pc => pc.Quantity.HasValue && pc.Quantity.Value > 0 && pc.Quantity.Value <= 3)
+                    .Include(pc => pc.Product)
+                    .ToListAsync();
+
+                var lowStockProducts = productConfigs.Select(pc => new WebLaptopBE.DTOs.LowStockProductDTO
+                {
+                    ProductId = pc.ProductId,
+                    ProductName = pc.Product?.ProductName,
+                    ProductModel = pc.Product?.ProductModel,
+                    ConfigurationId = pc.ConfigurationId,
+                    Cpu = pc.Cpu,
+                    Ram = pc.Ram,
+                    Rom = pc.Rom,
+                    Card = pc.Card,
+                    Quantity = pc.Quantity ?? 0,
+                    Price = pc.Price
+                })
+                .OrderBy(p => p.Quantity) // Sắp xếp theo số lượng tăng dần
+                .ThenBy(p => p.ProductName) // Sau đó sắp xếp theo tên sản phẩm
+                .ThenBy(p => p.ConfigurationId) // Cuối cùng sắp xếp theo ConfigurationId
+                .ToList();
+
+                return Ok(lowStockProducts);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy danh sách sản phẩm tồn kho thấp", error = ex.Message });
+            }
+        }
+
         // GET: api/admin/stock-exports/{id}
         // Lấy chi tiết một phiếu xuất hàng
         [HttpGet("{id}")]
