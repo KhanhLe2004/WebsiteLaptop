@@ -97,6 +97,7 @@ namespace WebLaptopBE.DTOs
         public string? ProductName { get; set; }
         public string? ProductModel { get; set; }
         public string DisplayName { get; set; } = null!;
+        public DateTime? WarrantyEndDate { get; set; }
     }
 
     // DTO cho khách hàng kèm danh sách serial

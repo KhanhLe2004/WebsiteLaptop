@@ -35,6 +35,7 @@ namespace WebLaptopBE.DTOs
         public string? ProductName { get; set; }
         public string? ProductModel { get; set; }
         public string? Specifications { get; set; }
+        public int? WarrantyPeriod { get; set; }
     }
 
     // DTO cho tạo mới hóa đơn bán

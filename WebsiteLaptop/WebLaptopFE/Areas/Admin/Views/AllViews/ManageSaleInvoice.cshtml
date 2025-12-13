@@ -729,6 +729,9 @@
                             <div class="col-md-6">
                                 <strong>Tổng tiền:</strong> ${formatCurrency(invoice.totalAmount || 0)}
                             </div>
+                            <div class="col-md-6">
+                                <strong>Thời gian bảo hành:</strong> ${getWarrantyPeriodDisplay(invoice.details)}
+                            </div>
                         </div>
                         <div class="row mb-3">
                             <div class="col-md-6">
@@ -984,6 +987,33 @@
                 'Đã hủy': '<span class="badge bg-gradient-danger">Đã hủy</span>'
             };
             return badges[status] || '<span class="badge bg-gradient-secondary">' + status + '</span>';
+        }
+
+        // Lấy hiển thị thời gian bảo hành
+        function getWarrantyPeriodDisplay(details) {
+            if (!details || details.length === 0) {
+                return '-';
+            }
+
+            // Lấy tất cả thời gian bảo hành từ các sản phẩm
+            const warrantyPeriods = details
+                .map(d => d.warrantyPeriod || d.WarrantyPeriod)
+                .filter(w => w != null && w !== undefined);
+
+            if (warrantyPeriods.length === 0) {
+                return '-';
+            }
+
+            // Kiểm tra xem tất cả có cùng thời gian bảo hành không
+            const uniqueWarranties = [...new Set(warrantyPeriods)];
+            
+            if (uniqueWarranties.length === 1) {
+                // Tất cả sản phẩm có cùng thời gian bảo hành
+                return `${uniqueWarranties[0]} tháng`;
+            } else {
+                // Có nhiều thời gian bảo hành khác nhau
+                return uniqueWarranties.map(w => `${w} tháng`).join(', ');
+            }
         }
 
         // Load danh sách nhân viên

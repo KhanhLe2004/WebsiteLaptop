@@ -134,12 +134,8 @@
                         </div>
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
-                                <label class="form-label">Loại *</label>
-                                <select class="form-control" id="typeInput" required onchange="handleTypeChange()">
-                                    <option value=""></option>
-                                    <option value="Bảo hành">Bảo hành</option>
-                                    <option value="Sửa chữa">Sửa chữa</option>
-                                </select>
+                                <label class="form-label">Loại</label>
+                                <input type="text" class="form-control" id="typeInput" readonly>
                             </div>
                         </div>
                     </div>
@@ -161,7 +157,7 @@
                         <div class="col-md-6">
                             <div class="input-group input-group-outline mb-3">
                                 <label class="form-label">Serial</label>
-                                <select class="form-control" id="serialIdInput">
+                                <select class="form-control" id="serialIdInput" onchange="handleSerialChange()">
                                     <option value=""></option>
                                 </select>
                             </div>
@@ -263,6 +259,7 @@
         let customersList = [];
         let employeesList = [];
         let serialsList = [];
+        let serialsDataMap = {}; // Map để lưu thông tin WarrantyEndDate của serials
         
         // Lấy thông tin nhân viên đang đăng nhập (sử dụng Json.Encode để tránh lỗi encoding và escape JavaScript)
         const currentEmployeeId = @Html.Raw(Json.Serialize(ViewBag.EmployeeId ?? ""));
@@ -681,9 +678,9 @@
             });
         }
 
-        // Xử lý thay đổi loại bảo hành
+        // Xử lý thay đổi loại bảo hành (tự động set dựa trên serial)
         function handleTypeChange() {
-            const type = $('#typeInput').val();
+            const type = $('#typeInput').val() || '';
             const customerNameInput = $('#customerNameInput');
             const serialIdInput = $('#serialIdInput');
             const totalAmountInput = $('#totalAmountInput');
@@ -693,34 +690,81 @@
                 customerNameInput.prop('readonly', true);
                 serialIdInput.prop('disabled', false);
                 totalAmountInput.val('0').prop('readonly', true);
-                
-                // Clear và reset form cho bảo hành
-                $('#customerIdInput').val('');
-                $('#customerNameInput').val('');
-                $('#serialIdInput').empty().append('<option value=""></option>');
-                
             } else if (type === 'Sửa chữa') {
-                // Sửa chữa: Tên khách hàng có thể nhập, serial không bắt buộc, tổng tiền có thể nhập
-                customerNameInput.prop('readonly', false);
-                serialIdInput.prop('disabled', true).val('');
+                // Sửa chữa: Tên khách hàng có thể nhập (nếu chưa có customerId), serial không bắt buộc, tổng tiền có thể nhập
+                const customerId = $('#customerIdInput').val();
+                if (!customerId) {
+                    customerNameInput.prop('readonly', false);
+                } else {
+                    customerNameInput.prop('readonly', true);
+                }
                 totalAmountInput.prop('readonly', false);
-                
-                // Clear customer info cho sửa chữa
-                $('#customerIdInput').val('');
-                $('#customerNameInput').val('');
-                
             } else {
                 // Chưa chọn loại: Reset về trạng thái mặc định
-                customerNameInput.prop('readonly', true);
+                customerNameInput.prop('readonly', false);
                 serialIdInput.prop('disabled', false);
                 totalAmountInput.prop('readonly', false);
-                
-                $('#customerIdInput').val('');
-                $('#customerNameInput').val('');
-                $('#serialIdInput').empty().append('<option value=""></option>');
             }
             
             updateInputLabels();
+        }
+
+        // Xử lý khi chọn serial - tự động set loại dựa trên WarrantyEndDate
+        function handleSerialChange() {
+            const serialId = $('#serialIdInput').val();
+            console.log('handleSerialChange called with serialId:', serialId);
+            
+            if (!serialId) {
+                $('#typeInput').val('');
+                handleTypeChange();
+                return;
+            }
+
+            const serialData = serialsDataMap[serialId];
+            console.log('serialData from map:', serialData);
+            
+            if (!serialData) {
+                // Nếu không có trong map, thử set mặc định là Sửa chữa
+                console.log('No serial data found, defaulting to Sửa chữa');
+                $('#typeInput').val('Sửa chữa');
+                $('#totalAmountInput').prop('readonly', false);
+                handleTypeChange();
+                return;
+            }
+
+            const warrantyEndDate = serialData.warrantyEndDate;
+            console.log('warrantyEndDate:', warrantyEndDate);
+            
+            if (!warrantyEndDate) {
+                // Không có WarrantyEndDate -> Sửa chữa
+                console.log('No warrantyEndDate, setting to Sửa chữa');
+                $('#typeInput').val('Sửa chữa');
+                $('#totalAmountInput').prop('readonly', false);
+                handleTypeChange();
+                return;
+            }
+
+            const now = new Date();
+            now.setHours(0, 0, 0, 0); // Reset về 00:00:00 để chỉ so sánh ngày
+            
+            const endDate = new Date(warrantyEndDate);
+            endDate.setHours(0, 0, 0, 0); // Reset về 00:00:00 để chỉ so sánh ngày
+
+            console.log('Comparing dates - now:', now, 'endDate:', endDate);
+
+            // Nếu còn thời gian bảo hành (WarrantyEndDate >= ngày hiện tại)
+            if (endDate >= now) {
+                console.log('Warranty still valid, setting to Bảo hành');
+                $('#typeInput').val('Bảo hành');
+                $('#totalAmountInput').val('0').prop('readonly', true);
+            } else {
+                // Hết thời gian bảo hành -> Sửa chữa
+                console.log('Warranty expired, setting to Sửa chữa');
+                $('#typeInput').val('Sửa chữa');
+                $('#totalAmountInput').prop('readonly', false);
+            }
+
+            handleTypeChange();
         }
 
         // Xử lý thay đổi loại bảo hành khi edit (không reset thông tin khách hàng)
@@ -753,26 +797,23 @@
 
         // Xử lý thay đổi số điện thoại
         function handlePhoneNumberChange() {
-            const type = $('#typeInput').val();
-            
-            if (type === 'Bảo hành') {
-                // Chỉ tìm kiếm khách hàng cho bảo hành
-                searchCustomerByPhone();
-            } else if (type === 'Sửa chữa') {
-                // Cho sửa chữa, không tự động tìm kiếm, chỉ clear customerId
-                $('#customerIdInput').val('');
-            }
+            searchCustomerByPhone();
         }
 
-        // Tìm khách hàng theo số điện thoại (chỉ cho bảo hành)
+        // Tìm khách hàng theo số điện thoại
         function searchCustomerByPhone() {
             const phoneNumber = $('#phoneNumberInput').val().trim();
             
             if (!phoneNumber) {
+                // Reset form khi xóa số điện thoại
                 $('#customerIdInput').val('');
-                $('#customerNameInput').val('');
-                $('#serialIdInput').empty().append('<option value=""></option>');
+                $('#customerNameInput').val('').prop('readonly', false);
+                $('#serialIdInput').empty().append('<option value=""></option>').prop('disabled', false);
+                $('#typeInput').val('');
+                $('#totalAmountInput').val('').prop('readonly', false);
+                serialsDataMap = {};
                 updateInputLabels();
+                handleTypeChange();
                 return;
             }
 
@@ -781,43 +822,72 @@
                 type: 'GET',
                 success: function(response) {
                     if (response && response.customerId) {
+                        // Khách hàng tồn tại
                         $('#customerIdInput').val(response.customerId);
-                        $('#customerNameInput').val(response.customerName || '');
+                        $('#customerNameInput').val(response.customerName || '').prop('readonly', true);
                         
-                        // Populate serial dropdown
+                        // Populate serial dropdown và lưu WarrantyEndDate
                         const serialSelect = $('#serialIdInput');
                         serialSelect.empty();
-                        serialSelect.append('<option value=""></option>');
+                        serialSelect.append('<option value=""></option>').prop('disabled', false);
+                        serialsDataMap = {};
                         
                         if (response.serials && response.serials.length > 0) {
                             response.serials.forEach(function(serial) {
                                 const serialId = serial.serialId || serial.SerialId;
                                 const displayName = serial.displayName || serial.DisplayName || serialId;
+                                const warrantyEndDate = serial.warrantyEndDate || serial.WarrantyEndDate;
+                                
                                 serialSelect.append(`<option value="${serialId}">${displayName}</option>`);
+                                
+                                // Lưu thông tin WarrantyEndDate
+                                serialsDataMap[serialId] = {
+                                    warrantyEndDate: warrantyEndDate
+                                };
+                                
+                                // Debug log
+                                console.log('Serial:', serialId, 'WarrantyEndDate:', warrantyEndDate);
                             });
+                            
+                            console.log('serialsDataMap:', serialsDataMap);
                         }
                         
-                        serialSelect.trigger('change');
-                        
+                        // Không trigger change ngay, để người dùng tự chọn serial
+                        // Khi chọn serial sẽ tự động gọi handleSerialChange() qua onchange
                         updateInputLabels();
                         showNotification('Đã tìm thấy khách hàng', 'success');
                     } else {
+                        // Khách hàng không tồn tại - cho phép nhập tên mới
                         $('#customerIdInput').val('');
-                        $('#customerNameInput').val('');
-                        $('#serialIdInput').empty().append('<option value=""></option>');
+                        $('#customerNameInput').val('').prop('readonly', false);
+                        $('#serialIdInput').empty().append('<option value=""></option>').prop('disabled', true);
+                        $('#typeInput').val('Sửa chữa');
+                        $('#totalAmountInput').prop('readonly', false);
+                        serialsDataMap = {};
                         updateInputLabels();
+                        handleTypeChange();
                     }
                 },
                 error: function(xhr) {
                     console.error('Error searching customer:', xhr);
-                    $('#customerIdInput').val('');
-                    $('#customerNameInput').val('');
-                    $('#serialIdInput').empty().append('<option value=""></option>');
-                    updateInputLabels();
                     
                     if (xhr.status === 404) {
-                        showNotification('Không tìm thấy khách hàng với số điện thoại này', 'error');
+                        // Khách hàng không tồn tại - cho phép nhập tên mới
+                        $('#customerIdInput').val('');
+                        $('#customerNameInput').val('').prop('readonly', false);
+                        $('#serialIdInput').empty().append('<option value=""></option>').prop('disabled', true);
+                        $('#typeInput').val('Sửa chữa');
+                        $('#totalAmountInput').prop('readonly', false);
+                        serialsDataMap = {};
+                        updateInputLabels();
+                        handleTypeChange();
                     } else {
+                        $('#customerIdInput').val('');
+                        $('#customerNameInput').val('');
+                        $('#serialIdInput').empty().append('<option value=""></option>');
+                        $('#typeInput').val('');
+                        serialsDataMap = {};
+                        updateInputLabels();
                         showNotification('Lỗi khi tìm kiếm khách hàng', 'error');
                     }
                 }
@@ -833,9 +903,11 @@
             $('#warrantyIdInput').val('');
             $('#warrantyIdInput').prop('readonly', true);
             $('#phoneNumberInput').val('');
-            $('#customerNameInput').val('').prop('readonly', true);
-            $('#serialIdInput').empty().append('<option value="">-</option>').prop('disabled', false);
+            $('#customerNameInput').val('').prop('readonly', false);
+            $('#serialIdInput').empty().append('<option value=""></option>').prop('disabled', true);
+            $('#typeInput').val('');
             $('#totalAmountInput').val('').prop('readonly', false);
+            serialsDataMap = {};
             // Set thời gian hiện tại khi tạo mới (chỉ để hiển thị, backend sẽ set chính xác)
             const now = new Date();
             const year = now.getFullYear();
@@ -850,7 +922,6 @@
             generateNextWarrantyId();
             // Tự động set nhân viên đang đăng nhập khi thêm mới
             populateEmployeeSelect(currentEmployeeId || '');
-            populateSerialSelect();
 
             const modal = new bootstrap.Modal(document.getElementById('createEditModal'));
             modal.show();
@@ -885,7 +956,7 @@
                     // Populate employee select với EmployeeId từ dữ liệu (giữ nguyên nhân viên đã tạo)
                     populateEmployeeSelect(savedEmployeeId);
                     
-                    // Set type trước để xử lý form đúng cách
+                    // Set type (readonly cho cả edit)
                     $('#typeInput').val(savedType);
                     
                     // Set thông tin cơ bản từ warranty response trước
@@ -986,8 +1057,15 @@
                             response.serials.forEach(function(serial) {
                                 const serialId = serial.serialId || serial.SerialId;
                                 const displayName = serial.displayName || serial.DisplayName || serialId;
+                                const warrantyEndDate = serial.warrantyEndDate || serial.WarrantyEndDate;
                                 const selected = serialId === selectedSerialId ? 'selected' : '';
+                                
                                 serialSelect.append(`<option value="${serialId}" ${selected}>${displayName}</option>`);
+                                
+                                // Lưu thông tin WarrantyEndDate
+                                serialsDataMap[serialId] = {
+                                    warrantyEndDate: warrantyEndDate
+                                };
                             });
                         } else {
                             // Nếu không có serial, vẫn set giá trị nếu có
@@ -996,9 +1074,13 @@
                             }
                         }
                         
-                        // Đảm bảo serial được chọn đúng
+                        // Đảm bảo serial được chọn đúng và tự động set loại
                         if (selectedSerialId) {
                             serialSelect.val(selectedSerialId).trigger('change');
+                            // Tự động set loại dựa trên WarrantyEndDate
+                            setTimeout(function() {
+                                handleSerialChange();
+                            }, 100);
                         } else {
                             serialSelect.trigger('change');
                         }
@@ -1146,7 +1228,8 @@
             if (!employeeId && currentEmployeeId) {
                 employeeId = currentEmployeeId;
             }
-            const type = $('#typeInput').val().trim();
+            // Lấy type từ input
+            const type = $('#typeInput').val() ? $('#typeInput').val().trim() : '';
             const contentDetail = $('#contentDetailInput').val().trim();
             const status = $('#statusInput').val().trim();
             const totalAmount = parseFloat($('#totalAmountInput').val()) || 0;
@@ -1169,7 +1252,7 @@
             }
             
             if (!type) {
-                showFormError('Vui lòng chọn loại');
+                showFormError('Vui lòng chọn serial để xác định loại bảo hành');
                 return;
             }
             
@@ -1186,6 +1269,12 @@
                 }
                 if (!serialId) {
                     showFormError('Vui lòng chọn serial cho bảo hành');
+                    return;
+                }
+            } else if (type === 'Sửa chữa') {
+                // Cho sửa chữa, nếu không có customerId thì cần có customerName
+                if (!customerId && !customerName) {
+                    showFormError('Vui lòng nhập tên khách hàng cho sửa chữa');
                     return;
                 }
             }
@@ -1260,9 +1349,11 @@
             $('#warrantyForm')[0].reset();
             $('#warrantyId').val('');
             $('#warrantyIdInput').prop('readonly', false);
-            $('#customerNameInput').prop('readonly', true);
-            $('#serialIdInput').prop('disabled', false);
+            $('#customerNameInput').prop('readonly', false);
+            $('#serialIdInput').prop('disabled', true);
+            $('#typeInput').val('');
             $('#totalAmountInput').prop('readonly', false);
+            serialsDataMap = {};
             $('#formErrorMessage').hide();
             $('.input-group-outline').removeClass('is-filled is-focused');
             if (typeof updateInputLabels === 'function') {

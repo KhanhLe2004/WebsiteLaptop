@@ -2,10 +2,7 @@
 <div id="chatAIWidget" class="chat-ai-widget-container">
     <!-- Nút chat floating - góc dưới bên phải -->
     <button id="chatToggleBtn" class="chat-toggle-btn" aria-label="Mở chat">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2ZM20 16H6L4 18V4H20V16Z" fill="currentColor"/>
-            <path d="M7 9H17V11H7V9ZM7 12H14V14H7V12Z" fill="currentColor"/>
-        </svg>
+        <span class="chat-ai-icon-text">AI</span>
     </button>
 
     <!-- Cửa sổ chat -->
@@ -27,7 +24,6 @@
                     <ul>
                         <li>Tìm kiếm laptop phù hợp</li>
                         <li>Tư vấn về chính sách bảo hành, đổi trả</li>
-                        <li>Kiểm tra tình trạng bảo hành</li>
                     </ul>
                     <p>Bạn cần hỗ trợ gì?</p>
                 </div>
@@ -105,6 +101,14 @@
 
 .chat-toggle-btn:active {
     transform: scale(0.95);
+}
+
+.chat-ai-icon-text {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 /* Cửa sổ chat */
@@ -705,16 +709,214 @@
             });
         }
 
-        // Auto focus input khi mở chat
+        // Auto focus input và scroll khi mở chat
         chatToggleBtn.addEventListener('click', function() {
             setTimeout(() => {
                 if (chatInput) chatInput.focus();
+                // Scroll xuống tin nhắn mới nhất
+                scrollToBottom();
             }, 300);
         });
         
         chatWidgetInitialized = true;
         console.log('ChatAIWidget initialized successfully!');
+        
+        // Load lại tin nhắn từ sessionStorage (chỉ trong session hiện tại)
+        loadChatHistory();
     }
+    
+    // Load chat history từ sessionStorage (chỉ lưu trong session, mất khi đóng website)
+    function loadChatHistory() {
+        try {
+            // Kiểm tra customerId hiện tại để đảm bảo không load tin nhắn của user khác
+            const currentCustomerId = getCurrentCustomerId();
+            const savedCustomerId = sessionStorage.getItem('chatAIWidget_customerId');
+            
+            // Nếu customerId thay đổi (đăng nhập tài khoản mới) → xóa lịch sử cũ
+            if (currentCustomerId && savedCustomerId && currentCustomerId !== savedCustomerId) {
+                console.log('Customer ID changed, clearing old chat history');
+                clearChatHistory();
+                sessionStorage.setItem('chatAIWidget_customerId', currentCustomerId);
+                return;
+            }
+            
+            // Lưu customerId hiện tại
+            if (currentCustomerId) {
+                sessionStorage.setItem('chatAIWidget_customerId', currentCustomerId);
+            }
+            
+            const savedMessages = sessionStorage.getItem('chatAIWidget_messages');
+            if (savedMessages && chatMessages) {
+                const messages = JSON.parse(savedMessages);
+                // Xóa welcome message mặc định nếu có tin nhắn đã lưu
+                if (messages.length > 0) {
+                    const welcomeMessage = chatMessages.querySelector('.message.bot');
+                    if (welcomeMessage && welcomeMessage.textContent.includes('Xin chào')) {
+                        welcomeMessage.remove();
+                    }
+                }
+                
+                // Load lại từng tin nhắn
+                messages.forEach(msg => {
+                    if (msg.type === 'product') {
+                        // Load lại product suggestions
+                        if (msg.products && msg.products.length > 0) {
+                            renderProductSuggestions(msg.products);
+                        }
+                    } else {
+                        // Load lại tin nhắn thường
+                        addMessageToDOM(msg.text, msg.type, msg.time, false); // false = không lưu lại
+                    }
+                });
+                
+                // Scroll xuống cuối sau khi load xong
+                if (chatMessages) {
+                    setTimeout(() => {
+                        scrollToBottom();
+                    }, 200);
+                }
+                
+                console.log(`Loaded ${messages.length} messages from history`);
+            }
+        } catch (error) {
+            console.error('Error loading chat history:', error);
+        }
+    }
+    
+    // Get current customer ID from sessionStorage (nếu có)
+    function getCurrentCustomerId() {
+        try {
+            const customerStr = sessionStorage.getItem('customer');
+            if (customerStr) {
+                const customer = JSON.parse(customerStr);
+                return customer.customerId || customer.CustomerId || customer.customer?.customerId || null;
+            }
+        } catch (e) {
+            console.error('Error getting customer ID:', e);
+        }
+        return null;
+    }
+    
+    // Save chat history to sessionStorage (chỉ lưu trong session, mất khi đóng website)
+    function saveChatHistory() {
+        try {
+            if (!chatMessages) return;
+            
+            // Lưu customerId hiện tại
+            const currentCustomerId = getCurrentCustomerId();
+            if (currentCustomerId) {
+                sessionStorage.setItem('chatAIWidget_customerId', currentCustomerId);
+            }
+            
+            const messages = [];
+            const messageElements = chatMessages.querySelectorAll('.message');
+            
+            messageElements.forEach(msgEl => {
+                const contentDiv = msgEl.querySelector('.message-content');
+                const timeDiv = msgEl.querySelector('.message-time');
+                
+                if (contentDiv) {
+                    const type = msgEl.classList.contains('user') ? 'user' : 'bot';
+                    const text = contentDiv.textContent || contentDiv.innerText;
+                    const time = timeDiv ? timeDiv.textContent : new Date().toLocaleTimeString('vi-VN', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    });
+                    
+                    // Check if this is a product suggestion
+                    const productList = contentDiv.querySelector('.suggested-products-list');
+                    if (productList) {
+                        const products = [];
+                        const productItems = productList.querySelectorAll('.product-item');
+                        productItems.forEach(item => {
+                            const name = item.querySelector('.product-name')?.textContent || '';
+                            const price = item.querySelector('.product-price')?.textContent || '';
+                            const link = item.querySelector('.product-detail-btn')?.href || '';
+                            const image = item.querySelector('.product-image')?.src || '';
+                            
+                            products.push({
+                                name: name,
+                                price: price,
+                                detailUrl: link,
+                                imageUrl: image
+                            });
+                        });
+                        
+                        if (products.length > 0) {
+                            messages.push({
+                                type: 'product',
+                                products: products,
+                                time: time
+                            });
+                        }
+                    } else {
+                        messages.push({
+                            type: type,
+                            text: text,
+                            time: time
+                        });
+                    }
+                }
+            });
+            
+            sessionStorage.setItem('chatAIWidget_messages', JSON.stringify(messages));
+        } catch (error) {
+            console.error('Error saving chat history:', error);
+        }
+    }
+    
+    // Clear chat history (xóa khỏi sessionStorage)
+    function clearChatHistory() {
+        try {
+            sessionStorage.removeItem('chatAIWidget_messages');
+            sessionStorage.removeItem('chatAIWidget_customerId');
+            if (chatMessages) {
+                // Giữ lại welcome message
+                chatMessages.innerHTML = `
+                    <div class="message bot">
+                        <div class="message-content">
+                            <p>Xin chào! Tôi là chatbot tư vấn bán hàng. Tôi có thể giúp bạn:</p>
+                            <ul>
+                                <li>Tìm kiếm laptop phù hợp</li>
+                                <li>Tư vấn về chính sách bảo hành, đổi trả</li>
+                                <li>Kiểm tra tình trạng bảo hành</li>
+                            </ul>
+                            <p>Bạn cần hỗ trợ gì?</p>
+                        </div>
+                        <div class="message-time"></div>
+                    </div>
+                `;
+            }
+            console.log('Chat history cleared');
+        } catch (error) {
+            console.error('Error clearing chat history:', error);
+        }
+    }
+    
+    // Listen for storage events để detect khi user đăng nhập/đăng xuất
+    window.addEventListener('storage', function(e) {
+        // Nếu customer session thay đổi → clear chat history
+        if (e.key === 'customer') {
+            const currentCustomerId = getCurrentCustomerId();
+            const savedCustomerId = sessionStorage.getItem('chatAIWidget_customerId');
+            
+            if (currentCustomerId !== savedCustomerId) {
+                console.log('Customer session changed, clearing chat history');
+                clearChatHistory();
+            }
+        }
+    });
+    
+    // Check customer change khi page load
+    window.addEventListener('load', function() {
+        const currentCustomerId = getCurrentCustomerId();
+        const savedCustomerId = sessionStorage.getItem('chatAIWidget_customerId');
+        
+        if (currentCustomerId && savedCustomerId && currentCustomerId !== savedCustomerId) {
+            console.log('Customer ID changed on page load, clearing old chat history');
+            clearChatHistory();
+        }
+    });
 
     // Initialize - đảm bảo chạy sau khi DOM sẵn sàng
     function startInitialization() {
@@ -740,8 +942,20 @@
             
             chatWindow.style.display = 'flex';
             console.log('Chat window opened');
+            
+            // Scroll xuống tin nhắn mới nhất sau khi mở
+            setTimeout(() => {
+                scrollToBottom();
+            }, 100);
         } else {
             closeChatWindow();
+        }
+    }
+    
+    // Scroll xuống tin nhắn mới nhất
+    function scrollToBottom() {
+        if (chatMessages) {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         }
     }
 
@@ -841,7 +1055,7 @@
 
                 // Hiển thị sản phẩm gợi ý với link click được
                 if (data.suggestedProducts && data.suggestedProducts.length > 0) {
-                    renderProductSuggestions(data.suggestedProducts);
+                    renderProductSuggestions(data.suggestedProducts, true);
                 }
             } else {
                 addMessage('Xin lỗi, tôi không thể trả lời câu hỏi này. Vui lòng thử lại.', 'bot');
@@ -897,31 +1111,43 @@
     chatInput.focus();
 }
 
-    // Add message to UI
+    // Add message to UI (wrapper function)
     function addMessage(text, type) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${type}`;
-
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
+        addMessageToDOM(text, type, null, true); // true = lưu vào localStorage
+    }
     
-    // Format text (support basic markdown-like formatting)
-    const formattedText = formatMessageText(text);
-    contentDiv.innerHTML = formattedText;
+    // Add message to DOM (internal function)
+    function addMessageToDOM(text, type, timeOverride = null, saveToStorage = true) {
+        if (!chatMessages) return;
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${type}`;
 
-    const timeDiv = document.createElement('div');
-    timeDiv.className = 'message-time';
-    timeDiv.textContent = new Date().toLocaleTimeString('vi-VN', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-    });
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        
+        // Format text (support basic markdown-like formatting)
+        const formattedText = formatMessageText(text);
+        contentDiv.innerHTML = formattedText;
+
+        const timeDiv = document.createElement('div');
+        timeDiv.className = 'message-time';
+        timeDiv.textContent = timeOverride || new Date().toLocaleTimeString('vi-VN', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
 
     messageDiv.appendChild(contentDiv);
     messageDiv.appendChild(timeDiv);
     chatMessages.appendChild(messageDiv);
 
     // Auto scroll to bottom
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    scrollToBottom();
+    
+    // Save to localStorage
+    if (saveToStorage) {
+        saveChatHistory();
+    }
 }
 
     // Format message text (basic markdown support)
@@ -952,55 +1178,62 @@
 }
 
     // Render product suggestions với link click được
-    function renderProductSuggestions(products) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = 'message bot';
-
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content product-suggestions';
-    
-    // Hiển thị tối đa 5 sản phẩm
-    const displayProducts = products.slice(0, 5);
-    
-    let html = '<div class="suggested-products-list">';
-    
-    displayProducts.forEach((product, index) => {
-        const productId = product.productId || product.ProductId;
-        const productName = product.name || product.Name || product.productName || product.ProductName;
-        const price = product.price || product.Price || product.sellingPrice || product.SellingPrice;
-        const imageUrl = product.imageUrl || product.ImageUrl;
-        const detailUrl = product.detailUrl || product.DetailUrl || `/Home/ProductDetail?id=${productId}`;
+    function renderProductSuggestions(products, saveToStorage = true) {
+        if (!chatMessages) return;
         
-        html += `
-            <div class="product-item">
-                ${imageUrl ? `<img src="${imageUrl}" alt="${productName}" class="product-image" onerror="this.src='/imageProducts/default.jpg'">` : ''}
-                <div class="product-info">
-                    <div class="product-name">${productName}</div>
-                    <div class="product-price">${formatPrice(price)}</div>
-                    <a href="${detailUrl}" class="product-detail-btn" target="_blank">
-                        Xem chi tiết →
-                    </a>
-                </div>
-            </div>
-        `;
-    });
-    
-    html += '</div>';
-    contentDiv.innerHTML = html;
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message bot';
 
-    const timeDiv = document.createElement('div');
-    timeDiv.className = 'message-time';
-    timeDiv.textContent = new Date().toLocaleTimeString('vi-VN', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-    });
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content product-suggestions';
+        
+        // Hiển thị tối đa 5 sản phẩm
+        const displayProducts = products.slice(0, 5);
+        
+        let html = '<div class="suggested-products-list">';
+        
+        displayProducts.forEach((product, index) => {
+            const productId = product.productId || product.ProductId;
+            const productName = product.name || product.Name || product.productName || product.ProductName;
+            const price = product.price || product.Price || product.sellingPrice || product.SellingPrice;
+            const imageUrl = product.imageUrl || product.ImageUrl;
+            const detailUrl = product.detailUrl || product.DetailUrl || `/Home/ProductDetail?id=${productId}`;
+            
+            html += `
+                <div class="product-item">
+                    ${imageUrl ? `<img src="${imageUrl}" alt="${productName}" class="product-image" onerror="this.src='/imageProducts/default.jpg'">` : ''}
+                    <div class="product-info">
+                        <div class="product-name">${productName}</div>
+                        <div class="product-price">${formatPrice(price)}</div>
+                        <a href="${detailUrl}" class="product-detail-btn" target="_blank">
+                            Xem chi tiết →
+                        </a>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        contentDiv.innerHTML = html;
+
+        const timeDiv = document.createElement('div');
+        timeDiv.className = 'message-time';
+        timeDiv.textContent = new Date().toLocaleTimeString('vi-VN', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
 
     messageDiv.appendChild(contentDiv);
     messageDiv.appendChild(timeDiv);
     chatMessages.appendChild(messageDiv);
 
     // Auto scroll to bottom
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    scrollToBottom();
+    
+    // Save to localStorage
+    if (saveToStorage) {
+        saveChatHistory();
+    }
 }
 
     // Show typing indicator
@@ -1075,6 +1308,8 @@
     window.Chatbot.closeChatWidgetIfOpen = closeChatWidgetIfOpen;
     window.Chatbot.getBackendApiUrl = getBackendApiUrl;
     window.Chatbot.initializeChatWidget = initializeChatWidget;
+    window.Chatbot.clearChatHistory = clearChatHistory;
+    window.Chatbot.loadChatHistory = loadChatHistory;
 
     // Expose function để ChatWidget có thể gọi để đóng ChatAIWidget
     window.closeChatAIWidget = function() {

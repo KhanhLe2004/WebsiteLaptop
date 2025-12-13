@@ -191,7 +191,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         ProductId = detail.ProductId,
                         ProductName = detail.Product?.ProductName,
                         ProductModel = detail.Product?.ProductModel,
-                        Specifications = detail.Specifications
+                        Specifications = detail.Specifications,
+                        WarrantyPeriod = detail.Product?.WarrantyPeriod
                     }).ToList()
                 };
 

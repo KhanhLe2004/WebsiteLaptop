@@ -192,7 +192,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         SerialId = ps.SerialId,
                         ProductName = ps.Product != null ? ps.Product.ProductName : null,
                         ProductModel = ps.Product != null ? ps.Product.ProductModel : null,
-                        DisplayName = ps.SerialId + (ps.Product != null ? " - " + ps.Product.ProductName + (ps.Product.ProductModel != null ? " - " + ps.Product.ProductModel : "") : "")
+                        DisplayName = ps.SerialId + (ps.Product != null ? " - " + ps.Product.ProductName + (ps.Product.ProductModel != null ? " - " + ps.Product.ProductModel : "") : ""),
+                        WarrantyEndDate = ps.WarrantyEndDate
                     })
                     .ToListAsync();
 
@@ -250,7 +251,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         SerialId = ps.SerialId,
                         ProductName = ps.Product != null ? ps.Product.ProductName : null,
                         ProductModel = ps.Product != null ? ps.Product.ProductModel : null,
-                        DisplayName = ps.SerialId + (ps.Product != null ? " - " + ps.Product.ProductName + (ps.Product.ProductModel != null ? " - " + ps.Product.ProductModel : "") : "")
+                        DisplayName = ps.SerialId + (ps.Product != null ? " - " + ps.Product.ProductName + (ps.Product.ProductModel != null ? " - " + ps.Product.ProductModel : "") : ""),
+                        WarrantyEndDate = ps.WarrantyEndDate
                     })
                     .ToListAsync();
 
@@ -311,7 +313,8 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                         SerialId = s.SerialId,
                         ProductName = s.Product != null ? s.Product.ProductName : null,
                         ProductModel = s.Product != null ? s.Product.ProductModel : null,
-                        DisplayName = s.SerialId + (s.Product != null ? " - " + s.Product.ProductName + (s.Product.ProductModel != null ? " - " + s.Product.ProductModel : "") : "")
+                        DisplayName = s.SerialId + (s.Product != null ? " - " + s.Product.ProductName + (s.Product.ProductModel != null ? " - " + s.Product.ProductModel : "") : ""),
+                        WarrantyEndDate = s.WarrantyEndDate
                     })
                     .ToListAsync();
 
