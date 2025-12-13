@@ -13,9 +13,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageStockExportAPIController : ControllerBase
     {
-        private readonly Testlaptop35Context _context;
+        private readonly Testlaptop38Context _context;
 
-        public ManageStockExportAPIController(Testlaptop35Context context)
+        public ManageStockExportAPIController(Testlaptop38Context context)
         {
             _context = context;
         }

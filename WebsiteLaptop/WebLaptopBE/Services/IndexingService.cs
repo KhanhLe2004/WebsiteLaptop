@@ -12,14 +12,14 @@ namespace WebLaptopBE.Services;
 /// </summary>
 public class IndexingService : IIndexingService
 {
-    private readonly Testlaptop35Context _dbContext;
+    private readonly Testlaptop38Context _dbContext;
     private readonly IQdrantVectorService _qdrantVectorService;
     private readonly ISemanticKernelService _semanticKernelService;
     private readonly ILogger<IndexingService> _logger;
     private readonly IConfiguration _configuration;
 
     public IndexingService(
-        Testlaptop35Context dbContext,
+        Testlaptop38Context dbContext,
         IQdrantVectorService qdrantVectorService,
         ISemanticKernelService semanticKernelService,
         ILogger<IndexingService> logger,

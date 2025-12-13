@@ -21,6 +21,8 @@ public partial class Warranty
 
     public string? Status { get; set; }
 
+    public DateTime? Time { get; set; }
+
     public decimal? TotalAmount { get; set; }
 
     public virtual Customer? Customer { get; set; }

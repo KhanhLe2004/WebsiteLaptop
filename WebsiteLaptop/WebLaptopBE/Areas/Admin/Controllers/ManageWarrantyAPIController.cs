@@ -13,9 +13,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageWarrantyAPIController : ControllerBase
     {
-        private readonly Testlaptop35Context _context;
+        private readonly Testlaptop38Context _context;
 
-        public ManageWarrantyAPIController(Testlaptop35Context context)
+        public ManageWarrantyAPIController(Testlaptop38Context context)
         {
             _context = context;
         }

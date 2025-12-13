@@ -17,6 +17,8 @@ public partial class Chat
 
     public string? EmployeeId { get; set; }
 
+    public string? SenderType { get; set; }
+
     public virtual Customer? Customer { get; set; }
 
     public virtual Employee? Employee { get; set; }

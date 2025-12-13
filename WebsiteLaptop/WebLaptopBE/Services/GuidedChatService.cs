@@ -21,14 +21,14 @@ public interface IGuidedChatService
 public class GuidedChatService : IGuidedChatService
 {
     private readonly IConversationStateService _conversationStateService;
-    private readonly Testlaptop35Context _dbContext;
+    private readonly Testlaptop38Context _dbContext;
     private readonly ILogger<GuidedChatService> _logger;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IConfiguration _configuration;
 
     public GuidedChatService(
         IConversationStateService conversationStateService,
-        Testlaptop35Context dbContext,
+        Testlaptop38Context dbContext,
         ILogger<GuidedChatService> logger,
         IHttpContextAccessor httpContextAccessor,
         IConfiguration configuration)
@@ -445,6 +445,8 @@ public class GuidedChatService : IGuidedChatService
             Timestamp = DateTime.UtcNow
         };
     }
+
+
 
     // Helper methods (tiếp tục implementation...)
     

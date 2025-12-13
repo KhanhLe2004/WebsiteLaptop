@@ -14,9 +14,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManagePromotionAPIController : ControllerBase
     {
-        private readonly Testlaptop35Context _context;
+        private readonly Testlaptop38Context _context;
 
-        public ManagePromotionAPIController(Testlaptop35Context context)
+        public ManagePromotionAPIController(Testlaptop38Context context)
         {
             _context = context;
         }

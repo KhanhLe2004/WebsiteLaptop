@@ -5,18 +5,16 @@ using WebLaptopBE.Models;
 
 namespace WebLaptopBE.Data;
 
-public partial class Testlaptop35Context : DbContext
+public partial class Testlaptop38Context : DbContext
 {
-    public Testlaptop35Context()
+    public Testlaptop38Context()
     {
     }
 
-    public Testlaptop35Context(DbContextOptions<Testlaptop35Context> options)
+    public Testlaptop38Context(DbContextOptions<Testlaptop38Context> options)
         : base(options)
     {
     }
-
-    public virtual DbSet<Branch> Branches { get; set; }
 
     public virtual DbSet<Brand> Brands { get; set; }
 
@@ -68,24 +66,6 @@ public partial class Testlaptop35Context : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Branch>(entity =>
-        {
-            entity.HasKey(e => e.BranchesId);
-
-            entity.Property(e => e.BranchesId)
-                .HasMaxLength(20)
-                .HasColumnName("branches_id");
-            entity.Property(e => e.Address)
-                .HasMaxLength(100)
-                .HasColumnName("address");
-            entity.Property(e => e.BranchesName)
-                .HasMaxLength(100)
-                .HasColumnName("branches_name");
-            entity.Property(e => e.PhoneNumber)
-                .HasMaxLength(20)
-                .HasColumnName("phone_number");
-        });
-
         modelBuilder.Entity<Brand>(entity =>
         {
             entity.Property(e => e.BrandId)
@@ -157,6 +137,9 @@ public partial class Testlaptop35Context : DbContext
             entity.Property(e => e.EmployeeId)
                 .HasMaxLength(20)
                 .HasColumnName("employee_id");
+            entity.Property(e => e.SenderType)
+                .HasMaxLength(20)
+                .HasColumnName("sender_type");
             entity.Property(e => e.Status)
                 .HasMaxLength(50)
                 .HasColumnName("status");
@@ -182,7 +165,7 @@ public partial class Testlaptop35Context : DbContext
                 .HasColumnName("customer_id");
             entity.Property(e => e.Active).HasColumnName("active");
             entity.Property(e => e.Address)
-                .HasMaxLength(100)
+                .HasMaxLength(1000)
                 .HasColumnName("address");
             entity.Property(e => e.Avatar)
                 .HasMaxLength(500)
@@ -214,14 +197,11 @@ public partial class Testlaptop35Context : DbContext
                 .HasColumnName("employee_id");
             entity.Property(e => e.Active).HasColumnName("active");
             entity.Property(e => e.Address)
-                .HasMaxLength(100)
+                .HasMaxLength(1000)
                 .HasColumnName("address");
             entity.Property(e => e.Avatar)
                 .HasMaxLength(100)
                 .HasColumnName("avatar");
-            entity.Property(e => e.BranchesId)
-                .HasMaxLength(20)
-                .HasColumnName("branches_id");
             entity.Property(e => e.DateOfBirth).HasColumnName("date_of_birth");
             entity.Property(e => e.Email)
                 .HasMaxLength(100)
@@ -242,10 +222,6 @@ public partial class Testlaptop35Context : DbContext
                 .HasMaxLength(100)
                 .HasColumnName("username");
 
-            entity.HasOne(d => d.Branches).WithMany(p => p.Employees)
-                .HasForeignKey(d => d.BranchesId)
-                .HasConstraintName("FK_Employee_Branches");
-
             entity.HasOne(d => d.Role).WithMany(p => p.Employees)
                 .HasForeignKey(d => d.RoleId)
                 .HasConstraintName("FK_Employee_Role");
@@ -259,7 +235,7 @@ public partial class Testlaptop35Context : DbContext
                 .HasMaxLength(20)
                 .HasColumnName("history_id");
             entity.Property(e => e.ActivityType)
-                .HasMaxLength(20)
+                .HasMaxLength(200)
                 .HasColumnName("activity_type");
             entity.Property(e => e.EmployeeId)
                 .HasMaxLength(20)
@@ -492,23 +468,35 @@ public partial class Testlaptop35Context : DbContext
                 .HasMaxLength(20)
                 .HasColumnName("customer_id");
             entity.Property(e => e.DeliveryAddress)
-                .HasMaxLength(100)
+                .HasMaxLength(1000)
                 .HasColumnName("delivery_address");
             entity.Property(e => e.DeliveryFee)
                 .HasColumnType("decimal(18, 2)")
                 .HasColumnName("delivery_fee");
+            entity.Property(e => e.Discount)
+                .HasColumnType("decimal(18, 2)")
+                .HasColumnName("discount");
             entity.Property(e => e.EmployeeId)
                 .HasMaxLength(20)
                 .HasColumnName("employee_id");
+            entity.Property(e => e.EmployeeShip)
+                .HasMaxLength(20)
+                .HasColumnName("employee_ship");
             entity.Property(e => e.PaymentMethod)
                 .HasMaxLength(50)
                 .HasColumnName("payment_method");
+            entity.Property(e => e.Phone)
+                .HasMaxLength(20)
+                .HasColumnName("phone");
             entity.Property(e => e.Status)
                 .HasMaxLength(50)
                 .HasColumnName("status");
             entity.Property(e => e.TimeCreate)
                 .HasColumnType("datetime")
                 .HasColumnName("time_create");
+            entity.Property(e => e.TimeShip)
+                .HasColumnType("datetime")
+                .HasColumnName("time_ship");
             entity.Property(e => e.TotalAmount)
                 .HasColumnType("decimal(18, 2)")
                 .HasColumnName("total_amount");
@@ -672,7 +660,7 @@ public partial class Testlaptop35Context : DbContext
                 .HasColumnName("supplier_id");
             entity.Property(e => e.Active).HasColumnName("active");
             entity.Property(e => e.Address)
-                .HasMaxLength(100)
+                .HasMaxLength(1000)
                 .HasColumnName("address");
             entity.Property(e => e.Email)
                 .HasMaxLength(100)
@@ -710,6 +698,9 @@ public partial class Testlaptop35Context : DbContext
             entity.Property(e => e.Status)
                 .HasMaxLength(50)
                 .HasColumnName("status");
+            entity.Property(e => e.Time)
+                .HasColumnType("datetime")
+                .HasColumnName("time");
             entity.Property(e => e.TotalAmount)
                 .HasColumnType("decimal(18, 2)")
                 .HasColumnName("total_amount");

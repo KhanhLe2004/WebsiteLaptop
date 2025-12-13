@@ -31,7 +31,7 @@ public class ChatOrchestratorService : IChatOrchestratorService
     private readonly ISemanticKernelService _semanticKernelService;
     private readonly IProductService _productService;
     private readonly IQdrantService _qdrantService;
-    private readonly Testlaptop35Context _dbContext;
+    private readonly Testlaptop38Context _dbContext;
     private readonly ILogger<ChatOrchestratorService> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly Kernel _kernel;
@@ -40,7 +40,7 @@ public class ChatOrchestratorService : IChatOrchestratorService
         ISemanticKernelService semanticKernelService,
         IProductService productService,
         IQdrantService qdrantService,
-        Testlaptop35Context dbContext,
+        Testlaptop38Context dbContext,
         ILogger<ChatOrchestratorService> logger,
         ILoggerFactory loggerFactory)
     {

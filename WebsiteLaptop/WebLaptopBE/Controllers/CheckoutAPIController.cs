@@ -12,7 +12,7 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class CheckoutAPIController : ControllerBase
     {
-        private readonly Testlaptop35Context _db = new();
+        private readonly Testlaptop38Context _db = new();
 
         // POST: api/Checkout/create
         [HttpPost("create")]

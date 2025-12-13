@@ -13,12 +13,12 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageEmployeeAPIController : ControllerBase
     {
-        private readonly Testlaptop35Context _context;
+        private readonly Testlaptop38Context _context;
         private readonly IWebHostEnvironment _environment;
         private readonly HttpClient _httpClient;
         private const string ADDRESS_API_BASE_URL = "https://production.cas.so/address-kit/2025-07-01";
 
-        public ManageEmployeeAPIController(Testlaptop35Context context, IWebHostEnvironment environment, IHttpClientFactory httpClientFactory)
+        public ManageEmployeeAPIController(Testlaptop38Context context, IWebHostEnvironment environment, IHttpClientFactory httpClientFactory)
         {
             _context = context;
             _environment = environment;
@@ -281,16 +281,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     }
                 }
 
-                // Kiểm tra BranchesId và RoleId có tồn tại trong database không (nếu có giá trị)
-                if (!string.IsNullOrWhiteSpace(dto.BranchesId))
-                {
-                    var branchExists = await _context.Branches.AnyAsync(b => b.BranchesId == dto.BranchesId);
-                    if (!branchExists)
-                    {
-                        return BadRequest(new { message = "Chi nhánh không tồn tại" });
-                    }
-                }
-
                 if (!string.IsNullOrWhiteSpace(dto.RoleId))
                 {
                     var roleExists = await _context.Roles.AnyAsync(r => r.RoleId == dto.RoleId);
@@ -311,7 +301,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     Email = dto.Email,
                     Username = dto.Username,
                     Password = dto.Password, // Lưu mật khẩu dạng plain text (nên hash trong production)
-                    BranchesId = string.IsNullOrWhiteSpace(dto.BranchesId) ? null : dto.BranchesId,
                     RoleId = string.IsNullOrWhiteSpace(dto.RoleId) ? null : dto.RoleId,
                     Avatar = avatarFileName,
                     Active = true // Mặc định active = true
@@ -501,15 +490,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 }
 
                 // Kiểm tra BranchesId và RoleId
-                if (!string.IsNullOrWhiteSpace(dto.BranchesId))
-                {
-                    var branchExists = await _context.Branches.AnyAsync(b => b.BranchesId == dto.BranchesId);
-                    if (!branchExists)
-                    {
-                        return BadRequest(new { message = "Chi nhánh không tồn tại" });
-                    }
-                }
-
+               
                 if (!string.IsNullOrWhiteSpace(dto.RoleId))
                 {
                     var roleExists = await _context.Roles.AnyAsync(r => r.RoleId == dto.RoleId);
@@ -526,7 +507,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 employee.Address = finalAddress;
                 employee.Email = dto.Email;
                 employee.Username = dto.Username;
-                employee.BranchesId = string.IsNullOrWhiteSpace(dto.BranchesId) ? null : dto.BranchesId;
                 employee.RoleId = string.IsNullOrWhiteSpace(dto.RoleId) ? null : dto.RoleId;
                 
                 // Chỉ cập nhật password nếu có giá trị mới
@@ -622,30 +602,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi khi tạo EmployeeId", error = ex.Message });
-            }
-        }
-
-        // GET: api/admin/employees/branches
-        // Lấy danh sách chi nhánh
-        [HttpGet("branches")]
-        public async Task<ActionResult<List<BranchDTO>>> GetBranches()
-        {
-            try
-            {
-                var branches = await _context.Branches
-                    .OrderBy(b => b.BranchesName)
-                    .Select(b => new BranchDTO
-                    {
-                        BranchesId = b.BranchesId,
-                        BranchesName = b.BranchesName
-                    })
-                    .ToListAsync();
-
-                return Ok(branches);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Lỗi khi lấy danh sách chi nhánh", error = ex.Message });
             }
         }
 
@@ -923,7 +879,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     Email = employee.Email,
                     Avatar = employee.Avatar,
                     Username = employee.Username,
-                    BranchesId = employee.BranchesId,
                     RoleId = employee.RoleId,
                     Active = employee.Active,
                     PasswordLength = !string.IsNullOrEmpty(employee.Password) ? employee.Password.Length : (int?)null
@@ -995,7 +950,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     Email = employee?.Email,
                     Avatar = employee?.Avatar,
                     Username = employee?.Username,
-                    BranchesId = employee?.BranchesId,
                     RoleId = employee?.RoleId,
                     Active = employee?.Active,
                     PasswordLength = !string.IsNullOrEmpty(employee?.Password) ? employee.Password.Length : (int?)null

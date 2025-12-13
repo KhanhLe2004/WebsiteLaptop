@@ -10,7 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 
 // Đăng ký DbContext
-builder.Services.AddDbContext<Testlaptop35Context>(options =>
+builder.Services.AddDbContext<Testlaptop38Context>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection") 
         ?? "Data Source=DESKTOP-48K2JPN\\SQLEXPRESS;Initial Catalog=testlaptop38;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False"));
 
@@ -110,6 +110,8 @@ builder.Services.AddSingleton<IConversationStateService, ConversationStateServic
 
 // 11. Guided Chat Service - Chatbot với guided conversation (button options)
 builder.Services.AddScoped<IGuidedChatService, GuidedChatService>();
+
+builder.Services.AddScoped<IEnhancedProductService, EnhancedProductService>();
 
 var app = builder.Build();
 

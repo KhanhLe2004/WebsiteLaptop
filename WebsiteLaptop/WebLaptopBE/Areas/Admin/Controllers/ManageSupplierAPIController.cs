@@ -14,9 +14,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageSupplierAPIController : ControllerBase
     {
-        private readonly Testlaptop35Context _context;
+        private readonly Testlaptop38Context _context;
 
-        public ManageSupplierAPIController(Testlaptop35Context context)
+        public ManageSupplierAPIController(Testlaptop38Context context)
         {
             _context = context;
         }
