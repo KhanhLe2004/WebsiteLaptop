@@ -1,7 +1,10 @@
 using System.Text.Json;
 using Microsoft.SemanticKernel;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using WebLaptopBE.AI.SemanticKernel;
 using WebLaptopBE.DTOs;
+using WebLaptopBE.Data;
 
 namespace WebLaptopBE.Services;
 
@@ -23,6 +26,7 @@ public class RAGChatService : IRAGChatService
     private readonly IConfiguration _configuration;
     private readonly AI.Services.IInputValidationService _inputValidationService;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IServiceProvider _serviceProvider;
     
     // Cache Frontend URL
     private string? _frontendUrl;
@@ -35,7 +39,8 @@ public class RAGChatService : IRAGChatService
         ILogger<RAGChatService> logger,
         IConfiguration configuration,
         AI.Services.IInputValidationService inputValidationService,
-        IHttpContextAccessor httpContextAccessor)
+        IHttpContextAccessor httpContextAccessor,
+        IServiceProvider serviceProvider)
     {
         _qdrantVectorService = qdrantVectorService;
         _semanticKernelService = semanticKernelService;
@@ -44,6 +49,7 @@ public class RAGChatService : IRAGChatService
         _configuration = configuration;
         _inputValidationService = inputValidationService;
         _httpContextAccessor = httpContextAccessor;
+        _serviceProvider = serviceProvider;
     }
 
     public async Task<RAGChatResponse> ProcessUserMessageAsync(string userMessage, string? customerId = null)
@@ -72,6 +78,9 @@ public class RAGChatService : IRAGChatService
             // Bước 1 & 2: Parallelize products và policies search với timeout tổng
             List<VectorSearchResult> productResults = new List<VectorSearchResult>();
             List<VectorSearchResult> policyResults = new List<VectorSearchResult>();
+            
+            // Detect use case từ userMessage để optimize search
+            var detectedUseCase = DetectUseCaseFromMessage(userMessage);
 
             // Chạy song song products và policies search với timeout tổng 8 giây
             using var searchCts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
@@ -143,8 +152,8 @@ public class RAGChatService : IRAGChatService
                 }
             }
 
-            // Bước 3: Build context từ search results
-            var productContext = BuildProductContext(productResults);
+            // Bước 3: Build context từ search results (có thể include use case info)
+            var productContext = BuildProductContext(productResults, detectedUseCase);
             var policyContext = BuildPolicyContext(policyResults);
 
             // Bước 4: Tạo prompt cho LLM
@@ -185,25 +194,52 @@ public class RAGChatService : IRAGChatService
             }
 
             // Bước 6: Parse suggested products từ productResults
+            // QUAN TRỌNG: Luôn parse suggested products để hiển thị cho khách hàng
             List<ProductDTO>? productDTOs = null;
             try
             {
                 productDTOs = await ParseSuggestedProductsAsync(productResults);
+                
+                // Nếu không parse được từ vector results, thử fallback search từ SQL
+                if (productDTOs == null || productDTOs.Count == 0)
+                {
+                    _logger.LogInformation("No products parsed from vector results, trying SQL fallback");
+                    var sqlProducts = await FallbackSearchFromSqlAsync(userMessage);
+                    if (sqlProducts != null && sqlProducts.Count > 0)
+                    {
+                        productDTOs = sqlProducts;
+                        _logger.LogInformation("SQL fallback found {Count} products", productDTOs.Count);
+                    }
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Error parsing suggested products");
+                _logger.LogWarning(ex, "Error parsing suggested products, will try SQL fallback");
+                // Thử fallback search từ SQL nếu parse fail
+                try
+                {
+                    var sqlProducts = await FallbackSearchFromSqlAsync(userMessage);
+                    if (sqlProducts != null && sqlProducts.Count > 0)
+                    {
+                        productDTOs = sqlProducts;
+                    }
+                }
+                catch (Exception fallbackEx)
+                {
+                    _logger.LogError(fallbackEx, "SQL fallback also failed");
+                }
             }
 
-            // Convert ProductDTO to ProductSuggestion (không thể convert trực tiếp)
-            // RAGChatResponse cũ dùng ProductDTO, giữ nguyên cho backward compatibility
+            // Convert ProductDTO to ProductSuggestion
             // Validate and sanitize response
             var sanitizedResponse = SanitizeResponse(response);
             
             return new RAGChatResponse
             {
                 Answer = sanitizedResponse,
-                SuggestedProducts = productDTOs != null ? ConvertToProductSuggestions(productDTOs) : null,
+                SuggestedProducts = productDTOs != null && productDTOs.Count > 0 
+                    ? ConvertToProductSuggestions(productDTOs) 
+                    : null,
                 Timestamp = DateTime.UtcNow
             };
         }
@@ -268,21 +304,52 @@ PHONG CÁCH GIAO TIẾP:
 
 📋 QUY TẮC TRẢ LỜI THEO TỪNG TÌNH HUỐNG:
 
-1. KHI TƯ VẤN SẢN PHẨM:
-   ✅ Luôn hỏi rõ nhu cầu sử dụng trước khi đề xuất (gaming, văn phòng, đồ họa, học tập, lập trình...)
-   ✅ Đề xuất 2-3 sản phẩm phù hợp với giải thích rõ ràng lý do tại sao phù hợp
+1. KHI TƯ VẤN SẢN PHẨM (QUAN TRỌNG - ĐỌC KỸ):
+   ✅ LUÔN gợi ý sản phẩm từ danh sách 'THÔNG TIN SẢN PHẨM CÓ SẴN' được cung cấp - KHÔNG bịa sản phẩm không có trong danh sách
+   ✅ Khi khách hỏi MỘT CÂU DÀI với nhiều yêu cầu (ví dụ: 'Tôi muốn mua laptop Dell có CPU i7, RAM 16GB, giá dưới 25 triệu để chơi game'):
+      - Phân tích TẤT CẢ các yêu cầu trong câu (thương hiệu, CPU, RAM, giá, mục đích sử dụng)
+      - Đề xuất sản phẩm phù hợp với TẤT CẢ các yêu cầu đó
+      - Nếu không có sản phẩm phù hợp 100% → đề xuất sản phẩm gần nhất và giải thích sự khác biệt
+      - Highlight từng yêu cầu: '✅ CPU i7', '✅ RAM 16GB', '✅ Giá dưới 25 triệu', '✅ Phù hợp gaming'
+      - Giải thích tại sao sản phẩm phù hợp với từng yêu cầu
+   ✅ Khi khách hỏi về thương hiệu cụ thể (ví dụ: 'máy Dell', 'laptop HP'): 
+      - Nếu có sản phẩm của thương hiệu đó trong danh sách → Đề xuất NGAY các sản phẩm đó
+      - Highlight các sản phẩm phù hợp với yêu cầu
+      - Không hỏi lại nếu đã có sản phẩm trong danh sách
+   ✅ Khi khách hỏi về giá rẻ (ví dụ: 'máy rẻ', 'laptop giá rẻ'):
+      - Nếu có sản phẩm giá rẻ trong danh sách → Đề xuất NGAY các sản phẩm đó (sắp xếp từ rẻ nhất)
+      - Highlight giá cả và giá trị nhận được
+      - Giải thích tại sao sản phẩm này có giá tốt
+   ✅ Khi khách hỏi về cấu hình (CPU, RAM, ROM, Card):
+      - Nếu có sản phẩm phù hợp trong danh sách → Đề xuất NGAY các sản phẩm đó
+      - LIỆT KÊ CHI TIẾT cấu hình của từng sản phẩm (CPU, RAM, ROM, Card)
+      - Giải thích ý nghĩa của từng thông số (ví dụ: 'Intel Core i5 phù hợp văn phòng', '16GB RAM đủ cho đa nhiệm')
+      - So sánh cấu hình giữa các sản phẩm nếu có nhiều sản phẩm
+      - Nếu khách hỏi 'laptop có CPU i7' → chỉ đề xuất sản phẩm có CPU i7
+      - Nếu khách hỏi 'laptop có RAM 16GB' → chỉ đề xuất sản phẩm có RAM 16GB
+      - Nếu khách hỏi 'laptop có card rời' → chỉ đề xuất sản phẩm có card đồ họa rời (RTX, GTX)
+   ✅ Khi khách hỏi về mục đích sử dụng (gaming, văn phòng, đồ họa, học tập, lập trình):
+      - Đề xuất sản phẩm phù hợp với mục đích đó
+      - Giải thích tại sao sản phẩm phù hợp (ví dụ: 'Card RTX 3060 mạnh mẽ, phù hợp gaming')
+      - Nếu có nhiều yêu cầu kết hợp → ưu tiên sản phẩm đáp ứng nhiều yêu cầu nhất
+   ✅ Đề xuất 2-10 sản phẩm phù hợp nhất với yêu cầu của khách hàng (nhiều hơn nếu câu hỏi dài, có nhiều tiêu chí)
    ✅ So sánh điểm mạnh/yếu của từng sản phẩm một cách khách quan
    ✅ Đề cập đến giá cả và giá trị nhận được (ví dụ: 'Sản phẩm này có giá tốt so với cấu hình')
-   ✅ Gợi ý sản phẩm tốt nhất dựa trên nhu cầu, không chỉ dựa trên giá
    ✅ Kết thúc bằng câu hỏi mở để tiếp tục tư vấn (ví dụ: 'Anh/chị có muốn xem thêm sản phẩm nào khác không?')
 
 2. KHI KHÁCH HỎI MƠ HỒ HOẶC THIẾU THÔNG TIN:
-   ✅ Đặt câu hỏi làm rõ một cách tự nhiên:
-      - 'Anh/chị muốn laptop để làm gì chủ yếu ạ? (gaming, văn phòng, đồ họa...)'
-      - 'Ngân sách của anh/chị khoảng bao nhiêu ạ?'
-      - 'Anh/chị có thương hiệu nào yêu thích không?'
-   ✅ Đưa ra gợi ý cụ thể: 'Nếu anh/chị cần laptop văn phòng, em có thể đề xuất...'
-   ✅ Không để khách hàng cảm thấy bị tra hỏi, mà như đang được tư vấn
+   ✅ Nếu khách chỉ hỏi chung chung (ví dụ: 'laptop', 'máy tính', 'máy', 'PC', 'notebook'):
+      - Đây là các từ khóa đồng nghĩa, đều có nghĩa là sản phẩm laptop
+      - Nếu có sản phẩm trong danh sách → Đề xuất NGAY các sản phẩm tốt nhất (top 5-10)
+      - Giới thiệu đa dạng sản phẩm (nhiều thương hiệu, nhiều phân khúc giá)
+      - Sau đó hỏi thêm: 'Anh/chị muốn laptop để làm gì chủ yếu ạ? (gaming, văn phòng, đồ họa...)'
+   ✅ Nếu khách hỏi mơ hồ nhưng có một số thông tin:
+      - Đặt câu hỏi làm rõ một cách tự nhiên:
+        • 'Anh/chị muốn laptop để làm gì chủ yếu ạ? (gaming, văn phòng, đồ họa...)'
+        • 'Ngân sách của anh/chị khoảng bao nhiêu ạ?'
+        • 'Anh/chị có thương hiệu nào yêu thích không?'
+      - Đưa ra gợi ý cụ thể: 'Nếu anh/chị cần laptop văn phòng, em có thể đề xuất...'
+      - Không để khách hàng cảm thấy bị tra hỏi, mà như đang được tư vấn
 
 3. KHI KHÔNG CÓ THÔNG TIN HOẶC KHÔNG CHẮC CHẮN:
    ✅ Thành thật: 'Em xin lỗi, hiện tại em chưa có thông tin chi tiết về...'
@@ -314,20 +381,39 @@ PHONG CÁCH GIAO TIẾP:
 
 ✅ VÍ DỤ TRẢ LỜI TỐT:
 
-VÍ DỤ 1 - Khách hỏi về SẢN PHẨM:
-Khách: 'Laptop Dell'
+VÍ DỤ 1 - Khách hỏi về SẢN PHẨM CỤ THỂ:
+Khách: 'Tôi muốn mua máy Dell'
 Bot: 'Chào anh/chị! Em rất vui được tư vấn về laptop Dell cho anh/chị. 
 
-Để em đề xuất sản phẩm phù hợp nhất, anh/chị cho em biết:
-• Anh/chị cần laptop để làm gì chủ yếu? (văn phòng, gaming, đồ họa, học tập...)
-• Ngân sách của anh/chị khoảng bao nhiêu ạ?
+Em đã tìm thấy một số laptop Dell phù hợp trong kho hàng:
 
-Hiện tại em có một số dòng Dell phổ biến:
-- **Dell XPS**: Dòng cao cấp, màn hình đẹp, phù hợp đồ họa và công việc chuyên nghiệp
-- **Dell Inspiron**: Tầm trung, cân bằng hiệu năng và giá cả, phù hợp đa mục đích
-- **Dell Vostro**: Dòng văn phòng, giá tốt, phù hợp công việc hàng ngày
+• **Dell Inspiron 15 3520** - 15,900,000 VND
+  Cấu hình: Intel Core i5, 8GB RAM, 256GB SSD
+  Phù hợp: Văn phòng, học tập, công việc hàng ngày
+  Điểm nổi bật: Giá tốt, hiệu năng ổn định
 
-Anh/chị muốn xem sản phẩm nào cụ thể ạ?'
+• **Dell Vostro 15 3510** - 18,500,000 VND
+  Cấu hình: Intel Core i5, 8GB RAM, 512GB SSD
+  Phù hợp: Văn phòng chuyên nghiệp
+  Điểm nổi bật: Ổ cứng lớn, bền bỉ
+
+Anh/chị có thể xem chi tiết từng sản phẩm bên dưới hoặc cho em biết thêm về nhu cầu sử dụng để em tư vấn chính xác hơn ạ!'
+
+VÍ DỤ 2 - Khách hỏi về MÁY RẺ:
+Khách: 'Tôi muốn mua loại máy rẻ'
+Bot: 'Chào anh/chị! Em hiểu anh/chị đang tìm laptop giá tốt. Em đã tìm thấy một số sản phẩm phù hợp với ngân sách:
+
+• **Laptop A** - 12,500,000 VND
+  Cấu hình: Intel Core i3, 8GB RAM, 256GB SSD
+  Phù hợp: Học tập, văn phòng cơ bản
+  Điểm nổi bật: Giá rẻ nhất, đủ dùng cho công việc hàng ngày
+
+• **Laptop B** - 14,900,000 VND
+  Cấu hình: Intel Core i5, 8GB RAM, 256GB SSD
+  Phù hợp: Văn phòng, học tập
+  Điểm nổi bật: CPU mạnh hơn, giá vẫn rất hợp lý
+
+Anh/chị có thể xem chi tiết từng sản phẩm bên dưới. Nếu cần tư vấn thêm, em sẵn sàng hỗ trợ ạ!'
 
 VÍ DỤ 2 - Khách hỏi về CHÍNH SÁCH:
 Khách: 'Chính sách bảo hành như thế nào?'
@@ -388,7 +474,23 @@ Anh/chị có thắc mắc gì về chính sách bảo hành không ạ?'
 
 🎯 HƯỚNG DẪN TRẢ LỜI:
 
-{(intent == "product_search" ? @"- Nếu có sản phẩm phù hợp: Đề xuất 2-3 sản phẩm tốt nhất, giải thích lý do tại sao phù hợp, so sánh điểm mạnh/yếu
+{(intent == "product_search" ? @"- QUAN TRỌNG: Nếu có sản phẩm trong danh sách 'THÔNG TIN SẢN PHẨM CÓ SẴN':
+  + LUÔN đề xuất NGAY các sản phẩm đó (2-10 sản phẩm tùy theo yêu cầu)
+  + KHÔNG hỏi lại nếu đã có sản phẩm trong danh sách
+  + Highlight các sản phẩm phù hợp với yêu cầu cụ thể của khách hàng
+  + Nếu khách hỏi chung chung (ví dụ: 'laptop', 'máy tính', 'máy', 'PC', 'notebook'):
+    → Đây là các từ khóa đồng nghĩa, đều có nghĩa là sản phẩm laptop
+    → Đề xuất đa dạng sản phẩm (nhiều thương hiệu, nhiều phân khúc giá)
+    → Giới thiệu 5-10 sản phẩm tốt nhất, đa dạng
+    → Sau đó hỏi thêm về nhu cầu cụ thể
+  + Nếu khách hỏi về thương hiệu (ví dụ: 'máy Dell') → chỉ đề xuất sản phẩm của thương hiệu đó
+  + Nếu khách hỏi về giá rẻ → chỉ đề xuất sản phẩm giá rẻ, sắp xếp từ rẻ nhất
+  + Nếu khách hỏi về mục đích sử dụng (gaming, văn phòng, đồ họa, học tập, lập trình):
+    → Đề xuất sản phẩm phù hợp với mục đích đó
+    → Giải thích tại sao sản phẩm phù hợp (ví dụ: 'Card RTX 3060 mạnh mẽ, phù hợp gaming')
+    → Nếu sản phẩm không phù hợp 100% → vẫn đề xuất và giải thích điểm khác biệt
+  + Giải thích lý do tại sao sản phẩm phù hợp, so sánh điểm mạnh/yếu
+  + Đề cập giá cả, cấu hình, và điểm nổi bật
 - Nếu không có sản phẩm: Hỏi rõ nhu cầu (mục đích sử dụng, ngân sách) để tìm kiếm tốt hơn
 - Luôn kết thúc bằng câu hỏi mở để tiếp tục tư vấn" : "")}
 
@@ -404,6 +506,73 @@ Anh/chị có thắc mắc gì về chính sách bảo hành không ạ?'
 {(intent == "price_inquiry" ? @"- Cung cấp giá cả chính xác từ context
 - Nếu có nhiều cấu hình, liệt kê giá của từng cấu hình
 - Đề cập đến giá trị nhận được so với giá bán" : "")}
+
+{(intent == "use_case_gaming" ? @"- QUAN TRỌNG: Khi khách hỏi về laptop cho GAMING:
+  + LUÔN đề xuất sản phẩm từ danh sách 'THÔNG TIN SẢN PHẨM CÓ SẴN' - KHÔNG bịa sản phẩm
+  + Nếu có sản phẩm trong danh sách → Đề xuất NGAY các sản phẩm phù hợp gaming (hoặc gần nhất)
+  + Highlight các đặc điểm quan trọng cho gaming:
+    • Card đồ họa rời (RTX, GTX) - QUAN TRỌNG cho gaming
+    • CPU mạnh (i7, i9, Ryzen 7, Ryzen 9) - Xử lý game tốt
+    • RAM lớn (16GB+) - Chạy game mượt mà
+    • Màn hình tốt (144Hz, 240Hz) nếu có thông tin
+  + Giải thích tại sao sản phẩm phù hợp gaming (ví dụ: 'Card RTX 3060 mạnh mẽ, chơi game AAA mượt mà')
+  + Nếu sản phẩm không có card rời nhưng có CPU mạnh → giải thích: 'Mặc dù không có card rời, nhưng CPU mạnh vẫn có thể chơi được nhiều game ở mức trung bình'
+  + So sánh các sản phẩm gaming với nhau
+  + Đề cập đến giá cả và giá trị nhận được
+  + Nếu không có sản phẩm gaming lý tưởng → vẫn đề xuất sản phẩm gần nhất và giải thích điểm khác biệt" : "")}
+
+{(intent == "use_case_office" ? @"- QUAN TRỌNG: Khi khách hỏi về laptop cho VĂN PHÒNG:
+  + LUÔN đề xuất sản phẩm từ danh sách 'THÔNG TIN SẢN PHẨM CÓ SẴN' - KHÔNG bịa sản phẩm
+  + Nếu có sản phẩm trong danh sách → Đề xuất NGAY các sản phẩm phù hợp văn phòng (hoặc gần nhất)
+  + Highlight các đặc điểm quan trọng cho văn phòng:
+    • CPU ổn định (i3, i5, i7, Ryzen 3, Ryzen 5, Ryzen 7) - Đủ mạnh cho công việc
+    • RAM 4GB trở lên (8GB+ tốt hơn) - Đa nhiệm tốt
+    • Pin tốt, nhẹ - Dễ mang theo
+    • Giá hợp lý - Phù hợp ngân sách văn phòng
+  + Giải thích tại sao sản phẩm phù hợp văn phòng (ví dụ: 'CPU i5 đủ mạnh cho Word, Excel, trình duyệt')
+  + So sánh các sản phẩm văn phòng với nhau
+  + Đề cập đến giá cả và giá trị nhận được
+  + Nếu sản phẩm có cấu hình cao hơn cần thiết → giải thích: 'Cấu hình này mạnh hơn cần thiết cho văn phòng, nhưng sẽ dùng mượt mà và tương lai không cần nâng cấp'
+  + Nếu không có sản phẩm phù hợp 100% → vẫn đề xuất sản phẩm gần nhất và giải thích" : "")}
+
+{(intent == "use_case_design" ? @"- QUAN TRỌNG: Khi khách hỏi về laptop cho ĐỒ HỌA:
+  + Nếu có sản phẩm trong danh sách → Đề xuất NGAY các sản phẩm phù hợp đồ họa
+  + Highlight các đặc điểm quan trọng cho đồ họa:
+    • CPU mạnh (i7, i9, Ryzen 7, Ryzen 9) - Render nhanh
+    • RAM lớn (16GB+) - Xử lý file lớn
+    • Card đồ họa tốt (RTX, GTX) - Render, chỉnh sửa video
+    • Màn hình đẹp (4K, QHD, OLED) nếu có thông tin
+  + Giải thích tại sao sản phẩm phù hợp đồ họa
+  + So sánh các sản phẩm đồ họa với nhau" : "")}
+
+{(intent == "use_case_student" ? @"- QUAN TRỌNG: Khi khách hỏi về laptop cho HỌC TẬP:
+  + Nếu có sản phẩm trong danh sách → Đề xuất NGAY các sản phẩm phù hợp học tập
+  + Highlight các đặc điểm quan trọng cho học tập:
+    • Giá rẻ (dưới 20 triệu) - Phù hợp ngân sách học sinh/sinh viên
+    • CPU ổn định (i3, i5, Ryzen 3, Ryzen 5) - Đủ dùng cho học tập
+    • RAM 8GB - Đủ cho học tập, xem video, làm bài tập
+    • Pin tốt - Dùng cả ngày ở trường
+  + Giải thích tại sao sản phẩm phù hợp học tập
+  + So sánh các sản phẩm học tập với nhau" : "")}
+
+{(intent == "use_case_programming" ? @"- QUAN TRỌNG: Khi khách hỏi về laptop cho LẬP TRÌNH:
+  + Nếu có sản phẩm trong danh sách → Đề xuất NGAY các sản phẩm phù hợp lập trình
+  + Highlight các đặc điểm quan trọng cho lập trình:
+    • CPU mạnh (i5, i7, Ryzen 5, Ryzen 7) - Compile code nhanh
+    • RAM lớn (16GB+) - Chạy nhiều IDE, Docker, VM
+    • Ổ cứng SSD - Khởi động nhanh, compile nhanh
+  + Giải thích tại sao sản phẩm phù hợp lập trình
+  + So sánh các sản phẩm lập trình với nhau" : "")}
+
+{(intent == "spec_inquiry" ? @"- QUAN TRỌNG: Khi khách hỏi về cấu hình (CPU, RAM, ROM, Card):
+  + Nếu có sản phẩm trong danh sách → LIỆT KÊ CHI TIẾT cấu hình của từng sản phẩm
+  + Giải thích ý nghĩa của từng thông số (ví dụ: 'Intel Core i5 phù hợp văn phòng', '16GB RAM đủ cho đa nhiệm')
+  + So sánh cấu hình giữa các sản phẩm nếu có nhiều sản phẩm
+  + Đề xuất sản phẩm phù hợp dựa trên cấu hình khách hàng yêu cầu
+  + Nếu khách hỏi 'laptop có CPU i7' → chỉ đề xuất sản phẩm có CPU i7
+  + Nếu khách hỏi 'laptop có RAM 16GB' → chỉ đề xuất sản phẩm có RAM 16GB
+  + Nếu khách hỏi 'laptop có card rời' → chỉ đề xuất sản phẩm có card đồ họa rời (RTX, GTX)
+  + LUÔN trả lời chi tiết, không chỉ nói chung chung" : "")}
 
 {(intent == "policy_inquiry" ? @"- Trích dẫn chính xác từ context chính sách
 - Giải thích rõ ràng, dễ hiểu
@@ -432,6 +601,61 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
             messageLower.Contains("hoàn tiền") || messageLower.Contains("chính sách"))
         {
             return "policy_inquiry";
+        }
+        
+        // Detect câu hỏi về use case (gaming, văn phòng, đồ họa) - ƯU TIÊN TRƯỚC
+        if (messageLower.Contains("gaming") || messageLower.Contains("game") || 
+            messageLower.Contains("chơi game") || messageLower.Contains("choi game") ||
+            messageLower.Contains("chơi") || messageLower.Contains("choi"))
+        {
+            return "use_case_gaming";
+        }
+        
+        if (messageLower.Contains("văn phòng") || messageLower.Contains("van phong") ||
+            messageLower.Contains("office") || messageLower.Contains("công việc") ||
+            messageLower.Contains("cong viec") || messageLower.Contains("làm việc") ||
+            messageLower.Contains("lam viec") || messageLower.Contains("công việc văn phòng"))
+        {
+            return "use_case_office";
+        }
+        
+        if (messageLower.Contains("đồ họa") || messageLower.Contains("do hoa") ||
+            messageLower.Contains("design") || messageLower.Contains("thiết kế") ||
+            messageLower.Contains("thiet ke") || messageLower.Contains("render") ||
+            messageLower.Contains("video") || messageLower.Contains("editing"))
+        {
+            return "use_case_design";
+        }
+        
+        if (messageLower.Contains("học tập") || messageLower.Contains("hoc tap") ||
+            messageLower.Contains("student") || messageLower.Contains("sinh viên") ||
+            messageLower.Contains("sinh vien") || messageLower.Contains("học sinh") ||
+            messageLower.Contains("hoc sinh"))
+        {
+            return "use_case_student";
+        }
+        
+        if (messageLower.Contains("lập trình") || messageLower.Contains("lap trinh") ||
+            messageLower.Contains("programming") || messageLower.Contains("code") ||
+            messageLower.Contains("developer") || messageLower.Contains("dev"))
+        {
+            return "use_case_programming";
+        }
+        
+        // Detect câu hỏi về cấu hình (CPU, RAM, ROM, Card)
+        if (messageLower.Contains("cpu") || messageLower.Contains("processor") || 
+            messageLower.Contains("intel") || messageLower.Contains("amd") ||
+            messageLower.Contains("core i") || messageLower.Contains("ryzen") ||
+            messageLower.Contains("ram") || messageLower.Contains("bộ nhớ") ||
+            messageLower.Contains("rom") || messageLower.Contains("ổ cứng") ||
+            messageLower.Contains("ssd") || messageLower.Contains("hdd") ||
+            messageLower.Contains("card") || messageLower.Contains("vga") ||
+            messageLower.Contains("rtx") || messageLower.Contains("gtx") ||
+            messageLower.Contains("cấu hình") || messageLower.Contains("cau hinh") ||
+            messageLower.Contains("thông số") || messageLower.Contains("thong so") ||
+            messageLower.Contains("spec") || messageLower.Contains("config"))
+        {
+            return "spec_inquiry";
         }
         
         if (messageLower.Contains("tư vấn") || messageLower.Contains("nên mua") || 
@@ -484,9 +708,43 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
     }
 
     /// <summary>
+    /// Detect use case từ message để optimize context building
+    /// </summary>
+    private string? DetectUseCaseFromMessage(string message)
+    {
+        var messageLower = message.ToLower();
+        
+        if (messageLower.Contains("gaming") || messageLower.Contains("game") || 
+            messageLower.Contains("chơi game") || messageLower.Contains("choi game"))
+            return "gaming";
+        
+        if (messageLower.Contains("văn phòng") || messageLower.Contains("van phong") ||
+            messageLower.Contains("office") || messageLower.Contains("công việc") ||
+            messageLower.Contains("cong viec") || messageLower.Contains("làm việc") ||
+            messageLower.Contains("lam viec"))
+            return "office";
+        
+        if (messageLower.Contains("đồ họa") || messageLower.Contains("do hoa") ||
+            messageLower.Contains("design") || messageLower.Contains("thiết kế") ||
+            messageLower.Contains("thiet ke"))
+            return "design";
+        
+        if (messageLower.Contains("học tập") || messageLower.Contains("hoc tap") ||
+            messageLower.Contains("student") || messageLower.Contains("sinh viên") ||
+            messageLower.Contains("sinh vien"))
+            return "student";
+        
+        if (messageLower.Contains("lập trình") || messageLower.Contains("lap trinh") ||
+            messageLower.Contains("programming") || messageLower.Contains("code"))
+            return "programming";
+        
+        return null;
+    }
+    
+    /// <summary>
     /// Build product context từ search results - Format đẹp và đầy đủ thông tin
     /// </summary>
-    private string BuildProductContext(List<VectorSearchResult> results)
+    private string BuildProductContext(List<VectorSearchResult> results, string? useCase = null)
     {
         if (results == null || results.Count == 0)
         {
@@ -494,7 +752,25 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
         }
 
         var context = new System.Text.StringBuilder();
-        context.AppendLine($"Tìm thấy {results.Count} sản phẩm liên quan:\n");
+        
+        // Thêm thông tin về use case nếu có
+        if (!string.IsNullOrEmpty(useCase))
+        {
+            var useCaseText = useCase switch
+            {
+                "gaming" => "GAMING",
+                "office" => "VĂN PHÒNG",
+                "design" => "ĐỒ HỌA",
+                "student" => "HỌC TẬP",
+                "programming" => "LẬP TRÌNH",
+                _ => useCase.ToUpper()
+            };
+            context.AppendLine($"🎯 Tìm thấy {results.Count} sản phẩm phù hợp cho {useCaseText}:\n");
+        }
+        else
+        {
+            context.AppendLine($"Tìm thấy {results.Count} sản phẩm liên quan:\n");
+        }
 
         int index = 1;
         foreach (var result in results)
@@ -547,19 +823,27 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
                         context.AppendLine($"   Phân khúc: Flagship, hiệu năng tối đa");
                 }
                 
-                // Cấu hình chi tiết
-                if (!string.IsNullOrEmpty(cpu) || !string.IsNullOrEmpty(ram) || !string.IsNullOrEmpty(rom))
-                {
-                    context.AppendLine($"   Cấu hình:");
+                // Cấu hình chi tiết - LUÔN hiển thị đầy đủ
+                context.AppendLine($"   Cấu hình chi tiết:");
                     if (!string.IsNullOrEmpty(cpu))
-                        context.AppendLine($"     • CPU: {cpu}");
+                    context.AppendLine($"     • CPU: {cpu} {GetCpuDescription(cpu)}");
+                else
+                    context.AppendLine($"     • CPU: (Chưa có thông tin)");
+                    
                     if (!string.IsNullOrEmpty(ram))
-                        context.AppendLine($"     • RAM: {ram}");
+                    context.AppendLine($"     • RAM: {ram} {GetRamDescription(ram)}");
+                else
+                    context.AppendLine($"     • RAM: (Chưa có thông tin)");
+                    
                     if (!string.IsNullOrEmpty(rom))
-                        context.AppendLine($"     • Ổ cứng: {rom}");
+                    context.AppendLine($"     • Ổ cứng: {rom} {GetStorageDescription(rom)}");
+                else
+                    context.AppendLine($"     • Ổ cứng: (Chưa có thông tin)");
+                    
                     if (!string.IsNullOrEmpty(card))
-                        context.AppendLine($"     • Card đồ họa: {card}");
-                }
+                    context.AppendLine($"     • Card đồ họa: {card} {GetCardDescription(card)}");
+                else
+                    context.AppendLine($"     • Card đồ họa: Tích hợp (phù hợp văn phòng, học tập)");
                 
                 if (warranty is int warrantyValue && warrantyValue > 0)
                 {
@@ -586,10 +870,121 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
         // Thêm gợi ý so sánh nếu có nhiều sản phẩm
         if (results.Count > 1)
         {
-            context.AppendLine("💡 Gợi ý: Có thể so sánh các sản phẩm trên về giá cả, cấu hình, và phù hợp với nhu cầu sử dụng.");
+            if (!string.IsNullOrEmpty(useCase))
+            {
+                var useCaseText = useCase switch
+                {
+                    "gaming" => "gaming",
+                    "office" => "văn phòng",
+                    "design" => "đồ họa",
+                    "student" => "học tập",
+                    "programming" => "lập trình",
+                    _ => useCase
+                };
+                context.AppendLine($"💡 Gợi ý: Có thể so sánh các sản phẩm trên về giá cả, cấu hình, và mức độ phù hợp cho {useCaseText}.");
+            }
+            else
+            {
+                context.AppendLine("💡 Gợi ý: Có thể so sánh các sản phẩm trên về giá cả, cấu hình, và phù hợp với nhu cầu sử dụng.");
+            }
         }
 
         return context.ToString();
+    }
+    
+    /// <summary>
+    /// Mô tả CPU để AI hiểu rõ hơn
+    /// </summary>
+    private string GetCpuDescription(string? cpu)
+    {
+        if (string.IsNullOrEmpty(cpu)) return "";
+        
+        var cpuLower = cpu.ToLower();
+        if (cpuLower.Contains("i3") || cpuLower.Contains("core i3"))
+            return "(phù hợp văn phòng, học tập cơ bản)";
+        else if (cpuLower.Contains("i5") || cpuLower.Contains("core i5"))
+            return "(phù hợp văn phòng, học tập, đa nhiệm tốt)";
+        else if (cpuLower.Contains("i7") || cpuLower.Contains("core i7"))
+            return "(mạnh mẽ, phù hợp gaming, đồ họa, lập trình)";
+        else if (cpuLower.Contains("i9") || cpuLower.Contains("core i9"))
+            return "(flagship, hiệu năng tối đa, phù hợp công việc chuyên nghiệp)";
+        else if (cpuLower.Contains("ryzen 3"))
+            return "(phù hợp văn phòng, học tập)";
+        else if (cpuLower.Contains("ryzen 5"))
+            return "(cân bằng hiệu năng và giá, phù hợp đa mục đích)";
+        else if (cpuLower.Contains("ryzen 7"))
+            return "(mạnh mẽ, phù hợp gaming, đồ họa)";
+        else if (cpuLower.Contains("ryzen 9"))
+            return "(flagship AMD, hiệu năng tối đa)";
+        
+        return "";
+    }
+    
+    /// <summary>
+    /// Mô tả RAM để AI hiểu rõ hơn
+    /// </summary>
+    private string GetRamDescription(string? ram)
+    {
+        if (string.IsNullOrEmpty(ram)) return "";
+        
+        var ramLower = ram.ToLower();
+        if (ramLower.Contains("4gb") || ramLower.Contains("4 gb"))
+            return "(đủ dùng cho công việc cơ bản)";
+        else if (ramLower.Contains("8gb") || ramLower.Contains("8 gb"))
+            return "(phù hợp văn phòng, học tập, đa nhiệm tốt)";
+        else if (ramLower.Contains("16gb") || ramLower.Contains("16 gb"))
+            return "(tốt cho gaming, đồ họa, lập trình, đa nhiệm mạnh)";
+        else if (ramLower.Contains("32gb") || ramLower.Contains("32 gb"))
+            return "(rất mạnh, phù hợp công việc chuyên nghiệp, render video)";
+        
+        return "";
+    }
+    
+    /// <summary>
+    /// Mô tả Storage để AI hiểu rõ hơn
+    /// </summary>
+    private string GetStorageDescription(string? rom)
+    {
+        if (string.IsNullOrEmpty(rom)) return "";
+        
+        var romLower = rom.ToLower();
+        if (romLower.Contains("128gb"))
+            return "(hạn chế, chỉ đủ cho hệ điều hành và vài ứng dụng)";
+        else if (romLower.Contains("256gb"))
+            return "(đủ dùng cho văn phòng, học tập)";
+        else if (romLower.Contains("512gb"))
+            return "(tốt, đủ cho hầu hết nhu cầu)";
+        else if (romLower.Contains("1tb") || romLower.Contains("1024gb"))
+            return "(rộng rãi, phù hợp lưu trữ nhiều dữ liệu)";
+        
+        if (romLower.Contains("ssd"))
+            return "(tốc độ nhanh, khởi động nhanh)";
+        else if (romLower.Contains("hdd"))
+            return "(dung lượng lớn, giá rẻ, tốc độ chậm hơn SSD)";
+        
+        return "";
+    }
+    
+    /// <summary>
+    /// Mô tả Card đồ họa để AI hiểu rõ hơn
+    /// </summary>
+    private string GetCardDescription(string? card)
+    {
+        if (string.IsNullOrEmpty(card)) return "";
+        
+        var cardLower = card.ToLower();
+        if (cardLower.Contains("rtx"))
+            return "(card rời NVIDIA, mạnh mẽ, phù hợp gaming, đồ họa, AI)";
+        else if (cardLower.Contains("gtx"))
+            return "(card rời NVIDIA, phù hợp gaming, đồ họa)";
+        else if (cardLower.Contains("radeon") || cardLower.Contains("amd"))
+            return "(card rời AMD, phù hợp gaming, đồ họa)";
+        else if (cardLower.Contains("rời") || cardLower.Contains("roi"))
+            return "(card đồ họa rời, hiệu năng cao hơn card tích hợp)";
+        else if (cardLower.Contains("tích hợp") || cardLower.Contains("integrated"))
+            return "(card tích hợp, phù hợp văn phòng, học tập)";
+        
+        return "";
     }
     
     /// <summary>
@@ -667,13 +1062,73 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
 
     /// <summary>
     /// Search products với fallback mechanism (internal helper để parallelize)
+    /// Cải thiện để xử lý tốt hơn các câu hỏi về use case (gaming, văn phòng)
     /// </summary>
     private async Task<List<VectorSearchResult>> SearchProductsWithFallbackAsync(string userMessage)
     {
         bool qdrantSearchFailed = false;
         List<VectorSearchResult> productResults = new List<VectorSearchResult>();
 
-        // Thử search từ Qdrant trước
+        // Parse use case sớm để quyết định strategy
+        var searchTerm = userMessage.ToLower();
+        bool hasUseCase = searchTerm.Contains("gaming") || searchTerm.Contains("game") || 
+                         searchTerm.Contains("chơi game") || searchTerm.Contains("choi game") ||
+                         searchTerm.Contains("văn phòng") || searchTerm.Contains("van phong") ||
+                         searchTerm.Contains("office") || searchTerm.Contains("công việc") ||
+                         searchTerm.Contains("cong viec") || searchTerm.Contains("làm việc") ||
+                         searchTerm.Contains("lam viec") || searchTerm.Contains("đồ họa") ||
+                         searchTerm.Contains("do hoa") || searchTerm.Contains("học tập") ||
+                         searchTerm.Contains("hoc tap") || searchTerm.Contains("lập trình") ||
+                         searchTerm.Contains("lap trinh");
+        
+        // Nếu có use case rõ ràng, ưu tiên search từ SQL với criteria cụ thể
+        // Vì vector search có thể không match tốt với use case
+        if (hasUseCase)
+        {
+            _logger.LogInformation("Detected use case in message, prioritizing SQL search with criteria");
+            try
+            {
+                var sqlProducts = await FallbackSearchFromSqlAsync(userMessage);
+                if (sqlProducts != null && sqlProducts.Count > 0)
+                {
+                    // Convert ProductDTO to VectorSearchResult format với metadata đầy đủ
+                    productResults = sqlProducts.Select(p => 
+                    {
+                        var firstConfig = p.Configurations?.FirstOrDefault();
+                        return new VectorSearchResult
+                        {
+                            Content = $"{p.ProductName} - {p.SellingPrice:N0} VND",
+                            Score = 0.9f, // Higher score vì match use case
+                            Metadata = new Dictionary<string, object>
+                            {
+                                ["productId"] = p.ProductId ?? "",
+                                ["name"] = p.ProductName ?? "",
+                                ["price"] = p.SellingPrice ?? 0,
+                                ["brand"] = p.BrandName ?? "",
+                                ["cpu"] = firstConfig?.Cpu ?? "",
+                                ["ram"] = firstConfig?.Ram ?? "",
+                                ["rom"] = firstConfig?.Rom ?? "",
+                                ["card"] = firstConfig?.Card ?? "",
+                                ["warrantyPeriod"] = p.WarrantyPeriod ?? 0,
+                                ["description"] = $"Laptop {p.ProductName} với giá {p.SellingPrice:N0} VND"
+                            }
+                        };
+                    }).ToList();
+                    _logger.LogInformation("SQL search with use case found {Count} products", productResults.Count);
+                    return productResults; // Return ngay, không cần Qdrant
+                }
+                else
+                {
+                    _logger.LogWarning("SQL search with use case returned no products, will try Qdrant");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error in SQL search with use case, will try Qdrant: {Error}", ex.Message);
+            }
+        }
+
+        // Thử search từ Qdrant (nếu chưa có kết quả từ SQL)
         try
         {
             productResults = await _qdrantVectorService.SearchProductsAsync(userMessage, topK: 5);
@@ -687,7 +1142,7 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
         }
 
         // Fallback: Nếu Qdrant fail hoặc không có kết quả, search từ SQL Server
-        if (qdrantSearchFailed || productResults.Count == 0)
+        if ((qdrantSearchFailed || productResults.Count == 0) && !hasUseCase)
         {
             try
             {
@@ -705,6 +1160,12 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
                             ["productId"] = p.ProductId ?? "",
                             ["name"] = p.ProductName ?? "",
                             ["price"] = p.SellingPrice ?? 0,
+                            ["brand"] = p.BrandName ?? "",
+                            ["cpu"] = p.Configurations?.FirstOrDefault()?.Cpu ?? "",
+                            ["ram"] = p.Configurations?.FirstOrDefault()?.Ram ?? "",
+                            ["rom"] = p.Configurations?.FirstOrDefault()?.Rom ?? "",
+                            ["card"] = p.Configurations?.FirstOrDefault()?.Card ?? "",
+                            ["warrantyPeriod"] = p.WarrantyPeriod ?? 0,
                             ["description"] = $"Laptop {p.ProductName} với giá {p.SellingPrice:N0} VND"
                         }
                     }).ToList();
@@ -777,15 +1238,57 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
 
     /// <summary>
     /// Fallback search từ SQL Server khi Qdrant fail hoặc không có kết quả
+    /// Cải thiện để parse tốt hơn các yêu cầu như "máy rẻ", "máy Dell"
+    /// Normalize các từ khóa sản phẩm (laptop, máy tính, máy, PC, notebook)
     /// </summary>
     private async Task<List<ProductDTO>?> FallbackSearchFromSqlAsync(string userMessage)
     {
         try
         {
-            // Simple keyword extraction from user message
             var searchTerm = userMessage.ToLower();
+            var criteria = new ProductSearchCriteria();
+            bool isCheapRequest = false;
+            bool sortByPriceAscending = false;
             
-            // Try to extract price range
+            // Normalize các từ khóa sản phẩm - loại bỏ các từ chung chung
+            // Các từ này đều có nghĩa là "sản phẩm" nên không cần search theo chúng
+            var productKeywords = new[] { 
+                "laptop", "máy tính", "may tinh", "máy", "may", 
+                "pc", "notebook", "sản phẩm", "san pham", 
+                "máy tính xách tay", "may tinh xach tay", "mtxt",
+                "computer", "máy vi tính", "may vi tinh"
+            };
+            
+            // Loại bỏ các từ khóa sản phẩm chung chung khỏi searchTerm
+            var normalizedSearchTerm = searchTerm;
+            foreach (var keyword in productKeywords)
+            {
+                normalizedSearchTerm = normalizedSearchTerm.Replace(keyword, " ").Trim();
+            }
+            normalizedSearchTerm = System.Text.RegularExpressions.Regex.Replace(normalizedSearchTerm, @"\s+", " ").Trim();
+            
+            // Nếu sau khi normalize chỉ còn các từ chung chung hoặc rỗng
+            // → Đây là câu hỏi chung về sản phẩm, không cần filter
+            bool isGeneralProductQuery = string.IsNullOrWhiteSpace(normalizedSearchTerm) || 
+                                        normalizedSearchTerm.Split(' ').Length <= 1;
+            
+            _logger.LogInformation("Original search term: '{Original}', Normalized: '{Normalized}', IsGeneral: {IsGeneral}", 
+                userMessage, normalizedSearchTerm, isGeneralProductQuery);
+            
+            // 1. Parse "máy rẻ", "rẻ", "giá rẻ", "rẻ tiền" → tìm sản phẩm giá thấp
+            if (searchTerm.Contains("rẻ") || searchTerm.Contains("re") || 
+                searchTerm.Contains("giá rẻ") || searchTerm.Contains("gia re") ||
+                searchTerm.Contains("rẻ tiền") || searchTerm.Contains("re tien") ||
+                searchTerm.Contains("giá thấp") || searchTerm.Contains("gia thap"))
+            {
+                isCheapRequest = true;
+                sortByPriceAscending = true;
+                // Giới hạn giá tối đa 15 triệu cho "máy rẻ"
+                criteria.MaxPrice = 15000000;
+                _logger.LogInformation("Detected 'cheap laptop' request, setting maxPrice = 15,000,000");
+            }
+            
+            // 2. Parse price range
             decimal? minPrice = null;
             decimal? maxPrice = null;
             
@@ -794,6 +1297,7 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
             if (underMatch.Success && decimal.TryParse(underMatch.Groups[1].Value, out var underValue))
             {
                 maxPrice = underValue * 1000000;
+                criteria.MaxPrice = maxPrice;
             }
             
             // Extract "từ X đến Y triệu" -> minPrice, maxPrice
@@ -805,37 +1309,557 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
                 {
                     minPrice = min * 1000000;
                     maxPrice = max * 1000000;
+                    criteria.MinPrice = minPrice;
+                    criteria.MaxPrice = maxPrice;
                 }
             }
             
-            // Extract brand names
-            string? brandId = null;
-            var brands = new[] { "dell", "hp", "lenovo", "asus", "acer", "msi", "gigabyte" };
-            foreach (var brand in brands)
+            // Extract "khoảng X triệu" -> ±20% range
+            var aroundMatch = System.Text.RegularExpressions.Regex.Match(searchTerm, @"khoảng\s*(\d+)\s*triệu");
+            if (aroundMatch.Success && decimal.TryParse(aroundMatch.Groups[1].Value, out var aroundValue))
             {
-                if (searchTerm.Contains(brand))
+                var targetPrice = aroundValue * 1000000;
+                criteria.MinPrice = targetPrice * 0.8m; // -20%
+                criteria.MaxPrice = targetPrice * 1.2m; // +20%
+            }
+            
+            // Extract "trên X triệu" hoặc "từ X triệu trở lên" -> minPrice
+            var aboveMatch = System.Text.RegularExpressions.Regex.Match(searchTerm, @"(trên|từ)\s*(\d+)\s*triệu\s*(trở lên|trở lên)?");
+            if (aboveMatch.Success && decimal.TryParse(aboveMatch.Groups[2].Value, out var aboveValue))
+            {
+                criteria.MinPrice = aboveValue * 1000000;
+            }
+            
+            // Extract "trên X triệu" -> minPrice (pattern khác)
+            var overMatch = System.Text.RegularExpressions.Regex.Match(searchTerm, @"trên\s*(\d+)\s*triệu");
+            if (overMatch.Success && !criteria.MinPrice.HasValue && 
+                decimal.TryParse(overMatch.Groups[1].Value, out var overValue))
+            {
+                criteria.MinPrice = overValue * 1000000;
+            }
+            
+            // 3. Parse cấu hình (CPU, RAM, ROM, Card) - Cải thiện để parse từ câu dài
+            // Parse CPU - Ưu tiên model cụ thể trước
+            if (searchTerm.Contains("i9") || searchTerm.Contains("core i9"))
+                criteria.Cpu = "i9";
+            else if (searchTerm.Contains("i7") || searchTerm.Contains("core i7"))
+                criteria.Cpu = "i7";
+            else if (searchTerm.Contains("i5") || searchTerm.Contains("core i5"))
+                criteria.Cpu = "i5";
+            else if (searchTerm.Contains("i3") || searchTerm.Contains("core i3"))
+                criteria.Cpu = "i3";
+            else if (searchTerm.Contains("ryzen 9"))
+                criteria.Cpu = "Ryzen 9";
+            else if (searchTerm.Contains("ryzen 7"))
+                criteria.Cpu = "Ryzen 7";
+            else if (searchTerm.Contains("ryzen 5"))
+                criteria.Cpu = "Ryzen 5";
+            else if (searchTerm.Contains("ryzen 3"))
+                criteria.Cpu = "Ryzen 3";
+            else if (searchTerm.Contains("cpu") || searchTerm.Contains("processor") || 
+                     searchTerm.Contains("intel") || searchTerm.Contains("amd") ||
+                     searchTerm.Contains("core i") || searchTerm.Contains("ryzen"))
+            {
+                // Nếu chỉ có "intel" hoặc "amd" mà không có model cụ thể
+                if (searchTerm.Contains("intel") && !searchTerm.Contains("core i"))
+                    criteria.Cpu = "Intel";
+                else if (searchTerm.Contains("amd") && !searchTerm.Contains("ryzen"))
+                    criteria.Cpu = "AMD";
+            }
+            
+            if (!string.IsNullOrEmpty(criteria.Cpu))
+                _logger.LogInformation("Detected CPU requirement: {Cpu}", criteria.Cpu);
+            
+            // Parse RAM - Cải thiện regex để parse tốt hơn từ câu dài
+            // Ưu tiên parse số lớn trước (32GB > 16GB > 8GB)
+            var ramPatterns = new[]
+            {
+                @"(\d+)\s*gb\s*ram|ram\s*(\d+)\s*gb|(\d+)\s*gb\s*bộ nhớ|bộ nhớ\s*(\d+)\s*gb",
+                @"32\s*gb|32gb",
+                @"16\s*gb|16gb",
+                @"8\s*gb|8gb",
+                @"4\s*gb|4gb"
+            };
+            
+            bool ramFound = false;
+            foreach (var pattern in ramPatterns)
+            {
+                var ramMatch = System.Text.RegularExpressions.Regex.Match(searchTerm, pattern, 
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (ramMatch.Success)
                 {
-                    // Try to find brand ID (this is a simplified approach)
-                    // In real implementation, you'd query the database for brand IDs
-                    brandId = brand; // This would need to be mapped to actual brand IDs
-                    break;
+                    var ramValue = ramMatch.Groups[1].Value;
+                    if (string.IsNullOrEmpty(ramValue))
+                        ramValue = ramMatch.Groups[2].Value;
+                    if (string.IsNullOrEmpty(ramValue))
+                        ramValue = ramMatch.Groups[3].Value;
+                    if (string.IsNullOrEmpty(ramValue))
+                        ramValue = ramMatch.Groups[4].Value;
+                    
+                    // Nếu pattern là số cụ thể (32gb, 16gb, 8gb)
+                    if (string.IsNullOrEmpty(ramValue) && pattern.Contains("32"))
+                        ramValue = "32";
+                    else if (string.IsNullOrEmpty(ramValue) && pattern.Contains("16"))
+                        ramValue = "16";
+                    else if (string.IsNullOrEmpty(ramValue) && pattern.Contains("8"))
+                        ramValue = "8";
+                    else if (string.IsNullOrEmpty(ramValue) && pattern.Contains("4"))
+                        ramValue = "4";
+                    
+                    if (!string.IsNullOrEmpty(ramValue))
+                    {
+                        criteria.Ram = $"{ramValue}GB";
+                        _logger.LogInformation("Detected RAM requirement: {Ram}", criteria.Ram);
+                        ramFound = true;
+                        break; // Dừng khi tìm thấy
+                    }
                 }
             }
-
-            // Build search criteria
-            var criteria = new ProductSearchCriteria
+            
+            // Fallback: Tìm "ram" hoặc "bộ nhớ" trong câu
+            if (!ramFound && (searchTerm.Contains("ram") || searchTerm.Contains("bộ nhớ") || 
+                             searchTerm.Contains("bo nho") || searchTerm.Contains("memory")))
             {
-                SearchTerm = userMessage,
-                MinPrice = minPrice,
-                MaxPrice = maxPrice,
-                // BrandId = brandId // Uncomment when brand mapping is implemented
+                // Nếu có từ "ram" hoặc "bộ nhớ" nhưng không tìm thấy số → không set criteria.Ram
+                // Để search rộng hơn
+            }
+            
+            // Parse ROM/Storage
+            if (searchTerm.Contains("rom") || searchTerm.Contains("ổ cứng") || 
+                searchTerm.Contains("o cung") || searchTerm.Contains("ssd") || 
+                searchTerm.Contains("hdd") || searchTerm.Contains("storage"))
+            {
+                // Extract storage size
+                var storageMatch = System.Text.RegularExpressions.Regex.Match(searchTerm, 
+                    @"(\d+)\s*(gb|tb)\s*(ssd|hdd|rom|ổ cứng)|(ssd|hdd)\s*(\d+)\s*(gb|tb)");
+                if (storageMatch.Success)
+                {
+                    var size = storageMatch.Groups[1].Value;
+                    var unit = storageMatch.Groups[2].Value;
+                    var type = storageMatch.Groups[3].Value;
+                    
+                    if (string.IsNullOrEmpty(size))
+                    {
+                        size = storageMatch.Groups[5].Value;
+                        unit = storageMatch.Groups[6].Value;
+                        type = storageMatch.Groups[4].Value;
+                    }
+                    
+                    if (!string.IsNullOrEmpty(size) && !string.IsNullOrEmpty(unit))
+                    {
+                        criteria.Rom = $"{size}{unit.ToUpper()} {type.ToUpper()}";
+                        _logger.LogInformation("Detected storage requirement: {Rom}", criteria.Rom);
+                    }
+                }
+                else
+                {
+                    // Default storage keywords
+                    if (searchTerm.Contains("256gb") || searchTerm.Contains("256 gb"))
+                        criteria.Rom = "256GB SSD";
+                    else if (searchTerm.Contains("512gb") || searchTerm.Contains("512 gb"))
+                        criteria.Rom = "512GB SSD";
+                    else if (searchTerm.Contains("1tb") || searchTerm.Contains("1 tb"))
+                        criteria.Rom = "1TB";
+                }
+            }
+            
+            // Parse Card/GPU
+            if (searchTerm.Contains("card") || searchTerm.Contains("vga") || 
+                searchTerm.Contains("gpu") || searchTerm.Contains("đồ họa") ||
+                searchTerm.Contains("do hoa") || searchTerm.Contains("graphics"))
+            {
+                // Extract GPU model
+                if (searchTerm.Contains("rtx"))
+                {
+                    var rtxMatch = System.Text.RegularExpressions.Regex.Match(searchTerm, @"rtx\s*(\d+)");
+                    if (rtxMatch.Success)
+                        criteria.Card = $"RTX {rtxMatch.Groups[1].Value}";
+                    else
+                        criteria.Card = "RTX";
+                }
+                else if (searchTerm.Contains("gtx"))
+                {
+                    var gtxMatch = System.Text.RegularExpressions.Regex.Match(searchTerm, @"gtx\s*(\d+)");
+                    if (gtxMatch.Success)
+                        criteria.Card = $"GTX {gtxMatch.Groups[1].Value}";
+                    else
+                        criteria.Card = "GTX";
+                }
+                else if (searchTerm.Contains("card rời") || searchTerm.Contains("card roi") ||
+                         searchTerm.Contains("đồ họa rời") || searchTerm.Contains("do hoa roi"))
+                {
+                    criteria.Card = "rời"; // Tìm card rời (RTX, GTX, Radeon)
+                }
+                
+                if (!string.IsNullOrEmpty(criteria.Card))
+                    _logger.LogInformation("Detected GPU requirement: {Card}", criteria.Card);
+            }
+            
+            // 4. Extract brand names và query database để lấy BrandId thực tế
+            string? brandId = null;
+            var brandKeywords = new Dictionary<string, string[]>
+            {
+                { "dell", new[] { "dell" } },
+                { "hp", new[] { "hp", "hewlett packard" } },
+                { "lenovo", new[] { "lenovo" } },
+                { "asus", new[] { "asus", "rog" } },
+                { "acer", new[] { "acer" } },
+                { "msi", new[] { "msi" } },
+                { "gigabyte", new[] { "gigabyte", "giga" } },
+                { "apple", new[] { "apple", "macbook", "mac" } },
+                { "samsung", new[] { "samsung" } }
             };
+            
+            foreach (var brandPair in brandKeywords)
+            {
+                var brandName = brandPair.Key;
+                var keywords = brandPair.Value;
+                
+                if (keywords.Any(keyword => searchTerm.Contains(keyword)))
+                {
+                    // Query database để lấy BrandId thực tế
+                    try
+                    {
+                        // Lấy DbContext từ service provider
+                        var dbContext = _serviceProvider.GetService<Data.Testlaptop38Context>();
+                        if (dbContext != null)
+                        {
+                            var brandEntity = await dbContext.Brands
+                                .FirstOrDefaultAsync(b => b.BrandName != null && 
+                                    b.BrandName.ToLower().Contains(brandName));
+                            if (brandEntity != null && brandEntity.BrandId != null)
+                            {
+                                brandId = brandEntity.BrandId;
+                                criteria.BrandId = brandId;
+                                _logger.LogInformation("Found brand in database: {BrandName}, BrandId: {BrandId}", 
+                                    brandEntity.BrandName, brandId);
+                    break;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error querying brand: {BrandName}", brandName);
+                    }
+                }
+            }
+            
+            // 4. Extract use case (gaming, văn phòng, đồ họa) để filter sản phẩm phù hợp
+            // Use case sẽ được dùng để filter sau khi có kết quả
+            string? useCase = null;
+            if (searchTerm.Contains("gaming") || searchTerm.Contains("game") || 
+                searchTerm.Contains("chơi game") || searchTerm.Contains("choi game") ||
+                searchTerm.Contains("chơi") || searchTerm.Contains("choi"))
+            {
+                useCase = "gaming";
+                // Gaming thường cần card rời, nếu chưa có thì set criteria
+                if (string.IsNullOrEmpty(criteria.Card))
+                {
+                    // Không set criteria.Card = "rời" vì sẽ filter quá strict
+                    // Thay vào đó sẽ filter sau khi có kết quả
+                }
+            }
+            else if (searchTerm.Contains("văn phòng") || searchTerm.Contains("van phong") ||
+                     searchTerm.Contains("office") || searchTerm.Contains("công việc") ||
+                     searchTerm.Contains("cong viec") || searchTerm.Contains("làm việc") ||
+                     searchTerm.Contains("lam viec") || searchTerm.Contains("công việc văn phòng") ||
+                     searchTerm.Contains("cong viec van phong"))
+            {
+                useCase = "office";
+            }
+            else if (searchTerm.Contains("đồ họa") || searchTerm.Contains("do hoa") ||
+                     searchTerm.Contains("design") || searchTerm.Contains("thiết kế") ||
+                     searchTerm.Contains("thiet ke") || searchTerm.Contains("render") ||
+                     searchTerm.Contains("video") || searchTerm.Contains("editing"))
+            {
+                useCase = "design";
+            }
+            else if (searchTerm.Contains("học tập") || searchTerm.Contains("hoc tap") ||
+                     searchTerm.Contains("student") || searchTerm.Contains("sinh viên") ||
+                     searchTerm.Contains("sinh vien") || searchTerm.Contains("học sinh") ||
+                     searchTerm.Contains("hoc sinh"))
+            {
+                useCase = "student";
+            }
+            else if (searchTerm.Contains("lập trình") || searchTerm.Contains("lap trinh") ||
+                     searchTerm.Contains("programming") || searchTerm.Contains("code") ||
+                     searchTerm.Contains("developer") || searchTerm.Contains("dev"))
+            {
+                useCase = "programming";
+            }
+            
+            if (!string.IsNullOrEmpty(useCase))
+                _logger.LogInformation("Detected use case: {UseCase}", useCase);
+            
+            // 5. Log tất cả các tiêu chí đã parse được
+            _logger.LogInformation("Parsed search criteria - BrandId: {BrandId}, CPU: {Cpu}, RAM: {Ram}, ROM: {Rom}, Card: {Card}, " +
+                "MinPrice: {MinPrice}, MaxPrice: {MaxPrice}, UseCase: {UseCase}",
+                criteria.BrandId, criteria.Cpu, criteria.Ram, criteria.Rom, criteria.Card,
+                criteria.MinPrice, criteria.MaxPrice, useCase);
+            
+            // 6. Set SearchTerm
+            // Nếu là câu hỏi chung về sản phẩm (chỉ có "laptop", "máy tính", v.v.) → không set SearchTerm
+            // Nếu có từ khóa cụ thể → dùng normalizedSearchTerm
+            if (!isGeneralProductQuery && !string.IsNullOrWhiteSpace(normalizedSearchTerm))
+            {
+                // Chỉ set SearchTerm nếu không có brand, price, hoặc spec filters
+                if (string.IsNullOrEmpty(criteria.BrandId) && 
+                    !criteria.MinPrice.HasValue && !criteria.MaxPrice.HasValue &&
+                    string.IsNullOrEmpty(criteria.Cpu) && string.IsNullOrEmpty(criteria.Ram) &&
+                    string.IsNullOrEmpty(criteria.Rom) && string.IsNullOrEmpty(criteria.Card))
+                {
+                    criteria.SearchTerm = normalizedSearchTerm;
+                }
+            }
+            // Nếu là câu hỏi chung và không có filters → không set SearchTerm để lấy tất cả sản phẩm
 
-            // Search products
+            // 7. Search products với tất cả các tiêu chí đã parse
             var products = await _productService.SearchProductsAsync(criteria);
             
-            // Limit to top 5 results
-            return products.Take(5).ToList();
+            // 8. Nếu có use case nhưng không tìm được sản phẩm → search lại với criteria relaxed
+            if (!string.IsNullOrEmpty(useCase) && products.Count == 0)
+            {
+                _logger.LogInformation("No products found with strict criteria for use case: {UseCase}, trying relaxed search", useCase);
+                
+                // Relax criteria: chỉ giữ brand và price nếu có, bỏ các spec filters
+                var relaxedCriteria = new ProductSearchCriteria
+                {
+                    BrandId = criteria.BrandId,
+                    MinPrice = criteria.MinPrice,
+                    MaxPrice = criteria.MaxPrice
+                };
+                
+                products = await _productService.SearchProductsAsync(relaxedCriteria);
+                _logger.LogInformation("Relaxed search found {Count} products", products.Count);
+            }
+            
+            // 9. Filter theo use case nếu có (sau khi search)
+            // QUAN TRỌNG: Filter linh hoạt, không quá strict
+            if (!string.IsNullOrEmpty(useCase) && products.Any())
+            {
+                var filteredProducts = new List<ProductDTO>();
+                var allProducts = products.ToList(); // Backup để dùng nếu filter không có kết quả
+                
+                foreach (var product in products)
+                {
+                    bool matchesUseCase = false;
+                    
+                    switch (useCase)
+                    {
+                        case "gaming":
+                            // Gaming: ưu tiên card rời (RTX, GTX), nhưng cũng chấp nhận CPU mạnh
+                            var hasGamingCard = product.Configurations?.Any(c => 
+                                !string.IsNullOrEmpty(c.Card) && 
+                                (c.Card.Contains("RTX") || c.Card.Contains("GTX") || 
+                                 c.Card.Contains("Radeon"))) ?? false;
+                            var hasGamingCpu = product.Configurations?.Any(c => 
+                                !string.IsNullOrEmpty(c.Cpu) && 
+                                (c.Cpu.Contains("i7") || c.Cpu.Contains("i9") || 
+                                 c.Cpu.Contains("Ryzen 7") || c.Cpu.Contains("Ryzen 9"))) ?? false;
+                            // Relax: chấp nhận cả i5 nếu có RAM lớn
+                            var hasGamingCpuRelaxed = product.Configurations?.Any(c => 
+                                !string.IsNullOrEmpty(c.Cpu) && 
+                                (c.Cpu.Contains("i5") || c.Cpu.Contains("Ryzen 5")) &&
+                                !string.IsNullOrEmpty(c.Ram) && 
+                                (c.Ram.Contains("16GB") || c.Ram.Contains("32GB"))) ?? false;
+                            matchesUseCase = hasGamingCard || hasGamingCpu || hasGamingCpuRelaxed;
+                            break;
+                            
+                        case "office":
+                            // Văn phòng: CPU i3 trở lên, RAM 4GB trở lên (rất relax)
+                            matchesUseCase = product.Configurations?.Any(c => 
+                                (!string.IsNullOrEmpty(c.Cpu) && 
+                                 (c.Cpu.Contains("i3") || c.Cpu.Contains("i5") || 
+                                  c.Cpu.Contains("i7") || c.Cpu.Contains("Ryzen 3") || 
+                                  c.Cpu.Contains("Ryzen 5") || c.Cpu.Contains("Ryzen 7"))) &&
+                                (!string.IsNullOrEmpty(c.Ram) && 
+                                 (c.Ram.Contains("4GB") || c.Ram.Contains("8GB") || 
+                                  c.Ram.Contains("16GB") || c.Ram.Contains("32GB")))) ?? false;
+                            // Nếu không match, vẫn chấp nhận nếu có CPU
+                            if (!matchesUseCase)
+                            {
+                                matchesUseCase = product.Configurations?.Any(c => 
+                                    !string.IsNullOrEmpty(c.Cpu) && 
+                                    (c.Cpu.Contains("i3") || c.Cpu.Contains("i5") || 
+                                     c.Cpu.Contains("i7") || c.Cpu.Contains("Ryzen"))) ?? false;
+                            }
+                            break;
+                            
+                        case "design":
+                            // Đồ họa: ưu tiên RAM lớn (16GB+), nhưng cũng chấp nhận 8GB nếu CPU mạnh
+                            var hasDesignRam = product.Configurations?.Any(c => 
+                                !string.IsNullOrEmpty(c.Ram) && 
+                                (c.Ram.Contains("16GB") || c.Ram.Contains("32GB"))) ?? false;
+                            var hasDesignCpu = product.Configurations?.Any(c => 
+                                !string.IsNullOrEmpty(c.Cpu) && 
+                                (c.Cpu.Contains("i7") || c.Cpu.Contains("i9") || 
+                                 c.Cpu.Contains("Ryzen 7") || c.Cpu.Contains("Ryzen 9"))) ?? false;
+                            var hasDesignCpuWith8GB = product.Configurations?.Any(c => 
+                                !string.IsNullOrEmpty(c.Ram) && c.Ram.Contains("8GB")) ?? false;
+                            matchesUseCase = hasDesignRam || (hasDesignCpu && hasDesignCpuWith8GB);
+                            // Relax: chấp nhận i5 với RAM 8GB+
+                            if (!matchesUseCase)
+                            {
+                                matchesUseCase = product.Configurations?.Any(c => 
+                                    !string.IsNullOrEmpty(c.Cpu) && 
+                                    (c.Cpu.Contains("i5") || c.Cpu.Contains("Ryzen 5")) &&
+                                    !string.IsNullOrEmpty(c.Ram) && 
+                                    (c.Ram.Contains("8GB") || c.Ram.Contains("16GB"))) ?? false;
+                            }
+                            break;
+                            
+                        case "student":
+                            // Học tập: giá rẻ (< 25 triệu), CPU i3-i5, RAM 4GB+ (relax)
+                            var hasStudentConfig = product.Configurations?.Any(c => 
+                                (!string.IsNullOrEmpty(c.Cpu) && 
+                                 (c.Cpu.Contains("i3") || c.Cpu.Contains("i5") || 
+                                  c.Cpu.Contains("Ryzen 3") || c.Cpu.Contains("Ryzen 5"))) &&
+                                (!string.IsNullOrEmpty(c.Ram) && 
+                                 (c.Ram.Contains("4GB") || c.Ram.Contains("8GB") || 
+                                  c.Ram.Contains("16GB")))) ?? false;
+                            matchesUseCase = (product.SellingPrice ?? 0) < 25000000 && hasStudentConfig;
+                            // Relax: nếu giá < 30 triệu vẫn chấp nhận
+                            if (!matchesUseCase && (product.SellingPrice ?? 0) < 30000000)
+                            {
+                                matchesUseCase = hasStudentConfig;
+                            }
+                            break;
+                            
+                        case "programming":
+                            // Lập trình: ưu tiên RAM lớn (16GB+), nhưng cũng chấp nhận 8GB nếu CPU mạnh
+                            var hasProgRam = product.Configurations?.Any(c => 
+                                !string.IsNullOrEmpty(c.Ram) && 
+                                (c.Ram.Contains("16GB") || c.Ram.Contains("32GB"))) ?? false;
+                            var hasProgCpu = product.Configurations?.Any(c => 
+                                !string.IsNullOrEmpty(c.Cpu) && 
+                                (c.Cpu.Contains("i5") || c.Cpu.Contains("i7") || 
+                                 c.Cpu.Contains("Ryzen 5") || c.Cpu.Contains("Ryzen 7"))) ?? false;
+                            var hasProgCpuWith8GB = product.Configurations?.Any(c => 
+                                !string.IsNullOrEmpty(c.Ram) && c.Ram.Contains("8GB")) ?? false;
+                            matchesUseCase = hasProgRam || (hasProgCpu && hasProgCpuWith8GB);
+                            // Relax: chấp nhận i3 với RAM 8GB
+                            if (!matchesUseCase)
+                            {
+                                matchesUseCase = product.Configurations?.Any(c => 
+                                    !string.IsNullOrEmpty(c.Cpu) && 
+                                    (c.Cpu.Contains("i3") || c.Cpu.Contains("Ryzen 3")) &&
+                                    !string.IsNullOrEmpty(c.Ram) && 
+                                    (c.Ram.Contains("8GB") || c.Ram.Contains("16GB"))) ?? false;
+                            }
+                            break;
+                    }
+                    
+                    if (matchesUseCase)
+                    {
+                        filteredProducts.Add(product);
+                    }
+                }
+                
+                // Nếu filter có kết quả → dùng filtered
+                if (filteredProducts.Any())
+                {
+                    products = filteredProducts;
+                    _logger.LogInformation("Filtered {Count} products by use case: {UseCase}", 
+                        products.Count, useCase);
+                }
+                else
+                {
+                    // Không filter được → dùng tất cả products và log warning
+                    // AI sẽ giải thích rằng sản phẩm có thể không phù hợp 100% nhưng vẫn có thể dùng
+                    _logger.LogWarning("No products matched use case filter: {UseCase}, using all {Count} products. AI will explain suitability.", 
+                        useCase, allProducts.Count);
+                    products = allProducts; // Dùng tất cả để AI có thể giải thích
+                }
+            }
+            
+            // 6. Nếu không có kết quả và có use case → search lại với criteria rất relaxed
+            if (products.Count == 0 && !string.IsNullOrEmpty(useCase))
+            {
+                _logger.LogInformation("No products found with criteria for use case: {UseCase}, trying very relaxed search", useCase);
+                
+                // Search với criteria rất relaxed: chỉ filter theo use case requirements
+                var veryRelaxedCriteria = new ProductSearchCriteria();
+                
+                // Set criteria cơ bản theo use case
+                switch (useCase)
+                {
+                    case "gaming":
+                        // Gaming: tìm card rời hoặc CPU mạnh
+                        veryRelaxedCriteria.Card = "RTX"; // Tìm RTX, GTX
+                        break;
+                    case "office":
+                        // Văn phòng: không cần filter gì, lấy tất cả
+                        break;
+                    case "design":
+                        // Đồ họa: ưu tiên RAM lớn
+                        veryRelaxedCriteria.Ram = "16GB";
+                        break;
+                    case "student":
+                        // Học tập: giá rẻ
+                        veryRelaxedCriteria.MaxPrice = 25000000;
+                        break;
+                    case "programming":
+                        // Lập trình: RAM lớn
+                        veryRelaxedCriteria.Ram = "16GB";
+                        break;
+                }
+                
+                products = await _productService.SearchProductsAsync(veryRelaxedCriteria);
+                
+                // Nếu vẫn không có → lấy top sản phẩm
+                if (products.Count == 0)
+                {
+                    _logger.LogInformation("Still no products found, fetching top products");
+                    var allProducts = await _productService.SearchProductsAsync(new ProductSearchCriteria());
+                    products = allProducts
+                        .Where(p => p.SellingPrice.HasValue)
+                        .OrderByDescending(p => p.SellingPrice)
+                        .Take(10)
+                        .ToList();
+                }
+            }
+            // Nếu không có kết quả và là câu hỏi chung → lấy top sản phẩm
+            else if (products.Count == 0 && isGeneralProductQuery)
+            {
+                _logger.LogInformation("No products found with criteria, fetching top products for general query");
+                // Lấy top 10 sản phẩm bán chạy hoặc mới nhất
+                var allProducts = await _productService.SearchProductsAsync(new ProductSearchCriteria());
+                products = allProducts
+                    .Where(p => p.SellingPrice.HasValue)
+                    .OrderByDescending(p => p.SellingPrice) // Sắp xếp theo giá (có thể thay bằng số lượng bán)
+                    .Take(10)
+                    .ToList();
+            }
+            
+            // 7. Sort nếu là yêu cầu "máy rẻ"
+            if (sortByPriceAscending)
+            {
+                products = products
+                    .Where(p => p.SellingPrice.HasValue)
+                    .OrderBy(p => p.SellingPrice)
+                    .ToList();
+            }
+            // Nếu không có sort cụ thể và là câu hỏi chung → sort theo giá giảm dần (sản phẩm tốt nhất)
+            else if (isGeneralProductQuery && products.Any())
+            {
+                products = products
+                    .Where(p => p.SellingPrice.HasValue)
+                    .OrderByDescending(p => p.SellingPrice)
+                    .ToList();
+            }
+            
+            // 10. Limit to top 5-10 results 
+            // (10 nếu là "máy rẻ", câu hỏi chung, hoặc câu dài có nhiều tiêu chí để có nhiều lựa chọn)
+            var hasMultipleCriteria = (!string.IsNullOrEmpty(criteria.BrandId) ? 1 : 0) +
+                                     (!string.IsNullOrEmpty(criteria.Cpu) ? 1 : 0) +
+                                     (!string.IsNullOrEmpty(criteria.Ram) ? 1 : 0) +
+                                     (!string.IsNullOrEmpty(criteria.Rom) ? 1 : 0) +
+                                     (!string.IsNullOrEmpty(criteria.Card) ? 1 : 0) +
+                                     (criteria.MinPrice.HasValue || criteria.MaxPrice.HasValue ? 1 : 0) +
+                                     (!string.IsNullOrEmpty(useCase) ? 1 : 0);
+            
+            var limit = (isCheapRequest || isGeneralProductQuery || hasMultipleCriteria >= 3) ? 10 : 5;
+            return products.Take(limit).ToList();
         }
         catch (Exception ex)
         {
@@ -942,9 +1966,26 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
             var imageUrl = $"{backendUrl}/imageProducts/default.jpg";
             if (!string.IsNullOrEmpty(p.Avatar))
             {
-                imageUrl = p.Avatar.StartsWith("http") 
-                    ? p.Avatar 
-                    : $"{backendUrl}{(p.Avatar.StartsWith("/") ? "" : "/")}{p.Avatar}";
+                // Nếu Avatar đã là URL đầy đủ (http/https), dùng trực tiếp
+                if (p.Avatar.StartsWith("http"))
+                {
+                    imageUrl = p.Avatar;
+                }
+                // Nếu Avatar đã có /imageProducts/, dùng trực tiếp
+                else if (p.Avatar.StartsWith("/imageProducts/"))
+                {
+                    imageUrl = $"{backendUrl}{p.Avatar}";
+                }
+                // Nếu Avatar chỉ là tên file (ví dụ: "abc.jpg"), thêm /imageProducts/
+                else if (!p.Avatar.Contains("/"))
+                {
+                    imageUrl = $"{backendUrl}/imageProducts/{p.Avatar}";
+                }
+                // Trường hợp khác (có thể là đường dẫn tương đối khác)
+                else
+                {
+                    imageUrl = $"{backendUrl}{(p.Avatar.StartsWith("/") ? "" : "/")}{p.Avatar}";
+                }
             }
             else if (p.Images != null && p.Images.Count > 0)
             {
@@ -976,4 +2017,5 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
         }).ToList();
     }
 }
+
 

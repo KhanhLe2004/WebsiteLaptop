@@ -360,10 +360,26 @@ public class GuidedChatService : IGuidedChatService
         var imageUrl = $"{backendUrl}/imageProducts/default.jpg"; // Default image
         if (!string.IsNullOrEmpty(product.Avatar))
         {
-            // Avatar đã là đường dẫn tương đối hoặc tuyệt đối
-            imageUrl = product.Avatar.StartsWith("http") 
-                ? product.Avatar 
-                : $"{backendUrl}{(product.Avatar.StartsWith("/") ? "" : "/")}{product.Avatar}";
+            // Nếu Avatar đã là URL đầy đủ (http/https), dùng trực tiếp
+            if (product.Avatar.StartsWith("http"))
+            {
+                imageUrl = product.Avatar;
+            }
+            // Nếu Avatar đã có /imageProducts/, dùng trực tiếp
+            else if (product.Avatar.StartsWith("/imageProducts/"))
+            {
+                imageUrl = $"{backendUrl}{product.Avatar}";
+            }
+            // Nếu Avatar chỉ là tên file (ví dụ: "abc.jpg"), thêm /imageProducts/
+            else if (!product.Avatar.Contains("/"))
+            {
+                imageUrl = $"{backendUrl}/imageProducts/{product.Avatar}";
+            }
+            // Trường hợp khác (có thể là đường dẫn tương đối khác)
+            else
+            {
+                imageUrl = $"{backendUrl}{(product.Avatar.StartsWith("/") ? "" : "/")}{product.Avatar}";
+            }
         }
         else if (product.ProductImages != null && product.ProductImages.Any())
         {

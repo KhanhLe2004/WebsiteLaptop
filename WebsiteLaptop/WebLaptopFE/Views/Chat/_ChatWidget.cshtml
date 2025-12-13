@@ -31,7 +31,7 @@
         <div class="chat-box-footer">
             <div class="input-group">
                 <input type="text" id="chatMessageInput" class="form-control" placeholder="Nhập tin nhắn..." />
-                <button class="btn btn-primary" type="button" id="chatSendButton">
+                <button class="btn btn-info" type="button" id="chatSendButton">
                     <i class="bi bi-send-fill"></i>
                 </button>
             </div>
@@ -89,10 +89,10 @@
     
     .chat-box {
         position: absolute;
-        bottom: 80px;
-        right: 0;
+        bottom: 0; /* Ngang với bottom của icon */
+        right: 70px; /* Xuất hiện bên trái icon (icon width 60px + 10px margin) */
         width: 380px;
-        height: 600px;
+        height: 450px;
         max-height: 80vh;
         background: white;
         border-radius: 12px;
@@ -246,7 +246,22 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
 <script>
-    (function() {
+    // Prevent multiple initializations
+    if (window.chatWidgetInitialized) {
+        console.log('Chat widget already initialized, skipping...');
+    } else {
+        window.chatWidgetInitialized = true;
+        
+        // Wait for DOM to be ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeChatWidget);
+        } else {
+            // DOM is already ready
+            initializeChatWidget();
+        }
+    }
+    
+    function initializeChatWidget() {
         const apiBase = "http://localhost:5068/api/";
         const hubUrl = "http://localhost:5068/chathub";
         
@@ -254,21 +269,62 @@
         let currentCustomerId = null;
         let lastSentMessage = null;
         let isChatBoxOpen = false;
+        let badgeUpdateInterval = null;
+        
+        // Get DOM elements
+        const chatWidgetButton = document.getElementById("chatWidgetButton");
+        const chatBox = document.getElementById("chatBox");
+        const chatCloseButton = document.getElementById("chatCloseButton");
+        const chatSendButton = document.getElementById("chatSendButton");
+        const chatMessageInput = document.getElementById("chatMessageInput");
+        
+        // Check if elements exist
+        if (!chatWidgetButton || !chatBox) {
+            console.error('Chat widget elements not found');
+            return;
+        }
         
         // Get customer info from sessionStorage
         function getCustomerInfo() {
             const customerStr = sessionStorage.getItem('customer');
             if (customerStr) {
-                const customer = JSON.parse(customerStr);
-                return customer.customerId || customer.CustomerId || customer.customer?.customerId;
+                try {
+                    const customer = JSON.parse(customerStr);
+                    return customer.customerId || customer.CustomerId || customer.customer?.customerId;
+                } catch (e) {
+                    console.error('Error parsing customer info:', e);
+                }
             }
             return null;
         }
         
         // Initialize SignalR connection
         function startChatConnection() {
+            // If already connected, return
+            if (chatConnection && chatConnection.state === signalR.HubConnectionState.Connected) {
+                return Promise.resolve();
+            }
+            
+            // If connection exists but is not connected, stop it first
+            if (chatConnection) {
+                chatConnection.stop().catch(err => console.error("Error stopping connection:", err));
+            }
+            
             chatConnection = new signalR.HubConnectionBuilder()
-                .withUrl(hubUrl)
+                .withUrl(hubUrl, {
+                    skipNegotiation: false,
+                    transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.LongPolling,
+                    accessTokenFactory: null
+                })
+                .configureLogging(signalR.LogLevel.Information)
+                .withAutomaticReconnect({
+                    nextRetryDelayInMilliseconds: retryContext => {
+                        if (retryContext.elapsedMilliseconds < 60000) {
+                            return Math.min(1000 * Math.pow(2, retryContext.previousRetryCount), 30000);
+                        }
+                        return null; // Stop retrying after 60 seconds
+                    }
+                })
                 .build();
             
             chatConnection.on("ReceiveMessage", function (message) {
@@ -284,23 +340,63 @@
                 // Only display if chat box is open
                 if (isChatBoxOpen) {
                     displayChatMessage(message, false);
+                    // If chat box is open, mark as read immediately
+                    if (message.senderType === "employee") {
+                        markChatAsRead();
+                    }
                 }
                 
                 // Update unread badge if message is from employee
+                // Always update badge when receiving message from employee
                 if (message.senderType === "employee") {
-                    updateUnreadBadge();
+                    // Delay slightly to ensure message is saved in database
+                    setTimeout(() => {
+                        updateUnreadBadgeFromAPI();
+                    }, 500);
                 }
             });
             
             chatConnection.on("Error", function (error) {
+                console.error("Chat connection error:", error);
                 updateChatConnectionStatus(false);
             });
             
-            chatConnection.start().then(function () {
+            chatConnection.onreconnecting(function() {
+                console.log("Chat reconnecting...");
+                updateChatConnectionStatus(false);
+            });
+            
+            chatConnection.onreconnected(function() {
+                console.log("Chat reconnected");
                 currentCustomerId = getCustomerInfo();
                 if (currentCustomerId) {
                     chatConnection.invoke("JoinRoom", currentCustomerId, "customer")
+                        .catch(err => console.error("Error rejoining room:", err));
+                }
+                updateChatConnectionStatus(true);
+            });
+            
+            chatConnection.onclose(function (error) {
+                console.log("Chat connection closed", error);
+                updateChatConnectionStatus(false);
+                // Only auto-reconnect if chat box is open
+                if (isChatBoxOpen && currentCustomerId) {
+                    setTimeout(() => {
+                        if (isChatBoxOpen) {
+                            startChatConnection().catch(err => console.error("Auto-reconnect failed:", err));
+                        }
+                    }, 3000);
+                }
+            });
+            
+            // Return promise so we can await it
+            return chatConnection.start().then(function () {
+                console.log("Chat connection started");
+                currentCustomerId = getCustomerInfo();
+                if (currentCustomerId) {
+                    return chatConnection.invoke("JoinRoom", currentCustomerId, "customer")
                         .then(function() {
+                            console.log("Joined chat room");
                             updateChatConnectionStatus(true);
                             if (isChatBoxOpen) {
                                 loadChatMessages();
@@ -309,76 +405,229 @@
                                 // Load unread count when connection is established
                                 updateUnreadBadgeFromAPI();
                             }
+                            
+                            // Start periodic badge update (every 30 seconds)
+                            startBadgeUpdateInterval();
                         })
                         .catch(function (err) {
+                            console.error("Error joining room:", err);
                             updateChatConnectionStatus(false);
+                            throw err;
                         });
+                } else {
+                    updateChatConnectionStatus(true);
                 }
             }).catch(function (err) {
+                console.error("Error starting chat connection:", err);
+                console.error("Error details:", {
+                    message: err.message,
+                    stack: err.stack,
+                    hubUrl: hubUrl
+                });
                 updateChatConnectionStatus(false);
-            });
-            
-            chatConnection.onclose(function () {
-                updateChatConnectionStatus(false);
-                setTimeout(startChatConnection, 5000);
+                
+                // Provide more helpful error message
+                if (err.message && err.message.includes("Failed to fetch")) {
+                    console.error("CORS or network error. Check:");
+                    console.error("1. Backend is running on http://localhost:5068");
+                    console.error("2. CORS is configured correctly in Program.cs");
+                    console.error("3. SignalR hub is mapped at /chathub");
+                }
+                
+                throw err;
             });
         }
         
         // Toggle chat box
-        document.getElementById("chatWidgetButton").addEventListener("click", async function() {
-            const chatBox = document.getElementById("chatBox");
+        chatWidgetButton.addEventListener("click", async function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
             isChatBoxOpen = !isChatBoxOpen;
             
             if (isChatBoxOpen) {
+                // Đóng ChatAIWidget nếu đang mở
+                closeChatAIWidgetIfOpen();
+                
                 chatBox.style.display = "flex";
+                // Stop periodic badge update when chat box is open
+                stopBadgeUpdateInterval();
+                
                 currentCustomerId = getCustomerInfo();
+                
+                const messagesList = document.getElementById("chatMessagesList");
+                
                 if (currentCustomerId) {
-                    if (!chatConnection || chatConnection.state !== signalR.HubConnectionState.Connected) {
-                        startChatConnection();
-                    } else {
-                        await loadChatMessages();
-                        // Mark messages as read when opening chat box
-                        await markChatAsRead();
+                    // Show loading message
+                    if (messagesList) {
+                        messagesList.innerHTML = 
+                            '<div class="text-center text-muted p-3">Đang kết nối...</div>';
+                    }
+                    
+                    try {
+                        // Check connection state
+                        if (!chatConnection || chatConnection.state !== signalR.HubConnectionState.Connected) {
+                            // Wait for connection to be established
+                            await startChatConnection();
+                            
+                            // Wait a bit more to ensure connection is ready
+                            let attempts = 0;
+                            const maxAttempts = 10;
+                            while (attempts < maxAttempts && 
+                                   (!chatConnection || chatConnection.state !== signalR.HubConnectionState.Connected)) {
+                                await new Promise(resolve => setTimeout(resolve, 200));
+                                attempts++;
+                            }
+                        }
+                        
+                        // If connected, load messages
+                        if (chatConnection && chatConnection.state === signalR.HubConnectionState.Connected) {
+                            await loadChatMessages();
+                            await markChatAsRead();
+                        } else {
+                            if (messagesList) {
+                                messagesList.innerHTML = 
+                                    '<div class="text-center text-danger p-3">Không thể kết nối đến server. Vui lòng thử lại sau.</div>';
+                            }
+                        }
+                    } catch (error) {
+                        console.error("Error opening chat:", error);
+                        if (messagesList) {
+                            messagesList.innerHTML = 
+                                '<div class="text-center text-danger p-3">Lỗi kết nối: ' + error.message + '. Vui lòng thử lại.</div>';
+                        }
                     }
                 } else {
-                    document.getElementById("chatMessagesList").innerHTML = 
-                        '<div class="text-center text-muted p-3">Vui lòng đăng nhập để sử dụng tính năng chat</div>';
+                    if (messagesList) {
+                        messagesList.innerHTML = 
+                            '<div class="text-center text-muted p-3">Vui lòng đăng nhập để sử dụng tính năng chat</div>';
+                    }
                 }
+                
                 // Hide badge when opening chat box
-                document.getElementById("chatBadge").style.display = "none";
+                const badge = document.getElementById("chatBadge");
+                if (badge) {
+                    badge.style.display = "none";
+                }
             } else {
                 chatBox.style.display = "none";
+                // Resume periodic badge update when chat box is closed
+                if (currentCustomerId) {
+                    startBadgeUpdateInterval();
+                }
+            }
+        });
+        
+        // Đóng ChatAIWidget nếu đang mở (được gọi từ ChatWidget)
+        function closeChatAIWidgetIfOpen() {
+            const chatAIWindow = document.getElementById('chatWindow');
+            
+            if (chatAIWindow) {
+                const isOpen = chatAIWindow.style.display === 'flex' || 
+                              (chatAIWindow.style.display === '' && window.getComputedStyle(chatAIWindow).display === 'flex');
+                
+                if (isOpen) {
+                    // Gọi function từ ChatAIWidget để đóng
+                    if (window.Chatbot && typeof window.Chatbot.closeChatWindow === 'function') {
+                        window.Chatbot.closeChatWindow();
+                    } else if (typeof window.closeChatAIWidget === 'function') {
+                        window.closeChatAIWidget();
+                    } else {
+                        // Fallback: đóng trực tiếp
+                        chatAIWindow.style.display = 'none';
+                    }
+                    // Dispatch event để ChatAIWidget biết đã bị đóng
+                    window.dispatchEvent(new CustomEvent('chatAIWidgetClosed'));
+                }
+            }
+        }
+        
+        // Listen event khi ChatWidget bị đóng từ ChatAIWidget
+        window.addEventListener('chatWidgetClosed', function() {
+            isChatBoxOpen = false;
+            // Resume periodic badge update when chat box is closed
+            if (currentCustomerId) {
+                startBadgeUpdateInterval();
             }
         });
         
         // Close chat box
-        document.getElementById("chatCloseButton").addEventListener("click", function() {
-            document.getElementById("chatBox").style.display = "none";
-            isChatBoxOpen = false;
-        });
+        if (chatCloseButton) {
+            chatCloseButton.addEventListener("click", function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                chatBox.style.display = "none";
+                isChatBoxOpen = false;
+            });
+        }
         
         // Send message
-        document.getElementById("chatSendButton").addEventListener("click", function() {
-            sendChatMessage();
-        });
-        
-        document.getElementById("chatMessageInput").addEventListener("keypress", function(event) {
-            if (event.key === "Enter") {
+        if (chatSendButton) {
+            chatSendButton.addEventListener("click", function(e) {
+                e.preventDefault();
                 sendChatMessage();
-            }
-        });
+            });
+        }
         
-        function sendChatMessage() {
-            const messageInput = document.getElementById("chatMessageInput");
-            const message = messageInput.value.trim();
-            
-            if (message === "" || !currentCustomerId) {
+        if (chatMessageInput) {
+            chatMessageInput.addEventListener("keypress", function(event) {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    sendChatMessage();
+                }
+            });
+        }
+        
+        async function sendChatMessage() {
+            if (!chatMessageInput || !currentCustomerId) {
+                if (!currentCustomerId) {
+                    alert("Vui lòng đăng nhập để sử dụng tính năng chat");
+                }
                 return;
             }
             
-            if (!chatConnection || chatConnection.state !== signalR.HubConnectionState.Connected) {
-                alert("Chưa kết nối đến server. Vui lòng đợi...");
+            const message = chatMessageInput.value.trim();
+            
+            if (message === "") {
                 return;
+            }
+            
+            // Check and ensure connection
+            if (!chatConnection || chatConnection.state !== signalR.HubConnectionState.Connected) {
+                // Try to reconnect
+                try {
+                    const messagesList = document.getElementById("chatMessagesList");
+                    if (messagesList) {
+                        const loadingMsg = document.createElement("div");
+                        loadingMsg.className = "text-center text-muted p-2";
+                        loadingMsg.textContent = "Đang kết nối lại...";
+                        messagesList.appendChild(loadingMsg);
+                    }
+                    
+                    await startChatConnection();
+                    
+                    // Wait for connection
+                    let attempts = 0;
+                    const maxAttempts = 10;
+                    while (attempts < maxAttempts && 
+                           (!chatConnection || chatConnection.state !== signalR.HubConnectionState.Connected)) {
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                        attempts++;
+                    }
+                    
+                    if (messagesList && messagesList.lastChild && messagesList.lastChild.className.includes("text-muted")) {
+                        messagesList.removeChild(messagesList.lastChild);
+                    }
+                    
+                    if (!chatConnection || chatConnection.state !== signalR.HubConnectionState.Connected) {
+                        alert("Không thể kết nối đến server. Vui lòng thử lại sau.");
+                        return;
+                    }
+                } catch (error) {
+                    console.error("Error reconnecting:", error);
+                    alert("Lỗi kết nối: " + error.message);
+                    return;
+                }
             }
             
             // Show message immediately (optimistic update)
@@ -389,7 +638,7 @@
             };
             lastSentMessage = tempMessage;
             displayChatMessage(tempMessage);
-            messageInput.value = "";
+            chatMessageInput.value = "";
             
             chatConnection.invoke("SendMessage", currentCustomerId, null, message, "customer")
                 .then(function() {
@@ -398,9 +647,10 @@
                     }, 3000);
                 })
                 .catch(function (err) {
+                    console.error("Error sending message:", err);
                     alert("Lỗi khi gửi tin nhắn: " + err.toString());
                     const messagesList = document.getElementById("chatMessagesList");
-                    if (messagesList.lastChild) {
+                    if (messagesList && messagesList.lastChild) {
                         messagesList.removeChild(messagesList.lastChild);
                     }
                     lastSentMessage = null;
@@ -463,6 +713,7 @@
         // Display message
         function displayChatMessage(message, skipDateCheck = false) {
             const messagesList = document.getElementById("chatMessagesList");
+            if (!messagesList) return;
             
             // Clear placeholder if exists
             if (messagesList.querySelector('.text-center.text-muted')) {
@@ -500,9 +751,14 @@
             
             try {
                 const response = await fetch(`${apiBase}Chat/GetMessages?customerId=${currentCustomerId}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
                 const messages = await response.json();
                 
                 const messagesList = document.getElementById("chatMessagesList");
+                if (!messagesList) return;
+                
                 messagesList.innerHTML = "";
                 
                 if (messages && messages.length > 0) {
@@ -514,6 +770,10 @@
                 }
             } catch (error) {
                 console.error("Error loading messages:", error);
+                const messagesList = document.getElementById("chatMessagesList");
+                if (messagesList) {
+                    messagesList.innerHTML = '<div class="text-center text-danger p-3">Lỗi khi tải tin nhắn. Vui lòng thử lại.</div>';
+                }
             }
         }
         
@@ -545,16 +805,28 @@
             
             try {
                 const response = await fetch(`${apiBase}Chat/GetConversations/Customer?customerId=${currentCustomerId}`);
+                if (!response.ok) {
+                    console.error("Failed to fetch unread count:", response.status, response.statusText);
+                    return;
+                }
                 const conversations = await response.json();
                 
                 if (conversations && conversations.length > 0) {
                     const unreadCount = conversations[0].unreadCount || 0;
                     const badge = document.getElementById("chatBadge");
                     
-                    if (unreadCount > 0 && !isChatBoxOpen) {
-                        badge.textContent = unreadCount;
-                        badge.style.display = "flex";
-                    } else {
+                    if (badge) {
+                        if (unreadCount > 0 && !isChatBoxOpen) {
+                            badge.textContent = unreadCount > 99 ? "99+" : unreadCount.toString();
+                            badge.style.display = "flex";
+                        } else {
+                            badge.style.display = "none";
+                        }
+                    }
+                } else {
+                    // No conversations found, hide badge
+                    const badge = document.getElementById("chatBadge");
+                    if (badge) {
                         badge.style.display = "none";
                     }
                 }
@@ -566,22 +838,24 @@
         // Scroll to bottom
         function scrollChatToBottom() {
             const messagesArea = document.getElementById("chatMessagesArea");
-            messagesArea.scrollTop = messagesArea.scrollHeight;
+            if (messagesArea) {
+                messagesArea.scrollTop = messagesArea.scrollHeight;
+            }
         }
         
         // Update connection status
         function updateChatConnectionStatus(connected) {
             const statusEl = document.getElementById("chatConnectionStatus");
-            // Hide connection status badge
-            statusEl.style.display = "none";
+            if (statusEl) {
+                // Hide connection status badge
+                statusEl.style.display = "none";
+            }
         }
         
-        // Update unread badge
+        // Update unread badge (legacy function, now always calls API)
         function updateUnreadBadge() {
-            if (!isChatBoxOpen) {
-                // Get actual unread count from API instead of just incrementing
-                updateUnreadBadgeFromAPI();
-            }
+            // Always get actual unread count from API for accuracy
+            updateUnreadBadgeFromAPI();
         }
         
         // Escape HTML
@@ -592,8 +866,31 @@
             return div.innerHTML;
         }
         
+        // Start periodic badge update
+        function startBadgeUpdateInterval() {
+            // Clear existing interval if any
+            if (badgeUpdateInterval) {
+                clearInterval(badgeUpdateInterval);
+            }
+            
+            // Update badge every 30 seconds if chat box is closed
+            badgeUpdateInterval = setInterval(() => {
+                if (!isChatBoxOpen && currentCustomerId) {
+                    updateUnreadBadgeFromAPI();
+                }
+            }, 30000); // 30 seconds
+        }
+        
+        // Stop periodic badge update
+        function stopBadgeUpdateInterval() {
+            if (badgeUpdateInterval) {
+                clearInterval(badgeUpdateInterval);
+                badgeUpdateInterval = null;
+            }
+        }
+        
         // Start connection when page loads
         startChatConnection();
-    })();
+    }
 </script>
 

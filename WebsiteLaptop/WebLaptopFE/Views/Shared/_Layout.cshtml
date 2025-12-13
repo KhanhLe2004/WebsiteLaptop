@@ -46,10 +46,11 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     
+    <!-- Chat AI Widget -->
+    @await Html.PartialAsync("~/Views/Chat/_ChatAIWedget.cshtml")
+    
     <!-- Chat Widget -->
-    @await Html.PartialAsync("_ChatWidget")
-    <link rel="stylesheet" href="~/css/chatbot.css" asp-append-version="true" />
-    <script src="~/js/chatbot.js" asp-append-version="true"></script>
+    @await Html.PartialAsync("~/Views/Chat/_ChatWidget.cshtml")
     
     @await RenderSectionAsync("Scripts", required: false)
 </body>

@@ -1,0 +1,1086 @@
+<!-- Chat AI Widget - Floating Button và Chat Window -->
+<div id="chatAIWidget" class="chat-ai-widget-container">
+    <!-- Nút chat floating - góc dưới bên phải -->
+    <button id="chatToggleBtn" class="chat-toggle-btn" aria-label="Mở chat">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2ZM20 16H6L4 18V4H20V16Z" fill="currentColor"/>
+            <path d="M7 9H17V11H7V9ZM7 12H14V14H7V12Z" fill="currentColor"/>
+        </svg>
+    </button>
+
+    <!-- Cửa sổ chat -->
+    <div id="chatWindow" class="chat-window" style="display: none;">
+        <!-- Header -->
+        <div class="chat-header">
+            <div class="chat-header-content">
+                <h3 class="chat-title">Hỗ trợ tư vấn sản phẩm</h3>
+            </div>
+            <button id="chatCloseBtn" class="chat-close-btn" aria-label="Đóng chat">×</button>
+        </div>
+
+        <!-- Messages area -->
+        <div id="chatMessages" class="chat-messages">
+            <!-- Welcome message -->
+            <div class="message bot">
+                <div class="message-content">
+                    <p>Xin chào! Tôi là chatbot tư vấn bán hàng. Tôi có thể giúp bạn:</p>
+                    <ul>
+                        <li>Tìm kiếm laptop phù hợp</li>
+                        <li>Tư vấn về chính sách bảo hành, đổi trả</li>
+                        <li>Kiểm tra tình trạng bảo hành</li>
+                    </ul>
+                    <p>Bạn cần hỗ trợ gì?</p>
+                </div>
+                <div class="message-time"></div>
+            </div>
+        </div>
+
+        <!-- Typing indicator -->
+        <div id="chatTyping" class="chat-typing" style="display: none;">
+            <div class="typing-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <span class="typing-text">Đang trả lời...</span>
+        </div>
+
+        <!-- Input area -->
+        <div class="chat-input-container">
+            <input 
+                type="text" 
+                id="chatInput" 
+                class="chat-input" 
+                placeholder="Nhập câu hỏi của bạn..." 
+                autocomplete="off"
+            />
+            <button id="chatSendBtn" class="chat-send-btn" aria-label="Gửi tin nhắn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M2.01 21L23 12 2.01 3 2 10L17 12L2 14L2.01 21Z" fill="currentColor"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ============================================
+   CHAT WIDGET STYLES - Giống CellphoneS/TGDD
+   ============================================ */
+
+/* Chat AI Widget Container - Hiển thị phía trên Chat Widget */
+.chat-ai-widget-container {
+    position: fixed;
+    bottom: 100px; /* Cao hơn Chat Widget (20px) */
+    right: 20px;
+    z-index: 1001; /* Cao hơn Chat Widget (1000) */
+}
+
+/* Nút chat floating - góc dưới bên phải */
+.chat-toggle-btn {
+    position: relative;
+    bottom: 0;
+    right: 0;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #81C408 0%, #6ba006 100%);
+    color: white;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(129, 196, 8, 0.4);
+    transition: all 0.3s ease;
+    z-index: 9999; /* Cao hơn header và các element khác */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    pointer-events: auto; /* Đảm bảo có thể click */
+}
+
+.chat-toggle-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(129, 196, 8, 0.6);
+}
+
+.chat-toggle-btn:active {
+    transform: scale(0.95);
+}
+
+/* Cửa sổ chat */
+.chat-window {
+    position: absolute;
+    bottom: 0; /* Ngang với bottom của icon */
+    right: 70px; /* Xuất hiện bên trái icon (icon width 60px + 10px margin) */
+    width: 380px;
+    height: 450px;
+    max-height: calc(100vh - 120px);
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    z-index: 9998; /* Cao hơn header và các element khác, nhưng thấp hơn toggle button */
+    overflow: hidden;
+    animation: slideUp 0.3s ease-out;
+}
+
+@@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Header */
+.chat-header {
+    background: linear-gradient(135deg, #81C408 0%, #6ba006 100%);
+    color: white;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 16px 16px 0 0;
+}
+
+.chat-header-content {
+    flex: 1;
+}
+
+.chat-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: white;
+}
+
+.chat-status {
+    font-size: 12px;
+    opacity: 0.9;
+    display: block;
+    margin-top: 4px;
+}
+
+.chat-close-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 24px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.chat-close-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Messages area */
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: #f8f9fa;
+}
+
+.chat-messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Message bubble */
+.message {
+    max-width: 75%;
+    padding: 12px 16px;
+    border-radius: 18px;
+    word-wrap: break-word;
+    animation: fadeIn 0.3s ease-out;
+    position: relative;
+}
+
+@@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message.user {
+    align-self: flex-end;
+    background: linear-gradient(135deg, #81C408 0%, #6ba006 100%);
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.message.bot {
+    align-self: flex-start;
+    background: white;
+    color: #333;
+    border: 1px solid #e0e0e0;
+    border-bottom-left-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.message-content {
+    line-height: 1.5;
+}
+
+.message-content p {
+    margin: 0 0 8px 0;
+}
+
+.message-content p:last-child {
+    margin-bottom: 0;
+}
+
+.message-content ul {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.message-content li {
+    margin: 4px 0;
+}
+
+.message-time {
+    font-size: 10px;
+    opacity: 0.7;
+    margin-top: 4px;
+    text-align: right;
+}
+
+.message.bot .message-time {
+    text-align: left;
+}
+
+/* Typing indicator */
+.chat-typing {
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #f8f9fa;
+    border-top: 1px solid #e0e0e0;
+}
+
+.typing-dots {
+    display: flex;
+    gap: 4px;
+}
+
+.typing-dots span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #81C408;
+    animation: typing 1.4s infinite;
+}
+
+.typing-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.typing-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@@keyframes typing {
+    0%, 60%, 100% {
+        transform: translateY(0);
+        opacity: 0.7;
+    }
+    30% {
+        transform: translateY(-10px);
+        opacity: 1;
+    }
+}
+
+.typing-text {
+    font-size: 14px;
+    color: #666;
+    font-style: italic;
+}
+
+/* Input container */
+.chat-input-container {
+    display: flex;
+    padding: 12px;
+    background: white;
+    border-top: 1px solid #e0e0e0;
+    gap: 8px;
+    align-items: center;
+}
+
+.chat-input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 1px solid #ddd;
+    border-radius: 24px;
+    outline: none;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.chat-input:focus {
+    border-color: #81C408;
+    box-shadow: 0 0 0 3px rgba(129, 196, 8, 0.1);
+}
+
+.chat-send-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #81C408 0%, #6ba006 100%);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    padding: 0;
+}
+
+.chat-send-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(129, 196, 8, 0.4);
+}
+
+.chat-send-btn:active {
+    transform: scale(0.95);
+}
+
+.chat-send-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Responsive - Mobile */
+@@media (max-width: 768px) {
+    .chat-ai-widget-container {
+        bottom: 100px; /* Vẫn cao hơn Chat Widget trên mobile */
+        right: 20px;
+    }
+    
+    .chat-window {
+        width: calc(100% - 40px);
+        height: calc(100vh - 120px);
+        bottom: 90px;
+        right: 20px;
+        left: 20px;
+        max-width: none;
+    }
+
+    .chat-toggle-btn {
+        bottom: 0;
+        right: 0;
+        width: 56px;
+        height: 56px;
+    }
+}
+
+/* Responsive - Small screens */
+@@media (max-width: 480px) {
+    .chat-window {
+        width: 100%;
+        height: 100vh;
+        bottom: 0;
+        right: 0;
+        left: 0;
+        border-radius: 0;
+    }
+
+    .chat-header {
+        border-radius: 0;
+    }
+
+    .chat-toggle-btn {
+        bottom: 10px;
+        right: 10px;
+    }
+}
+
+/* ============================================
+   BUTTON OPTIONS (QUICK REPLIES)
+   ============================================ */
+.quick-reply-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.quick-reply-btn {
+    padding: 8px 16px;
+    background: white;
+    border: 2px solid #81C408;
+    color: #81C408;
+    border-radius: 20px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.quick-reply-btn:hover {
+    background: #81C408;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(129, 196, 8, 0.3);
+}
+
+.quick-reply-btn:active {
+    transform: translateY(0);
+}
+
+/* ============================================
+   EXPAND/COLLAPSE FOR LONG MESSAGES
+   ============================================ */
+.message-content.collapsed {
+    max-height: 400px;
+    overflow: hidden;
+    position: relative;
+}
+
+.message-content.collapsed::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: linear-gradient(to bottom, transparent, white);
+}
+
+.message.bot .message-content.collapsed::after {
+    background: linear-gradient(to bottom, transparent, white);
+}
+
+.expand-btn {
+    display: inline-block;
+    color: #81C408;
+    cursor: pointer;
+    font-weight: 500;
+    margin-top: 8px;
+    font-size: 14px;
+    text-decoration: underline;
+}
+
+.expand-btn:hover {
+    color: #6ba006;
+}
+
+/* ============================================
+   PRODUCT LIST IN MESSAGE
+   ============================================ */
+.product-list {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.product-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    transition: all 0.2s;
+}
+
+.product-item:hover {
+    border-color: #81C408;
+    box-shadow: 0 2px 8px rgba(129, 196, 8, 0.2);
+}
+
+.product-image {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: white;
+}
+
+.product-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.product-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: #333;
+    line-height: 1.3;
+}
+
+.product-price {
+    font-size: 16px;
+    font-weight: 700;
+    color: #81C408;
+}
+
+.product-link,
+.product-detail-btn {
+    align-self: flex-start;
+    padding: 6px 12px;
+    background: #81C408;
+    color: white !important;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-top: 4px;
+    transition: all 0.2s;
+    display: inline-block;
+    border: none;
+    cursor: pointer;
+}
+
+.product-link:hover,
+.product-detail-btn:hover {
+    background: #6ba006;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(129, 196, 8, 0.3);
+    color: white !important;
+}
+
+/* Product suggestions container */
+.product-suggestions {
+    padding: 0 !important;
+}
+
+.suggested-products-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.product-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    transition: all 0.2s;
+}
+
+.product-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
+}
+
+.product-image {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: white;
+    border: 1px solid #dee2e6;
+}
+</style>
+
+<script>
+(function() {
+    'use strict';
+    
+    // ============================================
+    // CHATBOT JAVASCRIPT - Tương tác với Backend API
+    // ============================================
+
+    // Config
+    const CHAT_API_URL = '/api/chat/ai'; // Relative URL - sẽ tự động resolve đến Backend
+    const BACKEND_BASE_URL = 'https://localhost:5068'; // Backend API URL
+    const HEALTH_CHECK_URL = '/api/chat/health'; // Health check endpoint
+
+    // DOM Elements
+    let chatToggleBtn, chatWindow, chatCloseBtn, chatMessages, chatInput, chatSendBtn, chatTyping;
+
+    // Cache for backend URL detection
+    let cachedBackendUrl = null;
+
+    // Flag để tránh initialize nhiều lần
+    let chatWidgetInitialized = false;
+
+    // Initialize function - có thể gọi nhiều lần an toàn
+    function initializeChatWidget() {
+        // Tránh initialize nhiều lần
+        if (chatWidgetInitialized) {
+            console.log('ChatAIWidget already initialized, skipping...');
+            return;
+        }
+
+        // Get DOM elements
+        chatToggleBtn = document.getElementById('chatToggleBtn');
+        chatWindow = document.getElementById('chatWindow');
+        chatCloseBtn = document.getElementById('chatCloseBtn');
+        chatMessages = document.getElementById('chatMessages');
+        chatInput = document.getElementById('chatInput');
+        chatSendBtn = document.getElementById('chatSendBtn');
+        chatTyping = document.getElementById('chatTyping');
+
+        if (!chatToggleBtn || !chatWindow) {
+            console.warn('Chat widget elements not found, retrying...', {
+                chatToggleBtn: !!chatToggleBtn,
+                chatWindow: !!chatWindow
+            });
+            // Retry sau 200ms nếu chưa có element
+            setTimeout(initializeChatWidget, 200);
+            return;
+        }
+
+        console.log('Found chat elements, attaching listeners...');
+
+        // Event listeners - Remove existing nếu có
+        const newToggleHandler = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Toggle button clicked!');
+            toggleChatWindow();
+        };
+        
+        // Remove old listener nếu có
+        chatToggleBtn.removeEventListener('click', newToggleHandler);
+        chatToggleBtn.addEventListener('click', newToggleHandler);
+        
+        if (chatCloseBtn) {
+            const newCloseHandler = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                closeChatWindow();
+            };
+            chatCloseBtn.removeEventListener('click', newCloseHandler);
+            chatCloseBtn.addEventListener('click', newCloseHandler);
+        }
+        
+        if (chatSendBtn) {
+            const newSendHandler = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                sendMessage();
+            };
+            chatSendBtn.removeEventListener('click', newSendHandler);
+            chatSendBtn.addEventListener('click', newSendHandler);
+        }
+        
+        if (chatInput) {
+            chatInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        }
+
+        // Auto focus input khi mở chat
+        chatToggleBtn.addEventListener('click', function() {
+            setTimeout(() => {
+                if (chatInput) chatInput.focus();
+            }, 300);
+        });
+        
+        chatWidgetInitialized = true;
+        console.log('ChatAIWidget initialized successfully!');
+    }
+
+    // Initialize - đảm bảo chạy sau khi DOM sẵn sàng
+    function startInitialization() {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeChatWidget);
+        } else {
+            // DOM đã sẵn sàng, chạy ngay nhưng delay một chút để đảm bảo HTML đã render
+            setTimeout(initializeChatWidget, 100);
+        }
+    }
+    
+    // Toggle chat window
+    function toggleChatWindow() {
+        console.log('toggleChatWindow called, chatWindow:', chatWindow);
+        if (!chatWindow) {
+            console.error('chatWindow is null!');
+            return;
+        }
+        
+        if (chatWindow.style.display === 'none' || chatWindow.style.display === '') {
+            // Đóng ChatWidget nếu đang mở
+            closeChatWidgetIfOpen();
+            
+            chatWindow.style.display = 'flex';
+            console.log('Chat window opened');
+        } else {
+            closeChatWindow();
+        }
+    }
+
+    // Close chat window
+    function closeChatWindow() {
+        if (chatWindow) {
+            chatWindow.style.display = 'none';
+            console.log('Chat window closed');
+        }
+    }
+
+    // Đóng ChatWidget nếu đang mở (được gọi từ ChatAIWidget)
+    function closeChatWidgetIfOpen() {
+        const chatBox = document.getElementById('chatBox');
+        
+        if (chatBox) {
+            const isOpen = chatBox.style.display === 'flex' || 
+                          (chatBox.style.display === '' && window.getComputedStyle(chatBox).display === 'flex');
+            
+            if (isOpen) {
+                chatBox.style.display = 'none';
+                // Dispatch event để ChatWidget biết đã bị đóng
+                window.dispatchEvent(new CustomEvent('chatWidgetClosed'));
+            }
+        }
+    }
+    
+    // Listen event khi ChatAIWidget bị đóng từ ChatWidget
+    window.addEventListener('chatAIWidgetClosed', function() {
+        // ChatAIWidget đã bị đóng bởi ChatWidget
+        if (chatWindow) {
+            closeChatWindow();
+        }
+    });
+    
+    // Start initialization
+    startInitialization();
+    
+    // Send message with retry logic
+    async function sendMessage() {
+    const message = chatInput.value.trim();
+    if (!message) return;
+
+    // Disable input và button
+    chatInput.disabled = true;
+    chatSendBtn.disabled = true;
+
+    // Add user message to UI
+    addMessage(message, 'user');
+    chatInput.value = '';
+
+    // Show typing indicator
+    showTyping();
+
+    // Retry logic: thử 2 lần nếu fail
+    const maxRetries = 2;
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            // Determine API URL with improved detection
+            const apiUrl = await getBackendApiUrl(CHAT_API_URL);
+
+            // Call API with shorter timeout (15 seconds) để fail fast
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+            console.log(`[Chat] Attempt ${attempt}/${maxRetries} - Calling API: ${apiUrl}`);
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: message,
+                    customerId: null
+                }),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: `HTTP ${response.status}` }));
+                throw new Error(errorData.message || `API error: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+
+            // Hide typing
+            hideTyping();
+
+            // Add bot response
+            if (data.answer) {
+                addMessage(data.answer, 'bot');
+
+                // Hiển thị sản phẩm gợi ý với link click được
+                if (data.suggestedProducts && data.suggestedProducts.length > 0) {
+                    renderProductSuggestions(data.suggestedProducts);
+                }
+            } else {
+                addMessage('Xin lỗi, tôi không thể trả lời câu hỏi này. Vui lòng thử lại.', 'bot');
+            }
+            
+            // Success - re-enable input và exit retry loop
+            chatInput.disabled = false;
+            chatSendBtn.disabled = false;
+            chatInput.focus();
+            console.log(`[Chat] Success on attempt ${attempt}`);
+            return; // Exit the retry loop
+
+        } catch (error) {
+            lastError = error;
+            console.error(`[Chat] Attempt ${attempt}/${maxRetries} failed:`, error);
+            
+            // Nếu còn retry thì thử lại sau 1 giây
+            if (attempt < maxRetries) {
+                console.log(`[Chat] Retrying in 1 second...`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                continue;
+            }
+        }
+    }
+
+    // Tất cả retries đều fail
+    hideTyping();
+    
+    // Provide detailed error messages based on error type
+    let errorMessage = 'Xin lỗi, hiện tại hệ thống đang gặp sự cố. ';
+    
+    if (lastError) {
+        if (lastError.name === 'AbortError') {
+            errorMessage += 'Yêu cầu đã quá thời gian chờ. Vui lòng thử lại sau.';
+        } else if (lastError.message && (lastError.message.includes('Failed to fetch') || lastError.message.includes('NetworkError'))) {
+            errorMessage += 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng hoặc liên hệ nhân viên để được hỗ trợ.';
+        } else if (lastError.message && lastError.message.includes('CORS')) {
+            errorMessage += 'Lỗi cấu hình kết nối. Vui lòng liên hệ nhân viên kỹ thuật.';
+        } else if (lastError.message) {
+            errorMessage += `Chi tiết: ${lastError.message}`;
+        } else {
+            errorMessage += 'Anh/chị vui lòng thử lại sau hoặc liên hệ nhân viên để được hỗ trợ.';
+        }
+    } else {
+        errorMessage += 'Anh/chị vui lòng thử lại sau hoặc liên hệ nhân viên để được hỗ trợ.';
+    }
+    
+    addMessage(errorMessage, 'bot');
+
+    // Re-enable input và button
+    chatInput.disabled = false;
+    chatSendBtn.disabled = false;
+    chatInput.focus();
+}
+
+    // Add message to UI
+    function addMessage(text, type) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${type}`;
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    
+    // Format text (support basic markdown-like formatting)
+    const formattedText = formatMessageText(text);
+    contentDiv.innerHTML = formattedText;
+
+    const timeDiv = document.createElement('div');
+    timeDiv.className = 'message-time';
+    timeDiv.textContent = new Date().toLocaleTimeString('vi-VN', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    });
+
+    messageDiv.appendChild(contentDiv);
+    messageDiv.appendChild(timeDiv);
+    chatMessages.appendChild(messageDiv);
+
+    // Auto scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+    // Format message text (basic markdown support)
+    function formatMessageText(text) {
+    // Convert line breaks
+    text = text.replace(/\n/g, '<br>');
+    
+    // Convert **bold**
+    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // Convert *italic*
+    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    
+    // Convert bullet points
+    text = text.replace(/^•\s(.+)$/gm, '<li>$1</li>');
+    text = text.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+    
+    return text;
+}
+
+    // Format price
+    function formatPrice(price) {
+    if (!price) return 'Liên hệ';
+    return new Intl.NumberFormat('vi-VN', {
+        style: 'currency',
+        currency: 'VND'
+    }).format(price);
+}
+
+    // Render product suggestions với link click được
+    function renderProductSuggestions(products) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message bot';
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content product-suggestions';
+    
+    // Hiển thị tối đa 5 sản phẩm
+    const displayProducts = products.slice(0, 5);
+    
+    let html = '<div class="suggested-products-list">';
+    
+    displayProducts.forEach((product, index) => {
+        const productId = product.productId || product.ProductId;
+        const productName = product.name || product.Name || product.productName || product.ProductName;
+        const price = product.price || product.Price || product.sellingPrice || product.SellingPrice;
+        const imageUrl = product.imageUrl || product.ImageUrl;
+        const detailUrl = product.detailUrl || product.DetailUrl || `/Home/ProductDetail?id=${productId}`;
+        
+        html += `
+            <div class="product-item">
+                ${imageUrl ? `<img src="${imageUrl}" alt="${productName}" class="product-image" onerror="this.src='/imageProducts/default.jpg'">` : ''}
+                <div class="product-info">
+                    <div class="product-name">${productName}</div>
+                    <div class="product-price">${formatPrice(price)}</div>
+                    <a href="${detailUrl}" class="product-detail-btn" target="_blank">
+                        Xem chi tiết →
+                    </a>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    contentDiv.innerHTML = html;
+
+    const timeDiv = document.createElement('div');
+    timeDiv.className = 'message-time';
+    timeDiv.textContent = new Date().toLocaleTimeString('vi-VN', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    });
+
+    messageDiv.appendChild(contentDiv);
+    messageDiv.appendChild(timeDiv);
+    chatMessages.appendChild(messageDiv);
+
+    // Auto scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+    // Show typing indicator
+    function showTyping() {
+    if (chatTyping) {
+        chatTyping.style.display = 'flex';
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+}
+
+    // Hide typing indicator
+    function hideTyping() {
+    if (chatTyping) {
+        chatTyping.style.display = 'none';
+    }
+}
+
+    // Get backend API URL with automatic detection
+    async function getBackendApiUrl(endpoint) {
+    // Use cached URL if available
+    if (cachedBackendUrl) {
+        return `${cachedBackendUrl}${endpoint}`;
+    }
+
+    const currentHost = window.location.hostname;
+    const currentPort = window.location.port;
+    const isLocalhost = currentHost === 'localhost' || currentHost === '127.0.0.1';
+
+    // If same origin, use relative URL
+    if (!isLocalhost || currentPort === '5068') {
+        cachedBackendUrl = '';
+        return endpoint;
+    }
+
+    // Try to detect backend URL by testing health check
+    const testUrls = [
+        `${BACKEND_BASE_URL}${endpoint.replace('/api/chat/ai', HEALTH_CHECK_URL)}`,
+        `http://localhost:5068${endpoint.replace('/api/chat/ai', HEALTH_CHECK_URL)}`,
+        `https://localhost:5068${endpoint.replace('/api/chat/ai', HEALTH_CHECK_URL)}`
+    ];
+
+    for (const testUrl of testUrls) {
+        try {
+            const baseUrl = testUrl.replace(HEALTH_CHECK_URL, '');
+            const response = await fetch(testUrl, {
+                method: 'GET',
+                mode: 'cors',
+                cache: 'no-cache'
+            });
+            
+            if (response.ok) {
+                cachedBackendUrl = baseUrl;
+                return `${baseUrl}${endpoint}`;
+            }
+        } catch (e) {
+            // Continue to next URL
+            console.debug(`Failed to connect to ${testUrl}:`, e);
+        }
+    }
+
+        // Fallback to configured backend URL
+        cachedBackendUrl = BACKEND_BASE_URL;
+        return `${BACKEND_BASE_URL}${endpoint}`;
+    }
+
+    // Export functions for potential external use
+    window.Chatbot = window.Chatbot || {};
+    window.Chatbot.sendMessage = sendMessage;
+    window.Chatbot.addMessage = addMessage;
+    window.Chatbot.toggleChatWindow = toggleChatWindow;
+    window.Chatbot.closeChatWindow = closeChatWindow;
+    window.Chatbot.closeChatWidgetIfOpen = closeChatWidgetIfOpen;
+    window.Chatbot.getBackendApiUrl = getBackendApiUrl;
+    window.Chatbot.initializeChatWidget = initializeChatWidget;
+
+    // Expose function để ChatWidget có thể gọi để đóng ChatAIWidget
+    window.closeChatAIWidget = function() {
+        if (chatWindow) {
+            closeChatWindow();
+        }
+    };
+})();
+</script>

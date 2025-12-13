@@ -327,9 +327,6 @@
 
         @await Html.PartialAsync("_Footer")
 
-        <!-- Chat Widget -->
-        @await Html.PartialAsync("_ChatWidget")
-
         <!-- Back to Top -->
         <a href="#" class="btn btn-primary border-3 border-primary rounded-circle back-to-top"><i class="fa fa-arrow-up"></i></a>   
 
@@ -581,8 +578,11 @@
         })();
     </script>
 
+    <!-- Chat AI Widget -->
+    @await Html.PartialAsync("~/Views/Chat/_ChatAIWedget.cshtml")
+    
     <!-- Chat Widget -->
-    @await Html.PartialAsync("_ChatWidget")
+    @await Html.PartialAsync("~/Views/Chat/_ChatWidget.cshtml")
     <link rel="stylesheet" href="~/css/chatbot.css" asp-append-version="true" />
     <script src="~/js/chatbot.js" asp-append-version="true"></script>
 

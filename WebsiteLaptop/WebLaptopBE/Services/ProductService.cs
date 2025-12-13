@@ -35,6 +35,7 @@ public class ProductService : IProductService
             var query = _context.Products
                 .Include(p => p.Brand) // Load thông tin thương hiệu
                 .Include(p => p.ProductConfigurations) // Load các cấu hình
+                .Include(p => p.ProductImages) // Load ảnh sản phẩm
                 .Where(p => p.Active == true) // Chỉ lấy sản phẩm đang bán
                 .AsQueryable();
 
@@ -103,6 +104,7 @@ public class ProductService : IProductService
 
             // Thực hiện query và chuyển đổi sang DTO
             var products = await query
+                .Include(p => p.ProductImages) // Load ProductImages
                 .Select(p => new ProductDTO
                 {
                     ProductId = p.ProductId,
@@ -128,6 +130,13 @@ public class ProductService : IProductService
                         Price = pc.Price,
                         Quantity = pc.Quantity,
                         ProductId = pc.ProductId
+                    }).ToList(),
+                    // Lấy thông tin ảnh sản phẩm
+                    Images = p.ProductImages.Select(pi => new ProductImageDTO
+                    {
+                        ImageId = pi.ImageId,
+                        ProductId = pi.ProductId,
+                        ImageUrl = pi.ImageId // ImageId là tên file, sẽ build URL sau
                     }).ToList()
                 })
                 .ToListAsync();
@@ -153,6 +162,7 @@ public class ProductService : IProductService
             var product = await _context.Products
                 .Include(p => p.Brand)
                 .Include(p => p.ProductConfigurations)
+                .Include(p => p.ProductImages) // Load ProductImages
                 .Where(p => p.ProductId == productId && p.Active == true)
                 .Select(p => new ProductDTO
                 {
@@ -178,6 +188,13 @@ public class ProductService : IProductService
                         Price = pc.Price,
                         Quantity = pc.Quantity,
                         ProductId = pc.ProductId
+                    }).ToList(),
+                    // Lấy thông tin ảnh sản phẩm
+                    Images = p.ProductImages.Select(pi => new ProductImageDTO
+                    {
+                        ImageId = pi.ImageId,
+                        ProductId = pi.ProductId,
+                        ImageUrl = pi.ImageId // ImageId là tên file, sẽ build URL sau
                     }).ToList()
                 })
                 .FirstOrDefaultAsync();
@@ -244,6 +261,7 @@ public class ProductService : IProductService
             var products = await _context.Products
                 .Include(p => p.Brand)
                 .Include(p => p.ProductConfigurations)
+                .Include(p => p.ProductImages) // Load ProductImages
                 .Where(p => productIds.Contains(p.ProductId) && p.Active == true)
                 .Select(p => new ProductDTO
                 {
@@ -269,6 +287,13 @@ public class ProductService : IProductService
                         Price = pc.Price,
                         Quantity = pc.Quantity,
                         ProductId = pc.ProductId
+                    }).ToList(),
+                    // Lấy thông tin ảnh sản phẩm
+                    Images = p.ProductImages.Select(pi => new ProductImageDTO
+                    {
+                        ImageId = pi.ImageId,
+                        ProductId = pi.ProductId,
+                        ImageUrl = pi.ImageId // ImageId là tên file, sẽ build URL sau
                     }).ToList()
                 })
                 .ToListAsync();

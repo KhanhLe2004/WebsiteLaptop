@@ -171,12 +171,13 @@ public class ChatAPIController : ControllerBase
             // Unread count: messages sent by employee with status "sent" that haven't been read
             // Only count messages from employee (not from customer)
             var unreadCount = allChatsForCustomer.Count(c => 
-                c.Status == "sent" && // Only unread messages
+                c.Status == "sent" && // Only unread messages (not "read")
                 // Message is from employee if:
                 // 1. SenderType is "employee" (most reliable)
                 // 2. SenderType is null AND EmployeeId is not null (old messages from employee)
+                // 3. SenderType is null AND EmployeeId is null AND CustomerId matches (fallback - should not happen)
                 ((c.SenderType != null && c.SenderType == "employee") ||
-                 (c.SenderType == null && c.EmployeeId != null)));
+                 (c.SenderType == null && c.EmployeeId != null && c.EmployeeId != "")));
             
             var conversation = new ChatConversationDTO
             {

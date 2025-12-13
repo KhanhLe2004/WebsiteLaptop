@@ -81,29 +81,19 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        // In development, allow all origins
-        if (builder.Environment.IsDevelopment())
-        {
-            policy.AllowAnyOrigin()
-                  .AllowAnyMethod()
-                  .AllowAnyHeader()
-                  .WithExposedHeaders("Content-Type", "Content-Length");
-        }
-        else
-        {
-            // In production, specify allowed origins
-            policy.WithOrigins(
-                    "https://localhost:5001",
-                    "https://localhost:5000",
-                    "http://localhost:5001",
-                    "http://localhost:5000",
-                    "http://localhost:5253", "https://localhost:5253"
-                  )
-                  .AllowAnyMethod()
-                  .AllowAnyHeader()
-                  .AllowCredentials()
-                  .WithExposedHeaders("Content-Type", "Content-Length");
-        }
+        // Always specify origins explicitly to allow credentials (required for SignalR)
+        policy.WithOrigins(
+                "http://localhost:5253",
+                "https://localhost:5253",
+                "http://localhost:5001",
+                "https://localhost:5001",
+                "http://localhost:5000",
+                "https://localhost:5000"
+              )
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials() // Required for SignalR
+              .WithExposedHeaders("Content-Type", "Content-Length", "Access-Control-Allow-Origin");
     });
 });
 
@@ -171,10 +161,16 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
-
-// Use CORS - must be before UseSession và UseAuthorization
+// Use CORS - MUST be before UseHttpsRedirection and before any other middleware
+// This is critical for SignalR negotiation
 app.UseCors("AllowAll");
+
+// HTTPS Redirection - can cause issues with SignalR in development
+// Only use in production
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 // Enable Session - must be after UseCors and before UseAuthorization
 app.UseSession();
