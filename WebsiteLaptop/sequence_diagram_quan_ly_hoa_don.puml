@@ -1,0 +1,95 @@
+@startuml
+
+hide footbox
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 12
+skinparam maxMessageSize 500
+skinparam ParticipantPadding 100
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam ActorBackgroundColor transparent
+skinparam ParticipantBackgroundColor transparent
+skinparam SequenceGroupBackgroundColor transparent
+skinparam SequenceBoxBackgroundColor transparent
+skinparam NoteBackgroundColor transparent
+
+skinparam SequenceActivationBorderColor black
+skinparam ActorBorderColor black
+skinparam ParticipantBorderColor black
+skinparam ArrowColor black
+skinparam roundcorner 0
+
+actor "Chủ cửa hàng" as OWNER
+participant "Frontend (Admin Web)" as FE
+participant "ManageSaleInvoiceAPIController" as API
+participant "Address API" as ADDR_API
+database "Database" as DB
+
+' 1) Mở màn quản lý
+OWNER -> FE : Chọn "Quản lý hóa đơn"
+FE -> API : GET /api/admin/sale-invoices
+API -> DB : SELECT saleInvoices (Include Customer, Employee, filter, pagination)
+DB --> API : saleInvoiceList
+API --> FE : 200 OK + list
+FE --> OWNER : Hiển thị danh sách
+
+' 2) Thao tác: Thêm / Cập nhật status
+alt Thêm hóa đơn
+  OWNER -> FE : Nhập thông tin\nNhấn "Lưu"
+  FE -> API : POST /api/admin/sale-invoices
+  API -> API : Validate + GenerateSaleInvoiceId()
+  alt Không có CustomerId + có CustomerName + PhoneNumber
+    API -> API : GenerateCustomerId()
+    API -> DB : INSERT Customers (new customer)
+    API -> API : Set customerId = newCustomerId
+  end
+  opt Có ProvinceCode
+    API -> ADDR_API : GET /provinces (lấy tên tỉnh)
+    ADDR_API --> API : provinceName
+  end
+  opt Có CommuneCode
+    API -> ADDR_API : GET /provinces/{code}/communes (lấy tên phường)
+    ADDR_API --> API : communeName
+  end
+  API -> API : BuildFullAddress + SerializeAddress
+  API -> API : CalculateSubtotal(details)
+  opt Có khuyến mại
+    API -> API : ApplyPromotion (tính discount, shippingDiscount)
+  end
+  API -> API : CalculateTotalAmount (subtotal - discount + deliveryFee - shippingDiscount)
+  API -> DB : INSERT SaleInvoices
+  loop For each detail
+    API -> DB : INSERT SaleInvoiceDetails
+  end
+  API -> API : LogHistory("Thêm hóa đơn")
+  API --> FE : 201 Created + SaleInvoiceDTO
+  FE --> OWNER : Thông báo "Thành công"\nReload
+else Cập nhật trạng thái hóa đơn
+  OWNER -> FE : Chọn hóa đơn\nCập nhật status\nNhấn "Lưu"
+  FE -> API : PUT /api/admin/sale-invoices/{id}/status
+  API -> DB : SELECT saleInvoice WHERE id (Include Details)
+  API -> API : Validate Status not empty
+  alt Status = "Hoàn thành" hoặc "Đã hủy"
+    API --> FE : 400 Bad Request (không cho cập nhật)
+    FE --> OWNER : "Không thể cập nhật"
+  else Status khác
+    API -> DB : UPDATE SaleInvoices SET Status
+    alt OldStatus = "Chờ xử lý" AND NewStatus = "Đang xử lý"
+      API -> API : GenerateStockExportId()
+      API -> DB : INSERT StockExports (Status="Chờ xử lý")
+      loop For each saleInvoiceDetail
+        API -> DB : INSERT StockExportDetails
+      end
+      API -> DB : SaveChanges
+    end
+    API -> API : LogHistory("Cập nhật trạng thái hóa đơn")
+    API --> FE : 200 OK
+    FE --> OWNER : "Thành công"\nReload
+  end
+end
+
+FE --> OWNER : Hiển thị danh sách
+
+@enduml
+

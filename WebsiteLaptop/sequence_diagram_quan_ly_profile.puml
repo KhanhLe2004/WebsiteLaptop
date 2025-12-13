@@ -1,0 +1,82 @@
+@startuml
+
+hide footbox
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 12
+skinparam maxMessageSize 500
+skinparam ParticipantPadding 100
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam ActorBackgroundColor transparent
+skinparam ParticipantBackgroundColor transparent
+skinparam SequenceGroupBackgroundColor transparent
+skinparam SequenceBoxBackgroundColor transparent
+skinparam NoteBackgroundColor transparent
+
+skinparam SequenceActivationBorderColor black
+skinparam ActorBorderColor black
+skinparam ParticipantBorderColor black
+skinparam ArrowColor black
+skinparam roundcorner 0
+
+actor "Nhân viên" as EMPLOYEE
+participant "Frontend (Admin Web)" as FE
+participant "ManageProfileAPIController" as API
+participant "Address API" as ADDR_API
+database "Database" as DB
+
+' 1) Xem profile
+EMPLOYEE -> FE : Chọn "Thông tin cá nhân"
+FE -> API : GET /api/ManageProfileAPI/{employeeId}
+API -> DB : SELECT employee WHERE id
+DB --> API : employee
+API -> API : ParseEmployeeAddress (deserialize JSON address)
+API --> FE : 200 OK + EmployeeDTO
+FE --> EMPLOYEE : Hiển thị thông tin
+
+' 2) Cập nhật profile
+alt Cập nhật thông tin cá nhân
+  EMPLOYEE -> FE : Sửa thông tin\nNhấn "Lưu"
+  FE -> API : PUT /api/ManageProfileAPI/{employeeId} (FormData)
+  API -> DB : SELECT employee WHERE id
+  API -> API : Validate Username unique (if changed)
+  API -> API : Validate Email unique (if changed)
+  opt Có AvatarFile mới
+    API -> API : DeleteImage(oldAvatar)
+    API -> API : SaveImageAsync(newAvatar)
+    API -> DB : UPDATE Employees SET Avatar
+  end
+  opt Có ProvinceCode
+    API -> ADDR_API : GET /provinces (lấy tên tỉnh)
+    ADDR_API --> API : provinceName
+  end
+  opt Có CommuneCode
+    API -> ADDR_API : GET /provinces/{code}/communes (lấy tên phường)
+    ADDR_API --> API : communeName
+  end
+  API -> API : BuildFullAddress + SerializeAddress (JSON)
+  API -> DB : UPDATE Employees SET (EmployeeName, DateOfBirth, PhoneNumber, Address, Email, Username, Password if provided)
+  API --> FE : 200 OK + EmployeeDTO
+  FE --> EMPLOYEE : "Cập nhật thành công"\nReload
+
+else Đổi mật khẩu
+  EMPLOYEE -> FE : Nhập mật khẩu cũ + mới\nNhấn "Đổi mật khẩu"
+  FE -> API : PUT /api/ManageProfileAPI/change-password
+  API -> API : Validate (CurrentPassword, NewPassword, ConfirmPassword, length >= 6)
+  API -> DB : SELECT employee WHERE id
+  API -> API : Check CurrentPassword matches
+  alt Hợp lệ
+    API -> DB : UPDATE Employees SET Password
+    API --> FE : 200 OK
+    FE --> EMPLOYEE : "Đổi mật khẩu thành công"
+  else Không hợp lệ
+    API --> FE : 400/401 + errors
+    FE --> EMPLOYEE : "Vui lòng kiểm tra lại"
+  end
+end
+
+FE --> EMPLOYEE : Hiển thị thông tin
+
+@enduml
+

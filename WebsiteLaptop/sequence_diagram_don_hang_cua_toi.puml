@@ -1,0 +1,73 @@
+@startuml
+
+hide footbox
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 12
+skinparam maxMessageSize 500
+skinparam ParticipantPadding 100
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam ActorBackgroundColor transparent
+skinparam ParticipantBackgroundColor transparent
+skinparam SequenceGroupBackgroundColor transparent
+skinparam SequenceBoxBackgroundColor transparent
+skinparam NoteBackgroundColor transparent
+
+skinparam SequenceActivationBorderColor black
+skinparam ActorBorderColor black
+skinparam ParticipantBorderColor black
+skinparam ArrowColor black
+skinparam roundcorner 0
+
+actor "Khách hàng" as CUSTOMER
+participant "Frontend (User Web)" as FE
+participant "CustomerAccountAPIController" as API
+database "Database" as DB
+
+CUSTOMER -> FE : Chọn "Đơn hàng của tôi"
+FE -> API : GET /api/CustomerAccount/{customerId}/orders
+API -> API : Validate customerId not empty
+API -> DB : SELECT saleInvoices WHERE CustomerId AND Status IN ("Chờ xử lý", "Đang xử lý", "Chờ vận chuyển", "Đang vận chuyển") (Include SaleInvoiceDetails.Product)
+API -> DB : ORDER BY TimeCreate DESC
+DB --> API : ordersList
+API --> FE : 200 OK + orders (with Products)
+FE --> CUSTOMER : Hiển thị danh sách đơn hàng
+
+CUSTOMER -> FE : Chọn "Xem chi tiết"
+FE -> API : GET /api/CustomerAccount/order/{orderId}
+API -> API : Validate orderId not empty
+API -> DB : SELECT saleInvoice WHERE SaleInvoiceId (Include SaleInvoiceDetails.Product)
+API -> API : Calculate Subtotal for each item (Quantity * UnitPrice)
+API --> FE : 200 OK + order (with Items, Subtotal)
+FE --> CUSTOMER : Hiển thị chi tiết đơn hàng
+
+opt Hủy đơn hàng (chỉ khi Status = "Chờ xử lý")
+  CUSTOMER -> FE : Chọn "Hủy đơn hàng"
+  FE -> API : PUT /api/CustomerAccount/order/{orderId}/cancel
+  API -> API : Validate orderId not empty
+  API -> DB : SELECT saleInvoice WHERE SaleInvoiceId
+  alt Order không tồn tại
+    API --> FE : 404 Not Found ("Không tìm thấy đơn hàng")
+    FE --> CUSTOMER : "Không tìm thấy đơn hàng"
+  else Order tồn tại
+    API -> API : Check Status
+    alt Status = "Đã hủy"
+      API --> FE : 400 Bad Request ("Đơn hàng này đã bị hủy")
+      FE --> CUSTOMER : "Đơn hàng đã bị hủy"
+    else Status != "Chờ xử lý"
+      API --> FE : 400 Bad Request ("Chỉ có thể hủy đơn hàng khi trạng thái là 'Chờ xử lý'")
+      FE --> CUSTOMER : "Không thể hủy đơn hàng"
+    else Status = "Chờ xử lý"
+      API -> DB : UPDATE SaleInvoices SET Status="Đã hủy", TimeCreate=Now
+      API -> DB : SaveChanges
+      API --> FE : 200 OK ("Hủy đơn hàng thành công")
+      FE --> CUSTOMER : "Hủy đơn hàng thành công"\nReload
+    end
+  end
+end
+
+FE --> CUSTOMER : Hiển thị danh sách đơn hàng
+
+@enduml
+

@@ -15,10 +15,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManagePromotionAPIController : ControllerBase
     {
-        private readonly Testlaptop37Context _context;
+        private readonly Testlaptop38Context _context;
         private readonly HistoryService _historyService;
 
-        public ManagePromotionAPIController(Testlaptop37Context context, HistoryService historyService)
+        public ManagePromotionAPIController(Testlaptop38Context context, HistoryService historyService)
         {
             _context = context;
             _historyService = historyService;

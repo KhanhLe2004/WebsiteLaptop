@@ -9,7 +9,7 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class CartAPIController : ControllerBase
     {
-        private readonly Testlaptop37Context _db = new();
+        private readonly Testlaptop38Context _db = new();
 
         // GET: api/Cart/{customerId}
         [HttpGet("{customerId}")]

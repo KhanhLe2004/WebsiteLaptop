@@ -19,13 +19,13 @@ public partial class SaleInvoice
 
     public decimal? Discount { get; set; }
 
+    public string? Phone { get; set; }
+
     public string? DeliveryAddress { get; set; }
 
     public string? EmployeeId { get; set; }
 
     public string? CustomerId { get; set; }
-
-    public string? Phone { get; set; }
 
     public string? EmployeeShip { get; set; }
 

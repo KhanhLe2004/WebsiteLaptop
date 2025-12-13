@@ -15,10 +15,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageSupplierAPIController : ControllerBase
     {
-        private readonly Testlaptop37Context _context;
+        private readonly Testlaptop38Context _context;
         private readonly HistoryService _historyService;
 
-        public ManageSupplierAPIController(Testlaptop37Context context, HistoryService historyService)
+        public ManageSupplierAPIController(Testlaptop38Context context, HistoryService historyService)
         {
             _context = context;
             _historyService = historyService;
@@ -266,24 +266,18 @@ namespace WebLaptopBE.Areas.Admin.Controllers
 
         // DELETE: api/admin/suppliers/{id}
         // Ẩn nhà cung cấp (set active = false) thay vì xóa thực sự
+        // Cho phép xóa nhà cung cấp ngay cả khi có phiếu nhập hàng
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteSupplier(string id)
         {
             try
             {
                 var supplier = await _context.Suppliers
-                    .Include(s => s.StockImports)
                     .FirstOrDefaultAsync(s => s.SupplierId == id);
 
                 if (supplier == null)
                 {
                     return NotFound(new { message = "Không tìm thấy nhà cung cấp" });
-                }
-
-                // Kiểm tra xem nhà cung cấp có phiếu nhập hàng nào không
-                if (supplier.StockImports != null && supplier.StockImports.Count > 0)
-                {
-                    return BadRequest(new { message = "Không thể xóa nhà cung cấp vì đang có phiếu nhập hàng liên quan" });
                 }
 
                 // Set active = false thay vì xóa
@@ -329,7 +323,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     await _historyService.LogHistoryAsync(employeeId, $"Khôi phục nhà cung cấp: {id} - {supplier.SupplierName}");
                 }
 
-                return Ok(new { message = "Khôi phục nhà cung cấp thành công" });
+                return Ok(new { message = "Đã khôi phục nhà cung cấp thành công" });
             }
             catch (Exception ex)
             {

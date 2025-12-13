@@ -175,6 +175,26 @@
     </div>
 </div>
 
+<!-- Modal Xác nhận khôi phục -->
+<div class="modal fade" id="restoreModal" tabindex="-1" aria-labelledby="restoreModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-success">
+                <h5 class="modal-title text-white" id="restoreModalLabel">Xác nhận khôi phục</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Bạn có chắc chắn muốn khôi phục nhà cung cấp <strong id="restoreSupplierId"></strong>?</p>
+                <p class="text-danger text-sm mt-2" id="restoreWarningMessage" style="display:none;"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-success" onclick="confirmRestore()">Khôi phục</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <!-- Select2 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -183,11 +203,13 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         const API_URL = 'http://localhost:5068/api/admin/suppliers';
+        const EMPLOYEE_ID = '@Context.Session.GetString("EmployeeId")';
         let currentPage = 1;
         let pageSize = 10;
         let searchDebounceTimer = null;
         const SEARCH_DEBOUNCE_DELAY = 300;
         let deleteSupplierId = null;
+        let restoreSupplierId = null;
 
         $(document).ready(function() {
             loadSuppliers();
@@ -579,6 +601,7 @@
                 type: method,
                 contentType: 'application/json',
                 data: JSON.stringify(data),
+                headers: EMPLOYEE_ID ? { 'X-EmployeeId': EMPLOYEE_ID } : {},
                 success: function(response) {
                     showNotification(isEdit ? 'Cập nhật nhà cung cấp thành công' : 'Thêm nhà cung cấp thành công', 'success');
                     const modalInstance = bootstrap.Modal.getInstance(document.getElementById('createEditModal'));
@@ -609,11 +632,8 @@
                 url: `${API_URL}/${supplierId}`,
                 type: 'GET',
                 success: function(supplier) {
-                    if (supplier.stockImportCount > 0) {
-                        $('#deleteWarningMessage').text(`Cảnh báo: Nhà cung cấp này đang có ${supplier.stockImportCount} phiếu nhập hàng. Không thể xóa!`).show();
-                    } else {
-                        $('#deleteWarningMessage').hide();
-                    }
+                        $('#deleteWarningMessage').show();
+
                     const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
                     modal.show();
                 },
@@ -631,6 +651,7 @@
             $.ajax({
                 url: `${API_URL}/${deleteSupplierId}`,
                 type: 'DELETE',
+                headers: EMPLOYEE_ID ? { 'X-EmployeeId': EMPLOYEE_ID } : {},
                 success: function(response) {
                     showNotification('Xóa nhà cung cấp thành công', 'success');
                     const modalInstance = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
@@ -661,23 +682,58 @@
 
         // Khôi phục nhà cung cấp (set active = true)
         function restoreSupplier(supplierId, supplierName) {
-            if (!confirm(`Bạn có chắc chắn muốn khôi phục nhà cung cấp "${supplierName}"?\nNhà cung cấp sẽ được hiển thị lại trong danh sách đang hoạt động.`)) {
-                return;
-            }
+            restoreSupplierId = supplierId;
+            $('#restoreSupplierId').text(supplierId);
+            $('#restoreWarningMessage').hide();
+            
+            // Kiểm tra số phiếu nhập trước khi khôi phục
+            $.ajax({
+                url: `${API_URL}/${supplierId}`,
+                type: 'GET',
+                success: function(supplier) {
+                        $('#restoreWarningMessage').hide();
+                    const modal = new bootstrap.Modal(document.getElementById('restoreModal'));
+                    modal.show();
+                },
+                error: function() {
+                    const modal = new bootstrap.Modal(document.getElementById('restoreModal'));
+                    modal.show();
+                }
+            });
+        }
+
+        // Xác nhận khôi phục
+        function confirmRestore() {
+            if (!restoreSupplierId) return;
 
             $.ajax({
-                url: `${API_URL}/${supplierId}/restore`,
+                url: `${API_URL}/${restoreSupplierId}/restore`,
                 type: 'POST',
+                headers: EMPLOYEE_ID ? { 'X-EmployeeId': EMPLOYEE_ID } : {},
                 success: function(response) {
                     showNotification('Khôi phục nhà cung cấp thành công', 'success');
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('restoreModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
                     loadSuppliers();
+                    restoreSupplierId = null;
                 },
                 error: function(xhr) {
+                    console.error('Error restoring supplier:', xhr);
                     let message = 'Có lỗi xảy ra khi khôi phục nhà cung cấp';
                     if (xhr.responseJSON && xhr.responseJSON.message) {
                         message = xhr.responseJSON.message;
                     }
                     showNotification(message, 'error');
+                    
+                    // Nếu lỗi, đóng modal
+                    if (xhr.status === 400) {
+                        const modalInstance = bootstrap.Modal.getInstance(document.getElementById('restoreModal'));
+                        if (modalInstance) {
+                            modalInstance.hide();
+                        }
+                    }
                 }
             });
         }

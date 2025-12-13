@@ -1,0 +1,151 @@
+@startuml
+
+hide footbox
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 12
+skinparam maxMessageSize 500
+skinparam ParticipantPadding 100
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam ActorBackgroundColor transparent
+skinparam ParticipantBackgroundColor transparent
+skinparam SequenceGroupBackgroundColor transparent
+skinparam SequenceBoxBackgroundColor transparent
+skinparam NoteBackgroundColor transparent
+
+skinparam SequenceActivationBorderColor black
+skinparam ActorBorderColor black
+skinparam ParticipantBorderColor black
+skinparam ArrowColor black
+skinparam roundcorner 0
+
+actor "Khách hàng" as CUSTOMER
+participant "Frontend (User Web)" as FE
+participant "CustomerAccountAPIController" as API
+database "Database" as DB
+
+' 1) Xem thông tin cá nhân
+CUSTOMER -> FE : Chọn "Thông tin cá nhân"
+FE -> API : GET /api/CustomerAccount/{customerId}
+API -> API : Validate identifier not empty
+API -> DB : SELECT customer WHERE (CustomerId=identifier OR Username=identifier OR Email=identifier)
+alt Customer không tồn tại
+  API --> FE : 404 Not Found ("Không tìm thấy khách hàng")
+  FE --> CUSTOMER : "Không tìm thấy thông tin"
+else Customer tồn tại
+  API -> API : Check IsOAuthLogin (Password="GOOGLE_OAUTH" OR "FACEBOOK_OAUTH")
+  API --> FE : 200 OK + customerInfo (IsOAuthLogin)
+  FE --> CUSTOMER : Hiển thị thông tin cá nhân
+end
+
+' 2) Cập nhật thông tin cá nhân
+alt Cập nhật thông tin
+  CUSTOMER -> FE : Sửa thông tin\n(CustomerName, Email, PhoneNumber, Address, DateOfBirth)\nNhấn "Lưu"
+  FE -> API : PUT /api/CustomerAccount/{customerId}/profile
+  API -> API : Validate customerId, request not null
+  API -> DB : SELECT customer WHERE CustomerId
+  alt Customer không tồn tại
+    API --> FE : 404 Not Found ("Không tìm thấy khách hàng")
+    FE --> CUSTOMER : "Không tìm thấy khách hàng"
+  else Customer tồn tại
+    opt Có Email
+      API -> API : Validate Email format (regex)
+      API -> DB : Check Email exists (other customers)
+      alt Email đã tồn tại
+        API --> FE : 409 Conflict ("Email đã được sử dụng")
+        FE --> CUSTOMER : "Email đã được sử dụng"
+      else Email hợp lệ
+        API -> DB : UPDATE Customers SET Email
+      end
+    end
+    opt Có PhoneNumber
+      API -> API : Validate Phone format (regex, 9-15 digits)
+      API -> DB : Check PhoneNumber exists (other customers)
+      alt PhoneNumber đã tồn tại
+        API --> FE : 409 Conflict ("Số điện thoại đã được sử dụng")
+        FE --> CUSTOMER : "Số điện thoại đã được sử dụng"
+      else PhoneNumber hợp lệ
+        API -> DB : UPDATE Customers SET PhoneNumber
+      end
+    end
+    opt Có CustomerName
+      API -> DB : UPDATE Customers SET CustomerName
+    end
+    opt Có Address
+      API -> DB : UPDATE Customers SET Address
+    else Address empty
+      API -> DB : UPDATE Customers SET Address=null
+    end
+    opt Có DateOfBirth
+      API -> API : Parse DateOfBirth (DateOnly hoặc DateOfBirthString)
+      alt DateOfBirth không hợp lệ
+        API --> FE : 400 Bad Request ("Ngày sinh không hợp lệ")
+        FE --> CUSTOMER : "Ngày sinh không hợp lệ"
+      else DateOfBirth hợp lệ
+        API -> DB : UPDATE Customers SET DateOfBirth
+      end
+    end
+    API -> DB : SaveChanges
+    API --> FE : 200 OK ("Cập nhật thông tin thành công")
+    FE --> CUSTOMER : "Cập nhật thành công"\nReload
+  end
+
+else Upload Avatar
+  CUSTOMER -> FE : Chọn ảnh\nNhấn "Upload"
+  FE -> API : POST /api/CustomerAccount/{customerId}/avatar (FormData)
+  API -> API : Validate customerId not empty
+  API -> DB : SELECT customer WHERE CustomerId
+  API -> API : Validate file not null, ContentType="image/*", Size <= 10MB
+  alt Validation không hợp lệ
+    API --> FE : 400 Bad Request + error message
+    FE --> CUSTOMER : "Vui lòng chọn file ảnh hợp lệ"
+  else Validation hợp lệ
+    opt Có Avatar cũ
+      API -> API : DeleteImage(oldAvatar)
+    end
+    API -> API : SaveImageAsync(file) (generate random filename, save to wwwroot/imageCustomers)
+    API -> DB : UPDATE Customers SET Avatar
+    API -> DB : SaveChanges
+    API --> FE : 200 OK + (message, avatar)
+    FE --> CUSTOMER : "Cập nhật avatar thành công"\nReload
+  end
+
+else Đổi mật khẩu
+  CUSTOMER -> FE : Nhập mật khẩu cũ + mới\nNhấn "Đổi mật khẩu"
+  FE -> API : PUT /api/CustomerAccount/{customerId}/password
+  API -> API : Validate (CustomerId, CurrentPassword, NewPassword, ConfirmPassword not empty)
+  API -> DB : SELECT customer WHERE CustomerId
+  alt Customer không tồn tại
+    API --> FE : 404 Not Found ("Không tìm thấy khách hàng")
+    FE --> CUSTOMER : "Không tìm thấy khách hàng"
+  else Customer tồn tại
+    API -> API : Check CurrentPassword matches
+    alt CurrentPassword không đúng
+      API --> FE : 400 Bad Request ("Mật khẩu hiện tại không đúng")
+      FE --> CUSTOMER : "Mật khẩu hiện tại không đúng"
+    else CurrentPassword đúng
+      API -> API : Check NewPassword == ConfirmPassword
+      alt NewPassword != ConfirmPassword
+        API --> FE : 400 Bad Request ("Mật khẩu mới và xác nhận không khớp")
+        FE --> CUSTOMER : "Mật khẩu không khớp"
+      else NewPassword == ConfirmPassword
+        API -> API : Validate NewPassword (length >= 6, contains letter + digit)
+        alt NewPassword không hợp lệ
+          API --> FE : 400 Bad Request ("Mật khẩu mới phải tối thiểu 6 ký tự và gồm cả chữ và số")
+          FE --> CUSTOMER : "Mật khẩu không hợp lệ"
+        else NewPassword hợp lệ
+          API -> DB : UPDATE Customers SET Password
+          API -> DB : SaveChanges
+          API --> FE : 200 OK ("Đổi mật khẩu thành công")
+          FE --> CUSTOMER : "Đổi mật khẩu thành công"
+        end
+      end
+    end
+  end
+end
+
+FE --> CUSTOMER : Hiển thị thông tin cá nhân
+
+@enduml
+

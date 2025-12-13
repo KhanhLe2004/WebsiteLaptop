@@ -151,6 +151,26 @@
     </div>
 </div>
 
+<!-- Modal Xác nhận khôi phục -->
+<div class="modal fade" id="restoreModal" tabindex="-1" aria-labelledby="restoreModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-success">
+                <h5 class="modal-title text-white" id="restoreModalLabel">Xác nhận khôi phục</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Bạn có chắc chắn muốn khôi phục thương hiệu <strong id="restoreBrandId"></strong>?</p>
+                <p class="text-danger text-sm mt-2" id="restoreWarningMessage" style="display:none;"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-success" onclick="confirmRestore()">Khôi phục</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <!-- Select2 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -558,11 +578,9 @@
                 url: `${API_URL}/${brandId}`,
                 type: 'GET',
                 success: function(brand) {
-                    if (brand.productCount > 0) {
-                        $('#deleteWarningMessage').text(`Cảnh báo: thương hiệu này đang có ${brand.productCount} sản phẩm. Không thể xóa!`).show();
-                    } else {
-                        $('#deleteWarningMessage').hide();
-                    }
+
+                        $('#deleteWarningMessage').show();
+                   
                     const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
                     modal.show();
                 },
@@ -608,25 +626,61 @@
             });
         }
 
+        let restoreBrandId = null;
+
         // Khôi phục thương hiệu (set active = true)
         function restoreBrand(brandId, brandName) {
-            if (!confirm(`Bạn có chắc chắn muốn khôi phục thương hiệu "${brandName}"?\nthương hiệu sẽ được hiển thị lại trong danh sách đang hoạt động.`)) {
-                return;
-            }
+            restoreBrandId = brandId;
+            $('#restoreBrandId').text(brandId);
+            $('#restoreWarningMessage').hide();
+            
+            // Kiểm tra số sản phẩm trước khi khôi phục
+            $.ajax({
+                url: `${API_URL}/${brandId}`,
+                type: 'GET',
+                success: function(brand) {
+                        $('#restoreWarningMessage').show();
+                    const modal = new bootstrap.Modal(document.getElementById('restoreModal'));
+                    modal.show();
+                },
+                error: function() {
+                    const modal = new bootstrap.Modal(document.getElementById('restoreModal'));
+                    modal.show();
+                }
+            });
+        }
+
+        // Xác nhận khôi phục
+        function confirmRestore() {
+            if (!restoreBrandId) return;
 
             $.ajax({
-                url: `${API_URL}/${brandId}/restore`,
+                url: `${API_URL}/${restoreBrandId}/restore`,
                 type: 'POST',
                 success: function(response) {
                     showNotification('Khôi phục thương hiệu thành công', 'success');
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('restoreModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
                     loadBrands();
+                    restoreBrandId = null;
                 },
                 error: function(xhr) {
+                    console.error('Error restoring brand:', xhr);
                     let message = 'Có lỗi xảy ra khi khôi phục thương hiệu';
                     if (xhr.responseJSON && xhr.responseJSON.message) {
                         message = xhr.responseJSON.message;
                     }
                     showNotification(message, 'error');
+                    
+                    // Nếu lỗi, đóng modal
+                    if (xhr.status === 400) {
+                        const modalInstance = bootstrap.Modal.getInstance(document.getElementById('restoreModal'));
+                        if (modalInstance) {
+                            modalInstance.hide();
+                        }
+                    }
                 }
             });
         }

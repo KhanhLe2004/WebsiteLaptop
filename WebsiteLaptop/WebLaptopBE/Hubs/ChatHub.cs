@@ -6,9 +6,9 @@ namespace WebLaptopBE.Hubs;
 
 public class ChatHub : Hub
 {
-    private readonly Testlaptop37Context _db;
+    private readonly Testlaptop38Context _db;
 
-    public ChatHub(Testlaptop37Context db)
+    public ChatHub(Testlaptop38Context db)
     {
         _db = db;
     }

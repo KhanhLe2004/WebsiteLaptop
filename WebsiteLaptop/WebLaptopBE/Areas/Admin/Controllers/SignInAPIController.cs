@@ -12,10 +12,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class SignInAPIController : ControllerBase
     {
-        private readonly Testlaptop37Context _context;
+        private readonly Testlaptop38Context _context;
         private readonly HistoryService _historyService;
 
-        public SignInAPIController(Testlaptop37Context context, HistoryService historyService)
+        public SignInAPIController(Testlaptop38Context context, HistoryService historyService)
         {
             _context = context;
             _historyService = historyService;

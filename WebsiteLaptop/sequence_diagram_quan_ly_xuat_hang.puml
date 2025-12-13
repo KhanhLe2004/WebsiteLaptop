@@ -1,0 +1,130 @@
+@startuml
+
+hide footbox
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 12
+skinparam maxMessageSize 500
+skinparam ParticipantPadding 100
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam ActorBackgroundColor transparent
+skinparam ParticipantBackgroundColor transparent
+skinparam SequenceGroupBackgroundColor transparent
+skinparam SequenceBoxBackgroundColor transparent
+skinparam NoteBackgroundColor transparent
+
+skinparam SequenceActivationBorderColor black
+skinparam ActorBorderColor black
+skinparam ParticipantBorderColor black
+skinparam ArrowColor black
+skinparam roundcorner 0
+
+actor "Chủ cửa hàng" as OWNER
+participant "Frontend (Admin Web)" as FE
+participant "ManageStockExportAPIController" as API
+database "Database" as DB
+
+' 1) Mở màn quản lý
+OWNER -> FE : Chọn "Quản lý xuất hàng"
+FE -> API : GET /api/admin/stock-exports
+API -> DB : SELECT stockExports (Include SaleInvoice, Employee, filter, pagination)
+DB --> API : stockExportList
+API --> FE : 200 OK + list
+FE --> OWNER : Hiển thị danh sách
+
+' 2) Thao tác: Thêm / Sửa
+alt Thêm phiếu xuất hàng
+  OWNER -> FE : Nhập thông tin\nNhấn "Lưu"
+  FE -> API : POST /api/admin/stock-exports
+  API -> API : Validate + GenerateStockExportId()
+  alt Hợp lệ
+    API -> DB : INSERT StockExports
+    loop For each detail
+      API -> DB : INSERT StockExportDetails
+      alt Status = "Hoàn thành"
+        API -> API : GetAvailableQuantity + Check stock
+        API -> API : ParseSpecifications + Find ProductConfiguration
+        API -> DB : UPDATE ProductConfigurations SET Quantity -= exportQuantity
+        API -> API : UpdateProductSerials (link to StockExportDetailId)
+        API -> DB : UPDATE ProductSerials SET Status="exported", StockExportDetailId
+      end
+    end
+    API -> API : CalculateTotalAmount (from ProductConfiguration prices)
+    API -> API : LogHistory("Thêm phiếu xuất hàng")
+    API --> FE : 201 Created + StockExportDTO
+    FE --> OWNER : Thông báo "Thành công"\nReload
+  else Không hợp lệ
+    API --> FE : 400 + errors
+    FE --> OWNER : "Vui lòng nhập lại"
+  end
+
+else Cập nhật phiếu xuất hàng
+  OWNER -> FE : Chọn phiếu xuất\nSửa\nNhấn "Lưu"
+  FE -> API : PUT /api/admin/stock-exports/{id}
+  API -> DB : SELECT stockExport WHERE id (Include Details)
+  API -> API : Validate
+  alt Hợp lệ
+    alt Chỉ thay đổi Status (không có Details)
+      alt "Chờ xử lý" → "Hoàn thành"
+        loop For each detail
+          API -> API : GetAvailableQuantity + Check stock
+          API -> API : ParseSpecifications + Find ProductConfiguration
+          API -> DB : UPDATE ProductConfigurations SET Quantity -= quantity
+          API -> API : UpdateProductSerials
+          API -> DB : UPDATE ProductSerials SET Status="exported", StockExportDetailId
+        end
+        opt Có SaleInvoiceId
+          API -> DB : UPDATE SaleInvoices SET Status="Chờ vận chuyển"
+        end
+      else "Hoàn thành" → "Chờ xử lý"
+        loop For each detail
+          API -> API : RestoreProductSerials (cộng lại quantity)
+          API -> DB : UPDATE ProductConfigurations SET Quantity += quantity
+          API -> DB : UPDATE ProductSerials SET Status="in stock", StockExportDetailId=null
+        end
+      end
+    else Có thay đổi Details
+      alt OldStatus = "Hoàn thành"
+        loop For each old detail
+          API -> API : RestoreProductSerials (cộng lại quantity)
+          API -> DB : UPDATE ProductConfigurations SET Quantity += oldQuantity
+          API -> DB : UPDATE ProductSerials SET Status="in stock", StockExportDetailId=null
+        end
+      end
+      API -> DB : DELETE StockExportDetails (old)
+      alt NewStatus = "Hoàn thành"
+        loop For each new detail
+          API -> DB : INSERT StockExportDetails
+          API -> API : GetAvailableQuantity + Check stock
+          API -> API : ParseSpecifications + Find ProductConfiguration
+          API -> DB : UPDATE ProductConfigurations SET Quantity -= newQuantity
+          API -> API : UpdateProductSerials
+          API -> DB : UPDATE ProductSerials SET Status="exported", StockExportDetailId
+        end
+      else NewStatus != "Hoàn thành"
+        loop For each new detail
+          API -> DB : INSERT StockExportDetails
+        end
+      end
+      opt Status changed to "Hoàn thành"
+        opt Có SaleInvoiceId
+          API -> DB : UPDATE SaleInvoices SET Status="Chờ vận chuyển"
+        end
+      end
+    end
+    API -> DB : UPDATE StockExports
+    API -> API : CalculateTotalAmount (from ProductConfiguration prices)
+    API -> API : LogHistory("Cập nhật phiếu xuất hàng")
+    API --> FE : 200 OK
+    FE --> OWNER : "Thành công"\nReload
+  else Không hợp lệ
+    API --> FE : 400 + errors
+    FE --> OWNER : "Vui lòng nhập lại"
+  end
+end
+
+FE --> OWNER : Hiển thị danh sách
+
+@enduml
+

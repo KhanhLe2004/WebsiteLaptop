@@ -15,10 +15,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageBrandAPIController : ControllerBase
     {
-        private readonly Testlaptop37Context _context;
+        private readonly Testlaptop38Context _context;
         private readonly HistoryService _historyService;
 
-        public ManageBrandAPIController(Testlaptop37Context context, HistoryService historyService)
+        public ManageBrandAPIController(Testlaptop38Context context, HistoryService historyService)
         {
             _context = context;
             _historyService = historyService;
@@ -265,6 +265,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
 
         // DELETE: api/admin/brands/{id}
         // Ẩn hãng (set active = false) thay vì xóa thực sự
+        // Khi ẩn hãng, tất cả sản phẩm của hãng đó cũng sẽ được ẩn (active = false)
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteBrand(string id)
         {
@@ -279,25 +280,29 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     return NotFound(new { message = "Không tìm thấy hãng" });
                 }
 
-                // Kiểm tra xem hãng có sản phẩm đang hoạt động nào không (chỉ đếm sản phẩm active = true)
-                if (brand.Products != null && brand.Products.Any(p => p.Active == true))
+                // Set active = false cho thương hiệu
+                brand.Active = false;
+
+                // Set active = false cho tất cả sản phẩm của thương hiệu này
+                if (brand.Products != null)
                 {
-                    var activeProductCount = brand.Products.Count(p => p.Active == true);
-                    return BadRequest(new { message = $"Không thể xóa hãng vì đang có {activeProductCount} sản phẩm đang hoạt động thuộc hãng này" });
+                    foreach (var product in brand.Products)
+                    {
+                        product.Active = false;
+                    }
                 }
 
-                // Set active = false thay vì xóa
-                brand.Active = false;
                 await _context.SaveChangesAsync();
 
                 // Ghi log lịch sử
                 var employeeId = GetEmployeeId();
                 if (!string.IsNullOrEmpty(employeeId))
                 {
-                    await _historyService.LogHistoryAsync(employeeId, $"Xóa thương hiệu: {id} - {brand.BrandName}");
+                    var productCount = brand.Products != null ? brand.Products.Count : 0;
+                    await _historyService.LogHistoryAsync(employeeId, $"Xóa thương hiệu: {id} - {brand.BrandName} (đã ẩn {productCount} sản phẩm)");
                 }
 
-                return Ok(new { message = "Đã ẩn hãng thành công" });
+                return Ok(new { message = "Đã ẩn hãng và tất cả sản phẩm của hãng thành công" });
             }
             catch (Exception ex)
             {
@@ -307,29 +312,43 @@ namespace WebLaptopBE.Areas.Admin.Controllers
 
         // POST: api/admin/brands/{id}/restore
         // Khôi phục hãng (set active = true)
+        // Khi khôi phục hãng, tất cả sản phẩm của hãng đó cũng sẽ được khôi phục (active = true)
         [HttpPost("{id}/restore")]
         public async Task<IActionResult> RestoreBrand(string id)
         {
             try
             {
-                var brand = await _context.Brands.FindAsync(id);
+                var brand = await _context.Brands
+                    .Include(b => b.Products)
+                    .FirstOrDefaultAsync(b => b.BrandId == id);
                 if (brand == null)
                 {
                     return NotFound(new { message = "Không tìm thấy hãng" });
                 }
 
-                // Set active = true
+                // Set active = true cho thương hiệu
                 brand.Active = true;
+
+                // Set active = true cho tất cả sản phẩm của thương hiệu này
+                if (brand.Products != null)
+                {
+                    foreach (var product in brand.Products)
+                    {
+                        product.Active = true;
+                    }
+                }
+
                 await _context.SaveChangesAsync();
 
                 // Ghi log lịch sử
                 var employeeId = GetEmployeeId();
                 if (!string.IsNullOrEmpty(employeeId))
                 {
+                    var productCount = brand.Products != null ? brand.Products.Count : 0;
                     await _historyService.LogHistoryAsync(employeeId, $"Khôi phục thương hiệu: {id} - {brand.BrandName}");
                 }
 
-                return Ok(new { message = "Khôi phục hãng thành công" });
+                return Ok(new { message = "Đã khôi phục hãng và tất cả sản phẩm của hãng thành công" });
             }
             catch (Exception ex)
             {

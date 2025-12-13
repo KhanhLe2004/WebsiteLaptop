@@ -1,0 +1,93 @@
+@startuml
+
+hide footbox
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 12
+skinparam maxMessageSize 500
+skinparam ParticipantPadding 100
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam ActorBackgroundColor transparent
+skinparam ParticipantBackgroundColor transparent
+skinparam SequenceGroupBackgroundColor transparent
+skinparam SequenceBoxBackgroundColor transparent
+skinparam NoteBackgroundColor transparent
+
+skinparam SequenceActivationBorderColor black
+skinparam ActorBorderColor black
+skinparam ParticipantBorderColor black
+skinparam ArrowColor black
+skinparam roundcorner 0
+
+actor "Khách hàng" as CUSTOMER
+participant "Frontend (User Web)" as FE
+participant "ListProductAPIController" as API
+participant "SessionStorage" as STORAGE
+database "Database" as DB
+
+' 1) Thêm sản phẩm vào danh sách so sánh
+CUSTOMER -> FE : Chọn "So sánh" trên sản phẩm
+FE -> STORAGE : Get compareProducts
+STORAGE --> FE : compareList
+FE -> FE : Check if product already in list
+FE -> FE : Check if list.length < 2
+alt List đã đầy (2 sản phẩm)
+  FE --> CUSTOMER : "Chỉ có thể so sánh tối đa 2 sản phẩm"
+else Product đã có trong list
+  FE --> CUSTOMER : "Sản phẩm đã có trong danh sách so sánh"
+else Hợp lệ
+  FE -> FE : Add product to compareList
+  FE -> STORAGE : Set compareProducts (JSON)
+  FE -> FE : updateCompareBadge()
+  FE --> CUSTOMER : "Đã thêm vào danh sách so sánh"
+end
+
+' 2) Xem trang so sánh
+CUSTOMER -> FE : Chọn "So sánh sản phẩm"
+FE -> STORAGE : Get compareProducts
+STORAGE --> FE : compareList
+alt List rỗng
+  FE --> CUSTOMER : Hiển thị "Chưa có sản phẩm nào để so sánh"
+else List có sản phẩm
+  loop For each product (max 2)
+    FE -> API : GET /api/ListProductAPI/detail/{productId}
+    API -> DB : SELECT product WHERE ProductId AND Active=true (Include Brand)
+    API -> DB : SELECT productImages WHERE ProductId
+    API -> DB : SELECT productConfigurations WHERE ProductId
+    API -> DB : SELECT productReviews WHERE ProductId (Calculate averageRating)
+    DB --> API : productDetail (product, images, configurations, reviews)
+    API --> FE : 200 OK + productDetail
+  end
+  FE -> FE : displayComparison(products)
+  FE -> FE : Build comparison table (specs: name, model, brand, price, CPU, RAM, ROM, Card, screen, camera, weight, pin, connect, warranty)
+  FE -> FE : Format values (currency, weight, warranty)
+  FE --> CUSTOMER : Hiển thị bảng so sánh
+end
+
+' 3) Xóa sản phẩm khỏi danh sách so sánh
+CUSTOMER -> FE : Chọn "Xóa" trên sản phẩm
+FE -> STORAGE : Get compareProducts
+STORAGE --> FE : compareList
+FE -> FE : Remove product from list (shift hoặc pop)
+FE -> STORAGE : Set compareProducts (updated list)
+FE -> FE : updateCompareBadge()
+FE -> FE : loadComparison() (reload)
+FE --> CUSTOMER : "Đã xóa khỏi danh sách so sánh"\nReload comparison
+
+' 4) Xóa tất cả
+CUSTOMER -> FE : Chọn "Xóa tất cả"
+FE -> FE : Confirm dialog
+alt Xác nhận
+  FE -> STORAGE : Remove compareProducts
+  FE -> FE : updateCompareBadge()
+  FE -> FE : loadComparison() (reload)
+  FE --> CUSTOMER : "Đã xóa tất cả"\nHiển thị empty state
+else Hủy
+  FE --> CUSTOMER : Không làm gì
+end
+
+FE --> CUSTOMER : Hiển thị trang so sánh
+
+@enduml
+

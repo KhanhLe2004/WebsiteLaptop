@@ -1,0 +1,66 @@
+@startuml
+
+hide footbox
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 12
+skinparam maxMessageSize 500
+skinparam ParticipantPadding 100
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam ActorBackgroundColor transparent
+skinparam ParticipantBackgroundColor transparent
+skinparam SequenceGroupBackgroundColor transparent
+skinparam SequenceBoxBackgroundColor transparent
+skinparam NoteBackgroundColor transparent
+
+skinparam SequenceActivationBorderColor black
+skinparam ActorBorderColor black
+skinparam ParticipantBorderColor black
+skinparam ArrowColor black
+skinparam roundcorner 0
+
+actor "Chủ cửa hàng" as OWNER
+participant "Frontend (Admin Web)" as FE
+participant "ManageDeliveryAPIController" as API
+database "Database" as DB
+
+' 1) Mở màn quản lý
+OWNER -> FE : Chọn "Quản lý vận chuyển"
+FE -> API : GET /api/admin/deliveries
+API -> DB : SELECT saleInvoices WHERE Status IN ("Chờ vận chuyển", "Đang vận chuyển") (Include Customer, Employee, filter, pagination)
+DB --> API : deliveryList
+API --> FE : 200 OK + list
+FE --> OWNER : Hiển thị danh sách
+
+' 2) Cập nhật trạng thái vận chuyển
+OWNER -> FE : Chọn đơn hàng\nCập nhật status\nNhấn "Lưu"
+FE -> API : PUT /api/admin/deliveries/{id}/status
+API -> DB : SELECT saleInvoice WHERE id AND Status IN ("Chờ vận chuyển", "Đang vận chuyển")
+API -> API : Validate Status = "Đang vận chuyển" OR "Hoàn thành"
+alt Hợp lệ
+  alt Status = "Chờ vận chuyển" AND NewStatus = "Hoàn thành"
+    API --> FE : 400 Bad Request (phải qua "Đang vận chuyển" trước)
+    FE --> OWNER : "Không thể chuyển trực tiếp"
+  else Status hợp lệ
+    API -> DB : UPDATE SaleInvoices SET Status
+    alt NewStatus = "Đang vận chuyển"
+      API -> API : Set EmployeeShip = GetEmployeeId()
+      API -> DB : UPDATE SaleInvoices SET EmployeeShip
+    end
+    alt NewStatus = "Hoàn thành"
+      API -> DB : UPDATE SaleInvoices SET TimeShip = Now
+    end
+    API -> API : LogHistory("Cập nhật trạng thái đơn hàng vận chuyển")
+    API --> FE : 200 OK
+    FE --> OWNER : "Thành công"\nReload
+  end
+else Không hợp lệ
+  API --> FE : 400 + errors
+  FE --> OWNER : "Vui lòng nhập lại"
+end
+
+FE --> OWNER : Hiển thị danh sách
+
+@enduml
+
