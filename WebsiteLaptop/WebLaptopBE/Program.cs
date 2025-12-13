@@ -12,7 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Đăng ký DbContext
 builder.Services.AddDbContext<Testlaptop35Context>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection") 
-        ?? "Data Source=DESKTOP-48K2JPN\\SQLEXPRESS;Initial Catalog=testlaptop35;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False"));
+        ?? "Data Source=DESKTOP-48K2JPN\\SQLEXPRESS;Initial Catalog=testlaptop38;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False"));
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -32,6 +32,9 @@ builder.Services.AddSwaggerGen();
 
 // Add HttpClientFactory
 builder.Services.AddHttpClient();
+
+// Add HttpContextAccessor - Cần thiết cho RAGChatService và GuidedChatService
+builder.Services.AddHttpContextAccessor();
 
 // Add Memory Cache for performance optimization (caching embeddings, responses)
 builder.Services.AddMemoryCache(options =>
@@ -98,6 +101,15 @@ builder.Services.AddScoped<IChatOrchestratorService, ChatOrchestratorService>();
 builder.Services.AddScoped<ProductSearchPlugin>();
 builder.Services.AddScoped<PolicyRetrievalPlugin>();
 builder.Services.AddScoped<IntentDetectionPlugin>();
+
+// 9. Input Validation Service - Validate input từ người dùng
+builder.Services.AddScoped<WebLaptopBE.AI.Services.IInputValidationService, WebLaptopBE.AI.Services.InputValidationService>();
+
+// 10. Conversation State Service - Quản lý state của conversation (guided chat)
+builder.Services.AddSingleton<IConversationStateService, ConversationStateService>();
+
+// 11. Guided Chat Service - Chatbot với guided conversation (button options)
+builder.Services.AddScoped<IGuidedChatService, GuidedChatService>();
 
 var app = builder.Build();
 

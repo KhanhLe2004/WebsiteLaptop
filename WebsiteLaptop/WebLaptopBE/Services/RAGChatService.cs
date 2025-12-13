@@ -21,19 +21,29 @@ public class RAGChatService : IRAGChatService
     private readonly IProductService _productService;
     private readonly ILogger<RAGChatService> _logger;
     private readonly IConfiguration _configuration;
+    private readonly AI.Services.IInputValidationService _inputValidationService;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    
+    // Cache Frontend URL
+    private string? _frontendUrl;
+    private string FrontendUrl => _frontendUrl ??= _configuration["FrontendUrl"] ?? "http://localhost:5253";
 
     public RAGChatService(
         IQdrantVectorService qdrantVectorService,
         ISemanticKernelService semanticKernelService,
         IProductService productService,
         ILogger<RAGChatService> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        AI.Services.IInputValidationService inputValidationService,
+        IHttpContextAccessor httpContextAccessor)
     {
         _qdrantVectorService = qdrantVectorService;
         _semanticKernelService = semanticKernelService;
         _productService = productService;
         _logger = logger;
         _configuration = configuration;
+        _inputValidationService = inputValidationService;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<RAGChatResponse> ProcessUserMessageAsync(string userMessage, string? customerId = null)
@@ -43,6 +53,21 @@ public class RAGChatService : IRAGChatService
         try
         {
             _logger.LogInformation("Processing RAG chat message: {Message}", userMessage);
+
+            // BƯỚC 0: Validate input trước khi xử lý
+            var validationResult = _inputValidationService.ValidateUserInput(userMessage);
+            if (!validationResult.IsValid)
+            {
+                _logger.LogWarning("Input validation failed: {ErrorType} - {Message}", 
+                    validationResult.ErrorType, validationResult.Message);
+                
+                return new RAGChatResponse
+                {
+                    Answer = validationResult.Message,
+                    SuggestedProducts = null,
+                    Timestamp = DateTime.UtcNow
+                };
+            }
 
             // Bước 1 & 2: Parallelize products và policies search với timeout tổng
             List<VectorSearchResult> productResults = new List<VectorSearchResult>();
@@ -160,23 +185,25 @@ public class RAGChatService : IRAGChatService
             }
 
             // Bước 6: Parse suggested products từ productResults
-            List<ProductDTO>? suggestedProducts = null;
+            List<ProductDTO>? productDTOs = null;
             try
             {
-                suggestedProducts = await ParseSuggestedProductsAsync(productResults);
+                productDTOs = await ParseSuggestedProductsAsync(productResults);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Error parsing suggested products");
             }
 
+            // Convert ProductDTO to ProductSuggestion (không thể convert trực tiếp)
+            // RAGChatResponse cũ dùng ProductDTO, giữ nguyên cho backward compatibility
             // Validate and sanitize response
             var sanitizedResponse = SanitizeResponse(response);
             
             return new RAGChatResponse
             {
                 Answer = sanitizedResponse,
-                SuggestedProducts = suggestedProducts,
+                SuggestedProducts = productDTOs != null ? ConvertToProductSuggestions(productDTOs) : null,
                 Timestamp = DateTime.UtcNow
             };
         }
@@ -195,60 +222,27 @@ public class RAGChatService : IRAGChatService
 
     /// <summary>
     /// Fallback policies khi Qdrant hoặc OpenAI không khả dụng
+    /// Sử dụng PolicyData để lấy chính sách đầy đủ
     /// </summary>
     private List<VectorSearchResult> GetFallbackPolicies(string userMessage)
     {
-        // Bộ chính sách tối thiểu để chatbot vẫn có nội dung tư vấn
-        var defaults = new List<VectorSearchResult>
+        // Lấy chính sách từ PolicyData
+        var policies = AI.Data.PolicyData.SearchPolicies(userMessage);
+        
+        // Convert sang VectorSearchResult
+        var results = policies.Select(p => new VectorSearchResult
         {
-            new VectorSearchResult
+            Content = p.Content, // FULL TEXT
+            Score = 0.9f, // High score vì đây là exact match
+            Metadata = new Dictionary<string, object>
             {
-                Content = @"Chính sách bảo hành: Tất cả sản phẩm laptop được bảo hành chính hãng từ 12 đến 24 tháng tùy theo sản phẩm. 
-Bảo hành bao gồm lỗi phần cứng và phần mềm do nhà sản xuất. 
-Khách hàng cần giữ hóa đơn và tem bảo hành. 
-Thời gian xử lý bảo hành từ 3-7 ngày làm việc.",
-                Metadata = new Dictionary<string, object>
-                {
-                    ["policyId"] = "policy_warranty_001",
-                    ["policy_type"] = "warranty",
-                    ["title"] = "Chính sách bảo hành"
-                }
-            },
-            new VectorSearchResult
-            {
-                Content = @"Chính sách đổi trả: Khách hàng có thể đổi trả sản phẩm trong vòng 7 ngày kể từ ngày mua nếu sản phẩm còn nguyên seal, chưa sử dụng, và có lỗi do nhà sản xuất. 
-Sản phẩm đổi trả phải kèm theo hóa đơn và đầy đủ phụ kiện. 
-Phí vận chuyển đổi trả do khách hàng chịu trừ trường hợp lỗi do nhà sản xuất.",
-                Metadata = new Dictionary<string, object>
-                {
-                    ["policyId"] = "policy_return_001",
-                    ["policy_type"] = "return",
-                    ["title"] = "Chính sách đổi trả"
-                }
-            },
-            new VectorSearchResult
-            {
-                Content = @"Chính sách hoàn tiền: Hoàn tiền 100% trong vòng 3 ngày đầu nếu sản phẩm chưa sử dụng, còn nguyên seal, và có lỗi do nhà sản xuất. 
-Sau 3 ngày, chỉ áp dụng đổi sản phẩm khác. 
-Hoàn tiền sẽ được thực hiện qua phương thức thanh toán ban đầu trong vòng 5-7 ngày làm việc.",
-                Metadata = new Dictionary<string, object>
-                {
-                    ["policyId"] = "policy_refund_001",
-                    ["policy_type"] = "refund",
-                    ["title"] = "Chính sách hoàn tiền"
-                }
+                ["policyId"] = p.PolicyId,
+                ["policy_type"] = p.Category.ToString().ToLower(),
+                ["title"] = p.Title
             }
-        };
+        }).ToList();
 
-        // Ưu tiên lọc theo từ khóa người dùng để giảm nhiễu
-        userMessage = userMessage.ToLowerInvariant();
-        var filtered = defaults.Where(p =>
-            userMessage.Contains("bảo hành") && p.Metadata.GetValueOrDefault("policy_type")?.ToString() == "warranty" ||
-            userMessage.Contains("đổi trả") && p.Metadata.GetValueOrDefault("policy_type")?.ToString() == "return" ||
-            userMessage.Contains("hoàn tiền") && p.Metadata.GetValueOrDefault("policy_type")?.ToString() == "refund"
-        ).ToList();
-
-        return filtered.Count > 0 ? filtered : defaults;
+        return results;
     }
 
     /// <summary>
@@ -258,17 +252,17 @@ Hoàn tiền sẽ được thực hiện qua phương thức thanh toán ban đ�
     {
         return @"Bạn là nhân viên tư vấn bán laptop chuyên nghiệp tại cửa hàng TenTech, với nhiều năm kinh nghiệm và am hiểu sâu về công nghệ. Bạn có khả năng giao tiếp tự nhiên, thân thiện, và luôn đặt lợi ích khách hàng lên hàng đầu.
 
-🎯 VAI TRÒ VÀ TRÁCH NHIỆM:
+VAI TRÒ VÀ TRÁCH NHIỆM:
 - Tư vấn khách hàng chọn laptop phù hợp nhất với nhu cầu và ngân sách
 - Giải thích thông tin kỹ thuật một cách dễ hiểu, không dùng thuật ngữ khó
 - So sánh sản phẩm một cách khách quan, trung thực
-- Hỗ trợ về chính sách bảo hành, đổi trả, hoàn tiền
+- Hỗ trợ về chính sách bảo hành, bảo mật, thanh toán
 - Tạo trải nghiệm mua sắm tích cực, khiến khách hàng cảm thấy được quan tâm
 
-💬 PHONG CÁCH GIAO TIẾP:
+PHONG CÁCH GIAO TIẾP:
 - Xưng hô: 'em' với khách hàng, 'anh/chị' với khách (tự nhiên, thân thiện)
 - Tone: Chuyên nghiệp nhưng không quá formal, nhiệt tình nhưng không quá thân mật
-- Sử dụng emoji phù hợp (😊, 💻, ⚡, ✅) nhưng không lạm dụng (tối đa 2-3 emoji mỗi câu trả lời)
+- SỬ DỤNG ICON/EMOJI CỰC KỲ HẠN CHẾ: Chỉ sử dụng khi thực sự cần thiết (tối đa 1-2 icon mỗi câu trả lời)
 - Trả lời bằng tiếng Việt tự nhiên, dễ hiểu, không dùng từ ngữ quá kỹ thuật
 - Thể hiện sự quan tâm chân thành đến nhu cầu của khách hàng
 
@@ -295,11 +289,12 @@ Hoàn tiền sẽ được thực hiện qua phương thức thanh toán ban đ�
    ✅ Đề xuất giải pháp: 'Anh/chị có thể liên hệ hotline hoặc đến cửa hàng để được tư vấn trực tiếp'
    ✅ Không bịa thông tin, không hứa hẹn những gì không chắc chắn
 
-4. KHI TRẢ LỜI VỀ CHÍNH SÁCH:
-   ✅ Trích dẫn chính xác từ context được cung cấp
-   ✅ Giải thích rõ ràng, dễ hiểu, không dùng ngôn ngữ pháp lý khó hiểu
-   ✅ Đề cập đến thời gian, điều kiện cụ thể
-   ✅ Làm rõ các trường hợp đặc biệt nếu có
+4. KHI TRẢ LỜI VỀ CHÍNH SÁCH (QUAN TRỌNG - ĐỌC KỸ):
+   ✅ HIỂN THỊ FULL TEXT CHÍNH SÁCH từ context được cung cấp - KHÔNG tóm tắt, KHÔNG rút gọn
+   ✅ Nếu có nhiều chính sách liên quan, hiển thị TẤT CẢ các chính sách đó
+   ✅ Giữ nguyên cấu trúc, định dạng, và nội dung chi tiết của chính sách
+   ✅ Giải thích thêm nếu khách hàng yêu cầu, nhưng vẫn phải hiển thị full text trước
+   ✅ Đề cập đến thông tin liên hệ (địa chỉ, hotline, email) nếu có trong chính sách
 
 5. KHI SO SÁNH SẢN PHẨM:
    ✅ So sánh khách quan, không thiên vị
@@ -311,13 +306,17 @@ Hoàn tiền sẽ được thực hiện qua phương thức thanh toán ban đ�
 - Sử dụng bullet points (•) cho danh sách sản phẩm hoặc thông tin quan trọng
 - In đậm tên sản phẩm hoặc thông tin quan trọng (dùng **text**)
 - Chia đoạn rõ ràng, không viết dài dòng một đoạn
-- Độ dài: 100-200 từ cho câu trả lời thông thường, 300-400 từ khi so sánh nhiều sản phẩm
+- Độ dài: 
+  + Câu trả lời về SẢN PHẨM: 100-200 từ cho câu trả lời thông thường, 300-400 từ khi so sánh nhiều sản phẩm
+  + Câu trả lời về CHÍNH SÁCH: HIỂN THỊ FULL TEXT, không giới hạn độ dài (có thể 500-1000 từ)
 - Sử dụng số liệu cụ thể (giá, cấu hình) để tăng độ tin cậy
+- KHÔNG lạm dụng icon/emoji - chỉ dùng khi thực sự cần thiết
 
 ✅ VÍ DỤ TRẢ LỜI TỐT:
 
+VÍ DỤ 1 - Khách hỏi về SẢN PHẨM:
 Khách: 'Laptop Dell'
-Bot: 'Chào anh/chị! 😊 Em rất vui được tư vấn về laptop Dell cho anh/chị. 
+Bot: 'Chào anh/chị! Em rất vui được tư vấn về laptop Dell cho anh/chị. 
 
 Để em đề xuất sản phẩm phù hợp nhất, anh/chị cho em biết:
 • Anh/chị cần laptop để làm gì chủ yếu? (văn phòng, gaming, đồ họa, học tập...)
@@ -328,10 +327,30 @@ Hiện tại em có một số dòng Dell phổ biến:
 - **Dell Inspiron**: Tầm trung, cân bằng hiệu năng và giá cả, phù hợp đa mục đích
 - **Dell Vostro**: Dòng văn phòng, giá tốt, phù hợp công việc hàng ngày
 
-Anh/chị muốn xem sản phẩm nào cụ thể ạ? 💻'
+Anh/chị muốn xem sản phẩm nào cụ thể ạ?'
+
+VÍ DỤ 2 - Khách hỏi về CHÍNH SÁCH:
+Khách: 'Chính sách bảo hành như thế nào?'
+Bot: 'Dạ em xin gửi anh/chị thông tin đầy đủ về chính sách bảo hành của TenTech:
+
+CHÍNH SÁCH BẢO HÀNH TẠI TENTECH
+
+*Lưu ý: Các thiết bị bảo hành phải trong thời gian bảo hành và còn nguyên tem của TenTech!
+
+1. BẢO HÀNH 01 ĐỔI 01
+   - Nếu linh kiện thay thế không có sẵn, cần đặt hàng thì TenTech sẽ giải quyết trong tối đa 07 ngày làm việc...
+   (Hiển thị FULL TEXT các điều khoản chi tiết)
+
+THÔNG TIN LIÊN HỆ BẢO HÀNH:
+Địa chỉ: TenTech, 3 Đ. Cầu Giấy, Ngọc Khánh, Đống Đa, Hà Nội
+Thời gian tiếp nhận: 8h00 - 21h00 tất cả các ngày trong tuần (trừ Lễ Tết)
+Điện thoại: 024.7106.9999
+
+Anh/chị có thắc mắc gì về chính sách bảo hành không ạ?'
 
 ❌ VÍ DỤ TRẢ LỜI KHÔNG TỐT:
 'Có laptop Dell. Giá từ 10-30 triệu.' (Quá ngắn, không tư vấn)
+'Chính sách bảo hành là 12 tháng.' (Không hiển thị full text, thiếu thông tin chi tiết)
 
 🚫 LƯU Ý QUAN TRỌNG:
 - KHÔNG bịa thông tin không có trong context
@@ -339,7 +358,9 @@ Anh/chị muốn xem sản phẩm nào cụ thể ạ? 💻'
 - KHÔNG hứa hẹn về giá cả, khuyến mãi nếu không có trong context
 - KHÔNG nói xấu đối thủ hoặc sản phẩm khác
 - LUÔN ưu tiên trải nghiệm khách hàng, giúp họ đưa ra quyết định đúng đắn
-- LUÔN thể hiện sự chuyên nghiệp và nhiệt tình";
+- LUÔN thể hiện sự chuyên nghiệp và nhiệt tình
+- KHÔNG lạm dụng icon/emoji - chỉ dùng khi thực sự cần thiết (1-2 icon tối đa)
+- KHI KHÁCH HỎI VỀ CHÍNH SÁCH: HIỂN THỊ FULL TEXT, KHÔNG tóm tắt";
     }
 
     /// <summary>
@@ -618,6 +639,7 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
 
     /// <summary>
     /// Build policy context từ search results
+    /// LƯU Ý: Giữ nguyên FULL TEXT chính sách, KHÔNG tóm tắt
     /// </summary>
     private string BuildPolicyContext(List<VectorSearchResult> results)
     {
@@ -627,14 +649,16 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
         }
 
         var context = new System.Text.StringBuilder();
-        context.AppendLine("Thông tin chính sách:\n");
+        context.AppendLine("=== THÔNG TIN CHÍNH SÁCH (FULL TEXT) ===\n");
+        context.AppendLine("LƯU Ý: Hiển thị TOÀN BỘ nội dung chính sách cho khách hàng, KHÔNG rút gọn.\n");
 
         foreach (var result in results)
         {
             if (!string.IsNullOrEmpty(result.Content))
             {
+                // Hiển thị full text, không truncate
                 context.AppendLine(result.Content);
-                context.AppendLine();
+                context.AppendLine("\n" + new string('-', 80) + "\n");
             }
         }
 
@@ -830,14 +854,15 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
             return "Xin lỗi, tôi không thể tạo phản hồi lúc này. Vui lòng thử lại sau.";
         }
 
-        // Trim và giới hạn độ dài
+        // Trim
         var sanitized = response.Trim();
         
-        // Giới hạn độ dài response (tránh response quá dài)
-        const int maxLength = 2000;
+        // Giới hạn độ dài response - chỉ cắt khi THỰC SỰ quá dài bất thường (> 15000 ký tự)
+        // Chính sách có thể dài 5000-8000 ký tự, nên không cắt ở mức 2000
+        const int maxLength = 15000;
         if (sanitized.Length > maxLength)
         {
-            sanitized = sanitized.Substring(0, maxLength) + "...";
+            sanitized = sanitized.Substring(0, maxLength) + "\n\n... (Nội dung quá dài, vui lòng liên hệ nhân viên để biết thêm chi tiết)";
             _logger.LogWarning("Response truncated from {OriginalLength} to {MaxLength} characters", 
                 response.Length, maxLength);
         }
@@ -853,12 +878,13 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
         var sb = new System.Text.StringBuilder();
         sb.AppendLine("Xin chào! Em là trợ lý tư vấn của cửa hàng.");
         
-        // Nếu có sản phẩm tìm được
+            // Nếu có sản phẩm tìm được
         if (productResults != null && productResults.Count > 0)
         {
             sb.AppendLine($"\nEm đã tìm thấy {productResults.Count} sản phẩm phù hợp với yêu cầu của anh/chị:");
             
-            foreach (var product in productResults.Take(3))
+            // HIỂN THỊ ĐẦY ĐỦ - không Take(3) nữa
+            foreach (var product in productResults)
             {
                 if (product.Metadata != null)
                 {
@@ -897,6 +923,57 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
         }
         
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Convert ProductDTO sang ProductSuggestion với URLs
+    /// </summary>
+    private List<ProductSuggestion> ConvertToProductSuggestions(List<ProductDTO> products)
+    {
+        // Lấy Backend URL cho ảnh
+        var httpContext = _httpContextAccessor.HttpContext;
+        var backendUrl = httpContext != null 
+            ? $"{httpContext.Request.Scheme}://{httpContext.Request.Host}"
+            : "http://localhost:5068";
+
+        return products.Select(p => 
+        {
+            // Build image URL (dùng Backend URL)
+            var imageUrl = $"{backendUrl}/imageProducts/default.jpg";
+            if (!string.IsNullOrEmpty(p.Avatar))
+            {
+                imageUrl = p.Avatar.StartsWith("http") 
+                    ? p.Avatar 
+                    : $"{backendUrl}{(p.Avatar.StartsWith("/") ? "" : "/")}{p.Avatar}";
+            }
+            else if (p.Images != null && p.Images.Count > 0)
+            {
+                var firstImage = p.Images[0];
+                if (!string.IsNullOrEmpty(firstImage.ImageId))
+                {
+                    imageUrl = $"{backendUrl}/imageProducts/{firstImage.ImageId}";
+                }
+            }
+
+            // Build detail URL - Phải trỏ về FRONTEND (parameter phải là 'id' theo HomeController)
+            var detailUrl = $"{FrontendUrl}/Home/ProductDetail?id={p.ProductId}";
+
+            // Lấy config đầu tiên
+            var firstConfig = p.Configurations?.FirstOrDefault();
+
+            return new ProductSuggestion
+            {
+                ProductId = p.ProductId ?? "",
+                Name = p.ProductName ?? "",
+                Price = p.SellingPrice ?? 0,
+                ImageUrl = imageUrl,
+                DetailUrl = detailUrl,
+                Brand = p.BrandId,
+                Cpu = firstConfig?.Cpu,
+                Ram = firstConfig?.Ram,
+                Storage = firstConfig?.Rom
+            };
+        }).ToList();
     }
 }
 

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace WebLaptopBE.DTOs;
 
 /// <summary>
@@ -105,7 +107,7 @@ public class IntentResult
 }
 
 /// <summary>
-/// Request cho RAG Chat API
+/// Request cho RAG Chat API - Mở rộng để hỗ trợ guided conversation
 /// </summary>
 public class RAGChatRequest
 {
@@ -118,6 +120,17 @@ public class RAGChatRequest
     /// ID khách hàng (optional)
     /// </summary>
     public string? CustomerId { get; set; }
+    
+    /// <summary>
+    /// Session ID để theo dõi conversation state
+    /// </summary>
+    public string? SessionId { get; set; }
+    
+    /// <summary>
+    /// Payload từ button click (nếu có)
+    /// Ví dụ: { "intent": "filter_brand", "value": "Dell", "step": "select_cpu" }
+    /// </summary>
+    public Dictionary<string, object>? Payload { get; set; }
 }
 
 

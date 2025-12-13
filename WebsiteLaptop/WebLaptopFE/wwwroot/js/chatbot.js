@@ -127,17 +127,9 @@ async function sendMessage() {
             if (data.answer) {
                 addMessage(data.answer, 'bot');
 
-                // Nếu có suggested products, có thể hiển thị thêm
+                // Hiển thị sản phẩm gợi ý với link click được
                 if (data.suggestedProducts && data.suggestedProducts.length > 0) {
-                    // Tùy chọn: hiển thị danh sách sản phẩm
-                    const productsText = data.suggestedProducts
-                        .slice(0, 3)
-                        .map(p => `• ${p.productName} - ${formatPrice(p.sellingPrice)}`)
-                        .join('\n');
-                    
-                    if (productsText) {
-                        addMessage(`\n**Sản phẩm đề xuất:**\n${productsText}`, 'bot');
-                    }
+                    renderProductSuggestions(data.suggestedProducts);
                 }
             } else {
                 addMessage('Xin lỗi, tôi không thể trả lời câu hỏi này. Vui lòng thử lại.', 'bot');
@@ -245,6 +237,58 @@ function formatPrice(price) {
         style: 'currency',
         currency: 'VND'
     }).format(price);
+}
+
+// Render product suggestions với link click được
+function renderProductSuggestions(products) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message bot';
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content product-suggestions';
+    
+    // Hiển thị tối đa 5 sản phẩm
+    const displayProducts = products.slice(0, 5);
+    
+    let html = '<div class="suggested-products-list">';
+    
+    displayProducts.forEach((product, index) => {
+        const productId = product.productId || product.ProductId;
+        const productName = product.name || product.Name || product.productName || product.ProductName;
+        const price = product.price || product.Price || product.sellingPrice || product.SellingPrice;
+        const imageUrl = product.imageUrl || product.ImageUrl;
+        const detailUrl = product.detailUrl || product.DetailUrl || `/Home/ProductDetail?id=${productId}`;
+        
+        html += `
+            <div class="product-item">
+                ${imageUrl ? `<img src="${imageUrl}" alt="${productName}" class="product-image" onerror="this.src='/imageProducts/default.jpg'">` : ''}
+                <div class="product-info">
+                    <div class="product-name">${productName}</div>
+                    <div class="product-price">${formatPrice(price)}</div>
+                    <a href="${detailUrl}" class="product-detail-btn" target="_blank">
+                        Xem chi tiết →
+                    </a>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    contentDiv.innerHTML = html;
+
+    const timeDiv = document.createElement('div');
+    timeDiv.className = 'message-time';
+    timeDiv.textContent = new Date().toLocaleTimeString('vi-VN', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    });
+
+    messageDiv.appendChild(contentDiv);
+    messageDiv.appendChild(timeDiv);
+    chatMessages.appendChild(messageDiv);
+
+    // Auto scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 // Show typing indicator
