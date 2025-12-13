@@ -1,6 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using WebLaptopBE.AI.Orchestrator;
+using WebLaptopBE.AI.Plugins;
+using WebLaptopBE.AI.SemanticKernel;
 using Microsoft.OpenApi.Models;
 using WebLaptopBE.Data;
+using WebLaptopBE.Services;
 using WebLaptopBE.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -63,16 +67,86 @@ builder.Services.AddSession(options =>
 });
 
 // Add CORS với hỗ trợ credentials cho Session
+// Add HttpContextAccessor - Cần thiết cho RAGChatService và GuidedChatService
+builder.Services.AddHttpContextAccessor();
+
+// Add Memory Cache for performance optimization (caching embeddings, responses)
+builder.Services.AddMemoryCache(options =>
+{
+    options.SizeLimit = 1024; // Limit cache size
+});
+
+// Add CORS - Improved configuration for development and production
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.WithOrigins("http://localhost:5253", "https://localhost:5253") // Frontend URLs
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials(); // Quan trọng: cho phép gửi cookies/session
+        // In development, allow all origins
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .WithExposedHeaders("Content-Type", "Content-Length");
+        }
+        else
+        {
+            // In production, specify allowed origins
+            policy.WithOrigins(
+                    "https://localhost:5001",
+                    "https://localhost:5000",
+                    "http://localhost:5001",
+                    "http://localhost:5000",
+                    "http://localhost:5253", "https://localhost:5253"
+                  )
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials()
+                  .WithExposedHeaders("Content-Type", "Content-Length");
+        }
     });
 });
+
+// ============================================
+// ĐĂNG KÝ SERVICES CHO AI CHATBOT
+// ============================================
+
+// 1. Product Service - Tìm kiếm sản phẩm từ SQL
+builder.Services.AddScoped<IProductService, ProductService>();
+
+// 2. Qdrant Service (cũ - cho policies)
+builder.Services.AddScoped<IQdrantService, QdrantService>();
+
+// 3. Qdrant Vector Service (mới - cho products + policies với RAG)
+builder.Services.AddScoped<IQdrantVectorService, QdrantVectorService>();
+
+// 4. Semantic Kernel Service - Quản lý LLM
+builder.Services.AddSingleton<ISemanticKernelService, SemanticKernelService>();
+
+// 5. RAG Chat Service - RAG pipeline hoàn chỉnh
+builder.Services.AddScoped<IRAGChatService, RAGChatService>();
+
+// 6. Indexing Service - Index dữ liệu từ SQL → Qdrant
+builder.Services.AddScoped<IIndexingService, IndexingService>();
+
+// 7. Chat Orchestrator Service - Điều phối chatbot (cũ - vẫn giữ để tương thích)
+builder.Services.AddScoped<IChatOrchestratorService, ChatOrchestratorService>();
+
+// 8. Plugins - Đăng ký các plugins cho Semantic Kernel
+builder.Services.AddScoped<ProductSearchPlugin>();
+builder.Services.AddScoped<PolicyRetrievalPlugin>();
+builder.Services.AddScoped<IntentDetectionPlugin>();
+
+// 9. Input Validation Service - Validate input từ người dùng
+builder.Services.AddScoped<WebLaptopBE.AI.Services.IInputValidationService, WebLaptopBE.AI.Services.InputValidationService>();
+
+// 10. Conversation State Service - Quản lý state của conversation (guided chat)
+builder.Services.AddSingleton<IConversationStateService, ConversationStateService>();
+
+// 11. Guided Chat Service - Chatbot với guided conversation (button options)
+builder.Services.AddScoped<IGuidedChatService, GuidedChatService>();
+
+builder.Services.AddScoped<IEnhancedProductService, EnhancedProductService>();
 
 var app = builder.Build();
 
