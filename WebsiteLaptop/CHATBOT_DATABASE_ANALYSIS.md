@@ -522,3 +522,5 @@ Với các cải tiến trên, chatbot sẽ:
 4. **Tích hợp đánh giá** (trung bình, tăng trust)
 5. **So sánh sản phẩm** (khó, nhưng rất giá trị)
 
+
+

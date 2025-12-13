@@ -565,3 +565,5 @@ public class ProductComparisonDTO
     public Dictionary<string, string> Differences { get; set; } = new();
 }
 
+
+
