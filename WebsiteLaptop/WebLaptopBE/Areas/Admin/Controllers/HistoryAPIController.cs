@@ -9,9 +9,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class HistoryAPIController : ControllerBase
     {
-        private readonly Testlaptop38Context _context;
+        private readonly WebLaptopTenTechContext _context;
 
-        public HistoryAPIController(Testlaptop38Context context)
+        public HistoryAPIController(WebLaptopTenTechContext context)
         {
             _context = context;
         }

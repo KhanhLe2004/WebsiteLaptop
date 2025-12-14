@@ -7,8 +7,20 @@
     <!-- Header -->
     <div class="row mb-4">
         <div class="col-12">
-            <h4 class="mb-0">Thống Kê & Báo Cáo</h4>
-            <p class="text-sm text-secondary mb-0">Tổng quan chi tiết về hoạt động kinh doanh của bạn</p>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-0">Thống Kê & Báo Cáo</h4>
+                    <p class="text-sm text-secondary mb-0">Tổng quan chi tiết về hoạt động kinh doanh của bạn</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-success btn-sm" onclick="exportOverviewToExcel()">
+                        <i class="material-icons text-sm">file_download</i> Xuất Excel Tổng Quan
+                    </button>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="exportOverviewToPdf()">
+                        <i class="material-icons text-sm">picture_as_pdf</i> Xuất PDF Tổng Quan
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -183,6 +195,12 @@
                                 <option value="2024">2024</option>
                                 <option value="2025" selected>2025</option>
                             </select>
+                            <button type="button" class="btn btn-success btn-sm" onclick="exportRevenueByMonthToExcel()" title="Xuất Excel">
+                                <i class="material-icons text-sm">file_download</i>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="exportRevenueByMonthToPdf()" title="Xuất PDF">
+                                <i class="material-icons text-sm">picture_as_pdf</i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -194,7 +212,17 @@
         <div class="col-lg-4 col-md-4 mb-4 mb-md-0">
             <div class="card border-0 shadow-lg">
                 <div class="card-header pb-0 pt-3">
-                    <h6 class="mb-0">Top 5 Sản Phẩm Bán Chạy</h6>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Top 5 Sản Phẩm Bán Chạy</h6>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-success btn-sm" onclick="exportTopProductsToExcel()" title="Xuất Excel">
+                                <i class="material-icons text-sm">file_download</i>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="exportTopProductsToPdf()" title="Xuất PDF">
+                                <i class="material-icons text-sm">picture_as_pdf</i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     <canvas id="topProductsChart" height="200"></canvas>
@@ -212,6 +240,12 @@
                                 <option value="2024">2024</option>
                                 <option value="2025" selected>2025</option>
                             </select>
+                            <button type="button" class="btn btn-success btn-sm" onclick="exportImportAmountByMonthToExcel()" title="Xuất Excel">
+                                <i class="material-icons text-sm">file_download</i>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="exportImportAmountByMonthToPdf()" title="Xuất PDF">
+                                <i class="material-icons text-sm">picture_as_pdf</i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -293,6 +327,12 @@
                                 <option value="2024">2024</option>
                                 <option value="2025" selected>2025</option>
                             </select>
+                            <button type="button" class="btn btn-success btn-sm" onclick="exportImportVsExportToExcel()" title="Xuất Excel">
+                                <i class="material-icons text-sm">file_download</i>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="exportImportVsExportToPdf()" title="Xuất PDF">
+                                <i class="material-icons text-sm">picture_as_pdf</i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -304,7 +344,17 @@
         <div class="col-md-6">
             <div class="card border-0 shadow-lg">
                 <div class="card-header pb-0 pt-3">
-                    <h6 class="mb-0">Doanh Số Theo Nhân Viên</h6>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Doanh Số Theo Nhân Viên</h6>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-success btn-sm" onclick="exportSalesByEmployeeToExcel()" title="Xuất Excel">
+                                <i class="material-icons text-sm">file_download</i>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="exportSalesByEmployeeToPdf()" title="Xuất PDF">
+                                <i class="material-icons text-sm">picture_as_pdf</i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     <canvas id="salesByEmployeeChart" height="200"></canvas>
@@ -318,7 +368,17 @@
         <div class="col-md-6 mb-4 mb-md-0">
             <div class="card border-0 shadow-lg">
                 <div class="card-header pb-0 pt-3">
-                    <h6 class="mb-0">Top 5 Khách Hàng</h6>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Top 5 Khách Hàng</h6>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-success btn-sm" onclick="exportTopCustomersToExcel()" title="Xuất Excel">
+                                <i class="material-icons text-sm">file_download</i>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="exportTopCustomersToPdf()" title="Xuất PDF">
+                                <i class="material-icons text-sm">picture_as_pdf</i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body px-0 pt-0">
                     <div class="table-responsive p-0">
@@ -348,7 +408,17 @@
         <div class="col-md-6">
             <div class="card border-0 shadow-lg">
                 <div class="card-header pb-0 pt-3">
-                    <h6 class="mb-0">Thống Kê Nhà Cung Cấp</h6>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Thống Kê Nhà Cung Cấp</h6>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-success btn-sm" onclick="exportSupplierStatisticsToExcel()" title="Xuất Excel">
+                                <i class="material-icons text-sm">file_download</i>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="exportSupplierStatisticsToPdf()" title="Xuất PDF">
+                                <i class="material-icons text-sm">picture_as_pdf</i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body px-0 pt-0">
                     <div class="table-responsive p-0">
@@ -1610,6 +1680,77 @@
             }
         }
 
+        // Export functions
+        function exportOverviewToExcel() {
+            window.open(`${API_BASE_URL}/overview/export-excel`, '_blank');
+        }
+
+        function exportOverviewToPdf() {
+            window.open(`${API_BASE_URL}/overview/export-pdf`, '_blank');
+        }
+
+        function exportRevenueByMonthToExcel() {
+            const year = document.getElementById('yearSelect').value;
+            window.open(`${API_BASE_URL}/revenue-by-month/export-excel?year=${year}`, '_blank');
+        }
+
+        function exportRevenueByMonthToPdf() {
+            const year = document.getElementById('yearSelect').value;
+            window.open(`${API_BASE_URL}/revenue-by-month/export-pdf?year=${year}`, '_blank');
+        }
+
+        function exportTopProductsToExcel() {
+            window.open(`${API_BASE_URL}/top-products/export-excel?top=5`, '_blank');
+        }
+
+        function exportTopProductsToPdf() {
+            window.open(`${API_BASE_URL}/top-products/export-pdf?top=5`, '_blank');
+        }
+
+        function exportTopCustomersToExcel() {
+            window.open(`${API_BASE_URL}/top-customers/export-excel?top=5`, '_blank');
+        }
+
+        function exportTopCustomersToPdf() {
+            window.open(`${API_BASE_URL}/top-customers/export-pdf?top=5`, '_blank');
+        }
+
+        function exportSalesByEmployeeToExcel() {
+            window.open(`${API_BASE_URL}/sales-by-employee/export-excel`, '_blank');
+        }
+
+        function exportSalesByEmployeeToPdf() {
+            window.open(`${API_BASE_URL}/sales-by-employee/export-pdf`, '_blank');
+        }
+
+        function exportImportAmountByMonthToExcel() {
+            const year = document.getElementById('importYearSelect').value;
+            window.open(`${API_BASE_URL}/import-amount-by-month/export-excel?year=${year}`, '_blank');
+        }
+
+        function exportImportAmountByMonthToPdf() {
+            const year = document.getElementById('importYearSelect').value;
+            window.open(`${API_BASE_URL}/import-amount-by-month/export-pdf?year=${year}`, '_blank');
+        }
+
+        function exportImportVsExportToExcel() {
+            const year = document.getElementById('compareYearSelect').value;
+            window.open(`${API_BASE_URL}/import-vs-export/export-excel?year=${year}`, '_blank');
+        }
+
+        function exportImportVsExportToPdf() {
+            const year = document.getElementById('compareYearSelect').value;
+            window.open(`${API_BASE_URL}/import-vs-export/export-pdf?year=${year}`, '_blank');
+        }
+
+        function exportSupplierStatisticsToExcel() {
+            window.open(`${API_BASE_URL}/supplier-statistics/export-excel`, '_blank');
+        }
+
+        function exportSupplierStatisticsToPdf() {
+            window.open(`${API_BASE_URL}/supplier-statistics/export-pdf`, '_blank');
+        }
+
         // Initialize all data on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadOverviewStatistics();
@@ -1643,15 +1784,41 @@
 
         .numbers h5 {
             font-size: 1.5rem;
+            word-break: break-word;
+            line-height: 1.2;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .card {
             border-radius: 1rem;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-body {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            min-height: 120px;
+            padding: 1.5rem !important;
         }
 
         .card-header {
             background-color: transparent;
             border-bottom: 1px solid rgba(0,0,0,.125);
+        }
+
+        /* Đảm bảo tất cả các card trong row có cùng chiều cao */
+        .row.mb-4 > div[class*="col-"] {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .row.mb-4 > div[class*="col-"] > .card {
+            height: 100%;
         }
 
         .table thead th {
@@ -1673,6 +1840,18 @@
         .spinner-border {
             width: 3rem;
             height: 3rem;
+        }
+
+        /* Đảm bảo text trong card không làm card bị giãn */
+        .numbers {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .numbers p {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
     </style>
 }

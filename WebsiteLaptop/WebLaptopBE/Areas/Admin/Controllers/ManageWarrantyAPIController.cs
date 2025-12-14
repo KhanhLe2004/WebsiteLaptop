@@ -18,10 +18,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageWarrantyAPIController : ControllerBase
     {
-        private readonly Testlaptop38Context _context;
+        private readonly WebLaptopTenTechContext _context;
         private readonly HistoryService _historyService;
 
-        public ManageWarrantyAPIController(Testlaptop38Context context, HistoryService historyService)
+        public ManageWarrantyAPIController(WebLaptopTenTechContext context, HistoryService historyService)
         {
             _context = context;
             _historyService = historyService;

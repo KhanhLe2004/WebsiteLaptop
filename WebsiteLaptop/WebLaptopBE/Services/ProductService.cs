@@ -12,13 +12,13 @@ namespace WebLaptopBE.Services;
 /// </summary>
 public class ProductService : IProductService
 {
-    private readonly Testlaptop38Context _context;
+    private readonly WebLaptopTenTechContext _context;
     private readonly ILogger<ProductService> _logger;
 
     /// <summary>
     /// Constructor - Nhận vào DbContext và Logger từ Dependency Injection
     /// </summary>
-    public ProductService(Testlaptop38Context context, ILogger<ProductService> logger)
+    public ProductService(WebLaptopTenTechContext context, ILogger<ProductService> logger)
     {
         _context = context;
         _logger = logger;

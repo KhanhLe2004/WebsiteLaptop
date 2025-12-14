@@ -15,10 +15,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageSupplierAPIController : ControllerBase
     {
-        private readonly Testlaptop38Context _context;
+        private readonly WebLaptopTenTechContext _context;
         private readonly HistoryService _historyService;
 
-        public ManageSupplierAPIController(Testlaptop38Context context, HistoryService historyService)
+        public ManageSupplierAPIController(WebLaptopTenTechContext context, HistoryService historyService)
         {
             _context = context;
             _historyService = historyService;

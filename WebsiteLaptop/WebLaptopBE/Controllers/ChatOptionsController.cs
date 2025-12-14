@@ -13,11 +13,11 @@ namespace WebLaptopBE.Controllers;
 [Route("api/chat/options")]
 public class ChatOptionsController : ControllerBase
 {
-    private readonly Testlaptop38Context _dbContext;
+    private readonly WebLaptopTenTechContext _dbContext;
     private readonly ILogger<ChatOptionsController> _logger;
 
     public ChatOptionsController(
-        Testlaptop38Context dbContext,
+        WebLaptopTenTechContext dbContext,
         ILogger<ChatOptionsController> logger)
     {
         _dbContext = dbContext;

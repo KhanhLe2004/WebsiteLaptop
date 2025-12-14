@@ -19,13 +19,13 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageSaleInvoiceAPIController : ControllerBase
     {
-        private readonly Testlaptop38Context _context;
+        private readonly WebLaptopTenTechContext _context;
         private readonly HistoryService _historyService;
 
         private readonly HttpClient _httpClient;
         private const string ADDRESS_API_BASE_URL = "https://production.cas.so/address-kit/2025-07-01";
 
-        public ManageSaleInvoiceAPIController(Testlaptop38Context context, HistoryService historyService, IHttpClientFactory httpClientFactory)
+        public ManageSaleInvoiceAPIController(WebLaptopTenTechContext context, HistoryService historyService, IHttpClientFactory httpClientFactory)
         {
             _context = context;
             _historyService = historyService;

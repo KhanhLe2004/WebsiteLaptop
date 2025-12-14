@@ -15,10 +15,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ForgetPasswordAPIController : ControllerBase
     {
-        private readonly Testlaptop38Context _context;
+        private readonly WebLaptopTenTechContext _context;
         private readonly IConfiguration _configuration;
 
-        public ForgetPasswordAPIController(Testlaptop38Context context, IConfiguration configuration)
+        public ForgetPasswordAPIController(WebLaptopTenTechContext context, IConfiguration configuration)
         {
             _context = context;
             _configuration = configuration;

@@ -38,11 +38,11 @@ public interface IEnhancedProductService
 
 public class EnhancedProductService : IEnhancedProductService
 {
-    private readonly Testlaptop38Context _dbContext;
+    private readonly WebLaptopTenTechContext _dbContext;
     private readonly ILogger<EnhancedProductService> _logger;
 
     public EnhancedProductService(
-        Testlaptop38Context dbContext,
+        WebLaptopTenTechContext dbContext,
         ILogger<EnhancedProductService> logger)
     {
         _dbContext = dbContext;

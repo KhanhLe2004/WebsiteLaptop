@@ -233,7 +233,7 @@ public class ChatController : ControllerBase
         // Check Database
         try
         {
-            var dbContext = HttpContext.RequestServices.GetRequiredService<Testlaptop38Context>();
+            var dbContext = HttpContext.RequestServices.GetRequiredService<WebLaptopTenTechContext>();
             var productCount = await dbContext.Products.CountAsync();
             components["database"] = new
             {

@@ -1247,16 +1247,16 @@
             function loadFeaturedProducts() {
                 $.ajax({
                     type: 'GET',
-                    url: url + "api/ListProductAPI/all",
+                    url: url + "api/ListProductAPI/featured?limit=6&minRating=4.0",
                     dataType: 'json',
                     success: function(data) {
                         if (data && data.length > 0) {
                             let featuredHtml = '';
-                            let featuredProducts = data.slice(0, 6);
-                            featuredProducts.forEach(function(product) {
+                            data.forEach(function(product) {
                                 let image = getBackendImageUrl(product.avatar);
                                 let price = product.sellingPrice ? formatCurrency(product.sellingPrice) : 'Liên hệ';
                                 let productDetailUrl = '/Home/ProductDetail?id=' + encodeURIComponent(product.productId || '');
+                                let rating = product.averageRating || 0;
                                 featuredHtml += `
                                     <div class="d-flex align-items-center justify-content-start mb-3">
                                         <div class="rounded me-3" style="width: 100px; height: 100px; overflow: hidden;">
@@ -1266,16 +1266,22 @@
                                         </div>
                                         <div>
                                             <h6 class="mb-2"><a href="${productDetailUrl}" class="text-dark text-decoration-none">${product.productName || 'Sản phẩm'}</a></h6>
-                                            <div class="d-flex mb-2">${formatRating(4)}</div>
+                                            <p class="text-muted mb-2" style="font-size: 0.9em;">${product.productModel || ''}</p>
+                                            <div class="d-flex mb-2">${formatRating(rating)}</div>
                                             <div class="d-flex mb-2"><h5 class="fw-bold me-2 mb-0">${price}</h5></div>
                                         </div>
                                     </div>
                                 `;
                             });
                             $('#featuredProducts').html(featuredHtml);
+                        } else {
+                            $('#featuredProducts').html('<p class="text-muted">Chưa có sản phẩm nổi bật.</p>');
                         }
                     },
-                    error: function(xhr, status, error) { console.error('Lỗi khi tải sản phẩm nổi bật:', error); }
+                    error: function(xhr, status, error) { 
+                        console.error('Lỗi khi tải sản phẩm nổi bật:', error);
+                        $('#featuredProducts').html('<p class="text-muted">Không thể tải sản phẩm nổi bật.</p>');
+                    }
                 });
             }
 

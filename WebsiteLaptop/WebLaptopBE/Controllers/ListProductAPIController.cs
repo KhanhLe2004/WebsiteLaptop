@@ -10,7 +10,7 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class ListProductAPIController : ControllerBase
     {
-        private readonly Testlaptop38Context _db = new();
+        private readonly WebLaptopTenTechContext _db = new();
         
         [HttpGet("all")]
         public IActionResult GetAllProducts()
@@ -255,6 +255,92 @@ namespace WebLaptopBE.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi khi tìm kiếm sản phẩm", error = ex.Message });
+            }
+        }
+
+        [HttpGet("featured")]
+        public IActionResult GetFeaturedProducts([FromQuery] int limit = 6, [FromQuery] double minRating = 4.0)
+        {
+            try
+            {
+                // Lấy tất cả reviews và nhóm theo ProductId
+                var reviewStats = _db.ProductReviews
+                    .AsNoTracking()
+                    .Where(pr => pr.ProductId != null && pr.Rate != null && pr.Rate > 0)
+                    .GroupBy(pr => pr.ProductId)
+                    .Select(g => new
+                    {
+                        ProductId = g.Key,
+                        ReviewCount = g.Count(),
+                        AverageRating = g.Average(pr => (double)(pr.Rate ?? 0))
+                    })
+                    .Where(rs => rs.ProductId != null && rs.ReviewCount > 0 && rs.AverageRating >= minRating)
+                    .ToList();
+
+                // Lấy danh sách ProductId có rating cao
+                var productIds = reviewStats
+                    .Where(rs => rs.ProductId != null)
+                    .OrderByDescending(rs => rs.AverageRating)
+                    .ThenByDescending(rs => rs.ReviewCount)
+                    .Take(limit)
+                    .Select(rs => rs.ProductId!)
+                    .ToList();
+
+                if (!productIds.Any())
+                {
+                    return Ok(new List<object>());
+                }
+
+                // Lấy thông tin sản phẩm
+                var products = _db.Products
+                    .AsNoTracking()
+                    .Include(p => p.Brand)
+                    .Where(p => p.Active == true && productIds.Contains(p.ProductId))
+                    .ToList();
+
+                // Tạo dictionary để tra cứu rating nhanh
+                var ratingDict = reviewStats
+                    .Where(rs => rs.ProductId != null)
+                    .ToDictionary(rs => rs.ProductId!, rs => new { rs.AverageRating, rs.ReviewCount });
+
+                // Sắp xếp theo thứ tự trong productIds và tạo kết quả
+                var result = productIds
+                    .Select(pid => products.FirstOrDefault(p => p.ProductId == pid))
+                    .Where(p => p != null)
+                    .Select(p =>
+                    {
+                        var stats = ratingDict.ContainsKey(p.ProductId) ? ratingDict[p.ProductId] : null;
+                        return new
+                        {
+                            p.ProductId,
+                            p.ProductName,
+                            p.ProductModel,
+                            p.WarrantyPeriod,
+                            p.OriginalSellingPrice,
+                            p.SellingPrice,
+                            p.Screen,
+                            p.Camera,
+                            p.Connect,
+                            p.Weight,
+                            p.Pin,
+                            p.BrandId,
+                            p.Avatar,
+                            Brand = p.Brand != null ? new
+                            {
+                                p.Brand.BrandId,
+                                p.Brand.BrandName
+                            } : null,
+                            AverageRating = stats != null ? Math.Round(stats.AverageRating, 1) : 0.0,
+                            TotalReviews = stats?.ReviewCount ?? 0
+                        };
+                    })
+                    .ToList();
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy sản phẩm nổi bật", error = ex.Message, stackTrace = ex.StackTrace });
             }
         }
     }

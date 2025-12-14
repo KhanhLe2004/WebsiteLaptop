@@ -9,9 +9,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class DashboardAPIController : ControllerBase
     {
-        private readonly Testlaptop38Context _context;
+        private readonly WebLaptopTenTechContext _context;
 
-        public DashboardAPIController(Testlaptop38Context context)
+        public DashboardAPIController(WebLaptopTenTechContext context)
         {
             _context = context;
         }
@@ -30,12 +30,15 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 var startDate = new DateTime(currentYear, currentMonth, 1);
                 var endDate = startDate.AddMonths(1);
 
-                // Doanh thu tháng này (chỉ đơn hoàn thành)
+                // Doanh thu tháng này: 
+                // - Nếu PaymentMethod = "Thanh toán khi nhận hàng" thì chỉ tính khi Status = "Hoàn thành"
+                // - Nếu PaymentMethod = "Chuyển khoản ngân hàng" thì tính luôn không cần xét trạng thái
                 var monthlyRevenue = await _context.SaleInvoices
                     .Where(si => si.TimeCreate >= startDate && 
                                  si.TimeCreate < endDate && 
-                                 si.Status == "Hoàn thành" && 
-                                 si.TotalAmount != null)
+                                 si.TotalAmount != null &&
+                                 ((si.PaymentMethod == "Thanh toán khi nhận hàng" && si.Status == "Hoàn thành") ||
+                                  (si.PaymentMethod == "Chuyển khoản ngân hàng")))
                     .SumAsync(si => si.TotalAmount ?? 0);
 
                 // Số đơn hàng tháng này
@@ -67,8 +70,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 var previousMonthRevenue = await _context.SaleInvoices
                     .Where(si => si.TimeCreate >= previousMonthStart && 
                                  si.TimeCreate < previousMonthEnd && 
-                                 si.Status == "Hoàn thành" && 
-                                 si.TotalAmount != null)
+                                 si.TotalAmount != null &&
+                                 ((si.PaymentMethod == "Thanh toán khi nhận hàng" && si.Status == "Hoàn thành") ||
+                                  (si.PaymentMethod == "Chuyển khoản ngân hàng")))
                     .SumAsync(si => si.TotalAmount ?? 0);
 
                 var previousMonthOrders = await _context.SaleInvoices
@@ -151,8 +155,9 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 var revenueByMonth = await _context.SaleInvoices
                     .Where(si => si.TimeCreate >= startDate && 
                                  si.TimeCreate < endDate && 
-                                 si.Status == "Hoàn thành" && 
-                                 si.TotalAmount != null)
+                                 si.TotalAmount != null &&
+                                 ((si.PaymentMethod == "Thanh toán khi nhận hàng" && si.Status == "Hoàn thành") ||
+                                  (si.PaymentMethod == "Chuyển khoản ngân hàng")))
                     .GroupBy(si => new { 
                         Year = si.TimeCreate.Value.Year, 
                         Month = si.TimeCreate.Value.Month
@@ -201,7 +206,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     .Include(d => d.Product)
                         .ThenInclude(p => p.Brand)
                     .Include(d => d.SaleInvoice)
-                    .Where(d => d.SaleInvoice != null && d.SaleInvoice.Status == "Hoàn thành")
+                    .Where(d => d.SaleInvoice != null && 
+                                d.SaleInvoice.TotalAmount != null &&
+                                ((d.SaleInvoice.PaymentMethod == "Thanh toán khi nhận hàng" && d.SaleInvoice.Status == "Hoàn thành") ||
+                                 (d.SaleInvoice.PaymentMethod == "Chuyển khoản ngân hàng")))
                     .GroupBy(d => new { d.ProductId, ProductName = d.Product != null ? d.Product.ProductName : "Chưa có tên" })
                     .Select(g => new
                     {

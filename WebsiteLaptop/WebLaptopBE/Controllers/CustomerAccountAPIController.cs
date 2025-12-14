@@ -14,10 +14,10 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class CustomerAccountAPIController : ControllerBase
     {
-        private readonly Testlaptop38Context _db;
+        private readonly WebLaptopTenTechContext _db;
         private readonly IWebHostEnvironment _environment;
 
-        public CustomerAccountAPIController(Testlaptop38Context db, IWebHostEnvironment environment)
+        public CustomerAccountAPIController(WebLaptopTenTechContext db, IWebHostEnvironment environment)
         {
             _db = db;
             _environment = environment;

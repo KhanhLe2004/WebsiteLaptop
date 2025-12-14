@@ -15,10 +15,10 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class FogetPassswordAPIController : ControllerBase
     {
-        private readonly Testlaptop38Context _db;
+        private readonly WebLaptopTenTechContext _db;
         private readonly IConfiguration _configuration;
 
-        public FogetPassswordAPIController(Testlaptop38Context db, IConfiguration configuration)
+        public FogetPassswordAPIController(WebLaptopTenTechContext db, IConfiguration configuration)
         {
             _db = db;
             _configuration = configuration;

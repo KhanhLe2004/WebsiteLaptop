@@ -10,7 +10,7 @@ namespace WebLaptopBE.Controllers
     [ApiController]
     public class RegisterAPIController : ControllerBase
     {
-        private readonly Testlaptop38Context _db = new();
+        private readonly WebLaptopTenTechContext _db = new();
 
         [HttpPost]
         public IActionResult Register([FromBody] RegisterRequest request)

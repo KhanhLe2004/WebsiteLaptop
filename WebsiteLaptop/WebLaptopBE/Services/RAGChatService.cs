@@ -1521,7 +1521,7 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
                     try
                     {
                         // Lấy DbContext từ service provider
-                        var dbContext = _serviceProvider.GetService<Data.Testlaptop38Context>();
+                        var dbContext = _serviceProvider.GetService<Data.WebLaptopTenTechContext>();
                         if (dbContext != null)
                         {
                             var brandEntity = await dbContext.Brands

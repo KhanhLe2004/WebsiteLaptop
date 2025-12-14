@@ -21,14 +21,14 @@ public interface IGuidedChatService
 public class GuidedChatService : IGuidedChatService
 {
     private readonly IConversationStateService _conversationStateService;
-    private readonly Testlaptop38Context _dbContext;
+    private readonly WebLaptopTenTechContext _dbContext;
     private readonly ILogger<GuidedChatService> _logger;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IConfiguration _configuration;
 
     public GuidedChatService(
         IConversationStateService conversationStateService,
-        Testlaptop38Context dbContext,
+        WebLaptopTenTechContext dbContext,
         ILogger<GuidedChatService> logger,
         IHttpContextAccessor httpContextAccessor,
         IConfiguration configuration)

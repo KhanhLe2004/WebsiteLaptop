@@ -15,10 +15,10 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     [ApiController]
     public class ManageBrandAPIController : ControllerBase
     {
-        private readonly Testlaptop38Context _context;
+        private readonly WebLaptopTenTechContext _context;
         private readonly HistoryService _historyService;
 
-        public ManageBrandAPIController(Testlaptop38Context context, HistoryService historyService)
+        public ManageBrandAPIController(WebLaptopTenTechContext context, HistoryService historyService)
         {
             _context = context;
             _historyService = historyService;

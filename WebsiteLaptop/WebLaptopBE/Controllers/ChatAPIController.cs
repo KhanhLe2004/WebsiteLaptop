@@ -10,9 +10,9 @@ namespace WebLaptopBE.Controllers;
 [ApiController]
 public class ChatAPIController : ControllerBase
 {
-    private readonly Testlaptop38Context _db;
+    private readonly WebLaptopTenTechContext _db;
 
-    public ChatAPIController(Testlaptop38Context db)
+    public ChatAPIController(WebLaptopTenTechContext db)
     {
         _db = db;
     }

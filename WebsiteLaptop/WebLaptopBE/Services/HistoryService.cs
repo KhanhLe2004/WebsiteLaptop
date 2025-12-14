@@ -6,9 +6,9 @@ namespace WebLaptopBE.Services
 {
     public class HistoryService
     {
-        private readonly Testlaptop38Context _context;
+        private readonly WebLaptopTenTechContext _context;
 
-        public HistoryService(Testlaptop38Context context)
+        public HistoryService(WebLaptopTenTechContext context)
         {
             _context = context;
         }
