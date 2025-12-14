@@ -1,0 +1,78 @@
+@startuml
+
+hide footbox
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 12
+skinparam maxMessageSize 500
+skinparam ParticipantPadding 100
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam ActorBackgroundColor transparent
+skinparam ParticipantBackgroundColor transparent
+skinparam SequenceGroupBackgroundColor transparent
+skinparam SequenceBoxBackgroundColor transparent
+skinparam NoteBackgroundColor transparent
+
+skinparam SequenceActivationBorderColor black
+skinparam ActorBorderColor black
+skinparam ParticipantBorderColor black
+skinparam ArrowColor black
+skinparam roundcorner 0
+
+actor "Khách hàng" as CUSTOMER
+participant "Frontend (User Web)" as FE
+participant "ChatAPIController" as API
+participant "ChatHub (SignalR)" as HUB
+database "Database" as DB
+
+' 1) Mở màn chat
+CUSTOMER -> FE : Chọn "Chat với cửa hàng"
+FE -> API : GET /api/Chat/GetConversations/Customer?customerId
+API -> DB : SELECT chats WHERE CustomerId
+API -> API : Get lastMessage, Calculate unreadCount (messages from employee with Status="sent")
+DB --> API : conversationData
+API --> FE : 200 OK + conversation
+FE --> CUSTOMER : Hiển thị conversation (unreadCount)
+
+' 2) Kết nối SignalR và lấy tin nhắn
+CUSTOMER -> FE : Kết nối SignalR
+FE -> HUB : JoinRoom(customerId, "customer")
+HUB -> HUB : AddToGroup("customer_{customerId}")
+HUB --> FE : UserJoined
+FE -> API : GET /api/Chat/GetMessages?customerId
+API -> DB : SELECT chats WHERE CustomerId (Include Customer, Employee)
+API -> API : Determine SenderType (from SenderType field or EmployeeId)
+DB --> API : messagesList
+API --> FE : 200 OK + messages
+FE --> CUSTOMER : Hiển thị tin nhắn
+
+' 3) Gửi tin nhắn
+CUSTOMER -> FE : Nhập tin nhắn\nNhấn "Gửi"
+FE -> HUB : SendMessage(customerId, employeeId=null, content, senderType="customer")
+HUB -> HUB : GenerateChatId() (format CH001, CH002...)
+HUB -> DB : INSERT Chats (ChatId, CustomerId, EmployeeId=null, SenderType="customer", ContentDetail, Time=Now, Status="sent")
+HUB -> DB : SaveChanges
+HUB -> HUB : Broadcast to "employee_all" group (notify all employees)
+HUB -> HUB : Send to "customer_{customerId}" group (sender)
+HUB --> FE : ReceiveMessage (real-time)
+FE --> CUSTOMER : Hiển thị tin nhắn đã gửi
+
+' 4) Nhận tin nhắn từ nhân viên (real-time)
+HUB -> FE : ReceiveMessage (from employee)
+FE --> CUSTOMER : Hiển thị tin nhắn mới từ nhân viên
+
+' 5) Đánh dấu đã đọc
+CUSTOMER -> FE : Mở cuộc trò chuyện
+FE -> API : POST /api/Chat/MarkAsRead (customerId, employeeId=null)
+API -> DB : SELECT chats WHERE CustomerId AND Status="sent"
+API -> API : Filter messages from employee (SenderType="employee" OR EmployeeId != null)
+API -> DB : UPDATE Chats SET Status="read" (for messages from employee)
+API -> DB : SaveChanges
+API --> FE : 200 OK + count
+FE --> CUSTOMER : Cập nhật unreadCount = 0
+
+FE --> CUSTOMER : Hiển thị cuộc trò chuyện
+
+@enduml
+

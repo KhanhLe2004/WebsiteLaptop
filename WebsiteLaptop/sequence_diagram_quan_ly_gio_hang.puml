@@ -1,0 +1,158 @@
+@startuml
+
+hide footbox
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 12
+skinparam maxMessageSize 500
+skinparam ParticipantPadding 100
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam ActorBackgroundColor transparent
+skinparam ParticipantBackgroundColor transparent
+skinparam SequenceGroupBackgroundColor transparent
+skinparam SequenceBoxBackgroundColor transparent
+skinparam NoteBackgroundColor transparent
+
+skinparam SequenceActivationBorderColor black
+skinparam ActorBorderColor black
+skinparam ParticipantBorderColor black
+skinparam ArrowColor black
+skinparam roundcorner 0
+
+actor "Khách hàng" as CUSTOMER
+participant "Frontend (User Web)" as FE
+participant "CartAPIController" as API
+database "Database" as DB
+
+
+
+
+  /'CUSTOMER -> FE : Chọn sản phẩm + cấu hình\nNhấn "Thêm vào giỏ hàng"'/
+  /'FE -> API : POST /api/Cart/add'/
+  /'API -> API : Validate (CustomerId, ProductId, Quantity > 0)'/
+
+  /'  API -> DB : SELECT cart WHERE CustomerId (Include CartDetails)'/
+  /'  alt Cart không tồn tại'/
+  /'    API -> API : GenerateCartId() (format CA001, CA002...)'/
+  /'    API -> DB : INSERT Carts (CartId, CustomerId, TotalAmount=0)'/
+  /'    API -> DB : SaveChanges'/
+  /'    API -> DB : Reload cart'/
+  /'  end'/
+  /'  opt Có ConfigurationId'/
+  /'    API -> DB : SELECT productConfiguration WHERE ConfigurationId'/
+  /'    API -> API : Build Specifications = "CPU / RAM / ROM / Card"'/
+  /'  end'/
+  /'  API -> DB : SELECT cartDetail WHERE ProductId AND Specifications'/
+  /'  alt CartDetail đã tồn tại'/
+  /'    opt Có configuration'/
+  /'      API -> API : CalculateAvailableQuantity (stock - ordered)'/
+  /'      API -> API : Check (currentQuantity + newQuantity) <= availableQuantity'/
+  /'      alt Vượt quá số lượng có sẵn'/
+  /'        API --> FE : 400 Bad Request ("Số lượng có sẵn: X")'/
+  /'        FE --> CUSTOMER : "Không đủ số lượng"'/
+  /'      else Hợp lệ'/
+  /'        API -> DB : UPDATE CartDetails SET Quantity += newQuantity'/
+  /'      end'/
+  /'    else Không có configuration'/
+  /'      API -> DB : UPDATE CartDetails SET Quantity += newQuantity'/
+  /'    end'/
+  /'  else CartDetail chưa tồn tại'/
+  /'    opt Có configuration'/
+  /'      API -> API : CalculateAvailableQuantity (stock - ordered)'/
+  /'      API -> API : Check newQuantity <= availableQuantity'/
+  /'      alt Vượt quá số lượng có sẵn'/
+  /'        API --> FE : 400 Bad Request ("Số lượng có sẵn: X")'/
+  /'        FE --> CUSTOMER : "Không đủ số lượng"'/
+  /'      else Hợp lệ'/
+  /'        API -> API : GenerateCartDetailId() (format CAD001, CAD002...)'/
+  /'        API -> DB : INSERT CartDetails (CartDetailId, CartId, ProductId, Quantity, Specifications)'/
+  /'      end'/
+  /'    else Không có configuration'/
+  /'      API -> API : GenerateCartDetailId()'/
+  /'      API -> DB : INSERT CartDetails'/
+  /'    end'/
+  /'  end'/
+  /'  API -> DB : SaveChanges'/
+  /'  API --> FE : 200 OK ("Đã thêm sản phẩm vào giỏ hàng")'/
+  /'  FE --> CUSTOMER : "Thêm thành công"\nReload cart'/
+
+
+...
+...
+  /'CUSTOMER -> FE : Thay đổi số lượng\nNhấn "Cập nhật"'/
+  /'FE -> API : PUT /api/Cart/update'/
+  /'API -> API : Validate (CartDetailId, Quantity > 0)'/
+  /'API -> DB : SELECT cartDetail WHERE CartDetailId (Include Product)'/
+  /'alt CartDetail không tồn tại'/
+  /'  API --> FE : 404 Not Found ("Không tìm thấy sản phẩm trong giỏ hàng")'/
+  /'  FE --> CUSTOMER : "Không tìm thấy sản phẩm"'/
+  /'else CartDetail tồn tại'/
+  /'  opt Có ConfigurationId hoặc Specifications'/
+  /'    API -> DB : SELECT productConfiguration (from Specifications)'/
+  /'    opt Có configuration'/
+  /'      API -> API : CalculateAvailableQuantity (stock - ordered)'/
+  /'      API -> API : Check newQuantity <= availableQuantity'/
+  /'      alt Vượt quá số lượng có sẵn'/
+  /'        API --> FE : 400 Bad Request ("Số lượng có sẵn: X")'/
+  /'        FE --> CUSTOMER : "Không đủ số lượng"'/
+  /'      else Hợp lệ'/
+  /'        API -> DB : UPDATE CartDetails SET Quantity, Specifications'/
+  /'      end'/
+  /'    else Không có configuration'/
+  /'      API -> DB : UPDATE CartDetails SET Quantity'/
+  /'    end'/
+  /'  else Không có configuration'/
+  /'    API -> DB : UPDATE CartDetails SET Quantity'/
+  /'  end'/
+  /'  API -> DB : SaveChanges'/
+    /'API --> FE : 200 OK ("Đã cập nhật giỏ hàng")'/
+    /'FE --> CUSTOMER : "Cập nhật thành công"\nReload cart'/
+  /'end'/
+
+
+  CUSTOMER -> FE : Chọn "Xóa"
+  FE -> API : DELETE /api/Cart/remove/{cartDetailId}
+
+    API -> API : Save CartId
+    API -> DB : DELETE CartDetails
+    API -> DB : SaveChanges
+    API -> DB : SELECT cartDetails WHERE CartId
+    alt Không còn CartDetail nào
+      API -> DB : DELETE Carts
+      API -> DB : SaveChanges
+    end
+    API --> FE : 200 OK ("Đã xóa sản phẩm khỏi giỏ hàng")
+    FE --> CUSTOMER : "Xóa thành công"\nReload cart
+
+/'else Kiểm tra số lượng tồn kho'/
+/'  CUSTOMER -> FE : Chọn sản phẩm để thanh toán\nNhấn "Thanh toán"'/
+/'  FE -> API : POST /api/Cart/check-stock'/
+/'  API -> API : Validate (CustomerId, CartDetailIds not empty)'/
+/'  API -> DB : SELECT cart WHERE CustomerId (Include CartDetails.Product)'/
+/'  loop For each selected CartDetail'/
+/'    API -> API : Find ProductConfiguration (from Specifications)'/
+/'    opt Có configuration'/
+/'      API -> DB : SELECT saleInvoices WHERE Status IN ("Chờ xử lý", "Đang xử lý")'/
+/'      API -> DB : SELECT saleInvoiceDetails WHERE ProductId AND Specifications match'/
+/'      API -> API : Calculate orderedQuantity'/
+/'      API -> API : Calculate availableQuantity = stockQuantity - orderedQuantity'/
+/'      API -> API : Check cartQuantity <= availableQuantity'/
+/'      alt Vượt quá số lượng có sẵn'/
+/'        API -> API : Add to outOfStockItems'/
+/'      end'/
+/'    end'/
+/'  end'/
+/'  alt Có sản phẩm không đủ số lượng'/
+/'    API --> FE : 400 Bad Request + outOfStockItems'/
+/'    FE --> CUSTOMER : "Sản phẩm không đủ số lượng"'/
+/'  else Tất cả đều đủ số lượng'/
+/'    API --> FE : 200 OK ("Tất cả sản phẩm đều đủ số lượng")'/
+/'    FE --> CUSTOMER : Redirect to Checkout'/
+/'  end'/
+
+
+/'FE --> CUSTOMER : Hiển thị giỏ hàng'/
+
+@enduml
+

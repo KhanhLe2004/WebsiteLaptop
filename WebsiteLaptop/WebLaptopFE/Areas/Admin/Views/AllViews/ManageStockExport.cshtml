@@ -1,0 +1,2451 @@
+﻿@{
+    ViewData["Title"] = "Quản lý xuất hàng";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card my-4">
+                <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                    <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="text-white text-capitalize ps-3 mb-0">Quản lý xuất hàng</h6>
+                            <div class="d-flex align-items-center gap-2 me-3">
+                                <button class="btn btn-warning btn-sm text-white" id="totalStockQuantityDisplay" style="cursor: default;" disabled>
+                                    <i class="material-icons text-sm">inventory</i> Tồn kho: <strong id="totalStockQuantity">-</strong>
+                                </button>
+                                <button class="btn btn-warning btn-sm" onclick="showLowStockModal()" title="Sản phẩm tồn kho thấp">
+                                    <i class="material-icons text-sm">warning</i> Tồn kho thấp
+                                </button>
+                                <button class="btn btn-light btn-sm" onclick="showCreateModal()">
+                                <i class="material-icons text-sm">add</i> Thêm mới
+                            </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body px-3 pb-2">
+                    <!-- Bộ lọc và tìm kiếm -->
+                    <div class="row mb-3 g-2 align-items-end">
+                        <div class="col-lg-3 col-md-6">
+                            <div class="input-group input-group-outline">
+                                <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm phiếu xuất hàng...">
+                            </div>
+                        </div>
+                        <div class="col-lg-2 col-md-3">
+                            <select id="statusFilter" class="form-select">
+                                <option value="">Tất cả trạng thái</option>
+                                <option value="Chờ xử lý">Chờ xử lý</option>
+                                <option value="Hoàn thành">Hoàn thành</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-2 col-md-3">
+                            <div class="input-group input-group-outline">
+                                <label class="form-label">Từ ngày</label>
+                                <input type="date" id="dateFromInput" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-lg-2 col-md-3">
+                            <div class="input-group input-group-outline">
+                                <label class="form-label">Đến ngày</label>
+                                <input type="date" id="dateToInput" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-lg-1 col-md-3 d-flex align-items-end">
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearDateFilters()" title="Xóa bộ lọc ngày" style="height: 40px; min-width: 40px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                                <i class="material-icons" style="font-size: 18px;">clear</i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Bảng phiếu xuất hàng -->
+                    <div class="table-responsive p-0">
+                        <table class="table align-items-center mb-0" style="table-layout: fixed; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 12%;">Mã phiếu xuất</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 18%;">Mã hóa đơn bán</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Nhân viên</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 12%;">Tổng số lượng</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Trạng thái</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 13%;">Ngày xuất</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stockExportTableBody">
+                                <!-- Dữ liệu sẽ được load bằng AJAX -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Phân trang -->
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <p class="text-sm mb-0" id="pageInfo">Đang tải...</p>
+                        </div>
+                        <div class="col-md-6">
+                            <nav aria-label="Page navigation">
+                                <ul class="pagination justify-content-end mb-0" id="pagination">
+                                    <!-- Phân trang sẽ được tạo bằng JavaScript -->
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xem chi tiết -->
+<div class="modal fade" id="viewModal" tabindex="-1" aria-labelledby="viewModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-info">
+                <h5 class="modal-title text-white" id="viewModalLabel">Chi tiết phiếu xuất hàng</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="viewModalBody">
+                <!-- Nội dung sẽ được load bằng JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Chọn loại file xuất -->
+<div class="modal fade" id="exportOptionsModal" tabindex="-1" aria-labelledby="exportOptionsModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-primary">
+                <h5 class="modal-title text-white" id="exportOptionsModalLabel">Chọn loại file xuất</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <input type="hidden" id="currentStockExportIdForExport" value="">
+                <button type="button" class="btn btn-success w-100 mb-3" onclick="exportToExcelFromModal()">
+                    <i class="material-icons text-sm me-2">file_download</i> Xuất Excel
+                </button>
+                <button type="button" class="btn btn-danger w-100" onclick="exportToPdfFromModal()">
+                    <i class="material-icons text-sm me-2">picture_as_pdf</i> Xuất PDF
+                </button>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Cập nhật trạng thái -->
+<div class="modal fade" id="updateStatusModal" tabindex="-1" aria-labelledby="updateStatusModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-warning">
+                <h5 class="modal-title text-white" id="updateStatusModalLabel">Cập nhật trạng thái</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="updateStatusForm">
+                    <input type="hidden" id="updateStatusStockExportId" value="">
+                    <div class="input-group input-group-outline mb-3">
+                        <label class="form-label">Trạng thái *</label>
+                        <select class="form-control" id="updateStatusSelect" required>
+                            <option value="Chờ xử lý">Chờ xử lý</option>
+                            <option value="Hoàn thành">Hoàn thành</option>
+                        </select>
+                    </div>
+                    <div class="text-danger mb-3" id="updateStatusErrorMessage" style="display:none;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-warning" onclick="saveStatusUpdate()">
+                    <i class="material-icons text-sm">save</i> Cập nhật
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Danh sách sản phẩm tồn kho thấp -->
+<div class="modal fade" id="lowStockModal" tabindex="-1" aria-labelledby="lowStockModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-warning">
+                <h5 class="modal-title text-white" id="lowStockModalLabel">
+                    <i class="material-icons text-sm me-2">warning</i> Sản phẩm tồn kho thấp (≤ 3)
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th style="width: 12%;">Mã sản phẩm</th>
+                                <th style="width: 25%;">Tên sản phẩm</th>
+                                <th style="width: 18%;">Model</th>
+                                <th style="width: 35%;">Thông số kỹ thuật</th>
+                                <th style="width: 10%; text-align: center;">Số lượng</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lowStockTableBody">
+                            <tr>
+                                <td colspan="5" class="text-center text-secondary py-4">
+                                    <div class="spinner-border spinner-border-sm me-2" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    Đang tải dữ liệu...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Thêm/Sửa -->
+<div class="modal fade" id="createEditModal" tabindex="-1" aria-labelledby="createEditModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-primary">
+                <h5 class="modal-title text-white" id="createEditModalLabel">Thêm phiếu xuất hàng</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="StockExportForm">
+                    <input type="hidden" id="StockExportId" value="">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Mã phiếu xuất</label>
+                                <input type="text" class="form-control" id="StockExportIdInput" readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Ngày xuất *</label>
+                                <input type="datetime-local" class="form-control" id="timeInput" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Mã hóa đơn bán</label>
+                                <div class="autocomplete-wrapper position-relative" style="width: 100%;">
+                                    <input type="text" id="SaleInvoiceIdInput" class="form-control" autocomplete="off">
+                                    <input type="hidden" id="SaleInvoiceIdValue" value="">
+                                    <div id="SaleInvoiceIdDropdown" class="autocomplete-dropdown"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Nhân viên</label>
+                                <input type="text" class="form-control" id="employeeIdInput" readonly>
+                                <input type="hidden" id="employeeIdValue" value="@ViewBag.EmployeeId">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Trạng thái</label>
+                                <select class="form-control" id="statusInput">
+                                    <option value="Chờ xử lý">Chờ xử lý</option>
+                                    <option value="Hoàn thành">Hoàn thành</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6>Chi tiết sản phẩm</h6>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="addDetailRow()">
+                            <i class="material-icons text-sm">add</i> Thêm sản phẩm
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Sản phẩm</th>
+                                    <th>Thông số</th>
+                                    <th>Số lượng</th>
+                                    <th>Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detailTableBody">
+                                <!-- Chi tiết sẽ được thêm bằng JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-danger mb-3" id="formErrorMessage" style="display:none;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" onclick="saveStockExport()">
+                    <i class="material-icons text-sm">save</i> Lưu
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+    <!-- Select2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <!-- Select2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script>
+        const API_URL = 'http://localhost:5068/api/admin/stock-exports';
+        let currentPage = 1;
+        let pageSize = 10;
+        let searchDebounceTimer = null;
+        const SEARCH_DEBOUNCE_DELAY = 300;
+         let detailRowIndex = 0;
+         let SaleInvoicesList = [];
+         let productsList = [];
+         
+         // Lấy thông tin nhân viên đang đăng nhập (sử dụng Json.Encode để tránh lỗi encoding và escape JavaScript)
+         const currentEmployeeId = @Html.Raw(Json.Serialize(ViewBag.EmployeeId ?? ""));
+         const currentEmployeeName = @Html.Raw(Json.Serialize(ViewBag.EmployeeName ?? ""));
+
+         $(document).ready(function() {
+             loadStockExports();
+             loadSaleInvoices();
+             loadProducts();
+             loadTotalStockQuantity();
+
+            // Tìm kiếm tự động
+            $('#searchInput').on('input', function() {
+                triggerAutoSearch();
+            });
+
+            // Lọc theo trạng thái
+            $('#statusFilter').on('change', function() {
+                currentPage = 1;
+                loadStockExports();
+            });
+
+            // Lọc theo ngày
+            $('#dateFromInput, #dateToInput').on('change', function() {
+                triggerAutoSearch();
+            });
+
+            // Xử lý label cho Material Dashboard inputs
+            window.updateInputLabels = function() {
+                $('.input-group-outline input, .input-group-outline select').each(function() {
+                    const $input = $(this);
+                    const value = $input.val();
+                    if (value && value.trim() !== '') {
+                        $input.closest('.input-group-outline').addClass('is-filled');
+                    } else {
+                        $input.closest('.input-group-outline').removeClass('is-filled');
+                    }
+                });
+            };
+
+            $(document).on('input change', '.input-group-outline input, .input-group-outline select', function() {
+                const $input = $(this);
+                const value = $input.val();
+                if (value && value.trim() !== '') {
+                    $input.closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    $input.closest('.input-group-outline').removeClass('is-filled');
+                }
+            });
+
+            $(document).on('focus', '.input-group-outline input, .input-group-outline select', function() {
+                $(this).closest('.input-group-outline').addClass('is-focused');
+            });
+
+            $(document).on('blur', '.input-group-outline input, .input-group-outline select', function() {
+                const $input = $(this);
+                const $group = $input.closest('.input-group-outline');
+                $group.removeClass('is-focused');
+                const value = $input.val();
+                if (value && value.trim() !== '') {
+                    $group.addClass('is-filled');
+                } else {
+                    $group.removeClass('is-filled');
+                }
+            });
+
+            // Event delegation cho các nút thao tác
+            $(document).on('click', '.action-btn[data-action="view"]', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const stockExportId = $(this).attr('data-id');
+                console.log('View button clicked, ID:', stockExportId);
+                if (stockExportId && typeof viewStockExport === 'function') {
+                    viewStockExport(stockExportId);
+                } else {
+                    console.error('viewStockExport function not found or ID is empty');
+                }
+            });
+
+            $(document).on('click', '.action-btn[data-action="updateStatus"]', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const $btn = $(this);
+                const stockExportId = $btn.attr('data-id');
+                const currentStatus = $btn.attr('data-status') || 'Chờ xử lý';
+                
+                if (!stockExportId) {
+                    showNotification('Không tìm thấy mã phiếu xuất hàng', 'error');
+                    return;
+                }
+                
+                updateStockExportStatus(stockExportId, currentStatus);
+            });
+
+        });
+
+        function triggerAutoSearch() {
+            currentPage = 1;
+            if (searchDebounceTimer) {
+                clearTimeout(searchDebounceTimer);
+            }
+            searchDebounceTimer = setTimeout(() => {
+                loadStockExports();
+            }, SEARCH_DEBOUNCE_DELAY);
+        }
+
+        // Hàm xóa bộ lọc ngày
+        function clearDateFilters() {
+            $('#dateFromInput').val('').removeAttr('value').removeAttr('data-has-input');
+            $('#dateToInput').val('').removeAttr('value').removeAttr('data-has-input');
+            updateInputLabels();
+            triggerAutoSearch();
+        }
+
+        // Xử lý input date để hiển thị dd/mm/yyyy khi có giá trị
+        $(document).on('input change', 'input[type="date"]', function() {
+            const $input = $(this);
+            const value = $input.val();
+            if (value && value.trim() !== '') {
+                $input.attr('value', value).attr('data-has-input', 'true');
+            } else {
+                $input.removeAttr('value').removeAttr('data-has-input');
+            }
+        });
+
+        // Xử lý khi focus vào input date
+        $(document).on('focus', 'input[type="date"]', function() {
+            const $input = $(this);
+            const value = $input.val();
+            if (value && value.trim() !== '') {
+                $input.attr('data-has-input', 'true');
+            }
+        });
+
+        // Xử lý khi blur khỏi input date
+        $(document).on('blur', 'input[type="date"]', function() {
+            const $input = $(this);
+            const value = $input.val();
+            if (!value || value.trim() === '') {
+                $input.removeAttr('data-has-input');
+            } else {
+                $input.attr('value', value).attr('data-has-input', 'true');
+            }
+        });
+
+        // Load danh sách phiếu xuất hàng
+        function loadStockExports(page = currentPage) {
+            currentPage = page;
+            const searchTerm = $('#searchInput').val().trim();
+            const statusFilter = $('#statusFilter').val();
+            const dateFrom = $('#dateFromInput').val();
+            const dateTo = $('#dateToInput').val();
+
+            const dataParams = {
+                pageNumber: currentPage,
+                pageSize: pageSize,
+                searchTerm: searchTerm
+            };
+
+            if (statusFilter !== '') {
+                dataParams.status = statusFilter;
+            }
+
+            if (dateFrom) {
+                dataParams.dateFrom = dateFrom;
+            }
+
+            if (dateTo) {
+                dataParams.dateTo = dateTo;
+            }
+
+            $.ajax({
+                url: API_URL,
+                type: 'GET',
+                data: dataParams,
+                success: function(response) {
+                    displayStockExports(response.items);
+                    displayPagination(response);
+                    updatePageInfo(response);
+                },
+                error: function(xhr) {
+                    console.error('Lỗi khi tải phiếu xuất hàng:', xhr);
+                    showNotification('Lỗi khi tải dữ liệu phiếu xuất hàng', 'error');
+                }
+            });
+        }
+
+        // Hiển thị phiếu xuất hàng
+        function displayStockExports(stockExports) {
+            const tbody = $('#stockExportTableBody');
+            tbody.empty();
+
+            if (stockExports.length === 0) {
+                tbody.append(`
+                    <tr>
+                        <td colspan="7" class="text-center text-secondary py-4">
+                            Không có phiếu xuất hàng nào
+                        </td>
+                    </tr>
+                `);
+                return;
+            }
+
+            $.each(stockExports, function(index, stockExport) {
+                const time = stockExport.time ? new Date(stockExport.time).toLocaleString('vi-VN') : '-';
+                const totalQuantity = stockExport.totalQuantity || 0;
+                const status = stockExport.status || 'Chờ xử lý';
+                const statusClass = status === 'Hoàn thành' ? 'badge bg-gradient-success' : 'badge bg-gradient-warning';
+                const statusText = status === 'Hoàn thành' ? 'Hoàn thành' : 'Chờ xử lý';
+
+                tbody.append(`
+                    <tr>
+                        <td style="vertical-align: middle;">
+                            <span class="text-xs font-weight-bold">${stockExport.stockExportId}</span>
+                        </td>
+                         <td style="vertical-align: middle;">
+                             <span class="text-xs font-weight-bold">${stockExport.saleInvoiceId || '-'}</span>
+                         </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold">${stockExport.employeeName || '-'}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold">${totalQuantity}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="${statusClass}">${statusText}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold">${time}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;" class="table-actions">
+                            <button type="button" class="btn btn-info action-btn" data-action="view" data-id="${String(stockExport.stockExportId || '').replace(/"/g, '&quot;')}" title="Xem">
+                                <i class="material-icons text-sm">visibility</i>
+                            </button>
+                            ${status !== 'Hoàn thành' ? `
+                            <button type="button" class="btn btn-warning action-btn" data-action="updateStatus" data-id="${String(stockExport.stockExportId || '').replace(/"/g, '&quot;')}" data-status="${String(stockExport.status || '').replace(/"/g, '&quot;')}" title="Cập nhật trạng thái">
+                                <i class="material-icons text-sm">edit</i>
+                            </button>
+                            ` : ''}
+                            <button type="button" class="btn btn-primary action-btn" onclick='showExportModal("${stockExport.stockExportId}")' title="In phiếu xuất hàng">
+                                <i class="material-icons text-sm">print</i>
+                            </button>
+                        </td>
+                    </tr>
+                `);
+            });
+        }
+
+        // Hiển thị phân trang
+        function displayPagination(response) {
+            const pagination = $('#pagination');
+            pagination.empty();
+
+            if (response.totalPages <= 1) return;
+
+            pagination.append(`
+                <li class="page-item ${response.hasPreviousPage ? '' : 'disabled'}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadStockExports(${currentPage - 1})">
+                        <i class="material-icons text-sm">chevron_left</i>
+                    </a>
+                </li>
+            `);
+
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(response.totalPages, currentPage + 2);
+
+            if (startPage > 1) {
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadStockExports(1)">1</a></li>`);
+                if (startPage > 2) {
+                    pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                pagination.append(`
+                    <li class="page-item ${i === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="javascript:void(0)" onclick="loadStockExports(${i})">${i}</a>
+                    </li>
+                `);
+            }
+
+            if (endPage < response.totalPages) {
+                if (endPage < response.totalPages - 1) {
+                    pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadStockExports(${response.totalPages})">${response.totalPages}</a></li>`);
+            }
+
+            pagination.append(`
+                <li class="page-item ${response.hasNextPage ? '' : 'disabled'}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadStockExports(${currentPage + 1})">
+                        <i class="material-icons text-sm">chevron_right</i>
+                    </a>
+                </li>
+            `);
+        }
+
+        // Cập nhật thông tin trang
+        function updatePageInfo(response) {
+            const start = (response.pageNumber - 1) * response.pageSize + 1;
+            const end = Math.min(response.pageNumber * response.pageSize, response.totalItems);
+            $('#pageInfo').text(`Hiển thị ${start} - ${end} trong tổng số ${response.totalItems} phiếu xuất hàng`);
+        }
+
+        // Xem chi tiết phiếu xuất hàng
+        function viewStockExport(stockExportId) {
+            $.ajax({
+                url: `${API_URL}/${stockExportId}`,
+                type: 'GET',
+                success: function(stockExport) {
+                    let html = `
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Mã phiếu xuất:</strong> ${stockExport.stockExportId}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Ngày xuất:</strong> ${stockExport.time ? new Date(stockExport.time).toLocaleString('vi-VN') : '-'}
+                            </div>
+                        </div>
+                         <div class="row mb-3">
+                             <div class="col-md-6">
+                                 <strong>Mã hóa đơn bán:</strong> ${stockExport.saleInvoiceId || '-'}
+                             </div>
+                            <div class="col-md-6">
+                                <strong>Nhân viên:</strong> ${stockExport.employeeName || '-'}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Tổng số lượng:</strong> ${stockExport.totalQuantity || 0}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Trạng thái:</strong> 
+                                <span class="${stockExport.status === 'Hoàn thành' ? 'badge bg-gradient-success' : 'badge bg-gradient-warning'}">
+                                    ${stockExport.status || 'Chờ xử lý'}
+                                </span>
+                            </div>
+                        </div>
+                        <hr>
+                        <h6>Chi tiết phiếu xuất hàng:</h6>
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Sản phẩm</th>
+                                        <th>Thông số</th>
+                                        <th style="text-align: center;">Số lượng</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+
+                    if (stockExport.details && stockExport.details.length > 0) {
+                        stockExport.details.forEach(function(detail) {
+                            // Hiển thị productName - productModel hoặc chỉ productName nếu không có model
+                            let productDisplay = detail.productName || detail.productId || '-';
+                            if (detail.productModel) {
+                                productDisplay = `${detail.productName || detail.productId} - ${detail.productModel}`;
+                            }
+                            html += `
+                                <tr>
+                                    <td style="word-wrap: break-word; overflow-wrap: break-word;">${productDisplay}</td>
+                                    <td class="spec-cell">${detail.specifications || '-'}</td>
+                                    <td style="text-align: center;">${detail.quantity || 0}</td>
+                                </tr>
+                            `;
+                        });
+                    } else {
+                        html += '<tr><td colspan="3" class="text-center">Không có chi tiết</td></tr>';
+                    }
+
+                    html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+
+                    $('#viewModalBody').html(html);
+                    const modal = new bootstrap.Modal(document.getElementById('viewModal'));
+                    modal.show();
+                },
+                error: function(xhr) {
+                    console.error('Error loading stock export:', xhr);
+                    showNotification('Lỗi khi tải thông tin phiếu xuất hàng', 'error');
+                }
+            });
+        }
+
+        // Tạo ID tự động
+        function generateNextStockExportId() {
+            // Lấy tất cả ID để tìm số lớn nhất
+            $.ajax({
+                url: API_URL,
+                type: 'GET',
+                data: { pageNumber: 1, pageSize: 1000 }, // Lấy nhiều để tìm max
+                success: function(response) {
+                    let nextId = 'SE001';
+                    if (response.items && response.items.length > 0) {
+                        let maxNumber = 0;
+                        response.items.forEach(function(item) {
+                            const id = item.stockExportId;
+                            if (id && id.startsWith('SE') && id.length === 5) {
+                                const number = parseInt(id.substring(2)) || 0;
+                                maxNumber = Math.max(maxNumber, number);
+                            }
+                        });
+                        nextId = 'SE' + String(maxNumber + 1).padStart(3, '0');
+                    }
+                    $('#StockExportIdInput').val(nextId);
+                    updateInputLabels();
+                },
+                error: function() {
+                    // Nếu lỗi, tạo ID mặc định
+                    $('#StockExportIdInput').val('SE001');
+                    updateInputLabels();
+                }
+            });
+        }
+
+        // Hiển thị modal thêm mới
+        function showCreateModal() {
+            $('#createEditModalLabel').text('Thêm phiếu xuất hàng');
+            $('#StockExportForm')[0].reset();
+            $('#StockExportId').val('');
+            $('#StockExportIdInput').val('');
+            $('#StockExportIdInput').prop('readonly', true); // Không cho phép chỉnh sửa ID khi thêm mới
+            $('#detailTableBody').empty();
+            detailRowIndex = 0;
+             $('#formErrorMessage').hide();
+             $('#SaleInvoiceIdInput').val('');
+             $('#SaleInvoiceIdValue').val('');
+             $('#statusInput').val('Chờ xử lý');
+             originalDetails = null; // Reset chi tiết ban đầu
+             
+             // Tự động set nhân viên đang đăng nhập
+             const employeeId = currentEmployeeId || $('#employeeIdValue').val();
+             const employeeName = currentEmployeeName || '';
+             if (employeeId) {
+                 $('#employeeIdInput').val(employeeName || employeeId);
+                 $('#employeeIdValue').val(employeeId);
+                 $('#employeeIdInput').closest('.input-group-outline').addClass('is-filled');
+             }
+             
+             // Tự động tạo ID khi mở modal
+             generateNextStockExportId();
+             
+             // Set ngày hiện tại
+             const now = new Date();
+             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+             $('#timeInput').val(now.toISOString().slice(0, 16));
+
+             const modal = new bootstrap.Modal(document.getElementById('createEditModal'));
+             modal.show();
+             
+             // Luôn load lại SaleInvoices khi mở modal để đảm bảo có dữ liệu mới nhất
+             loadSaleInvoices(function() {
+                 // Đợi modal hiển thị xong rồi update lại combobox
+                 setTimeout(function() {
+                     populateSaleInvoiceSelect('');
+                 }, 300);
+             });
+        }
+
+        // Cập nhật trạng thái phiếu xuất hàng
+        function updateStockExportStatus(stockExportId, currentStatus) {
+            if (!stockExportId) {
+                showNotification('Không tìm thấy mã phiếu xuất hàng', 'error');
+                return;
+            }
+            
+            $('#updateStatusStockExportId').val(stockExportId);
+            $('#updateStatusSelect').val(currentStatus || 'Chờ xử lý');
+            $('#updateStatusErrorMessage').hide();
+            
+            const modal = new bootstrap.Modal(document.getElementById('updateStatusModal'));
+            modal.show();
+        }
+
+        // Lưu cập nhật trạng thái
+        function saveStatusUpdate() {
+            const stockExportId = $('#updateStatusStockExportId').val();
+            const newStatus = $('#updateStatusSelect').val();
+                    
+            if (!stockExportId) {
+                showNotification('Không tìm thấy mã phiếu xuất hàng', 'error');
+                return;
+            }
+            
+            if (!newStatus) {
+                $('#updateStatusErrorMessage').text('Vui lòng chọn trạng thái').show();
+                return;
+                    }
+                    
+            // Lấy EmployeeId từ biến global hoặc từ hidden input
+            const employeeId = currentEmployeeId || $('#employeeIdValue').val() || '';
+            
+            $.ajax({
+                url: `${API_URL}/${stockExportId}`,
+                type: 'PUT',
+                contentType: 'application/json',
+                headers: {
+                    'X-Employee-Id': employeeId || ''
+                },
+                data: JSON.stringify({
+                    status: newStatus,
+                    employeeId: employeeId || null
+                }),
+                success: function(response) {
+                    showNotification('Cập nhật trạng thái thành công', 'success');
+                    $('#updateStatusModal').modal('hide');
+                    loadStockExports();
+                    loadTotalStockQuantity(); // Cập nhật lại tổng số lượng tồn kho
+                },
+                error: function(xhr) {
+                    console.error('Error updating status:', xhr);
+                    let errorMessage = 'Lỗi khi cập nhật trạng thái';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMessage = xhr.responseJSON.message;
+                    }
+                    $('#updateStatusErrorMessage').text(errorMessage).show();
+                }
+            });
+        }
+
+         // Load danh sách hóa đơn bán
+         function loadSaleInvoices(callback) {
+             $.ajax({
+                 url: `${API_URL}/sale-invoices`,
+                 type: 'GET',
+                 dataType: 'json',
+                 success: function(response) {
+                     console.log('SaleInvoices response:', response);
+                     
+                     // Kiểm tra nếu response là object có chứa data
+                     let saleInvoices = response;
+                     if (response && response.data) {
+                         saleInvoices = response.data;
+                     } else if (Array.isArray(response)) {
+                         saleInvoices = response;
+                     } else if (response && response.value) {
+                         // Có thể response được wrap trong value
+                         saleInvoices = response.value;
+                     }
+                     
+                     SaleInvoicesList = saleInvoices || [];
+                     console.log('SaleInvoices list:', SaleInvoicesList);
+                     console.log('SaleInvoices count:', SaleInvoicesList.length);
+                     
+                     // Luôn populate sau khi load xong
+                     populateSaleInvoiceSelect();
+                     
+                     // Gọi callback nếu có
+                     if (callback && typeof callback === 'function') {
+                         callback();
+                     }
+                 },
+                 error: function(xhr, status, error) {
+                     console.error('Error loading sale invoices:', {
+                         status: status,
+                         error: error,
+                         response: xhr.responseText,
+                         statusCode: xhr.status,
+                         responseJSON: xhr.responseJSON
+                     });
+                     showNotification('Lỗi khi tải danh sách hóa đơn bán: ' + (xhr.responseJSON?.message || error), 'error');
+                     
+                     // Gọi callback ngay cả khi lỗi
+                     if (callback && typeof callback === 'function') {
+                         callback();
+                     }
+                 }
+             });
+         }
+
+         // Populate combobox hóa đơn bán (lưu danh sách để dùng cho autocomplete)
+         function populateSaleInvoiceSelect(selectedId = '') {
+             const saleInvoiceInput = $('#SaleInvoiceIdInput');
+             if (saleInvoiceInput.length === 0) {
+                 console.warn('SaleInvoice input element not found, retrying...');
+                 // Retry sau 100ms nếu element chưa có
+                 setTimeout(function() { populateSaleInvoiceSelect(selectedId); }, 100);
+                 return;
+             }
+             
+             // Lưu danh sách SaleInvoices để dùng cho autocomplete
+             window.allSaleInvoicesForSelect = SaleInvoicesList || [];
+             
+             const saleInvoiceValue = $('#SaleInvoiceIdValue');
+             
+             // Nếu có selectedId, set giá trị
+             if (selectedId) {
+                 const saleInvoice = SaleInvoicesList.find(si => {
+                     const id = si.saleInvoiceId || si.SaleInvoiceId;
+                     return id === selectedId;
+                 });
+                 if (saleInvoice) {
+                     const displayName = saleInvoice.displayName || saleInvoice.DisplayName || saleInvoice.saleInvoiceId || saleInvoice.SaleInvoiceId || selectedId;
+                     saleInvoiceInput.val(displayName);
+                     saleInvoiceValue.val(selectedId);
+                     saleInvoiceInput.closest('.input-group-outline').addClass('is-filled');
+                 } else {
+                     saleInvoiceInput.val('');
+                     saleInvoiceValue.val('');
+                     saleInvoiceInput.closest('.input-group-outline').removeClass('is-filled');
+                 }
+             } else {
+                 saleInvoiceInput.val('');
+                 saleInvoiceValue.val('');
+                 saleInvoiceInput.closest('.input-group-outline').removeClass('is-filled');
+             }
+             
+             // Khởi tạo autocomplete cho SaleInvoices
+             initializeSaleInvoiceAutocomplete();
+             
+             updateInputLabels();
+         }
+
+         // Khởi tạo autocomplete cho SaleInvoices
+         function initializeSaleInvoiceAutocomplete() {
+             const saleInvoiceInput = $('#SaleInvoiceIdInput');
+             const saleInvoiceValue = $('#SaleInvoiceIdValue');
+             const dropdown = $('#SaleInvoiceIdDropdown');
+             let selectedIndex = -1;
+             let filteredSaleInvoices = [];
+
+             function showDropdown(saleInvoices) {
+                 if (!saleInvoices || saleInvoices.length === 0) {
+                     dropdown.html('<div class="autocomplete-item" style="color: #6c757d; cursor: default;">Không tìm thấy hóa đơn bán</div>').show();
+                     selectedIndex = -1;
+                     return;
+                 }
+
+                 let html = '';
+                 saleInvoices.forEach((saleInvoice, index) => {
+                     const saleInvoiceId = saleInvoice.saleInvoiceId || saleInvoice.SaleInvoiceId;
+                     const displayName = saleInvoice.displayName || saleInvoice.DisplayName || saleInvoiceId;
+                     const displayNameEscaped = (displayName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                     html += `<div class="autocomplete-item" data-index="${index}" data-sale-invoice-id="${saleInvoiceId}" data-display-name="${displayNameEscaped}">${displayName}</div>`;
+                 });
+                 dropdown.html(html).show();
+                 selectedIndex = -1;
+             }
+
+             function updateSelectedItem() {
+                 $('#SaleInvoiceIdDropdown .autocomplete-item').removeClass('selected');
+                 if (selectedIndex >= 0 && selectedIndex < filteredSaleInvoices.length) {
+                     $('#SaleInvoiceIdDropdown .autocomplete-item').eq(selectedIndex).addClass('selected');
+                 }
+             }
+
+             // Xử lý khi gõ
+             saleInvoiceInput.off('input.saleinvoice').on('input.saleinvoice', function() {
+                 const searchTerm = $(this).val().toLowerCase().trim();
+                 
+                 // Cập nhật class is-filled
+                 if (searchTerm) {
+                     $(this).closest('.input-group-outline').addClass('is-filled');
+                 } else {
+                     $(this).closest('.input-group-outline').removeClass('is-filled');
+                 }
+                 
+                 if (searchTerm === '') {
+                     dropdown.hide();
+                     saleInvoiceValue.val('');
+                     return;
+                 }
+
+                 const allSaleInvoices = window.allSaleInvoicesForSelect || [];
+                 filteredSaleInvoices = allSaleInvoices.filter(saleInvoice => {
+                     const displayName = (saleInvoice.displayName || saleInvoice.DisplayName || saleInvoice.saleInvoiceId || saleInvoice.SaleInvoiceId || '').toLowerCase();
+                     return displayName.includes(searchTerm);
+                 });
+
+                 showDropdown(filteredSaleInvoices);
+             });
+
+             // Xử lý khi click vào item
+             $(document).off('click.saleinvoice-item').on('click.saleinvoice-item', '#SaleInvoiceIdDropdown .autocomplete-item', function() {
+                 const saleInvoiceId = $(this).data('sale-invoice-id');
+                 const displayName = $(this).data('display-name');
+                 
+                 if (saleInvoiceId && displayName) {
+                     saleInvoiceInput.val(displayName);
+                     saleInvoiceValue.val(saleInvoiceId);
+                     saleInvoiceInput.closest('.input-group-outline').addClass('is-filled');
+                     dropdown.hide();
+                 }
+             });
+
+             // Xử lý phím tắt
+             saleInvoiceInput.off('keydown.saleinvoice').on('keydown.saleinvoice', function(e) {
+                 if (dropdown.is(':visible') && filteredSaleInvoices.length > 0) {
+                     if (e.key === 'ArrowDown') {
+                         e.preventDefault();
+                         selectedIndex = Math.min(selectedIndex + 1, filteredSaleInvoices.length - 1);
+                         updateSelectedItem();
+                     } else if (e.key === 'ArrowUp') {
+                         e.preventDefault();
+                         selectedIndex = Math.max(selectedIndex - 1, -1);
+                         updateSelectedItem();
+                     } else if (e.key === 'Enter') {
+                         e.preventDefault();
+                         if (selectedIndex >= 0 && selectedIndex < filteredSaleInvoices.length) {
+                             const saleInvoice = filteredSaleInvoices[selectedIndex];
+                             const displayName = saleInvoice.displayName || saleInvoice.DisplayName || saleInvoice.saleInvoiceId || saleInvoice.SaleInvoiceId;
+                             saleInvoiceInput.val(displayName);
+                             saleInvoiceValue.val(saleInvoice.saleInvoiceId || saleInvoice.SaleInvoiceId);
+                             saleInvoiceInput.closest('.input-group-outline').addClass('is-filled');
+                             dropdown.hide();
+                         }
+                     } else if (e.key === 'Escape') {
+                         dropdown.hide();
+                         selectedIndex = -1;
+                     }
+                 }
+             });
+
+             // Ẩn dropdown khi click ra ngoài
+             $(document).off('click.saleinvoice-close').on('click.saleinvoice-close', function(e) {
+                 if (!$(e.target).closest('#SaleInvoiceIdInput').closest('.autocomplete-wrapper').length) {
+                     dropdown.hide();
+                     selectedIndex = -1;
+                 }
+             });
+
+             // Xử lý khi focus vào input
+             saleInvoiceInput.off('focus.saleinvoice').on('focus.saleinvoice', function() {
+                 $(this).closest('.input-group-outline').addClass('is-filled');
+                 
+                 const val = $(this).val().trim();
+                 if (val) {
+                     $(this).trigger('input.saleinvoice');
+                 } else {
+                     const allSaleInvoices = window.allSaleInvoicesForSelect || [];
+                     if (allSaleInvoices.length > 0) {
+                         filteredSaleInvoices = allSaleInvoices;
+                         showDropdown(filteredSaleInvoices);
+                     }
+                 }
+             });
+
+             // Xử lý khi blur
+             saleInvoiceInput.off('blur.saleinvoice').on('blur.saleinvoice', function() {
+                 const val = $(this).val().trim();
+                 if (!val) {
+                     $(this).closest('.input-group-outline').removeClass('is-filled');
+                 }
+             });
+
+             // Xử lý khi click vào input
+             saleInvoiceInput.off('click.saleinvoice').on('click.saleinvoice', function() {
+                 $(this).closest('.input-group-outline').addClass('is-filled');
+                 
+                 const val = $(this).val().trim();
+                 if (val) {
+                     $(this).trigger('input.saleinvoice');
+                 } else {
+                     const allSaleInvoices = window.allSaleInvoicesForSelect || [];
+                     if (allSaleInvoices.length > 0) {
+                         filteredSaleInvoices = allSaleInvoices;
+                         showDropdown(filteredSaleInvoices);
+                     }
+                 }
+             });
+         }
+
+        // Load danh sách sản phẩm
+        function loadProducts() {
+            $.ajax({
+                url: `${API_URL}/products`,
+                type: 'GET',
+                dataType: 'json',
+                success: function(response) {
+                    // Kiểm tra nếu response là object có chứa data
+                    let products = response;
+                    if (response && response.data) {
+                        products = response.data;
+                    } else if (Array.isArray(response)) {
+                        products = response;
+                    }
+                    
+                    productsList = products || [];
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading products:', {
+                        status: status,
+                        error: error,
+                        response: xhr.responseText,
+                        statusCode: xhr.status
+                    });
+                    showNotification('Lỗi khi tải danh sách sản phẩm: ' + (xhr.responseJSON?.message || error), 'error');
+                }
+            });
+        }
+
+        // Load cấu hình sản phẩm
+        function loadProductConfigurations(productId, selectElement, selectedValue = '', callback = null) {
+            if (!productId) {
+                selectElement.empty();
+                selectElement.append('<option value="">-- Chọn sản phẩm trước --</option>');
+                if (callback) callback();
+                return;
+            }
+
+            $.ajax({
+                url: `${API_URL}/product-configurations/${productId}`,
+                type: 'GET',
+                success: function(configurations) {
+                    selectElement.empty();
+                    selectElement.append('<option value="">-- Chọn thông số --</option>');
+                    
+                    if (configurations && configurations.length > 0) {
+                        configurations.forEach(function(config) {
+                            // Tạo chuỗi hiển thị thông số (format: Core i5-1335U / 8GB / 512GB SSD / Iris Xe)
+                            const specParts = [];
+                            if (config.cpu) specParts.push(config.cpu);
+                            if (config.ram) specParts.push(config.ram);
+                            if (config.rom) specParts.push(config.rom);
+                            if (config.card) specParts.push(config.card);
+                            
+                            const specText = specParts.length > 0 ? specParts.join(' / ') : config.configurationId;
+                            const optionValue = JSON.stringify({
+                                configurationId: config.configurationId,
+                                cpu: config.cpu || '',
+                                ram: config.ram || '',
+                                rom: config.rom || '',
+                                card: config.card || ''
+                            });
+                            
+                            // Dùng jQuery để tạo option element, tự động xử lý escape
+                            const $option = $('<option></option>')
+                                .attr('value', optionValue)
+                                .text(specText);
+                            
+                            // So sánh với selectedValue để set selected
+                            if (selectedValue) {
+                                // So sánh cả escaped và unescaped (jQuery có thể unescape khi lấy value)
+                                const normalizedSelected = selectedValue.replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+                                if (selectedValue === optionValue || normalizedSelected === optionValue) {
+                                    $option.prop('selected', true);
+                                }
+                            }
+                            
+                            selectElement.append($option);
+                        });
+                    } else {
+                        selectElement.append('<option value="">Không có thông số</option>');
+                    }
+                    
+                    // Khởi tạo Select2 nếu chưa có
+                    if (!selectElement.hasClass('select2-hidden-accessible')) {
+                        selectElement.select2({
+                            theme: 'bootstrap-5',
+                            placeholder: '-- Chọn thông số --',
+                            allowClear: true,
+                            minimumResultsForSearch: 0,
+                            dropdownParent: $('#createEditModal'),
+                            language: {
+                                noResults: function() {
+                                    return "Không tìm thấy kết quả";
+                                },
+                                searching: function() {
+                                    return "Đang tìm kiếm...";
+                                }
+                            }
+                        });
+                    } else {
+                        selectElement.trigger('change');
+                    }
+                    
+                    if (callback) callback();
+                },
+                error: function(xhr) {
+                    console.error('Error loading configurations:', xhr);
+                    selectElement.empty();
+                    selectElement.append('<option value="">Lỗi khi tải thông số</option>');
+                    if (callback) callback();
+                }
+            });
+        }
+
+        // Thêm dòng chi tiết
+        function addDetailRow(detail = null) {
+            const index = detailRowIndex++;
+            
+            // Tạo select cho sản phẩm
+            let productSelect = '<select class="form-control form-control-sm detail-product" data-index="' + index + '" onchange="onProductChange(' + index + ')"><option value="">-- Chọn sản phẩm --</option>';
+            productsList.forEach(function(product) {
+                const selected = detail && detail.productId === product.productId ? 'selected' : '';
+                productSelect += `<option value="${product.productId}" ${selected}>${product.displayName}</option>`;
+            });
+            productSelect += '</select>';
+
+            // Tạo select cho thông số
+            let specSelect = '<select class="form-control form-control-sm detail-spec" data-index="' + index + '"><option value="">-- Chọn sản phẩm trước --</option></select>';
+
+            const row = `
+                <tr data-index="${index}">
+                    <td>
+                        ${productSelect}
+                    </td>
+                    <td>
+                        ${specSelect}
+                    </td>
+                    <td>
+                        <input type="number" class="form-control form-control-sm detail-quantity" 
+                               value="${detail ? (detail.quantity || '') : ''}" 
+                               min="1" placeholder="Số lượng">
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="removeDetailRow(${index})">
+                            <i class="material-icons text-sm">delete</i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+            $('#detailTableBody').append(row);
+            
+            // Khởi tạo Select2 cho product select
+            setTimeout(function() {
+                const productSelectElement = $(`tr[data-index="${index}"] .detail-product`);
+                if (productSelectElement.length > 0 && !productSelectElement.hasClass('select2-hidden-accessible')) {
+                    productSelectElement.select2({
+                        theme: 'bootstrap-5',
+                        placeholder: '-- Chọn sản phẩm --',
+                        allowClear: true,
+                        minimumResultsForSearch: 0,
+                        dropdownParent: $('#createEditModal'),
+                        language: {
+                            noResults: function() {
+                                return "Không tìm thấy kết quả";
+                            },
+                            searching: function() {
+                                return "Đang tìm kiếm...";
+                            }
+                        }
+                    });
+                }
+                
+                // Khởi tạo Select2 cho spec select
+                const specSelectElement = $(`tr[data-index="${index}"] .detail-spec`);
+                if (specSelectElement.length > 0 && !specSelectElement.hasClass('select2-hidden-accessible')) {
+                    specSelectElement.select2({
+                        theme: 'bootstrap-5',
+                        placeholder: '-- Chọn sản phẩm trước --',
+                        allowClear: true,
+                        minimumResultsForSearch: 0,
+                        dropdownParent: $('#createEditModal'),
+                        language: {
+                            noResults: function() {
+                                return "Không tìm thấy kết quả";
+                            },
+                            searching: function() {
+                                return "Đang tìm kiếm...";
+                            }
+                        }
+                    });
+                }
+            }, 100);
+            
+            // Nếu có detail và productId, load lại cấu hình sau khi append và tìm thông số tương ứng
+            if (detail && detail.productId) {
+                const savedSpec = (detail.specifications || '').trim();
+                
+                console.log('Loading config for detail:', {
+                    productId: detail.productId,
+                    savedSpec: savedSpec,
+                    index: index
+                });
+                
+                // Đợi một chút để DOM được render xong
+                setTimeout(function() {
+                    const specSelectElement = $(`tr[data-index="${index}"] .detail-spec`);
+                    
+                    if (specSelectElement.length === 0) {
+                        console.error('Spec select element not found for index:', index);
+                        return;
+                    }
+                    
+                    // Load cấu hình và sau đó tìm match
+                    loadProductConfigurations(detail.productId, specSelectElement, '', function() {
+                    // Sau khi load xong, tìm option phù hợp với savedSpec
+                    if (savedSpec) {
+                        let found = false;
+                        console.log('Matching savedSpec:', savedSpec);
+                        
+                        specSelectElement.find('option').each(function() {
+                            if (found) return false; // Đã tìm thấy, dừng lại
+                            
+                            const optionValue = $(this).val();
+                            const optionText = $(this).text().trim();
+                            
+                            if (!optionValue) return true; // Bỏ qua option rỗng
+                            
+                            try {
+                                // jQuery tự động unescape khi lấy value từ DOM, nhưng đảm bảo parse được
+                                let unescapedValue = optionValue;
+                                // Nếu có HTML entities, unescape chúng
+                                if (optionValue.includes('&quot;') || optionValue.includes('&#39;')) {
+                                    unescapedValue = optionValue.replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+                                }
+                                
+                                const specObj = JSON.parse(unescapedValue);
+                                const specParts = [];
+                                if (specObj.cpu) specParts.push(specObj.cpu);
+                                if (specObj.ram) specParts.push(specObj.ram);
+                                if (specObj.rom) specParts.push(specObj.rom);
+                                if (specObj.card) specParts.push(specObj.card);
+                                const specText = specParts.length > 0 ? specParts.join(' / ') : '';
+                                
+                                // Normalize để so sánh (loại bỏ khoảng trắng thừa, chuyển về lowercase, loại bỏ prefix và normalize dấu phân cách)
+                                const normalizeString = (str) => {
+                                    if (!str) return '';
+                                    // Loại bỏ prefix "CPU:", "RAM:", "ROM:", "Card:" nếu có
+                                    let normalized = str.replace(/CPU:\s*/gi, '')
+                                                       .replace(/RAM:\s*/gi, '')
+                                                       .replace(/ROM:\s*/gi, '')
+                                                       .replace(/Card:\s*/gi, '');
+                                    // Normalize dấu phân cách (cả "," và "/" thành " / ")
+                                    normalized = normalized.replace(/,\s*/g, ' / ').replace(/\s*\/\s*/g, ' / ');
+                                    // Loại bỏ khoảng trắng thừa và chuyển về lowercase
+                                    return normalized.trim().toLowerCase().replace(/\s+/g, ' ');
+                                };
+                                
+                                const normalizedSpecText = normalizeString(specText);
+                                const normalizedSavedSpec = normalizeString(savedSpec);
+                                const normalizedOptionText = normalizeString(optionText);
+                                
+                                console.log('Comparing:', {
+                                    normalizedSpecText: normalizedSpecText,
+                                    normalizedSavedSpec: normalizedSavedSpec,
+                                    normalizedOptionText: normalizedOptionText,
+                                    optionText: optionText,
+                                    configurationId: specObj.configurationId,
+                                    rawSavedSpec: savedSpec
+                                });
+                                
+                                // So sánh theo nhiều cách:
+                                // 1. So sánh formatted text (normalized)
+                                // 2. So sánh option text (normalized)
+                                // 3. So sánh với configurationId nếu có
+                                // 4. So sánh trực tiếp (case-sensitive) nếu normalized không match
+                                if (normalizedSpecText === normalizedSavedSpec || 
+                                    normalizedOptionText === normalizedSavedSpec ||
+                                    specText.trim() === savedSpec.trim() ||
+                                    optionText.trim() === savedSpec.trim() ||
+                                    (specObj.configurationId && specObj.configurationId === normalizedSavedSpec)) {
+                                    $(this).prop('selected', true);
+                                    specSelectElement.val(optionValue); // Đảm bảo select được set
+                                    specSelectElement.trigger('change'); // Trigger change event
+                                    found = true;
+                                    console.log('Found match! Selected option:', optionText);
+                                    return false; // break
+                                }
+                            } catch (e) {
+                                console.log('Error parsing option value:', e, optionValue);
+                                // Nếu không parse được JSON, so sánh trực tiếp với text hoặc value
+                                if (optionText === savedSpec || optionValue === savedSpec) {
+                                    $(this).prop('selected', true);
+                                    specSelectElement.val(optionValue);
+                                    specSelectElement.trigger('change');
+                                    found = true;
+                                    console.log('Found match by text/value!');
+                                    return false;
+                                }
+                            }
+                        });
+                        
+                        if (!found && savedSpec) {
+                            console.warn('No match found for savedSpec:', savedSpec);
+                            // Thêm option tạm thời để hiển thị savedSpec nếu không tìm thấy match
+                            const tempOption = $('<option></option>')
+                                .attr('value', savedSpec)
+                                .text(savedSpec)
+                                .prop('selected', true);
+                            specSelectElement.append(tempOption);
+                            specSelectElement.val(savedSpec);
+                            specSelectElement.trigger('change');
+                            console.log('Added temporary option for savedSpec:', savedSpec);
+                        }
+                    }
+                    });
+                }, 50); // Delay 50ms để đảm bảo DOM đã render
+            }
+        }
+
+        // Xử lý khi chọn sản phẩm
+        function onProductChange(index) {
+            const productId = $(`tr[data-index="${index}"] .detail-product`).val();
+            const specSelect = $(`tr[data-index="${index}"] .detail-spec`);
+            loadProductConfigurations(productId, specSelect);
+        }
+
+        // Xóa dòng chi tiết
+        function removeDetailRow(index) {
+            const row = $(`tr[data-index="${index}"]`);
+            // Destroy Select2 trước khi xóa row
+            row.find('.detail-product').select2('destroy');
+            row.find('.detail-spec').select2('destroy');
+            row.remove();
+        }
+
+
+        // Lưu phiếu xuất hàng
+        function saveStockExport() {
+            $('#formErrorMessage').hide();
+
+             let stockExportId = $('#StockExportIdInput').val().trim();
+             const time = $('#timeInput').val();
+             const saleInvoiceId = $('#SaleInvoiceIdValue').val().trim();
+             // Lấy EmployeeId từ hidden input hoặc từ biến global
+             const employeeId = $('#employeeIdValue').val().trim() || currentEmployeeId || '';
+             const status = $('#statusInput').val();
+
+            const isEdit = $('#StockExportId').val() !== '';
+            
+            // Khi thêm mới, nếu không có ID thì để null để backend tự động tạo
+            if (!isEdit && !stockExportId) {
+                stockExportId = null;
+            }
+
+            if (!time) {
+                showFormError('Vui lòng chọn ngày xuất');
+                return;
+            }
+
+            // Lấy chi tiết
+            const details = [];
+            $('#detailTableBody tr').each(function() {
+                const productId = $(this).find('.detail-product').val().trim();
+                const quantity = parseInt($(this).find('.detail-quantity').val()) || 0;
+                let specifications = $(this).find('.detail-spec').val().trim();
+
+                // Nếu specifications là JSON string, parse nó và lấy thông tin
+                if (specifications) {
+                    try {
+                        // jQuery tự động unescape khi lấy value từ DOM, nhưng đảm bảo parse được
+                        let unescapedSpec = specifications;
+                        // Nếu có HTML entities, unescape chúng
+                        if (specifications.includes('&quot;') || specifications.includes('&#39;')) {
+                            unescapedSpec = specifications.replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+                        }
+                        
+                        const specObj = JSON.parse(unescapedSpec);
+                        const specParts = [];
+                        if (specObj.cpu) specParts.push(`CPU: ${specObj.cpu}`);
+                        if (specObj.ram) specParts.push(`RAM: ${specObj.ram}`);
+                        if (specObj.rom) specParts.push(`ROM: ${specObj.rom}`);
+                        if (specObj.card) specParts.push(`Card: ${specObj.card}`);
+                        specifications = specParts.length > 0 ? specParts.join(', ') : specifications;
+                    } catch (e) {
+                        // Nếu không phải JSON, giữ nguyên (có thể đã là formatted string)
+                        // Không cần làm gì, giữ nguyên giá trị
+                    }
+                }
+
+                if (productId && quantity > 0) {
+                    details.push({
+                        productId: productId,
+                        quantity: quantity,
+                        specifications: specifications || null
+                    });
+                }
+            });
+
+            // So sánh chi tiết hiện tại với chi tiết ban đầu (chỉ khi edit)
+            let detailsChanged = false;
+            if (isEdit && originalDetails) {
+                // Normalize để so sánh (sắp xếp và so sánh)
+                const normalizeDetail = (detail) => {
+                    return {
+                        productId: (detail.productId || '').trim(),
+                        quantity: detail.quantity || 0,
+                        specifications: (detail.specifications || '').trim()
+                    };
+                };
+                
+                const normalizedCurrent = details.map(normalizeDetail).sort((a, b) => {
+                    if (a.productId !== b.productId) return a.productId.localeCompare(b.productId);
+                    if (a.specifications !== b.specifications) return a.specifications.localeCompare(b.specifications);
+                    return a.quantity - b.quantity;
+                });
+                
+                const normalizedOriginal = originalDetails.map(normalizeDetail).sort((a, b) => {
+                    if (a.productId !== b.productId) return a.productId.localeCompare(b.productId);
+                    if (a.specifications !== b.specifications) return a.specifications.localeCompare(b.specifications);
+                    return a.quantity - b.quantity;
+                });
+                
+                console.log('Comparing details:', {
+                    originalCount: normalizedOriginal.length,
+                    currentCount: normalizedCurrent.length,
+                    original: normalizedOriginal,
+                    current: normalizedCurrent
+                });
+                
+                // So sánh số lượng và nội dung
+                if (normalizedCurrent.length !== normalizedOriginal.length) {
+                    detailsChanged = true;
+                    console.log('Details changed: different count');
+                } else {
+                    for (let i = 0; i < normalizedCurrent.length; i++) {
+                        if (normalizedCurrent[i].productId !== normalizedOriginal[i].productId ||
+                            normalizedCurrent[i].quantity !== normalizedOriginal[i].quantity ||
+                            normalizedCurrent[i].specifications !== normalizedOriginal[i].specifications) {
+                            detailsChanged = true;
+                            console.log('Details changed: different content at index', i);
+                            break;
+                        }
+                    }
+                    if (!detailsChanged) {
+                        console.log('Details unchanged');
+                    }
+                }
+            } else {
+                // Khi thêm mới, luôn có thay đổi nếu có details
+                detailsChanged = details.length > 0;
+                console.log('Not editing or no original details, detailsChanged:', detailsChanged);
+            }
+            
+            console.log('Final detailsChanged:', detailsChanged, 'isEdit:', isEdit);
+
+            const url = isEdit ? `${API_URL}/${stockExportId}` : API_URL;
+            const method = isEdit ? 'PUT' : 'POST';
+
+            // Xử lý time để tránh lỗi timezone
+            // time từ input datetime-local là format "YYYY-MM-DDTHH:mm" (local time, không có timezone)
+            // Gửi time string trực tiếp và thêm ":00" để có format đầy đủ, backend sẽ parse như local time
+            let timeValue;
+            if (time) {
+                // Thêm ":00" nếu chưa có giây
+                if (time.length === 16) {
+                    timeValue = time + ":00";
+                } else {
+                    timeValue = time;
+                }
+            } else {
+                // Nếu không có time, dùng thời gian hiện tại
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                timeValue = `${year}-${month}-${day}T${hours}:${minutes}:00`;
+            }
+
+             // Xác định details để gửi
+             let detailsToSend = null;
+             if (isEdit && !detailsChanged) {
+                 // Chỉ cập nhật thông tin chung, không gửi details
+                 detailsToSend = null;
+                 console.log('Sending null details (only updating general info)');
+             } else if (details.length > 0) {
+                 // Có details để gửi
+                 detailsToSend = details;
+                 console.log('Sending details:', detailsToSend);
+             } else if (isEdit) {
+                 // Edit nhưng không có details (có thể đã xóa hết)
+                 detailsToSend = null;
+                 console.log('Edit mode but no details, sending null');
+             } else {
+                 // Thêm mới nhưng không có details
+                 detailsToSend = [];
+                 console.log('Create mode but no details, sending empty array');
+             }
+
+             const data = {
+                 stockExportId: stockExportId || null, // null để backend tự động tạo khi thêm mới
+                 saleInvoiceId: saleInvoiceId || null,
+                 employeeId: employeeId || null,
+                 time: timeValue,
+                 status: status || 'Chờ xử lý',
+                 // Chỉ gửi details nếu có thay đổi về chi tiết
+                 // Nếu chỉ cập nhật thông tin chung (mã hóa đơn, mã nhân viên, trạng thái), gửi null để backend giữ nguyên chi tiết cũ
+                 details: detailsToSend
+             };
+             
+             console.log('Sending data:', data);
+
+            $.ajax({
+                url: url,
+                type: method,
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                success: function(response) {
+                    showNotification(isEdit ? 'Cập nhật phiếu xuất hàng thành công' : 'Thêm phiếu xuất hàng thành công', 'success');
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('createEditModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                    loadStockExports();
+                    loadTotalStockQuantity(); // Cập nhật lại tổng số lượng tồn kho
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error saving stock export:', {
+                        status: status,
+                        error: error,
+                        statusCode: xhr.status,
+                        responseText: xhr.responseText,
+                        responseJSON: xhr.responseJSON
+                    });
+                    let message = 'Có lỗi xảy ra khi lưu phiếu xuất hàng';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    } else if (xhr.responseText) {
+                        try {
+                            const errorObj = JSON.parse(xhr.responseText);
+                            if (errorObj.message) {
+                                message = errorObj.message;
+                            }
+                        } catch (e) {
+                            // Nếu không parse được JSON, dùng responseText
+                            if (xhr.responseText && xhr.responseText.length < 200) {
+                                message = xhr.responseText;
+                            }
+                        }
+                    }
+                    showFormError(message);
+                }
+            });
+        }
+
+
+        // Hiển thị thông báo
+        function showNotification(message, type) {
+            const bgColor = type === 'success' ? 'bg-gradient-success' : 'bg-gradient-danger';
+            const notification = $(
+                `<div class="alert ${bgColor} text-white alert-dismissible fade show position-fixed" 
+                     style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>`
+            );
+            $('body').append(notification);
+            setTimeout(() => notification.alert('close'), 3000);
+        }
+
+        // Hiển thị lỗi trong form
+        function showFormError(message) {
+            $('#formErrorMessage').html(message).show();
+        }
+
+        // Format tiền tệ
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+        }
+
+        // Hiển thị modal chọn loại xuất file
+        function showExportModal(stockExportId) {
+            $('#currentStockExportIdForExport').val(stockExportId);
+            const modal = new bootstrap.Modal(document.getElementById('exportOptionsModal'));
+            modal.show();
+        }
+
+        // Xuất phiếu xuất hàng ra Excel từ modal
+        function exportToExcelFromModal() {
+            try {
+                const stockExportId = $('#currentStockExportIdForExport').val();
+                if (!stockExportId) {
+                    showNotification('Không tìm thấy mã phiếu xuất hàng', 'error');
+                    return;
+                }
+                
+                // Đóng modal
+                const modalInstance = bootstrap.Modal.getInstance(document.getElementById('exportOptionsModal'));
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+                
+                const url = `${API_URL}/${stockExportId}/export-excel`;
+                window.open(url, '_blank');
+                showNotification('Đang tải file Excel...', 'success');
+            } catch (error) {
+                console.error('Error exporting to Excel:', error);
+                showNotification('Lỗi khi xuất file Excel', 'error');
+            }
+        }
+
+        // Xuất phiếu xuất hàng ra PDF từ modal
+        function exportToPdfFromModal() {
+            try {
+                const stockExportId = $('#currentStockExportIdForExport').val();
+                if (!stockExportId) {
+                    showNotification('Không tìm thấy mã phiếu xuất hàng', 'error');
+                    return;
+                }
+                
+                // Đóng modal
+                const modalInstance = bootstrap.Modal.getInstance(document.getElementById('exportOptionsModal'));
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+                
+                const url = `${API_URL}/${stockExportId}/export-pdf`;
+                window.open(url, '_blank');
+                showNotification('Đang tải file PDF...', 'success');
+            } catch (error) {
+                console.error('Error exporting to PDF:', error);
+                showNotification('Lỗi khi xuất file PDF', 'error');
+            }
+        }
+
+        // Load tổng số lượng tồn kho
+        function loadTotalStockQuantity() {
+            $.ajax({
+                url: `${API_URL}/total-stock-quantity`,
+                type: 'GET',
+                success: function(totalQuantity) {
+                    $('#totalStockQuantity').text(totalQuantity.toLocaleString('vi-VN'));
+                },
+                error: function(xhr) {
+                    console.error('Error loading total stock quantity:', xhr);
+                    $('#totalStockQuantity').text('-');
+                }
+            });
+        }
+
+        // Hiển thị modal danh sách sản phẩm tồn kho thấp
+        function showLowStockModal() {
+            const modal = new bootstrap.Modal(document.getElementById('lowStockModal'));
+            modal.show();
+            loadLowStockProducts();
+        }
+
+        // Load danh sách sản phẩm tồn kho thấp
+        function loadLowStockProducts() {
+            const tbody = $('#lowStockTableBody');
+            tbody.html(`
+                <tr>
+                    <td colspan="5" class="text-center text-secondary py-4">
+                        <div class="spinner-border spinner-border-sm me-2" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        Đang tải dữ liệu...
+                    </td>
+                </tr>
+            `);
+
+            $.ajax({
+                url: `${API_URL}/low-stock-products`,
+                type: 'GET',
+                success: function(products) {
+                    tbody.empty();
+                    
+                    if (!products || products.length === 0) {
+                        tbody.append(`
+                            <tr>
+                                <td colspan="5" class="text-center text-success py-4">
+                                    <i class="material-icons text-sm me-2">check_circle</i>
+                                    Không có sản phẩm nào tồn kho thấp
+                                </td>
+                            </tr>
+                        `);
+                        return;
+                    }
+
+                    products.forEach(function(product) {
+                        // Tạo chuỗi hiển thị thông số kỹ thuật
+                        const specParts = [];
+                        if (product.cpu) specParts.push(`CPU: ${product.cpu}`);
+                        if (product.ram) specParts.push(`RAM: ${product.ram}`);
+                        if (product.rom) specParts.push(`ROM: ${product.rom}`);
+                        if (product.card) specParts.push(`Card: ${product.card}`);
+                        const specText = specParts.length > 0 ? specParts.join(', ') : '-';
+
+                        // Hiển thị tên sản phẩm (không bao gồm model trong tên)
+                        const productDisplay = product.productName || product.productId || '-';
+
+                        // Màu sắc cho số lượng
+                        let quantityClass = 'text-danger';
+                        if (product.quantity === 3) {
+                            quantityClass = 'text-warning';
+                        } else if (product.quantity === 2) {
+                            quantityClass = 'text-danger';
+                        } else {
+                            quantityClass = 'text-danger fw-bold';
+                        }
+
+                        tbody.append(`
+                            <tr>
+                                <td style="vertical-align: middle;">
+                                    <span class="text-xs font-weight-bold">${product.productId || '-'}</span>
+                                </td>
+                                <td style="vertical-align: middle;">
+                                    <span class="text-xs font-weight-bold">${productDisplay}</span>
+                                </td>
+                                <td style="vertical-align: middle;">
+                                    <span class="text-xs">${product.productModel || '-'}</span>
+                                </td>
+                                <td style="vertical-align: middle; white-space: normal; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word;">
+                                    <span class="text-xs">${specText}</span>
+                                </td>
+                                <td style="vertical-align: middle; text-align: center; white-space: nowrap;">
+                                    <span class="text-xs font-weight-bold ${quantityClass}">${product.quantity}</span>
+                                </td>
+                            </tr>
+                        `);
+                    });
+                },
+                error: function(xhr) {
+                    console.error('Error loading low stock products:', xhr);
+                    tbody.html(`
+                        <tr>
+                            <td colspan="5" class="text-center text-danger py-4">
+                                <i class="material-icons text-sm me-2">error</i>
+                                Lỗi khi tải dữ liệu: ${xhr.responseJSON?.message || 'Không thể tải danh sách sản phẩm'}
+                            </td>
+                        </tr>
+                    `);
+                }
+            });
+        }
+
+        // Reset khi đóng modal
+        $(document).on('hidden.bs.modal', '#createEditModal', function() {
+            $('#StockExportForm')[0].reset();
+            $('#StockExportId').val('');
+            $('#StockExportIdInput').prop('readonly', false);
+            $('#detailTableBody').empty();
+            detailRowIndex = 0;
+            $('#formErrorMessage').hide();
+            originalDetails = null; // Reset chi tiết ban đầu
+            
+             // Reset autocomplete dropdowns
+             $('#SaleInvoiceIdDropdown').hide();
+             $('#SaleInvoiceIdInput').val('');
+             $('#SaleInvoiceIdValue').val('');
+             
+             // Reset employee input nhưng giữ lại giá trị từ biến global
+             if (currentEmployeeId) {
+                 $('#employeeIdInput').val(currentEmployeeName || currentEmployeeId);
+                 $('#employeeIdValue').val(currentEmployeeId);
+             } else {
+                 $('#employeeIdInput').val('');
+                 $('#employeeIdValue').val('');
+             }
+             
+             $('.input-group-outline').removeClass('is-filled is-focused');
+            if (typeof updateInputLabels === 'function') {
+                setTimeout(function() {
+                    updateInputLabels();
+                }, 50);
+            }
+        });
+    </script>
+}
+
+<style>
+    /* Fix Modal hiển thị giữa main content và cho phép scroll */
+    .modal {
+        padding-left: 250px !important; /* Offset bằng với chiều rộng sidebar */
+        overflow-y: auto !important;
+    }
+    
+    .modal-dialog {
+        margin: 1.75rem auto;
+        max-height: calc(100vh - 3.5rem);
+    }
+    
+    .modal-content {
+        max-height: calc(100vh - 3.5rem);
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .modal-body {
+        max-height: calc(100vh - 250px);
+        overflow-y: auto;
+        flex: 1 1 auto;
+    }
+    
+    .modal-header, .modal-footer {
+        flex-shrink: 0;
+    }
+    
+    /* Responsive cho modal trên màn hình nhỏ */
+    @@media (max-width: 1200px) {
+        .modal {
+            padding-left: 200px !important;
+        }
+    }
+    
+    @@media (max-width: 992px) {
+        .modal {
+            padding-left: 0 !important;
+        }
+    }
+
+    /* Bảng chính */
+    .table-responsive {
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .table {
+        margin-bottom: 0;
+        background-color: #fff;
+    }
+
+    .table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .table thead th {
+        color: #fff !important;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 1rem 0.75rem !important;
+        border: none;
+        font-size: 1.3125rem;
+        text-align: center;
+    }
+
+    .table tbody tr {
+        transition: all 0.3s ease;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .table tbody tr:hover {
+        background-color: #f8f9fa;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .table tbody tr:last-child {
+        border-bottom: none;
+    }
+
+    .action-btn {
+        padding: 0.375rem 0.625rem;
+        font-size: 0.75rem;
+        margin: 0 0.125rem;
+        border-radius: 0.375rem;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .table-actions {
+        white-space: nowrap;
+    }
+
+    #stockExportTableBody tr td {
+        vertical-align: middle !important;
+        padding: 1rem 0.75rem !important;
+        border: none;
+    }
+
+    /* Badge styling */
+    .badge {
+        padding: 0.5rem 0.75rem;
+        font-weight: 500;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+    }
+
+    /* Empty state */
+    .table tbody tr td[colspan] {
+        padding: 3rem 1rem !important;
+        text-align: center;
+        color: #6c757d;
+        font-style: italic;
+    }
+
+    /* CSS cho bảng xem chi tiết */
+    #viewModal .table-responsive {
+        max-height: 500px;
+        overflow-y: auto;
+        border-radius: 0.5rem;
+    }
+
+    #viewModal .spec-cell {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        white-space: normal;
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+
+    #viewModal table {
+        table-layout: fixed;
+        width: 100%;
+    }
+
+    #viewModal table td {
+        vertical-align: middle;
+    }
+
+    #viewModal table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    #viewModal table thead th {
+        color: #fff !important;
+        font-weight: 600;
+        font-size: 1.3125rem;
+        text-align: center;
+    }
+
+    /* Style cho bảng chi tiết trong modal thêm/sửa */
+    #createEditModal .table-responsive {
+        max-width: 100%;
+        overflow-x: auto;
+        overflow-y: visible;
+    }
+
+    #createEditModal table {
+        table-layout: fixed;
+        width: 100%;
+        min-width: 800px;
+    }
+
+    #createEditModal table thead th {
+        font-size: 0.875rem;
+        font-weight: 600;
+        padding: 0.5rem;
+        white-space: nowrap;
+    }
+
+    #createEditModal table tbody td {
+        padding: 0.5rem;
+        vertical-align: middle;
+        font-size: 0.875rem;
+    }
+
+    #createEditModal table tbody td .form-control-sm,
+    #createEditModal table tbody td .detail-product,
+    #createEditModal table tbody td .detail-spec {
+        font-size: 0.875rem;
+        padding: 0.25rem 0.5rem;
+    }
+
+    /* Đảm bảo các cột có width hợp lý */
+    #createEditModal table thead th:nth-child(1),
+    #createEditModal table tbody td:nth-child(1) {
+        width: 25%;
+    }
+
+    #createEditModal table thead th:nth-child(2),
+    #createEditModal table tbody td:nth-child(2) {
+        width: 25%;
+    }
+
+    #createEditModal table thead th:nth-child(3),
+    #createEditModal table tbody td:nth-child(3) {
+        width: 12%;
+    }
+
+    #createEditModal table thead th:nth-child(4),
+    #createEditModal table tbody td:nth-child(4) {
+        width: 15%;
+    }
+
+    #createEditModal table thead th:nth-child(5),
+    #createEditModal table tbody td:nth-child(5) {
+        width: 15%;
+    }
+
+    #createEditModal table thead th:nth-child(6),
+    #createEditModal table tbody td:nth-child(6) {
+        width: 8%;
+    }
+
+    /* Đảm bảo select và input không bị tràn */
+    #createEditModal table tbody td select,
+    #createEditModal table tbody td input {
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Autocomplete styling */
+    .autocomplete-wrapper {
+        width: 100%;
+        display: block;
+    }
+
+    /* Đảm bảo input trong autocomplete-wrapper có style giống các input khác */
+    .input-group-outline .autocomplete-wrapper .form-control {
+        border: none;
+        border-bottom: 1px solid #d2d6da;
+        border-left: 1px solid #d2d6da;
+        border-right: 1px solid #d2d6da;
+        border-radius: 0;
+        padding-left: 0;
+        padding-right: 0;
+        background: transparent;
+        background-image: none;
+        box-shadow: none;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+
+    .input-group-outline .autocomplete-wrapper .form-control:focus {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+        box-shadow: none;
+        outline: 0;
+    }
+
+    .input-group-outline.is-filled .autocomplete-wrapper .form-control {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+    }
+
+    .input-group-outline.is-focused .autocomplete-wrapper .form-control {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+        box-shadow: none;
+    }
+
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: #fff;
+        border: 1px solid #d2d6da;
+        border-radius: 0.375rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1000;
+        margin-top: 2px;
+        display: none;
+    }
+
+    .autocomplete-item {
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom: none;
+    }
+
+    .autocomplete-item:hover,
+    .autocomplete-item.selected {
+        background-color: #f8f9fa;
+        color: #667eea;
+    }
+
+    .autocomplete-item:first-child {
+        border-top-left-radius: 0.375rem;
+        border-top-right-radius: 0.375rem;
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom-left-radius: 0.375rem;
+        border-bottom-right-radius: 0.375rem;
+    }
+
+    /* Autocomplete trong modal */
+    .modal .autocomplete-dropdown {
+        z-index: 1055;
+    }
+
+    .modal .autocomplete-wrapper {
+        z-index: 1;
+    }
+
+    /* CSS cho bảng xem chi tiết */
+    #viewModal .table-responsive {
+        max-height: 500px;
+        overflow-y: auto;
+        overflow-x: auto;
+        border-radius: 0.5rem;
+    }
+
+    #viewModal .spec-cell {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        white-space: normal;
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+
+    #viewModal table {
+        table-layout: fixed;
+        width: 100%;
+        min-width: 600px;
+    }
+
+    #viewModal table td {
+        vertical-align: middle;
+        padding: 0.75rem !important;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+
+    #viewModal table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    #viewModal table thead th {
+        color: #fff !important;
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-align: center;
+        padding: 0.75rem !important;
+        white-space: nowrap;
+    }
+
+    /* Đảm bảo các cột có width cố định */
+    #viewModal table thead th:nth-child(1),
+    #viewModal table tbody td:nth-child(1) {
+        width: 35%;
+        min-width: 200px;
+    }
+
+    #viewModal table thead th:nth-child(2),
+    #viewModal table tbody td:nth-child(2) {
+        width: 45%;
+        min-width: 250px;
+    }
+
+    #viewModal table thead th:nth-child(3),
+    #viewModal table tbody td:nth-child(3) {
+        width: 20%;
+        min-width: 100px;
+    }
+
+    /* Xử lý đặc biệt cho input date - ẩn label trống */
+    .input-group-outline:has(input[type="date"]) .form-label:empty {
+        display: none;
+    }
+
+    .input-group-outline input[type="date"] {
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+
+    /* Ẩn placeholder dd/mm/yyyy trong input date */
+    input[type="date"]::placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]::-webkit-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]::-moz-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]:-ms-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    /* Ẩn text placeholder mặc định của input date (dd/mm/yyyy) khi KHÔNG có dữ liệu và KHÔNG đang nhập */
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input])::-webkit-datetime-edit,
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input]):invalid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input]):valid::-webkit-datetime-edit {
+        color: transparent !important;
+    }
+
+    /* Hiển thị dd/mm/yyyy khi CÓ dữ liệu ngày được nhập vào (có attribute value) hoặc đang nhập (có data-has-input) */
+    .input-group-outline input[type="date"][value]::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][value]:valid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]:invalid::-webkit-datetime-edit,
+    .input-group-outline     input[type="date"][data-has-input]:valid::-webkit-datetime-edit {
+        color: #495057 !important;
+    }
+
+    /* CSS cho hiển thị tổng số lượng tồn kho */
+    #totalStockQuantityDisplay {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        pointer-events: none;
+        color: #fff !important;
+        height: auto;
+        line-height: 1.5;
+    }
+
+    #totalStockQuantityDisplay:disabled {
+        opacity: 1;
+        color: #fff !important;
+    }
+
+    #totalStockQuantityDisplay i {
+        font-size: 1rem;
+        vertical-align: middle;
+        color: #fff !important;
+    }
+
+    #totalStockQuantityDisplay strong {
+        font-weight: 600;
+        font-size: 1rem;
+        color: #fff !important;
+    }
+
+    /* CSS cho modal tồn kho thấp */
+    #lowStockModal .modal-dialog {
+        max-width: 90% !important;
+        width: 90% !important;
+        margin: 1.5rem auto;
+        max-height: calc(100vh - 3rem);
+    }
+
+    #lowStockModal .modal-content {
+        max-height: calc(100vh - 3rem);
+        display: flex;
+        flex-direction: column;
+    }
+
+    #lowStockModal .modal-body {
+        overflow: visible;
+        flex: 1 1 auto;
+        padding: 1.25rem;
+    }
+
+    #lowStockModal .table-responsive {
+        max-height: calc(100vh - 250px);
+        overflow-y: auto;
+        overflow-x: auto;
+        border-radius: 0.5rem;
+    }
+
+    #lowStockModal .table {
+        margin-bottom: 0;
+        table-layout: fixed;
+        width: 100%;
+        min-width: 900px;
+    }
+
+    #lowStockModal .table thead {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    #lowStockModal .table thead th {
+        color: #fff !important;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 0.5rem 0.5rem !important;
+        border: none;
+        font-size: 0.875rem;
+        white-space: nowrap;
+    }
+
+    #lowStockModal .table tbody tr {
+        transition: all 0.3s ease;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    #lowStockModal .table tbody tr:hover {
+        background-color: #fff3cd;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    #lowStockModal .table tbody td {
+        vertical-align: middle;
+        padding: 0.5rem 0.5rem !important;
+        font-size: 0.875rem;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+
+    /* Đảm bảo cột Thông số kỹ thuật xuống dòng đúng cách */
+    #lowStockModal .table tbody td:nth-child(4) {
+        white-space: normal !important;
+        word-break: break-word;
+        overflow-wrap: break-word;
+        line-height: 1.4;
+    }
+
+    /* Đảm bảo các cột có tỉ lệ hợp lý */
+    #lowStockModal .table thead th:nth-child(1),
+    #lowStockModal .table tbody td:nth-child(1) {
+        width: 12%;
+        min-width: 120px;
+    }
+
+    #lowStockModal .table thead th:nth-child(2),
+    #lowStockModal .table tbody td:nth-child(2) {
+        width: 25%;
+        min-width: 200px;
+    }
+
+    #lowStockModal .table thead th:nth-child(3),
+    #lowStockModal .table tbody td:nth-child(3) {
+        width: 18%;
+        min-width: 150px;
+    }
+
+    #lowStockModal .table thead th:nth-child(4),
+    #lowStockModal .table tbody td:nth-child(4) {
+        width: 35%;
+        min-width: 300px;
+    }
+
+    #lowStockModal .table thead th:nth-child(5),
+    #lowStockModal .table tbody td:nth-child(5) {
+        width: 10%;
+        min-width: 80px;
+    }
+
+    /* Responsive cho header */
+    @@media (max-width: 768px) {
+        .bg-gradient-primary .d-flex {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        #totalStockQuantityDisplay {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>

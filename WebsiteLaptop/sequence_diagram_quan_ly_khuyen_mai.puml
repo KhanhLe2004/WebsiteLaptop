@@ -1,0 +1,100 @@
+@startuml
+
+hide footbox
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 12
+skinparam maxMessageSize 500
+skinparam ParticipantPadding 100
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam ActorBackgroundColor transparent
+skinparam ParticipantBackgroundColor transparent
+skinparam SequenceGroupBackgroundColor transparent
+skinparam SequenceBoxBackgroundColor transparent
+skinparam NoteBackgroundColor transparent
+
+skinparam SequenceActivationBorderColor black
+skinparam ActorBorderColor black
+skinparam ParticipantBorderColor black
+skinparam ArrowColor black
+skinparam roundcorner 0
+
+actor "Chủ cửa hàng" as OWNER
+participant "Frontend (Admin Web)" as FE
+participant "ManagePromotionAPIController" as API
+database "Database" as DB
+
+' 1) Mở màn quản lý
+OWNER -> FE : Chọn "Quản lý khuyến mại"
+FE -> API : GET /api/admin/promotions
+API -> DB : SELECT promotions (Include Product, filter, pagination)
+DB --> API : promotionList
+API --> FE : 200 OK + list
+FE --> OWNER : Hiển thị danh sách
+
+' 2) Thao tác: Thêm / Sửa / Xóa
+alt Thêm khuyến mại
+  OWNER -> FE : Nhập thông tin\nNhấn "Lưu"
+  FE -> API : POST /api/admin/promotions
+  API -> API : Validate ProductId + Type not empty
+  API -> DB : Check Product exists
+  API -> API : GeneratePromotionId()
+  API -> DB : Check PromotionId exists
+  alt Hợp lệ
+    API -> DB : INSERT Promotions
+    API -> API : LogHistory("Thêm khuyến mại")
+    API --> FE : 201 Created + PromotionDTO
+    FE --> OWNER : Thông báo "Thành công"\nReload
+  else Không hợp lệ
+    API --> FE : 400 + errors
+    FE --> OWNER : "Vui lòng nhập lại"
+  end
+
+else Cập nhật khuyến mại
+  OWNER -> FE : Chọn khuyến mại\nSửa\nNhấn "Lưu"
+  FE -> API : PUT /api/admin/promotions/{id}
+  API -> DB : SELECT promotion WHERE id (Include Product)
+  API -> API : Validate ProductId + Type not empty
+  API -> DB : Check Product exists
+  alt Hợp lệ
+    API -> DB : UPDATE Promotions SET (ProductId, Type, ContentDetail)
+    API -> API : LogHistory("Sửa khuyến mại")
+    API --> FE : 200 OK
+    FE --> OWNER : "Thành công"\nReload
+  else Không hợp lệ
+    API --> FE : 400 + errors
+    FE --> OWNER : "Vui lòng nhập lại"
+  end
+
+else Xóa khuyến mại
+  OWNER -> FE : Chọn Delete
+  FE -> API : DELETE /api/admin/promotions/{id}
+  activate API
+  API -> DB : SELECT promotion WHERE id
+  API -> DB : SELECT product WHERE id (for log)
+  API -> DB : DELETE Promotions
+  API -> API : LogHistory("Xóa khuyến mại")
+  API --> FE : 200 OK
+  deactivate API
+  FE --> OWNER : "Xóa thành công"\nReload
+
+else Tạo khuyến mại hàng loạt
+  OWNER -> FE : Chọn nhiều sản phẩm\nNhập thông tin\nNhấn "Lưu"
+  FE -> API : POST /api/admin/promotions/batch
+  API -> API : Validate ProductIds + Type not empty
+  API -> DB : Check all Products exist
+  API -> API : GeneratePromotionIds(count, existingIds)
+  loop For each productId
+    API -> DB : INSERT Promotions
+  end
+  API -> DB : SaveChanges (batch)
+  API -> API : LogHistory("Thêm khuyến mại hàng loạt")
+  API --> FE : 200 OK + (createdCount, promotions, errors)
+  FE --> OWNER : "Đã tạo X khuyến mại"\nReload
+end
+
+FE --> OWNER : Hiển thị danh sách
+
+@enduml
+

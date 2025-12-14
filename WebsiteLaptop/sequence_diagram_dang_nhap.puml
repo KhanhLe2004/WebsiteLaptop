@@ -1,0 +1,62 @@
+@startuml
+
+hide footbox
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 12
+skinparam maxMessageSize 500
+skinparam ParticipantPadding 100
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam ActorBackgroundColor transparent
+skinparam ParticipantBackgroundColor transparent
+skinparam SequenceGroupBackgroundColor transparent
+skinparam SequenceBoxBackgroundColor transparent
+skinparam NoteBackgroundColor transparent
+
+skinparam SequenceActivationBorderColor black
+skinparam ActorBorderColor black
+skinparam ParticipantBorderColor black
+skinparam ArrowColor black
+skinparam roundcorner 0
+
+actor "Nhân viên" as EMPLOYEE
+participant "Frontend (Admin Web)" as FE
+participant "SignInAPIController" as API
+database "Database" as DB
+participant "HistoryService" as HISTORY
+
+' Đăng nhập
+EMPLOYEE -> FE : Nhập Username/Email + Password\nNhấn "Đăng nhập"
+FE -> API : POST /api/SignInAPI
+API -> API : Validate ModelState
+alt Hợp lệ
+  API -> DB : SELECT employee WHERE (Username=credential OR Email=credential) (Include Role)
+  alt Employee không tồn tại
+    API --> FE : 401 Unauthorized ("Tên đăng nhập hoặc mật khẩu không đúng")
+    FE --> EMPLOYEE : "Sai thông tin đăng nhập"
+  else Employee tồn tại
+    API -> API : Check Password matches
+    alt Password không đúng
+      API --> FE : 401 Unauthorized ("Tên đăng nhập hoặc mật khẩu không đúng")
+      FE --> EMPLOYEE : "Sai thông tin đăng nhập"
+    else Password đúng
+      API -> API : Check Active == true
+      alt Active == false
+        API --> FE : 401 Unauthorized ("Tài khoản đã bị vô hiệu hóa")
+        FE --> EMPLOYEE : "Tài khoản đã bị khóa"
+      else Active == true
+        API -> HISTORY : LogHistoryAsync(employeeId, "Đăng nhập hệ thống")
+        HISTORY -> DB : INSERT Histories
+        API --> FE : 200 OK + SignInResponseDTO (Employee info + Role)
+        FE --> EMPLOYEE : "Đăng nhập thành công"\nRedirect to Dashboard
+      end
+    end
+  end
+else Không hợp lệ
+  API --> FE : 400 Bad Request ("Dữ liệu không hợp lệ")
+  FE --> EMPLOYEE : "Vui lòng nhập đầy đủ thông tin"
+end
+
+@enduml
+

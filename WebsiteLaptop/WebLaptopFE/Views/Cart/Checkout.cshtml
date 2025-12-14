@@ -1,0 +1,1463 @@
+﻿@{
+    ViewData["Title"] = "Đặt hàng";
+    Layout = "~/Views/Shared/_LayoutCheckout.cshtml";
+}
+
+@section Scripts {
+<script>
+    (function ($) {
+        'use strict';
+
+        // Cấu hình API
+        const getDefaultApiBase = () => {
+            if (window.CHECKOUT_API_BASE && window.CHECKOUT_API_BASE.trim()) {
+                return window.CHECKOUT_API_BASE.trim();
+            }
+            if (window.location && window.location.origin) {
+                const origin = window.location.origin;
+                if (!origin.includes('localhost')) {
+                    return origin;
+                }
+            }
+            return 'http://localhost:5068';
+        };
+
+        const API_BASE = getDefaultApiBase();
+        const CHECKOUT_API_BASE = `${API_BASE}/api/Checkout`;
+        const CART_API_BASE = `${API_BASE}/api/Cart`;
+        const ADDRESS_API_BASE = window.ADDRESS_API_BASE || `${API_BASE}/api/Address`;
+        const backendImageBase = `${API_BASE}/imageProducts/`;
+        const defaultProductImage = "/imageProducts/default-laptop.jpg";
+
+        // Helper function để lấy URL ảnh từ backend
+        function getBackendImageUrl(fileName) {
+            if (!fileName || typeof fileName !== "string" || !fileName.trim()) {
+                return defaultProductImage;
+            }
+            return backendImageBase + encodeURIComponent(fileName.trim());
+        }
+
+        // Lấy customerId từ session
+        function getCustomerId() {
+            try {
+                const isLoggedIn = sessionStorage.getItem('isLoggedIn');
+                const customer = sessionStorage.getItem('customer');
+                if (!isLoggedIn || !customer) {
+                    window.location.replace('/User/Login');
+                    return null;
+                }
+                const parsed = JSON.parse(customer);
+                return parsed.customerId || parsed.CustomerId || null;
+            } catch (err) {
+                console.error('Cannot get customerId:', err);
+                window.location.replace('/User/Login');
+                return null;
+            }
+        }
+
+        const currentCustomerId = getCustomerId();
+        if (!currentCustomerId) {
+            window.location.replace('/User/Login');
+        }
+
+        // Helper functions
+        function formatCurrency(value) {
+            return (value ?? 0).toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+        }
+
+        function showAlert(type, message) {
+            // Tạo toast notification ở góc trên bên phải
+            const toastId = 'toast-' + Date.now();
+            const iconMap = {
+                'success': '<i class="fa fa-check-circle me-2"></i>',
+                'danger': '<i class="fa fa-times-circle me-2"></i>',
+                'warning': '<i class="fa fa-exclamation-triangle me-2"></i>',
+                'info': '<i class="fa fa-info-circle me-2"></i>'
+            };
+            const icon = iconMap[type] || '';
+            
+            const toastHtml = `
+                <div id="${toastId}" class="toast-notification toast-${type}" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="toast-header bg-${type === 'danger' ? 'danger' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info'} text-white">
+                        ${icon}
+                        <strong class="me-auto">Thông báo</strong>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                </div>
+            `;
+            
+            // Tạo container nếu chưa có
+            if ($('#toast-container').length === 0) {
+                $('body').append('<div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>');
+            }
+            
+            $('#toast-container').append(toastHtml);
+            
+            // Khởi tạo và hiển thị toast
+            const toastElement = document.getElementById(toastId);
+            if (toastElement) {
+                const toast = new bootstrap.Toast(toastElement, {
+                    autohide: true,
+                    delay: 4000
+                });
+                toast.show();
+                
+                // Xóa toast khỏi DOM sau khi ẩn
+                toastElement.addEventListener('hidden.bs.toast', function() {
+                    $(this).remove();
+                });
+            }
+        }
+
+        let provinces = [];
+        const wardsCache = new Map();
+        
+        // Biến lưu trữ thông tin khuyến mại
+        let appliedPromotion = null;
+        let originalSubtotal = 0;
+        let currentDeliveryFee = 30000;
+
+        // Load danh sách khuyến mại
+        async function loadPromotions() {
+            try {
+                // Lấy danh sách cartDetailId đã chọn từ sessionStorage
+                const selectedCartItemsJson = sessionStorage.getItem('selectedCartItems');
+                const selectedCartDetailIds = selectedCartItemsJson ? JSON.parse(selectedCartItemsJson) : [];
+                
+                if (!selectedCartDetailIds || selectedCartDetailIds.length === 0) {
+                    $('#discountPromotionSelect').html('<option value="">Vui lòng chọn sản phẩm trước</option>');
+                    $('#freeshipPromotionSelect').html('<option value="">Vui lòng chọn sản phẩm trước</option>');
+                    return;
+                }
+
+                const url = `${CHECKOUT_API_BASE}/promotions?customerId=${encodeURIComponent(currentCustomerId)}&${selectedCartDetailIds.map(id => `selectedCartDetailIds=${encodeURIComponent(id)}`).join('&')}`;
+                const response = await fetch(url, { credentials: 'include' });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                
+                // Load khuyến mại giảm giá
+                const $discountSelect = $('#discountPromotionSelect');
+                $discountSelect.html('<option value="">Chọn khuyến mại giảm giá</option>');
+                
+                if (data.discountPromotions && data.discountPromotions.length > 0) {
+                    data.discountPromotions.forEach(promo => {
+                        $discountSelect.append(`<option value="${promo.promotionId}">${promo.displayText}</option>`);
+                    });
+                }
+
+                // Load khuyến mại freeship
+                const $freeshipSelect = $('#freeshipPromotionSelect');
+                $freeshipSelect.html('<option value="">Chọn khuyến mại freeship</option>');
+                
+                if (data.freeshipPromotions && data.freeshipPromotions.length > 0) {
+                    data.freeshipPromotions.forEach(promo => {
+                        $freeshipSelect.append(`<option value="${promo.promotionId}">${promo.displayText}</option>`);
+                    });
+                }
+            } catch (err) {
+                console.error('loadPromotions error:', err);
+                $('#discountPromotionSelect').html('<option value="">Lỗi khi tải khuyến mại</option>');
+                $('#freeshipPromotionSelect').html('<option value="">Lỗi khi tải khuyến mại</option>');
+            }
+        }
+
+        // Load địa chỉ
+        async function loadProvinces() {
+            if (provinces.length) {
+                initializeProvinceAutocomplete();
+                return provinces;
+            }
+            try {
+                const response = await fetch(`${ADDRESS_API_BASE}/provinces`, { credentials: 'include' });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                const list = Array.isArray(data) ? data : [];
+                provinces = list.map(item => ({
+                    code: String(item.code || item.id || '').trim(),
+                    name: String(item.name || '').trim()
+                })).filter(p => p.code && p.name);
+                initializeProvinceAutocomplete();
+                return provinces;
+            } catch (err) {
+                console.error('loadProvinces error:', err);
+                return [];
+            }
+        }
+
+        async function loadWardsByProvince(provinceCode) {
+            const $ward = $('#checkoutWard');
+            if (!$ward.length) return;
+            $ward.prop('disabled', true).val('').attr('placeholder', 'Đang tải...');
+            $('#checkoutWardValue').val('');
+            
+            if (!provinceCode) {
+                $ward.prop('disabled', true).val('').attr('placeholder', 'Tìm kiếm xã/phường...');
+                return;
+            }
+
+            if (wardsCache.has(provinceCode)) {
+                initializeWardAutocomplete(wardsCache.get(provinceCode));
+                return;
+            }
+
+            try {
+                const response = await fetch(`${ADDRESS_API_BASE}/wards/${provinceCode}`, { credentials: 'include' });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                const list = Array.isArray(data) ? data : [];
+                const wards = list.map(w => ({
+                    code: String(w.code || w.id || '').trim(),
+                    name: String(w.name || '').trim()
+                })).filter(w => w.code && w.name);
+                wardsCache.set(provinceCode, wards);
+                initializeWardAutocomplete(wards);
+            } catch (err) {
+                console.error('loadWards error:', err);
+                $ward.prop('disabled', true).val('').attr('placeholder', 'Không thể tải xã/phường');
+            }
+        }
+
+        // Khởi tạo autocomplete cho tỉnh/thành
+        function initializeProvinceAutocomplete() {
+            const provinceInput = $('#checkoutProvince');
+            const provinceValue = $('#checkoutProvinceValue');
+            const dropdown = $('#checkoutProvinceDropdown');
+            let selectedIndex = -1;
+            let filteredProvinces = [];
+
+            function showDropdown(provincesList) {
+                if (!provincesList || provincesList.length === 0) {
+                    dropdown.html('<div class="autocomplete-item" style="color: #6c757d; cursor: default;">Không tìm thấy tỉnh/thành</div>').show();
+                    selectedIndex = -1;
+                    return;
+                }
+
+                let html = '';
+                provincesList.forEach((province, index) => {
+                    const provinceName = province.name || province.code;
+                    const provinceNameEscaped = (provinceName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    html += `<div class="autocomplete-item" data-index="${index}" data-province-code="${province.code}" data-province-name="${provinceNameEscaped}">${provinceName}</div>`;
+                });
+                dropdown.html(html).show();
+                selectedIndex = -1;
+            }
+
+            function updateSelectedItem() {
+                $('#checkoutProvinceDropdown .autocomplete-item').removeClass('selected');
+                if (selectedIndex >= 0 && selectedIndex < filteredProvinces.length) {
+                    $('#checkoutProvinceDropdown .autocomplete-item').eq(selectedIndex).addClass('selected');
+                }
+            }
+
+            // Xử lý khi gõ
+            provinceInput.off('input.province').on('input.province', function() {
+                const searchTerm = $(this).val().toLowerCase().trim();
+                
+                if (searchTerm === '') {
+                    dropdown.hide();
+                    provinceValue.val('');
+                    $('#checkoutWard').prop('disabled', true).val('').attr('placeholder', 'Tìm kiếm xã/phường...');
+                    $('#checkoutWardValue').val('');
+                    return;
+                }
+
+                filteredProvinces = provinces.filter(p => {
+                    const provinceName = (p.name || p.code || '').toLowerCase();
+                    return provinceName.includes(searchTerm);
+                });
+
+                showDropdown(filteredProvinces);
+            });
+
+            // Xử lý khi click vào item
+            $(document).off('click.province-item').on('click.province-item', '#checkoutProvinceDropdown .autocomplete-item', function() {
+                const provinceCode = $(this).data('province-code');
+                const provinceName = $(this).data('province-name');
+                
+                if (provinceCode && provinceName) {
+                    provinceInput.val(provinceName);
+                    provinceValue.val(provinceCode);
+                    dropdown.hide();
+                    loadWardsByProvince(provinceCode);
+                }
+            });
+
+            // Xử lý phím tắt
+            provinceInput.off('keydown.province').on('keydown.province', function(e) {
+                if (dropdown.is(':visible') && filteredProvinces.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        selectedIndex = Math.min(selectedIndex + 1, filteredProvinces.length - 1);
+                        updateSelectedItem();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        selectedIndex = Math.max(selectedIndex - 1, -1);
+                        updateSelectedItem();
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (selectedIndex >= 0 && selectedIndex < filteredProvinces.length) {
+                            const province = filteredProvinces[selectedIndex];
+                            provinceInput.val(province.name || province.code);
+                            provinceValue.val(province.code);
+                            dropdown.hide();
+                            loadWardsByProvince(province.code);
+                        }
+                    } else if (e.key === 'Escape') {
+                        dropdown.hide();
+                        selectedIndex = -1;
+                    }
+                }
+            });
+
+            // Ẩn dropdown khi click ra ngoài
+            $(document).off('click.province-close').on('click.province-close', function(e) {
+                if (!$(e.target).closest('#checkoutProvince').closest('.autocomplete-wrapper').length) {
+                    dropdown.hide();
+                    selectedIndex = -1;
+                }
+            });
+
+            // Xử lý khi focus vào input
+            provinceInput.off('focus.province').on('focus.province', function() {
+                const val = $(this).val().trim();
+                if (val) {
+                    $(this).trigger('input.province');
+                } else {
+                    if (provinces.length > 0) {
+                        filteredProvinces = provinces;
+                        showDropdown(filteredProvinces);
+                    }
+                }
+            });
+        }
+
+        // Khởi tạo autocomplete cho phường/xã
+        function initializeWardAutocomplete(wardsList) {
+            const wardInput = $('#checkoutWard');
+            const wardValue = $('#checkoutWardValue');
+            const dropdown = $('#checkoutWardDropdown');
+            let selectedIndex = -1;
+            let filteredWards = [];
+
+            if (!wardsList || wardsList.length === 0) {
+                wardInput.prop('disabled', true).val('').attr('placeholder', 'Không có dữ liệu');
+                return;
+            }
+
+            wardInput.prop('disabled', false).attr('placeholder', 'Tìm kiếm xã/phường...');
+
+            function showDropdown(wards) {
+                if (!wards || wards.length === 0) {
+                    dropdown.html('<div class="autocomplete-item" style="color: #6c757d; cursor: default;">Không tìm thấy xã/phường</div>').show();
+                    selectedIndex = -1;
+                    return;
+                }
+
+                let html = '';
+                wards.forEach((ward, index) => {
+                    const wardName = ward.name || ward.code;
+                    const wardNameEscaped = (wardName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    html += `<div class="autocomplete-item" data-index="${index}" data-ward-code="${ward.code}" data-ward-name="${wardNameEscaped}">${wardName}</div>`;
+                });
+                dropdown.html(html).show();
+                selectedIndex = -1;
+            }
+
+            function updateSelectedItem() {
+                $('#checkoutWardDropdown .autocomplete-item').removeClass('selected');
+                if (selectedIndex >= 0 && selectedIndex < filteredWards.length) {
+                    $('#checkoutWardDropdown .autocomplete-item').eq(selectedIndex).addClass('selected');
+                }
+            }
+
+            // Xử lý khi gõ
+            wardInput.off('input.ward').on('input.ward', function() {
+                const searchTerm = $(this).val().toLowerCase().trim();
+                
+                if (searchTerm === '') {
+                    dropdown.hide();
+                    wardValue.val('');
+                    return;
+                }
+
+                filteredWards = wardsList.filter(w => {
+                    const wardName = (w.name || w.code || '').toLowerCase();
+                    return wardName.includes(searchTerm);
+                });
+
+                showDropdown(filteredWards);
+            });
+
+            // Xử lý khi click vào item
+            $(document).off('click.ward-item').on('click.ward-item', '#checkoutWardDropdown .autocomplete-item', function() {
+                const wardCode = $(this).data('ward-code');
+                const wardName = $(this).data('ward-name');
+                
+                if (wardCode && wardName) {
+                    wardInput.val(wardName);
+                    wardValue.val(wardCode);
+                    dropdown.hide();
+                }
+            });
+
+            // Xử lý phím tắt
+            wardInput.off('keydown.ward').on('keydown.ward', function(e) {
+                if (dropdown.is(':visible') && filteredWards.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        selectedIndex = Math.min(selectedIndex + 1, filteredWards.length - 1);
+                        updateSelectedItem();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        selectedIndex = Math.max(selectedIndex - 1, -1);
+                        updateSelectedItem();
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (selectedIndex >= 0 && selectedIndex < filteredWards.length) {
+                            const ward = filteredWards[selectedIndex];
+                            wardInput.val(ward.name || ward.code);
+                            wardValue.val(ward.code);
+                            dropdown.hide();
+                        }
+                    } else if (e.key === 'Escape') {
+                        dropdown.hide();
+                        selectedIndex = -1;
+                    }
+                }
+            });
+
+            // Ẩn dropdown khi click ra ngoài
+            $(document).off('click.ward-close').on('click.ward-close', function(e) {
+                if (!$(e.target).closest('#checkoutWard').closest('.autocomplete-wrapper').length) {
+                    dropdown.hide();
+                    selectedIndex = -1;
+                }
+            });
+
+            // Xử lý khi focus vào input
+            wardInput.off('focus.ward').on('focus.ward', function() {
+                const val = $(this).val().trim();
+                if (val) {
+                    $(this).trigger('input.ward');
+                } else {
+                    if (wardsList.length > 0) {
+                        filteredWards = wardsList;
+                        showDropdown(filteredWards);
+                    }
+                }
+            });
+        }
+
+        // Load giỏ hàng (chỉ các sản phẩm đã chọn)
+        async function loadCart() {
+            if (!currentCustomerId) {
+                $('#checkoutCartBody').html('<tr><td colspan="5" class="text-center text-danger">Vui lòng đăng nhập để tiếp tục</td></tr>');
+                return;
+            }
+
+            try {
+                // Lấy danh sách cartDetailId đã chọn từ sessionStorage
+                let selectedCartDetailIds = [];
+                try {
+                    const selectedCartItemsJson = sessionStorage.getItem('selectedCartItems');
+                    if (selectedCartItemsJson) {
+                        selectedCartDetailIds = JSON.parse(selectedCartItemsJson);
+                    }
+                } catch (parseErr) {
+                    console.error('Error parsing selectedCartItems from sessionStorage:', parseErr);
+                }
+                
+                if (!selectedCartDetailIds || selectedCartDetailIds.length === 0) {
+                    $('#checkoutCartBody').html('<tr><td colspan="5" class="text-center text-warning">Vui lòng chọn sản phẩm để thanh toán</td></tr>');
+                    updateTotals(0);
+                    return;
+                }
+
+                const response = await fetch(`${CART_API_BASE}/${currentCustomerId}`, { 
+                    credentials: 'include',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                // Đọc response text trước, sau đó parse JSON
+                const responseText = await response.text();
+                let data = null;
+                
+                if (responseText && responseText.trim()) {
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (parseError) {
+                        console.error('Failed to parse cart response as JSON:', responseText);
+                        throw new Error('Không thể đọc dữ liệu giỏ hàng');
+                    }
+                }
+                
+                if (!response.ok) {
+                    const errorMsg = data?.message || `Lỗi ${response.status}: ${response.statusText}`;
+                    throw new Error(errorMsg);
+                }
+                
+                if (!data) {
+                    throw new Error('Không nhận được dữ liệu từ server');
+                }
+                
+                // Lọc chỉ các sản phẩm đã chọn
+                // Hỗ trợ cả format data.items và data trực tiếp là array
+                const allItems = Array.isArray(data) ? data : (data.items || []);
+                const selectedItems = allItems.filter(item => {
+                    const itemId = item.cartDetailId || item.CartDetailId;
+                    return selectedCartDetailIds.includes(itemId);
+                });
+                
+                if (selectedItems.length === 0) {
+                    $('#checkoutCartBody').html('<tr><td colspan="5" class="text-center text-warning">Không có sản phẩm nào được chọn hoặc sản phẩm đã bị xóa khỏi giỏ hàng</td></tr>');
+                    updateTotals(0);
+                    return;
+                }
+                
+                renderCartItems(selectedItems);
+                
+                // Tính tổng tiền chỉ cho các sản phẩm đã chọn
+                const selectedTotal = selectedItems.reduce((sum, item) => {
+                    const price = item.price || item.Price || 0;
+                    const quantity = item.quantity || item.Quantity || 0;
+                    const subtotal = item.subtotal || item.Subtotal || (price * quantity);
+                    return sum + subtotal;
+                }, 0);
+                
+                // Reset khuyến mại khi load lại giỏ hàng
+                appliedPromotion = null;
+                $('#discountPromotionSelect').val('');
+                $('#freeshipPromotionSelect').val('');
+                $('#promotion-message').html('');
+                $('#discount-row').hide();
+                
+                // Load lại danh sách khuyến mại cho sản phẩm mới
+                await loadPromotions();
+                
+                updateTotals(selectedTotal);
+            } catch (err) {
+                console.error('loadCart error:', err);
+                const errorMsg = err.message || 'Không thể tải giỏ hàng';
+                $('#checkoutCartBody').html(`<tr><td colspan="5" class="text-center text-danger">${errorMsg}</td></tr>`);
+                updateTotals(0);
+            }
+        }
+
+        function renderCartItems(items) {
+            const $body = $('#checkoutCartBody');
+            if (!items || items.length === 0) {
+                $body.html('<tr><td colspan="5" class="text-center text-muted">Giỏ hàng trống</td></tr>');
+                return;
+            }
+
+            const rows = items.map(item => {
+                // Hỗ trợ cả camelCase và PascalCase
+                const productImage = item.productImage || item.ProductImage || '';
+                const productName = item.productName || item.ProductName || 'N/A';
+                const productModel = item.productModel || item.ProductModel || '';
+                const price = item.price || item.Price || 0;
+                const quantity = item.quantity || item.Quantity || 0;
+                const subtotal = item.subtotal || item.Subtotal || (price * quantity);
+                
+                const imageUrl = getBackendImageUrl(productImage);
+                const productNameDisplay = productModel 
+                    ? `${productName} ${productModel}` 
+                    : productName;
+                
+                return `
+                    <tr>
+                        <th scope="row">
+                            <div class="d-flex align-items-center mt-2">
+                                <img src="${imageUrl}" class="img-fluid" style="width: 90px; height: 90px; object-fit: cover;" alt="${productName}" onerror="this.src='${defaultProductImage}'">
+                            </div>
+                        </th>
+                        <td class="py-5">${productNameDisplay}</td>
+                        <td class="py-5 number-text">${formatCurrency(price)}</td>
+                        <td class="py-5">${quantity}</td>
+                        <td class="py-5 number-text">${formatCurrency(subtotal)}</td>
+                    </tr>`;
+            });
+
+            $body.html(rows.join(''));
+        }
+
+        function updateTotals(subtotal, deliveryFee = null, promotionData = null) {
+            originalSubtotal = subtotal;
+            let finalSubtotal = subtotal;
+            let finalDeliveryFee = deliveryFee !== null ? deliveryFee : currentDeliveryFee;
+            
+            // Áp dụng khuyến mại nếu có
+            if (promotionData) {
+                finalSubtotal = promotionData.discountedSubtotal || subtotal;
+                finalDeliveryFee = promotionData.finalDeliveryFee !== undefined ? promotionData.finalDeliveryFee : finalDeliveryFee;
+            }
+            
+            const total = finalSubtotal + finalDeliveryFee;
+            
+            // Tạm tính luôn hiển thị số tiền gốc (không áp dụng khuyến mại)
+            $('.subtotal-amount').text(formatCurrency(originalSubtotal));
+            $('.delivery-fee-amount').text(`+${formatCurrency(finalDeliveryFee)}`);
+            // Tổng hiển thị số tiền sau khi áp dụng khuyến mại
+            $('.total-amount').text(formatCurrency(total));
+            
+            // Hiển thị dòng giảm giá nếu có khuyến mại
+            if (promotionData && (promotionData.discount > 0 || promotionData.shippingDiscount > 0)) {
+                const totalDiscount = (promotionData.discount || 0) + (promotionData.shippingDiscount || 0);
+                $('.discount-amount').text(`-${formatCurrency(totalDiscount)}`);
+                $('#discount-row').show();
+            } else {
+                $('#discount-row').hide();
+            }
+        }
+
+        // Áp dụng khuyến mại
+        async function applyPromotion() {
+            const selectedDiscountPromotion = $('#discountPromotionSelect').val();
+            const selectedFreeshipPromotion = $('#freeshipPromotionSelect').val();
+            
+            if (!selectedDiscountPromotion && !selectedFreeshipPromotion) {
+                showAlert('warning', 'Vui lòng chọn ít nhất một loại khuyến mại');
+                return;
+            }
+
+            const btn = $('#btnApplyPromotion');
+            const original = btn.html();
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Đang áp dụng...');
+
+            try {
+                // Lấy danh sách cartDetailId đã chọn từ sessionStorage
+                const selectedCartItemsJson = sessionStorage.getItem('selectedCartItems');
+                const selectedCartDetailIds = selectedCartItemsJson ? JSON.parse(selectedCartItemsJson) : [];
+                
+                if (!selectedCartDetailIds || selectedCartDetailIds.length === 0) {
+                    showAlert('warning', 'Vui lòng chọn ít nhất một sản phẩm để áp dụng khuyến mại');
+                    return;
+                }
+
+                const requestBody = {
+                    customerId: currentCustomerId,
+                    selectedDiscountPromotions: selectedDiscountPromotion ? [selectedDiscountPromotion] : [],
+                    selectedFreeshipPromotions: selectedFreeshipPromotion ? [selectedFreeshipPromotion] : [],
+                    selectedCartDetailIds: selectedCartDetailIds,
+                    deliveryFee: currentDeliveryFee
+                };
+
+                const response = await fetch(`${CHECKOUT_API_BASE}/apply-promotion`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(requestBody)
+                });
+
+                const responseText = await response.text();
+                let data = null;
+                
+                if (responseText) {
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (parseError) {
+                        console.error('Failed to parse response as JSON:', responseText);
+                        if (!response.ok) {
+                            throw new Error(`Lỗi từ server: ${response.status} ${response.statusText}`);
+                        }
+                    }
+                }
+                
+                if (!response.ok) {
+                    let errorMessage = `Lỗi ${response.status}: ${response.statusText}`;
+                    if (data && data.message) {
+                        errorMessage = data.message;
+                    }
+                    throw new Error(errorMessage);
+                }
+                
+                if (!data) {
+                    throw new Error('Không nhận được dữ liệu từ server');
+                }
+
+                // Lưu thông tin khuyến mại đã áp dụng
+                appliedPromotion = {
+                    selectedDiscountPromotions: data.selectedDiscountPromotions,
+                    selectedFreeshipPromotions: data.selectedFreeshipPromotions,
+                    data: data
+                };
+
+                // Cập nhật hiển thị tổng tiền
+                updateTotals(originalSubtotal, currentDeliveryFee, data);
+
+                // Hiển thị danh sách sản phẩm được áp dụng khuyến mại
+                if (data.promotionDetails && data.promotionDetails.length > 0) {
+                    // Tách riêng khuyến mại giảm giá và freeship
+                    const discountPromotions = data.promotionDetails.filter(p => p.type === 'discount');
+                    const freeshipPromotions = data.promotionDetails.filter(p => p.type === 'freeship');
+                    
+                    let promotionInfo = '';
+                    
+                    if (discountPromotions.length > 0) {
+                        promotionInfo += `<strong>Sản phẩm được giảm giá:</strong><br><br>`;
+                        
+                        // Hiển thị chi tiết từng sản phẩm với số tiền giảm chính xác
+                        discountPromotions.forEach(promo => {
+                            promotionInfo += `${promo.displayText}: -${formatCurrency(promo.discountAmount)}<br>`;
+                        });
+                    }
+                    
+                    if (freeshipPromotions.length > 0) {
+                        if (promotionInfo) promotionInfo += '<br>';
+                        promotionInfo += `<strong>Khuyến mại vận chuyển:</strong><br><br>`;
+                        
+                        freeshipPromotions.forEach(promo => {
+                            promotionInfo += `${promo.displayText}: -${formatCurrency(promo.discountAmount)}`;
+                        });
+                    }
+                    
+                    if (promotionInfo) {
+                        $('#promotion-message').append(`<div class="alert alert-info small mt-2">${promotionInfo}</div>`);
+                    }
+                }
+
+            } catch (err) {
+                console.error('applyPromotion error:', err);
+                const errorMessage = err.message || 'Không thể áp dụng khuyến mại. Vui lòng thử lại sau.';
+                showAlert('danger', errorMessage);
+                $('#promotion-message').html('');
+                $('#discount-row').hide();
+                // Reset về trạng thái ban đầu
+                appliedPromotion = null;
+                updateTotals(originalSubtotal, currentDeliveryFee);
+            } finally {
+                btn.prop('disabled', false).html(original);
+            }
+        }
+
+        // Parse địa chỉ từ chuỗi đầy đủ
+        function parseAddress(fullAddress) {
+            if (!fullAddress || typeof fullAddress !== 'string') {
+                return { detailAddress: '', provinceName: '', wardName: '' };
+            }
+
+            const parts = fullAddress.split(',').map(p => p.trim()).filter(p => p);
+            if (parts.length === 0) {
+                return { detailAddress: fullAddress, provinceName: '', wardName: '' };
+            }
+
+            let detailAddress = '';
+            let wardName = '';
+            let provinceName = '';
+
+            // Phần cuối thường là tỉnh/thành phố
+            if (parts.length >= 1) {
+                provinceName = parts[parts.length - 1];
+            }
+            // Phần giữa thường là phường/xã
+            if (parts.length >= 2) {
+                wardName = parts[parts.length - 2];
+            }
+            // Phần đầu là địa chỉ chi tiết
+            if (parts.length >= 3) {
+                detailAddress = parts.slice(0, parts.length - 2).join(', ');
+            } else if (parts.length === 2) {
+                detailAddress = parts[0];
+            } else {
+                detailAddress = parts[0];
+            }
+
+            return {
+                detailAddress: detailAddress,
+                provinceName: provinceName,
+                wardName: wardName
+            };
+        }
+
+        // Tìm province code từ tên
+        function findProvinceCode(provinceName) {
+            if (!provinceName || provinces.length === 0) return '';
+            const matchedProvince = provinces.find(p => 
+                p.name.toLowerCase().includes(provinceName.toLowerCase()) ||
+                provinceName.toLowerCase().includes(p.name.toLowerCase())
+            );
+            return matchedProvince ? matchedProvince.code : '';
+        }
+
+        // Tìm ward code từ tên (sau khi wards đã được load)
+        function findWardCode(wardName, provinceCode) {
+            if (!wardName || !provinceCode || !wardsCache.has(provinceCode)) return '';
+            const wards = wardsCache.get(provinceCode);
+            const matchedWard = wards.find(w =>
+                w.name.toLowerCase().includes(wardName.toLowerCase()) ||
+                wardName.toLowerCase().includes(w.name.toLowerCase())
+            );
+            return matchedWard ? matchedWard.code : '';
+        }
+
+        // Load thông tin khách hàng
+        async function loadCustomerInfo() {
+            if (!currentCustomerId) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/CustomerAccount/${currentCustomerId}`, { credentials: 'include' });
+                if (!response.ok) return;
+                const customer = await response.json();
+                
+                // Điền thông tin vào form
+                const fullName = customer.customerName || customer.CustomerName || '';
+                if (fullName) {
+                    const nameParts = fullName.split(' ');
+                    if (nameParts.length > 1) {
+                        $('#checkoutLastName').val(nameParts[0]);
+                        $('#checkoutFirstName').val(nameParts.slice(1).join(' '));
+                    } else {
+                        $('#checkoutFirstName').val(fullName);
+                    }
+                }
+                $('#checkoutPhone').val(customer.phoneNumber || customer.PhoneNumber || '');
+                $('#checkoutEmail').val(customer.email || customer.Email || '');
+                
+                // Parse và điền địa chỉ
+                const fullAddress = customer.address || customer.Address || '';
+                if (fullAddress) {
+                    const parsed = parseAddress(fullAddress);
+                    $('#checkoutAddress').val(parsed.detailAddress);
+                    
+                    if (parsed.provinceName) {
+                        const provinceCode = findProvinceCode(parsed.provinceName);
+                        if (provinceCode) {
+                            const province = provinces.find(p => p.code === provinceCode);
+                            if (province) {
+                                $('#checkoutProvince').val(province.name);
+                                $('#checkoutProvinceValue').val(provinceCode);
+                            }
+                            // Load wards cho province này
+                            await loadWardsByProvince(provinceCode);
+                            // Sau khi load xong, tìm và set ward code
+                            if (parsed.wardName) {
+                                const wardCode = findWardCode(parsed.wardName, provinceCode);
+                                if (wardCode) {
+                                    const wards = wardsCache.get(provinceCode);
+                                    const ward = wards?.find(w => w.code === wardCode);
+                                    if (ward) {
+                                        $('#checkoutWard').val(ward.name);
+                                        $('#checkoutWardValue').val(wardCode);
+                                    }
+                                }
+                            }
+                        } else {
+                            // Nếu không tìm thấy code, vẫn hiển thị tên
+                            $('#checkoutProvince').val(parsed.provinceName);
+                        }
+                    }
+                } else {
+                    $('#checkoutAddress').val('');
+                }
+            } catch (err) {
+                console.error('loadCustomerInfo error:', err);
+            }
+        }
+
+        // Xóa tất cả lỗi validation
+        function clearAllErrors() {
+            $('.is-invalid').removeClass('is-invalid');
+        }
+
+        // Xử lý submit form
+        async function handleCheckout(e) {
+            e.preventDefault();
+            
+            // Lấy button và lưu trạng thái ban đầu
+            const btn = $('#btnPlaceOrder');
+            const original = btn.html();
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...');
+            
+            // Xóa tất cả lỗi cũ
+            clearAllErrors();
+            
+            const lastName = $('#checkoutLastName').val()?.toString().trim() || '';
+            const firstName = $('#checkoutFirstName').val()?.toString().trim() || '';
+            const fullName = [lastName, firstName].filter(n => n).join(' ').trim();
+            const phone = $('#checkoutPhone').val()?.toString().trim();
+            const email = $('#checkoutEmail').val()?.toString().trim();
+            const detailAddress = $('#checkoutAddress').val()?.toString().trim();
+            const provinceName = $('#checkoutProvince').val()?.toString().trim();
+            const provinceCode = $('#checkoutProvinceValue').val()?.toString().trim();
+            const wardName = $('#checkoutWard').val()?.toString().trim();
+            const wardCode = $('#checkoutWardValue').val()?.toString().trim();
+            const paymentMethod = $('input[name="PaymentMethod"]:checked').val();
+            // const note = $('#checkoutNote').val()?.toString().trim(); // Đã xóa ghi chú đơn hàng
+
+            let hasError = false;
+
+            // Validate từng trường
+            if (!lastName) {
+                $('#checkoutLastName').addClass('is-invalid');
+                hasError = true;
+            }
+            
+            if (!firstName) {
+                $('#checkoutFirstName').addClass('is-invalid');
+                hasError = true;
+            }
+
+            if (!phone) {
+                $('#checkoutPhone').addClass('is-invalid');
+                hasError = true;
+            } else if (!new RegExp('^\\d{9,15}$').test(phone)) {
+                $('#checkoutPhone').addClass('is-invalid');
+                hasError = true;
+            }
+
+            if (!email) {
+                $('#checkoutEmail').addClass('is-invalid');
+                hasError = true;
+            } else {
+                const atSymbol = String.fromCharCode(64);
+                const atIndex = email.indexOf(atSymbol);
+                const dotIndex = email.lastIndexOf('.');
+                if (atIndex <= 0 || dotIndex <= atIndex + 1 || dotIndex >= email.length - 1) {
+                    $('#checkoutEmail').addClass('is-invalid');
+                    hasError = true;
+                }
+            }
+
+            if (!detailAddress) {
+                $('#checkoutAddress').addClass('is-invalid');
+                hasError = true;
+            }
+
+            if (!provinceName || !provinceCode) {
+                $('#checkoutProvince').addClass('is-invalid');
+                hasError = true;
+            }
+
+            if (!wardName || !wardCode) {
+                $('#checkoutWard').addClass('is-invalid');
+                hasError = true;
+            }
+
+            if (!paymentMethod) {
+                $('input[name="PaymentMethod"]').closest('.form-check').addClass('is-invalid');
+                hasError = true;
+            }
+
+            if (hasError) {
+                // Kiểm tra nếu chưa chọn phương thức thanh toán thì hiển thị thông báo riêng
+                if (!paymentMethod) {
+                    showAlert('danger', 'Vui lòng chọn phương thức thanh toán');
+                } else {
+                    showAlert('danger', 'Vui lòng kiểm tra lại các trường bắt buộc');
+                }
+                btn.prop('disabled', false).html(original);
+                return;
+            }
+
+            // Ghép địa chỉ
+            let deliveryAddress = detailAddress;
+            if (wardName && wardName !== '') {
+                deliveryAddress = deliveryAddress ? `${deliveryAddress}, ${wardName}` : wardName;
+            }
+            if (provinceName && provinceName !== '') {
+                deliveryAddress = deliveryAddress ? `${deliveryAddress}, ${provinceName}` : provinceName;
+            }
+
+            // Lấy danh sách cartDetailId đã chọn từ sessionStorage
+            const selectedCartItemsJson = sessionStorage.getItem('selectedCartItems');
+            const selectedCartDetailIds = selectedCartItemsJson ? JSON.parse(selectedCartItemsJson) : [];
+            
+            if (!selectedCartDetailIds || selectedCartDetailIds.length === 0) {
+                showAlert('warning', 'Vui lòng chọn ít nhất một sản phẩm để thanh toán');
+                return;
+            }
+
+            try {
+                const requestBody = {
+                    customerId: currentCustomerId,
+                    fullName: fullName,
+                    phone: phone,
+                    email: email,
+                    deliveryAddress: deliveryAddress,
+                    paymentMethod: paymentMethod,
+                    deliveryFee: appliedPromotion && appliedPromotion.data.finalDeliveryFee !== undefined ? appliedPromotion.data.finalDeliveryFee : 30000,
+                    // note: note || null, // Đã xóa ghi chú đơn hàng
+                    selectedCartDetailIds: selectedCartDetailIds,
+                    selectedDiscountPromotions: appliedPromotion ? appliedPromotion.selectedDiscountPromotions : null,
+                    selectedFreeshipPromotions: appliedPromotion ? appliedPromotion.selectedFreeshipPromotions : null,
+                    discount: appliedPromotion ? appliedPromotion.data.discount : null,
+                    shippingDiscount: appliedPromotion ? appliedPromotion.data.shippingDiscount : null
+                };
+                
+                console.log('Sending checkout request:', requestBody);
+                
+                const response = await fetch(`${CHECKOUT_API_BASE}/create`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'include', // Quan trọng: gửi cookies/session
+                    body: JSON.stringify(requestBody)
+                });
+                
+                // Đọc response text trước, sau đó parse JSON
+                const responseText = await response.text();
+                let data = null;
+                
+                if (responseText) {
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (parseError) {
+                        console.error('Failed to parse response as JSON:', responseText);
+                        // Nếu không parse được JSON, vẫn có thể là lỗi
+                        if (!response.ok) {
+                            throw new Error(`Lỗi từ server: ${response.status} ${response.statusText}. ${responseText}`);
+                        }
+                    }
+                }
+                
+                if (!response.ok) {
+                    // Hiển thị lỗi chi tiết từ server
+                    let errorMessage = `Lỗi ${response.status}: ${response.statusText}`;
+                    if (data) {
+                        if (data.message) {
+                            errorMessage = data.message;
+                        } else if (data.error) {
+                            errorMessage = data.error;
+                        }
+                        // Log chi tiết lỗi để debug
+                        console.error('Server error response:', data);
+                    } else if (responseText) {
+                        errorMessage = responseText;
+                    }
+                    throw new Error(errorMessage);
+                }
+                
+                if (!data) {
+                    throw new Error('Không nhận được dữ liệu từ server');
+                }
+                
+                // Kiểm tra xem có cần chuyển hướng đến VNPay không
+                if (data && data.requiresPayment && data.paymentUrl) {
+                    // Thanh toán qua VNPay
+                    showAlert('info', 'Đang chuyển hướng đến VNPay để thanh toán...');
+                    
+                    // Trigger event để cập nhật số lượng đơn hàng trong header
+                    $(document).trigger('orderUpdated');
+                    if (typeof window.updateOrderCount === 'function') {
+                        window.updateOrderCount();
+                    }
+                    document.dispatchEvent(new Event('orderUpdated'));
+                    
+                    // Chuyển hướng đến VNPay sau 1 giây
+                    setTimeout(() => {
+                        window.location.href = data.paymentUrl;
+                    }, 1000);
+                } else {
+                    // Thanh toán khi nhận hàng
+                    if (data && data.message) {
+                        showAlert('success', data.message);
+                    } else {
+                        showAlert('success', 'Đặt hàng thành công!');
+                    }
+                    
+                    // Trigger event để cập nhật số lượng đơn hàng trong header
+                    $(document).trigger('orderUpdated');
+                    if (typeof window.updateOrderCount === 'function') {
+                        window.updateOrderCount();
+                    }
+                    document.dispatchEvent(new Event('orderUpdated'));
+                    
+                    setTimeout(() => {
+                        window.location.href = '/User/Account?success=true&message=' + encodeURIComponent('Đặt hàng thành công!') + '#tab-your-orders';
+                    }, 1500);
+                }
+            } catch (err) {
+                console.error('handleCheckout error:', err);
+                console.error('Error details:', {
+                    name: err.name,
+                    message: err.message,
+                    stack: err.stack
+                });
+                const errorMessage = err.message || 'Không thể đặt hàng. Vui lòng thử lại sau.';
+                showAlert('danger', errorMessage);
+            } finally {
+                btn.prop('disabled', false).html(original);
+            }
+        }
+
+        // Kiểm tra URL parameters để hiển thị thông báo lỗi thanh toán
+        function checkPaymentStatus() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const error = urlParams.get('error');
+            const errorCode = urlParams.get('code');
+            const errorMessage = urlParams.get('message');
+            
+            if (error === 'payment-failed') {
+                let message = 'Thanh toán thất bại. Vui lòng thử lại.';
+                if (errorMessage) {
+                    message = decodeURIComponent(errorMessage);
+                }
+                if (errorCode) {
+                    message += ` (Mã lỗi: ${errorCode})`;
+                }
+                showAlert('danger', message);
+            } else if (error === 'payment-error') {
+                let message = 'Có lỗi xảy ra trong quá trình thanh toán. Vui lòng thử lại.';
+                if (errorMessage) {
+                    message = decodeURIComponent(errorMessage);
+                }
+                showAlert('danger', message);
+            } else if (error === 'order-not-found') {
+                showAlert('warning', 'Không tìm thấy đơn hàng. Vui lòng kiểm tra lại.');
+            }
+            
+            // Xóa parameters khỏi URL sau khi hiển thị thông báo
+            if (error) {
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, newUrl);
+            }
+        }
+
+        // Initialize
+        $(document).ready(async function () {
+            // Kiểm tra trạng thái thanh toán từ URL
+            checkPaymentStatus();
+            
+            await loadProvinces();
+            await loadPromotions();
+            loadCart();
+            await loadCustomerInfo();
+
+            // Xóa lỗi khi người dùng nhập
+            $('#checkoutLastName, #checkoutFirstName').on('input', function() {
+                showFieldError('#' + this.id, '');
+            });
+            
+            $('#checkoutPhone').on('input', function() {
+                showFieldError('#checkoutPhone', '');
+            });
+            
+            $('#checkoutEmail').on('input', function() {
+                showFieldError('#checkoutEmail', '');
+            });
+            
+            $('#checkoutAddress').on('input', function() {
+                showFieldError('#checkoutAddress', '');
+            });
+            
+            $('#checkoutProvince').on('input', function() {
+                if ($('#checkoutProvinceValue').val()) {
+                    showFieldError('#checkoutProvince', '');
+                }
+            });
+            
+            $('#checkoutWard').on('input', function() {
+                if ($('#checkoutWardValue').val()) {
+                    showFieldError('#checkoutWard', '');
+                }
+            });
+            
+            $('input[name="PaymentMethod"]').on('change', function() {
+                showPaymentMethodError('');
+            });
+
+            // Event handler cho nút áp dụng khuyến mại
+            $('#btnApplyPromotion').on('click', applyPromotion);
+            
+            // Reset khuyến mại khi thay đổi selection
+            $('#discountPromotionSelect, #freeshipPromotionSelect').on('change', function() {
+                if (!$('#discountPromotionSelect').val() && !$('#freeshipPromotionSelect').val()) {
+                    appliedPromotion = null;
+                    $('#promotion-message').html('');
+                    $('#discount-row').hide();
+                    updateTotals(originalSubtotal, currentDeliveryFee);
+                }
+            });
+
+            $('#btnPlaceOrder').on('click', handleCheckout);
+        });
+    })(jQuery);
+</script>
+}
+
+<style>
+    /* Autocomplete styling */
+    .autocomplete-wrapper {
+        width: 100%;
+        display: block;
+        position: relative;
+    }
+
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: #fff;
+        border: 1px solid #d2d6da;
+        border-radius: 0.375rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1000;
+        margin-top: 2px;
+        display: none;
+    }
+
+    .autocomplete-item {
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom: none;
+    }
+
+    .autocomplete-item:hover,
+    .autocomplete-item.selected {
+        background-color: #f8f9fa;
+        color: #0d6efd;
+    }
+
+    .autocomplete-item:first-child {
+        border-top-left-radius: 0.375rem;
+        border-top-right-radius: 0.375rem;
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom-left-radius: 0.375rem;
+        border-bottom-right-radius: 0.375rem;
+    }
+    
+    /* Toast Notification Styles */
+    .toast-container {
+        z-index: 9999;
+    }
+    
+    .toast-notification {
+        min-width: 300px;
+        max-width: 400px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 10px;
+        background-color: #ffffff;
+    }
+    
+    .toast-notification .toast-header {
+        font-weight: 600;
+    }
+    
+    .toast-notification .toast-body {
+        padding: 0.75rem;
+    }
+    
+    .toast-success .toast-header {
+        background-color: #28a745 !important;
+    }
+    
+    .toast-danger .toast-header {
+        background-color: #dc3545 !important;
+    }
+    
+    .toast-warning .toast-header {
+        background-color: #ffc107 !important;
+        color: #000 !important;
+    }
+    
+    .toast-info .toast-header {
+        background-color: #17a2b8 !important;
+    }
+</style>
+
+        <!-- Checkout Page Start -->
+        <div class="container-fluid py-5">
+            <div class="container py-5">
+                <h1 class="mb-4">Thông tin thanh toán</h1>
+                <div class="checkout-form">
+                    <div class="row g-5">
+                        <div class="col-md-12 col-lg-6 col-xl-6">
+                            <div class="row">
+                                <div class="col-md-12 col-lg-6">
+                                    <div class="form-item w-100">
+                                        <label class="form-label my-3">Họ <sup>*</sup></label>
+                                        <input type="text" id="checkoutLastName" class="form-control" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-12 col-lg-6">
+                                    <div class="form-item w-100">
+                                        <label class="form-label my-3">Tên <sup>*</sup></label>
+                                        <input type="text" id="checkoutFirstName" class="form-control" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label my-3">Số điện thoại<sup>*</sup></label>
+                                <input type="tel" id="checkoutPhone" class="form-control" required>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label my-3">Địa chỉ email<sup>*</sup></label>
+                                <input type="email" id="checkoutEmail" class="form-control" required>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12 col-lg-6">
+                                    <div class="form-item w-100">
+                                        <label class="form-label my-3">Tỉnh/ Thành phố <sup>*</sup></label>
+                                        <div class="autocomplete-wrapper position-relative">
+                                          <input type="text" id="checkoutProvince" class="form-control" autocomplete="off" placeholder="Tìm kiếm tỉnh/thành phố..." required>
+                                          <input type="hidden" id="checkoutProvinceValue" value="">
+                                          <div id="checkoutProvinceDropdown" class="autocomplete-dropdown"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-12 col-lg-6">
+                                    <div class="form-item w-100">
+                                        <label class="form-label my-3">Xã/ Phường <sup>*</sup></label>
+                                        <div class="autocomplete-wrapper position-relative">
+                                          <input type="text" id="checkoutWard" class="form-control" autocomplete="off" placeholder="Tìm kiếm xã/phường..." required>
+                                          <input type="hidden" id="checkoutWardValue" value="">
+                                          <div id="checkoutWardDropdown" class="autocomplete-dropdown"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label my-3">Địa chỉ giao hàng <sup>*</sup></label>
+                                <input type="text" id="checkoutAddress" class="form-control" placeholder="Số nhà, tên đường" required>
+                            </div>
+                        </div>
+                        <div class="col-md-12 col-lg-6 col-xl-6">
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Sản phẩm</th>
+                                            <th scope="col">Tên</th>
+                                            <th scope="col">Giá</th>
+                                            <th scope="col">Số lượng</th>
+                                            <th scope="col">Thành tiền</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="checkoutCartBody">
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted">Đang tải giỏ hàng...</td>
+                                        </tr>
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <th scope="row"></th>
+                                            <td class="py-0">
+                                                <p class="mb-0 text-dark py-3">Tạm tính</p>
+                                            </td>
+                                            <td class="py-0"></td>
+                                            <td class="py-0"></td>
+                                            <td class="py-0">
+                                                <div class="py-3">
+                                                    <p class="mb-0 text-dark subtotal-amount" style="font-size: larger;">0 ₫</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th scope="row"></th>
+                                            <td class="py-0">
+                                                <p class="mb-0 text-dark py-3">Vận chuyển</p>
+                                            </td>
+                                            <td class="py-0"></td>
+                                            <td class="py-0"></td>
+                                            <td class="py-0">
+                                                <div class="py-3">
+                                                    <p class="mb-0 text-dark delivery-fee-amount" style="font-size: larger;">+30,000 ₫</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr id="discount-row" style="display: none;">
+                                            <th scope="row"></th>
+                                            <td class="py-0">
+                                                <p class="mb-0 text-success py-3">Giảm giá</p>
+                                            </td>
+                                            <td class="py-0"></td>
+                                            <td class="py-0"></td>
+                                            <td class="py-0">
+                                                <div class="py-3">
+                                                    <p class="mb-0 text-success discount-amount" style="font-size: larger;">0 ₫</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th scope="row"></th>
+                                            <td class="py-0">
+                                                <p class="mb-0 text-dark text-uppercase py-3">TỔNG</p>
+                                            </td>
+                                            <td class="py-0"></td>
+                                            <td class="py-0"></td>
+                                            <td class="py-0">
+                                                <div class="py-3">
+                                                    <p class="mb-0 text-dark total-amount" style="font-size: larger;">0 ₫</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                            <!-- Khuyến mại -->
+                            <div class="py-3">
+                                <p class="text-dark fw-bold mb-3" style="font-size: large;"><b>Chọn khuyến mại</b></p>
+                                
+                                <!-- Khuyến mại giảm giá -->
+                                <div class="mb-3">
+                                    <label class="form-label">Khuyến mại giảm giá (chỉ chọn 1):</label>
+                                    <select id="discountPromotionSelect" class="form-select border-0 border-bottom rounded py-2" style="box-shadow:none;">
+                                        <option value="">Chọn khuyến mại giảm giá</option>
+                                    </select>
+                                </div>
+
+                                <!-- Khuyến mại freeship -->
+                                <div class="mb-3">
+                                    <label class="form-label">Khuyến mại miễn phí vận chuyển (chỉ chọn 1):</label>
+                                    <select id="freeshipPromotionSelect" class="form-select border-0 border-bottom rounded py-2" style="box-shadow:none;">
+                                        <option value="">Chọn khuyến mại freeship</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <button type="button" id="btnApplyPromotion" class="btn border-secondary rounded-pill px-4 py-3 text-primary">
+                                        Áp dụng khuyến mại
+                                    </button>
+                                </div>
+                                
+                                <div id="promotion-message" class="w-100 mt-2"></div>
+                            </div>
+
+                            <!-- Phương thức thanh toán -->
+                            <div class="py-3">
+                                <p class="text-dark fw-bold mb-3" style="font-size: large;"><b>Chọn phương thức thanh toán</b></p>
+
+                                <div class="mb-3">
+                                    <div class="form-check my-2">
+                                        <input type="radio" class="form-check-input bg-primary border-0" id="Payment-Transfer" name="PaymentMethod" value="Chuyển khoản ngân hàng">
+                                        <label class="form-check-label" for="Payment-Transfer">Chuyển khoản ngân hàng</label>
+                                    </div>
+
+                                    <div class="form-check my-2">
+                                        <input type="radio" class="form-check-input bg-primary border-0" id="Payment-COD" name="PaymentMethod" value="Thanh toán khi nhận hàng">
+                                        <label class="form-check-label" for="Payment-COD">Thanh toán khi nhận hàng</label>
+                                    </div>
+                                    <div id="payment-method-error"></div>
+                                </div>
+                            </div>
+
+                            <!-- Nút đặt hàng -->
+                            <div class="py-3">
+                                <button type="button" id="btnPlaceOrder" class="btn border-secondary py-3 px-4 text-uppercase w-100 text-primary">Đặt hàng</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Checkout Page End -->

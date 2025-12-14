@@ -1,0 +1,159 @@
+@startuml
+
+hide footbox
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 12
+skinparam maxMessageSize 500
+skinparam ParticipantPadding 100
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam ActorBackgroundColor transparent
+skinparam ParticipantBackgroundColor transparent
+skinparam SequenceGroupBackgroundColor transparent
+skinparam SequenceBoxBackgroundColor transparent
+skinparam NoteBackgroundColor transparent
+
+skinparam SequenceActivationBorderColor black
+skinparam ActorBorderColor black
+skinparam ParticipantBorderColor black
+skinparam ArrowColor black
+skinparam roundcorner 0
+
+actor "Khách hàng" as CUSTOMER
+participant "Frontend (User Web)" as FE
+participant "LoginAPIController" as API
+participant "Google OAuth API" as GOOGLE
+participant "Facebook Graph API" as FACEBOOK
+database "Database" as DB
+
+' Đăng nhập thông thường
+alt Đăng nhập bằng Email/Username + Password
+  CUSTOMER -> FE : Nhập Email/Username + Password\nNhấn "Đăng nhập"
+  FE -> API : POST /api/Login
+  API -> API : Validate (EmailOrUsername, Password not empty, length <= 50)
+  alt Hợp lệ
+    API -> DB : SELECT customer WHERE (Email=credential OR Username=credential)
+    alt Customer không tồn tại
+      API --> FE : 401 Unauthorized ("Email/Tên đăng nhập hoặc mật khẩu không đúng")
+      FE --> CUSTOMER : "Sai thông tin đăng nhập"
+    else Customer tồn tại
+      API -> API : Check Password matches
+      alt Password không đúng
+        API --> FE : 401 Unauthorized ("Email/Tên đăng nhập hoặc mật khẩu không đúng")
+        FE --> CUSTOMER : "Sai thông tin đăng nhập"
+      else Password đúng
+        API -> API : Check Active == true
+        alt Active == false
+          API --> FE : 401 Unauthorized ("Tài khoản đã bị khóa")
+          FE --> CUSTOMER : "Tài khoản đã bị khóa"
+        else Active == true
+          API --> FE : 200 OK + CustomerDTO
+          FE --> CUSTOMER : "Đăng nhập thành công"\nRedirect
+        end
+      end
+    end
+  else Không hợp lệ
+    API --> FE : 400 Bad Request
+    FE --> CUSTOMER : "Vui lòng nhập đầy đủ thông tin"
+  end
+
+else Đăng nhập bằng Google
+  CUSTOMER -> FE : Chọn "Đăng nhập bằng Google"
+  FE -> GOOGLE : OAuth flow (lấy IdToken hoặc AccessToken)
+  GOOGLE --> FE : IdToken hoặc AccessToken + UserInfo
+  FE -> API : POST /api/Login/google (IdToken hoặc AccessToken + UserInfo)
+  alt Có IdToken
+    API -> API : GoogleJsonWebSignature.ValidateAsync(IdToken)
+    alt Token hợp lệ
+      API -> API : Extract payload (Email, Name, Picture)
+    else Token không hợp lệ
+      API --> FE : 401 Unauthorized ("Token Google không hợp lệ")
+      FE --> CUSTOMER : "Đăng nhập thất bại"
+    end
+  else Có AccessToken
+    API -> GOOGLE : GET /oauth2/v1/tokeninfo?access_token
+    GOOGLE --> API : Token info
+    alt Token hợp lệ
+      API -> API : Extract UserInfo (Email, Name, Picture)
+    else Token không hợp lệ
+      API --> FE : 401 Unauthorized ("Access token Google không hợp lệ")
+      FE --> CUSTOMER : "Đăng nhập thất bại"
+    end
+  end
+  alt Có payload hợp lệ
+    API -> DB : SELECT customer WHERE Email
+    alt Customer không tồn tại
+      API -> API : GenerateCustomerId()
+      API -> API : GenerateUsername(email)
+      API -> DB : INSERT Customers (Email, CustomerName, Username, Avatar, Password="GOOGLE_OAUTH")
+      API -> DB : SaveChanges
+      API --> FE : 200 OK + CustomerDTO
+      FE --> CUSTOMER : "Đăng nhập thành công"\nRedirect
+    else Customer tồn tại
+      API -> API : Check Active == true
+      alt Active == false
+        API --> FE : 401 Unauthorized ("Tài khoản đã bị khóa")
+        FE --> CUSTOMER : "Tài khoản đã bị khóa"
+      else Active == true
+        opt Chưa có Avatar hoặc CustomerName
+          API -> DB : UPDATE Customers SET (Avatar, CustomerName if empty)
+          API -> DB : SaveChanges
+        end
+        API --> FE : 200 OK + CustomerDTO
+        FE --> CUSTOMER : "Đăng nhập thành công"\nRedirect
+      end
+    end
+  end
+
+else Đăng nhập bằng Facebook
+  CUSTOMER -> FE : Chọn "Đăng nhập bằng Facebook"
+  FE -> FACEBOOK : OAuth flow (lấy AccessToken)
+  FACEBOOK --> FE : AccessToken
+  FE -> API : POST /api/Login/facebook (AccessToken)
+  API -> API : Validate AccessToken not empty
+  API -> FACEBOOK : GET /me?fields=id,name,email,picture&access_token
+  FACEBOOK --> API : UserInfo (id, name, email, picture)
+  alt Response không thành công
+    opt Không có email trong response
+      API -> FACEBOOK : GET /me?fields=email&access_token
+      FACEBOOK --> API : Email (if available)
+    end
+    API -> API : Parse UserInfo (id, name, email, picture)
+    alt Không có Facebook ID
+      API --> FE : 401 Unauthorized ("Không thể lấy thông tin từ Facebook")
+      FE --> CUSTOMER : "Đăng nhập thất bại"
+    else Có Facebook ID
+      API -> API : Generate usernameFromId = "fb_{facebookId}"
+      API -> DB : SELECT customer WHERE (Email=email OR Username=usernameFromId)
+      alt Customer không tồn tại
+        API -> API : GenerateCustomerId() (check duplicate)
+        API -> API : Generate unique Username (check duplicate)
+        API -> API : TruncateAvatarUrl(pictureUrl, 200)
+        API -> DB : INSERT Customers (CustomerName, Email, Username, Avatar, Password="FACEBOOK_OAUTH")
+        API -> DB : SaveChanges
+        API --> FE : 200 OK + CustomerDTO
+        FE --> CUSTOMER : "Đăng nhập thành công"\nRedirect
+      else Customer tồn tại
+        API -> API : Check Active == true
+        alt Active == false
+          API --> FE : 401 Unauthorized ("Tài khoản đã bị khóa")
+          FE --> CUSTOMER : "Tài khoản đã bị khóa"
+        else Active == true
+          opt Cần cập nhật thông tin
+            API -> DB : UPDATE Customers SET (CustomerName if empty, Email if empty, Avatar if empty, remove temp email)
+            API -> DB : SaveChanges
+          end
+          API --> FE : 200 OK + CustomerDTO
+          FE --> CUSTOMER : "Đăng nhập thành công"\nRedirect
+        end
+      end
+    end
+  else Response không thành công
+    API --> FE : 401 Unauthorized ("Access token Facebook không hợp lệ")
+    FE --> CUSTOMER : "Đăng nhập thất bại"
+  end
+end
+
+@enduml
+

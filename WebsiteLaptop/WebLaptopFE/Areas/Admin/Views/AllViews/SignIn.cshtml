@@ -1,0 +1,149 @@
+﻿@{
+    ViewData["Title"] = "Đăng nhập";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutSignIn.cshtml";
+}
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+        @TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+        @TempData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div id="errorMessage" class="alert alert-danger" style="display: none; margin: 10px 0;"></div>
+
+<form id="signInForm" role="form" class="text-start">
+    <div class="input-group input-group-outline my-3">
+        <label class="form-label">Email hoặc tên đăng nhập</label>
+        <input type="text" id="usernameOrEmail" name="usernameOrEmail" class="form-control" required>
+    </div>
+    <div class="input-group input-group-outline mb-3">
+        <label class="form-label">Password</label>
+        <input type="password" id="password" name="password" class="form-control" required>
+    </div>
+    <div>
+        <a href="@Url.Action("Index", "ForgetPassword", new { area = "Admin" })" class="text-primary text-gradient font-weight-bold">Quên mật khẩu?</a>
+    </div>
+    <div class="text-center">
+        <button type="submit" id="submitButton" class="btn bg-gradient-primary w-100 my-4 mb-2">Đăng nhập</button>
+    </div>
+</form>
+
+<script>
+    // Ẩn thông báo sau 5 giây
+    setTimeout(function() {
+        var alerts = document.querySelectorAll('.alert');
+        alerts.forEach(function(alert) {
+            var bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        });
+    }, 5000);
+</script>
+
+<script>
+    const API_URL = 'http://localhost:5068/api/SignInAPI';
+    const SET_SESSION_URL = '@Url.Action("SetSession", "SignIn", new { area = "Admin" })';
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var form = document.getElementById('signInForm');
+        var submitButton = document.getElementById('submitButton');
+
+        if (form && submitButton) {
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+
+                var usernameInput = document.getElementById('usernameOrEmail');
+                var passwordInput = document.getElementById('password');
+                
+                // Validate
+                if (!usernameInput.value.trim()) {
+                    showError('Vui lòng nhập email hoặc tên đăng nhập');
+                    return false;
+                }
+
+                if (!passwordInput.value) {
+                    showError('Vui lòng nhập mật khẩu');
+                    return false;
+                }
+
+                // Disable button và hiển thị loading
+                submitButton.disabled = true;
+                var originalButtonText = submitButton.innerHTML;
+                submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Đang xử lý...';
+                hideError();
+
+                try {
+                    // Gọi API đăng nhập
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            usernameOrEmail: usernameInput.value.trim(),
+                            password: passwordInput.value,
+                            rememberMe: false
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success && data.employee) {
+                        // Set session
+                        const sessionResponse = await fetch(SET_SESSION_URL, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(data.employee)
+                        });
+
+                        const sessionData = await sessionResponse.json();
+
+                        if (sessionData.success) {
+                            // Redirect đến Dashboard
+                            window.location.href = '@Url.Action("Index", "Dashboard", new { area = "Admin" })';
+                        } else {
+                            showError('Lỗi khi thiết lập session: ' + (sessionData.message || 'Lỗi không xác định'));
+                            submitButton.disabled = false;
+                            submitButton.innerHTML = originalButtonText;
+                        }
+                    } else {
+                        showError(data.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = originalButtonText;
+                    }
+                } catch (error) {
+                    showError('Không thể kết nối đến server. Vui lòng thử lại sau.');
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalButtonText;
+                }
+            });
+        }
+
+        function showError(message) {
+            var errorMessageDiv = document.getElementById('errorMessage');
+            if (errorMessageDiv) {
+                errorMessageDiv.textContent = message;
+                errorMessageDiv.style.display = 'block';
+                errorMessageDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        function hideError() {
+            var errorMessageDiv = document.getElementById('errorMessage');
+            if (errorMessageDiv) {
+                errorMessageDiv.style.display = 'none';
+            }
+        }
+    });
+</script>

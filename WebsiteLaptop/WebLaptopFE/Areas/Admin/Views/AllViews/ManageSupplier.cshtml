@@ -1,0 +1,934 @@
+﻿@{
+    ViewData["Title"] = "Quản lý nhà cung cấp";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card my-4">
+                <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                    <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="text-white text-capitalize ps-3 mb-0">Quản lý nhà cung cấp</h6>
+                            <button class="btn btn-light btn-sm me-3" onclick="showCreateModal()">
+                                <i class="material-icons text-sm">add</i> Thêm mới
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body px-3 pb-2">
+                    <!-- Bộ lọc và tìm kiếm -->
+                    <div class="row mb-3 g-2 align-items-end">
+                        <div class="col-lg-4 col-md-6">
+                            <div class="input-group input-group-outline">
+                                <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm nhà cung cấp...">
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <div class="input-group input-group-outline is-filled">
+                                <select class="form-control" id="activeFilter">
+                                    <option value="">Tất cả trạng thái</option>
+                                    <option value="true">Hoạt động</option>
+                                    <option value="false">Không hoạt động</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bảng nhà cung cấp -->
+                    <div class="table-responsive p-0">
+                        <table class="table align-items-center mb-0" style="table-layout: fixed; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 12%;">Mã NCC</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 20%;">Tên nhà cung cấp</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Số điện thoại</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 20%;">Email</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 10%;">Trạng thái</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 8%;">Số PN</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="supplierTableBody">
+                                <!-- Dữ liệu sẽ được load bằng AJAX -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Phân trang -->
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <p class="text-sm mb-0" id="pageInfo">Đang tải...</p>
+                        </div>
+                        <div class="col-md-6">
+                            <nav aria-label="Page navigation">
+                                <ul class="pagination justify-content-end mb-0" id="pagination">
+                                    <!-- Phân trang sẽ được tạo bằng JavaScript -->
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xem chi tiết -->
+<div class="modal fade" id="viewModal" tabindex="-1" aria-labelledby="viewModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-info">
+                <h5 class="modal-title text-white" id="viewModalLabel">Chi tiết nhà cung cấp</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="viewModalBody">
+                <!-- Nội dung sẽ được load bằng JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Thêm/Sửa -->
+<div class="modal fade" id="createEditModal" tabindex="-1" aria-labelledby="createEditModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-primary">
+                <h5 class="modal-title text-white" id="createEditModalLabel">Thêm nhà cung cấp</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="supplierForm">
+                    <input type="hidden" id="supplierId" value="">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Mã nhà cung cấp</label>
+                                <input type="text" class="form-control" id="supplierIdInput" readonly>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Tên nhà cung cấp *</label>
+                                <input type="text" class="form-control" id="supplierNameInput" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Số điện thoại</label>
+                                <input type="text" class="form-control" id="phoneNumberInput">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" id="emailInput">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Địa chỉ</label>
+                                <textarea class="form-control" id="addressInput" rows="3"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-danger mb-3" id="formErrorMessage" style="display:none;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" onclick="saveSupplier()">
+                    <i class="material-icons text-sm">save</i> Lưu
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xác nhận xóa -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-danger">
+                <h5 class="modal-title text-white" id="deleteModalLabel">Xác nhận xóa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Bạn có chắc chắn muốn xóa nhà cung cấp <strong id="deleteSupplierId"></strong>?</p>
+                <p class="text-danger text-sm mt-2" id="deleteWarningMessage" style="display:none;"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDelete()">Xóa</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xác nhận khôi phục -->
+<div class="modal fade" id="restoreModal" tabindex="-1" aria-labelledby="restoreModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-success">
+                <h5 class="modal-title text-white" id="restoreModalLabel">Xác nhận khôi phục</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Bạn có chắc chắn muốn khôi phục nhà cung cấp <strong id="restoreSupplierId"></strong>?</p>
+                <p class="text-danger text-sm mt-2" id="restoreWarningMessage" style="display:none;"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-success" onclick="confirmRestore()">Khôi phục</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <!-- Select2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <!-- Select2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script>
+        const API_URL = 'http://localhost:5068/api/admin/suppliers';
+        const EMPLOYEE_ID = '@Context.Session.GetString("EmployeeId")';
+        let currentPage = 1;
+        let pageSize = 10;
+        let searchDebounceTimer = null;
+        const SEARCH_DEBOUNCE_DELAY = 300;
+        let deleteSupplierId = null;
+        let restoreSupplierId = null;
+
+        $(document).ready(function() {
+            loadSuppliers();
+
+            // Tìm kiếm tự động
+            $('#searchInput').on('input', function() {
+                triggerAutoSearch();
+            });
+
+            // Lọc theo trạng thái
+            $('#activeFilter').on('change', function() {
+                triggerAutoSearch();
+            });
+
+            // Xử lý label cho Material Dashboard inputs
+            window.updateInputLabels = function() {
+                $('.input-group-outline input, .input-group-outline select, .input-group-outline textarea').each(function() {
+                    const $input = $(this);
+                    const value = $input.val();
+                    if (value && value.trim() !== '') {
+                        $input.closest('.input-group-outline').addClass('is-filled');
+                    } else {
+                        $input.closest('.input-group-outline').removeClass('is-filled');
+                    }
+                });
+            };
+
+            $(document).on('input change', '.input-group-outline input, .input-group-outline select, .input-group-outline textarea', function() {
+                const $input = $(this);
+                const value = $input.val();
+                if (value && value.trim() !== '') {
+                    $input.closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    $input.closest('.input-group-outline').removeClass('is-filled');
+                }
+            });
+
+            $(document).on('focus', '.input-group-outline input, .input-group-outline select, .input-group-outline textarea', function() {
+                $(this).closest('.input-group-outline').addClass('is-focused');
+            });
+
+            $(document).on('blur', '.input-group-outline input, .input-group-outline select, .input-group-outline textarea', function() {
+                const $input = $(this);
+                const $group = $input.closest('.input-group-outline');
+                $group.removeClass('is-focused');
+                const value = $input.val();
+                if (value && value.trim() !== '') {
+                    $group.addClass('is-filled');
+                } else {
+                    $group.removeClass('is-filled');
+                }
+            });
+        });
+
+        function triggerAutoSearch() {
+            currentPage = 1;
+            if (searchDebounceTimer) {
+                clearTimeout(searchDebounceTimer);
+            }
+            searchDebounceTimer = setTimeout(() => {
+                loadSuppliers();
+            }, SEARCH_DEBOUNCE_DELAY);
+        }
+
+        // Load danh sách nhà cung cấp
+        function loadSuppliers(page = currentPage) {
+            currentPage = page;
+            const searchTerm = $('#searchInput').val().trim();
+            const activeFilter = $('#activeFilter').val();
+
+            const dataParams = {
+                pageNumber: currentPage,
+                pageSize: pageSize,
+                searchTerm: searchTerm || null,
+                active: activeFilter === '' ? null : (activeFilter === 'true')
+            };
+
+            $.ajax({
+                url: API_URL,
+                type: 'GET',
+                data: dataParams,
+                success: function(response) {
+                    displaySuppliers(response.items);
+                    displayPagination(response);
+                    updatePageInfo(response);
+                },
+                error: function(xhr) {
+                    console.error('Lỗi khi tải nhà cung cấp:', xhr);
+                    showNotification('Lỗi khi tải dữ liệu nhà cung cấp', 'error');
+                }
+            });
+        }
+
+        // Hiển thị nhà cung cấp
+        function displaySuppliers(suppliers) {
+            const tbody = $('#supplierTableBody');
+            tbody.empty();
+
+            if (suppliers.length === 0) {
+                tbody.append(`
+                    <tr>
+                        <td colspan="7" class="text-center text-secondary py-4">
+                            Không có nhà cung cấp nào
+                        </td>
+                    </tr>
+                `);
+                return;
+            }
+
+            $.each(suppliers, function(index, supplier) {
+                const isActive = supplier.active !== false; // Mặc định true nếu không có giá trị
+                const statusBadge = isActive 
+                    ? '<span class="badge badge-sm bg-gradient-success">Hoạt động</span>'
+                    : '<span class="badge badge-sm bg-gradient-secondary">Không hoạt động</span>';
+                const supplierNameEscaped = (supplier.supplierName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+                // Nút thao tác khác nhau tùy theo active
+                let actionButtons = '';
+                if (isActive) {
+                    // Nhà cung cấp đang hoạt động: có nút Xem, Sửa, Xóa
+                    actionButtons = `
+                        <button class="btn btn-info action-btn" onclick='viewSupplier("${supplier.supplierId}")' title="Xem">
+                            <i class="material-icons text-sm">visibility</i>
+                        </button>
+                        <button class="btn btn-warning action-btn" onclick='editSupplier("${supplier.supplierId}")' title="Sửa">
+                            <i class="material-icons text-sm">edit</i>
+                        </button>
+                        <button class="btn btn-danger action-btn" onclick='deleteSupplier("${supplier.supplierId}")' title="Xóa">
+                            <i class="material-icons text-sm">delete</i>
+                        </button>
+                    `;
+                } else {
+                    // Nhà cung cấp không hoạt động: có nút Xem, Khôi phục
+                    actionButtons = `
+                        <button class="btn btn-info action-btn" onclick='viewSupplier("${supplier.supplierId}")' title="Xem">
+                            <i class="material-icons text-sm">visibility</i>
+                        </button>
+                        <button class="btn btn-success action-btn" onclick='restoreSupplier("${supplier.supplierId}", "${supplierNameEscaped}")' title="Khôi phục">
+                            <i class="material-icons text-sm">restore</i>
+                        </button>
+                    `;
+                }
+                
+                tbody.append(`
+                    <tr class="${!isActive ? 'table-secondary' : ''}">
+                        <td style="vertical-align: middle;">
+                            <span class="text-xs font-weight-bold">${supplier.supplierId}</span>
+                        </td>
+                        <td style="vertical-align: middle;">
+                            <span class="text-xs font-weight-bold">${supplier.supplierName || '-'}</span>
+                        </td>
+                        <td style="vertical-align: middle;">
+                            <span class="text-xs">${supplier.phoneNumber || '-'}</span>
+                        </td>
+                        <td style="vertical-align: middle;">
+                            <span class="text-xs">${supplier.email || '-'}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            ${statusBadge}
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold">${supplier.stockImportCount || 0}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;" class="table-actions">
+                            ${actionButtons}
+                        </td>
+                    </tr>
+                `);
+            });
+        }
+
+        // Hiển thị phân trang
+        function displayPagination(response) {
+            const pagination = $('#pagination');
+            pagination.empty();
+
+            if (response.totalPages <= 1) return;
+
+            pagination.append(`
+                <li class="page-item ${response.hasPreviousPage ? '' : 'disabled'}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadSuppliers(${currentPage - 1})">
+                        <i class="material-icons text-sm">chevron_left</i>
+                    </a>
+                </li>
+            `);
+
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(response.totalPages, currentPage + 2);
+
+            if (startPage > 1) {
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadSuppliers(1)">1</a></li>`);
+                if (startPage > 2) {
+                    pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                pagination.append(`
+                    <li class="page-item ${i === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="javascript:void(0)" onclick="loadSuppliers(${i})">${i}</a>
+                    </li>
+                `);
+            }
+
+            if (endPage < response.totalPages) {
+                if (endPage < response.totalPages - 1) {
+                    pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadSuppliers(${response.totalPages})">${response.totalPages}</a></li>`);
+            }
+
+            pagination.append(`
+                <li class="page-item ${response.hasNextPage ? '' : 'disabled'}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadSuppliers(${currentPage + 1})">
+                        <i class="material-icons text-sm">chevron_right</i>
+                    </a>
+                </li>
+            `);
+        }
+
+        // Cập nhật thông tin trang
+        function updatePageInfo(response) {
+            const start = (response.pageNumber - 1) * response.pageSize + 1;
+            const end = Math.min(response.pageNumber * response.pageSize, response.totalItems);
+            $('#pageInfo').text(`Hiển thị ${start} - ${end} trong tổng số ${response.totalItems} nhà cung cấp`);
+        }
+
+        // Xem chi tiết nhà cung cấp
+        function viewSupplier(supplierId) {
+            $.ajax({
+                url: `${API_URL}/${supplierId}`,
+                type: 'GET',
+                success: function(supplier) {
+                    let html = `
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Mã nhà cung cấp:</strong> ${supplier.supplierId}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Trạng thái:</strong> ${supplier.active ? '<span class="badge badge-sm bg-gradient-success">Hoạt động</span>' : '<span class="badge badge-sm bg-gradient-secondary">Không hoạt động</span>'}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <strong>Tên nhà cung cấp:</strong> ${supplier.supplierName || '-'}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Số điện thoại:</strong> ${supplier.phoneNumber || '-'}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Email:</strong> ${supplier.email || '-'}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <strong>Địa chỉ:</strong> ${supplier.address || '-'}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <strong>Số phiếu nhập:</strong> ${supplier.stockImportCount || 0}
+                            </div>
+                        </div>
+                    `;
+
+                    $('#viewModalBody').html(html);
+                    const modal = new bootstrap.Modal(document.getElementById('viewModal'));
+                    modal.show();
+                },
+                error: function(xhr) {
+                    console.error('Error loading supplier:', xhr);
+                    showNotification('Lỗi khi tải thông tin nhà cung cấp', 'error');
+                }
+            });
+        }
+
+        // Tạo ID tự động
+        function generateNextSupplierId() {
+            $.ajax({
+                url: API_URL,
+                type: 'GET',
+                data: { pageNumber: 1, pageSize: 1000 },
+                success: function(response) {
+                    let nextId = 'SUP001';
+                    if (response.items && response.items.length > 0) {
+                        let maxNumber = 0;
+                        response.items.forEach(function(item) {
+                            const id = item.supplierId;
+                            // Format: SUP001 (6 ký tự: SUP + 3 số)
+                            if (id && id.startsWith('SUP') && id.length === 6) {
+                                // Lấy phần số sau ký tự "SUP" (từ vị trí 3)
+                                const number = parseInt(id.substring(3)) || 0;
+                                maxNumber = Math.max(maxNumber, number);
+                            }
+                        });
+                        nextId = 'SUP' + String(maxNumber + 1).padStart(3, '0');
+                    }
+                    $('#supplierIdInput').val(nextId);
+                    updateInputLabels();
+                },
+                error: function() {
+                    $('#supplierIdInput').val('SUP001');
+                    updateInputLabels();
+                }
+            });
+        }
+
+        // Hiển thị modal thêm mới
+        function showCreateModal() {
+            $('#createEditModalLabel').text('Thêm nhà cung cấp');
+            $('#supplierForm')[0].reset();
+            $('#supplierId').val('');
+            $('#supplierIdInput').val('');
+            $('#supplierIdInput').prop('readonly', true);
+            $('#formErrorMessage').hide();
+            
+            generateNextSupplierId();
+
+            const modal = new bootstrap.Modal(document.getElementById('createEditModal'));
+            modal.show();
+        }
+
+        // Sửa nhà cung cấp
+        function editSupplier(supplierId) {
+            $.ajax({
+                url: `${API_URL}/${supplierId}`,
+                type: 'GET',
+                success: function(supplier) {
+                    $('#createEditModalLabel').text('Sửa nhà cung cấp');
+                    $('#supplierId').val(supplier.supplierId);
+                    $('#supplierIdInput').val(supplier.supplierId);
+                    $('#supplierIdInput').prop('readonly', true);
+                    $('#supplierNameInput').val(supplier.supplierName || '');
+                    $('#phoneNumberInput').val(supplier.phoneNumber || '');
+                    $('#emailInput').val(supplier.email || '');
+                    $('#addressInput').val(supplier.address || '');
+                    $('#formErrorMessage').hide();
+                    
+                    updateInputLabels();
+
+                    const modal = new bootstrap.Modal(document.getElementById('createEditModal'));
+                    modal.show();
+                },
+                error: function(xhr) {
+                    console.error('Error loading supplier:', xhr);
+                    showNotification('Lỗi khi tải thông tin nhà cung cấp', 'error');
+                }
+            });
+        }
+
+        // Lưu nhà cung cấp
+        function saveSupplier() {
+            $('#formErrorMessage').hide();
+
+            const supplierId = $('#supplierIdInput').val().trim();
+            const supplierName = $('#supplierNameInput').val().trim();
+            const phoneNumber = $('#phoneNumberInput').val().trim();
+            const email = $('#emailInput').val().trim();
+            const address = $('#addressInput').val().trim();
+
+            if (!supplierName) {
+                showFormError('Vui lòng nhập tên nhà cung cấp');
+                return;
+            }
+
+            const isEdit = $('#supplierId').val() !== '';
+            const url = isEdit ? `${API_URL}/${supplierId}` : API_URL;
+            const method = isEdit ? 'PUT' : 'POST';
+
+            const data = isEdit 
+                ? {
+                    supplierName: supplierName,
+                    phoneNumber: phoneNumber || null,
+                    email: email || null,
+                    address: address || null
+                }
+                : {
+                    supplierId: supplierId || null,
+                    supplierName: supplierName,
+                    phoneNumber: phoneNumber || null,
+                    email: email || null,
+                    address: address || null
+                };
+
+            $.ajax({
+                url: url,
+                type: method,
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                headers: EMPLOYEE_ID ? { 'X-EmployeeId': EMPLOYEE_ID } : {},
+                success: function(response) {
+                    showNotification(isEdit ? 'Cập nhật nhà cung cấp thành công' : 'Thêm nhà cung cấp thành công', 'success');
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('createEditModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                    loadSuppliers();
+                },
+                error: function(xhr) {
+                    console.error('Error saving supplier:', xhr);
+                    let message = 'Có lỗi xảy ra khi lưu nhà cung cấp';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showFormError(message);
+                }
+            });
+        }
+
+        // Xóa nhà cung cấp
+        function deleteSupplier(supplierId) {
+            deleteSupplierId = supplierId;
+            $('#deleteSupplierId').text(supplierId);
+            $('#deleteWarningMessage').hide();
+            
+            // Kiểm tra số phiếu nhập trước khi xóa
+            $.ajax({
+                url: `${API_URL}/${supplierId}`,
+                type: 'GET',
+                success: function(supplier) {
+                        $('#deleteWarningMessage').show();
+
+                    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+                    modal.show();
+                },
+                error: function() {
+                    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+                    modal.show();
+                }
+            });
+        }
+
+        // Xác nhận xóa
+        function confirmDelete() {
+            if (!deleteSupplierId) return;
+
+            $.ajax({
+                url: `${API_URL}/${deleteSupplierId}`,
+                type: 'DELETE',
+                headers: EMPLOYEE_ID ? { 'X-EmployeeId': EMPLOYEE_ID } : {},
+                success: function(response) {
+                    showNotification('Xóa nhà cung cấp thành công', 'success');
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                    loadSuppliers();
+                    deleteSupplierId = null;
+                },
+                error: function(xhr) {
+                    console.error('Error deleting supplier:', xhr);
+                    let message = 'Có lỗi xảy ra khi xóa nhà cung cấp';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showNotification(message, 'error');
+                    
+                    // Nếu lỗi do có phiếu nhập, đóng modal
+                    if (xhr.status === 400) {
+                        const modalInstance = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
+                        if (modalInstance) {
+                            modalInstance.hide();
+                        }
+                    }
+                }
+            });
+        }
+
+        // Khôi phục nhà cung cấp (set active = true)
+        function restoreSupplier(supplierId, supplierName) {
+            restoreSupplierId = supplierId;
+            $('#restoreSupplierId').text(supplierId);
+            $('#restoreWarningMessage').hide();
+            
+            // Kiểm tra số phiếu nhập trước khi khôi phục
+            $.ajax({
+                url: `${API_URL}/${supplierId}`,
+                type: 'GET',
+                success: function(supplier) {
+                        $('#restoreWarningMessage').hide();
+                    const modal = new bootstrap.Modal(document.getElementById('restoreModal'));
+                    modal.show();
+                },
+                error: function() {
+                    const modal = new bootstrap.Modal(document.getElementById('restoreModal'));
+                    modal.show();
+                }
+            });
+        }
+
+        // Xác nhận khôi phục
+        function confirmRestore() {
+            if (!restoreSupplierId) return;
+
+            $.ajax({
+                url: `${API_URL}/${restoreSupplierId}/restore`,
+                type: 'POST',
+                headers: EMPLOYEE_ID ? { 'X-EmployeeId': EMPLOYEE_ID } : {},
+                success: function(response) {
+                    showNotification('Khôi phục nhà cung cấp thành công', 'success');
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('restoreModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                    loadSuppliers();
+                    restoreSupplierId = null;
+                },
+                error: function(xhr) {
+                    console.error('Error restoring supplier:', xhr);
+                    let message = 'Có lỗi xảy ra khi khôi phục nhà cung cấp';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showNotification(message, 'error');
+                    
+                    // Nếu lỗi, đóng modal
+                    if (xhr.status === 400) {
+                        const modalInstance = bootstrap.Modal.getInstance(document.getElementById('restoreModal'));
+                        if (modalInstance) {
+                            modalInstance.hide();
+                        }
+                    }
+                }
+            });
+        }
+
+        // Hiển thị thông báo
+        function showNotification(message, type) {
+            const bgColor = type === 'success' ? 'bg-gradient-success' : 'bg-gradient-danger';
+            const notification = $(
+                `<div class="alert ${bgColor} text-white alert-dismissible fade show position-fixed" 
+                     style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>`
+            );
+            $('body').append(notification);
+            setTimeout(() => notification.alert('close'), 3000);
+        }
+
+        // Hiển thị lỗi trong form
+        function showFormError(message) {
+            $('#formErrorMessage').html(message).show();
+        }
+
+        // Reset khi đóng modal
+        $(document).on('hidden.bs.modal', '#createEditModal', function() {
+            $('#supplierForm')[0].reset();
+            $('#supplierId').val('');
+            $('#supplierIdInput').prop('readonly', false);
+            $('#formErrorMessage').hide();
+            $('.input-group-outline').removeClass('is-filled is-focused');
+            if (typeof updateInputLabels === 'function') {
+                setTimeout(function() {
+                    updateInputLabels();
+                }, 50);
+            }
+        });
+
+        // Ngăn scroll lan ra trang chính khi cuộn trong modal-body
+        $(document).on('wheel', '.modal-body', function(e) {
+            var $this = $(this);
+            var scrollTop = $this.scrollTop();
+            var scrollHeight = $this[0].scrollHeight;
+            var height = $this.outerHeight();
+            var delta = e.originalEvent.deltaY;
+
+            // Nếu cuộn lên và đã ở đầu, hoặc cuộn xuống và đã ở cuối -> chặn
+            if ((delta < 0 && scrollTop <= 0) || (delta > 0 && scrollTop + height >= scrollHeight)) {
+                e.preventDefault();
+            }
+        });
+
+        // Ngăn scroll trên modal backdrop
+        $(document).on('wheel', '.modal', function(e) {
+            if (!$(e.target).closest('.modal-body').length) {
+                e.preventDefault();
+            }
+        });
+    </script>
+}
+
+<style>
+    /* Fix Modal hiển thị giữa main content và cho phép scroll */
+    .modal {
+        padding-left: 250px !important; /* Offset bằng với chiều rộng sidebar */
+        overflow-y: auto !important;
+    }
+    
+    .modal-dialog {
+        margin: 1.75rem auto;
+        max-height: calc(100vh - 3.5rem);
+    }
+    
+    .modal-content {
+        max-height: calc(100vh - 3.5rem);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    
+    .modal-body {
+        max-height: calc(100vh - 250px);
+        overflow-y: auto;
+        overflow-x: hidden;
+        flex: 1 1 auto;
+        overscroll-behavior: contain; /* Ngăn scroll lan ra trang chính */
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .modal-header, .modal-footer {
+        flex-shrink: 0;
+    }
+    
+    /* Responsive cho modal trên màn hình nhỏ */
+    @@media (max-width: 1200px) {
+        .modal { padding-left: 200px !important; }
+    }
+    
+    @@media (max-width: 992px) {
+        .modal { padding-left: 0 !important; }
+    }
+    
+    /* Khóa scroll trang chính khi modal mở */
+    body.modal-open {
+        overflow: hidden !important;
+        padding-right: 0 !important;
+    }
+    
+    body.modal-open .main-content {
+        overflow: hidden !important;
+    }
+
+    /* Bảng chính */
+    .table-responsive {
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .table {
+        margin-bottom: 0;
+        background-color: #fff;
+    }
+
+    .table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .table thead th {
+        color: #fff !important;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 1rem 0.75rem !important;
+        border: none;
+        font-size: 1.3125rem;
+        text-align: center;
+    }
+
+    .table tbody tr {
+        transition: all 0.3s ease;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .table tbody tr:hover {
+        background-color: #f8f9fa;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .table tbody tr:last-child {
+        border-bottom: none;
+    }
+
+    .table tbody tr.table-secondary {
+        background-color: #f8f9fa;
+        opacity: 0.7;
+    }
+
+    .action-btn {
+        padding: 0.375rem 0.625rem;
+        font-size: 0.75rem;
+        margin: 0 0.125rem;
+        border-radius: 0.375rem;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .table-actions {
+        white-space: nowrap;
+    }
+
+    #supplierTableBody tr td {
+        vertical-align: middle !important;
+        padding: 1rem 0.75rem !important;
+        border: none;
+    }
+
+    /* Badge styling */
+    .badge {
+        padding: 0.5rem 0.75rem;
+        font-weight: 500;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+    }
+
+    /* Empty state */
+    .table tbody tr td[colspan] {
+        padding: 3rem 1rem !important;
+        text-align: center;
+        color: #6c757d;
+        font-style: italic;
+    }
+</style>

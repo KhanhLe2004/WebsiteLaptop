@@ -1,0 +1,2528 @@
+﻿@{
+    ViewData["Title"] = "Quản lý nhân viên";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card my-4">
+                <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                    <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="text-white text-capitalize ps-3 mb-0">Quản lý nhân viên</h6>
+                            <button type="button" class="btn btn-white btn-sm me-3" onclick="addEmployee()">
+                                <i class="material-icons text-sm">add</i> Thêm nhân viên
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body px-3 pb-2">
+                    <!-- Bộ lọc và tìm kiếm -->
+                    <div class="row mb-3 g-2 align-items-end">
+                        <div class="col-lg-4 col-md-6">
+                            <div class="input-group input-group-outline">
+                                <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm nhân viên...">
+                            </div>
+                        </div>
+                        <div class="col-lg-2 col-md-3">
+                            <select id="activeFilter" class="form-select">
+                                <option value="true" selected>Đang hoạt động</option>
+                                <option value="false">Đã khóa</option>
+                                <option value="">Tất cả trạng thái</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Bảng nhân viên -->
+                    <div class="table-responsive p-0">
+                        <table class="table align-items-center mb-0" style="table-layout: fixed; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 25%;">Nhân viên</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 20%;">Thông tin liên hệ</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Ngày sinh</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 15%;">Tài khoản</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 25%;">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="employeeTableBody">
+                                <!-- Dữ liệu sẽ được load bằng AJAX -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Phân trang -->
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <p class="text-sm mb-0" id="pageInfo">Đang tải...</p>
+                        </div>
+                        <div class="col-md-6">
+                            <nav aria-label="Page navigation">
+                                <ul class="pagination justify-content-end mb-0" id="pagination">
+                                    <!-- Phân trang sẽ được tạo bằng JavaScript -->
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xem chi tiết -->
+<div class="modal fade" id="viewEmployeeModal" tabindex="-1" aria-labelledby="viewEmployeeModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-info">
+                <h5 class="modal-title text-white" id="viewEmployeeModalLabel">Chi tiết nhân viên</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="viewEmployeeModalBody">
+                <!-- Nội dung sẽ được load bằng JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Thêm/Sửa Nhân viên -->
+<div class="modal fade" id="employeeModal" tabindex="-1" aria-labelledby="employeeModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-primary">
+                <h5 class="modal-title text-white" id="employeeModalLabel">Thêm nhân viên</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="employeeForm">
+                    <input type="hidden" id="isEditMode" value="false">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Mã nhân viên</label>
+                                <input type="text" class="form-control" id="employeeId" readonly disabled>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Tên nhân viên *</label>
+                                <input type="text" class="form-control" id="employeeName" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Ngày Sinh</label>
+                                <input type="date" class="form-control" id="dateOfBirth">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3 autocomplete-wrapper position-relative w-100">
+                                <label class="form-label">Vai trò</label>
+                                <input type="text" id="roleId" class="form-control" autocomplete="off">
+                                <input type="hidden" id="roleIdValue" value="">
+                                <div id="roleIdDropdown" class="autocomplete-dropdown"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Số điện thoại</label>
+                                <input type="text" class="form-control" id="phoneNumber">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" id="email">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Tên đăng nhập</label>
+                                <input type="text" class="form-control" id="username">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Mật khẩu</label>
+                                <input type="password" class="form-control" id="password" data-password-length="0" placeholder="">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3 autocomplete-wrapper position-relative w-100">
+                                <label class="form-label">Tỉnh/Thành</label>
+                                <input type="text" id="provinceCode" class="form-control" autocomplete="off">
+                                <input type="hidden" id="provinceCodeValue" value="">
+                                <div id="provinceCodeDropdown" class="autocomplete-dropdown"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-outline mb-3 autocomplete-wrapper position-relative w-100">
+                                <label class="form-label">Phường/Xã</label>
+                                <input type="text" id="communeCode" class="form-control" autocomplete="off" disabled>
+                                <input type="hidden" id="communeCodeValue" value="">
+                                <div id="communeCodeDropdown" class="autocomplete-dropdown"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="input-group input-group-outline mb-3">
+                                <label class="form-label">Địa chỉ cụ thể (Số nhà, tên đường, v.v.)</label>
+                                <input type="text" class="form-control" id="addressDetail">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <label for="avatarFile" class="form-label">Ảnh đại diện</label>
+                                <input type="file" class="form-control" id="avatarFile" accept="image/*" onchange="previewImage(this)">
+                                <img id="imagePreview" class="preview-image" style="display:none;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-danger mb-3" id="errorMessage" style="display:none;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" onclick="saveEmployee()">
+                    <i class="material-icons text-sm">save</i> Lưu
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xác nhận khóa -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-danger">
+                <h5 class="modal-title text-white" id="deleteModalLabel">Xác nhận khóa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteModalMessage">Bạn có chắc chắn muốn khóa nhân viên <strong id="deleteEmployeeName"></strong>?</p>
+                <p class="text-warning text-sm mb-0">Nhân viên sẽ bị ẩn khỏi danh sách đang hoạt động nhưng có thể khôi phục sau.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDelete()">
+                    <i class="material-icons text-sm">delete</i> Khóa
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts {
+    <!-- Select2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <!-- Select2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <style>
+        /* Bỏ viền đen ở chế độ xem chi tiết */
+        .view-mode input:disabled,
+        .view-mode input[disabled],
+        .view-mode select:disabled,
+        .view-mode select[disabled],
+        .view-mode .form-control:disabled,
+        .view-mode .form-control[disabled] {
+            border: none !important;
+            border-bottom: 1px solid #d2d6da !important;
+            background-color: transparent !important;
+            -webkit-text-fill-color: inherit !important;
+            opacity: 1 !important;
+        }
+        
+        .view-mode .input-group-outline input:disabled,
+        .view-mode .input-group-outline input[disabled] {
+            border: none !important;
+            border-bottom: 1px solid #d2d6da !important;
+            background-color: transparent !important;
+        }
+    </style>
+    <script>
+        const API_URL = 'http://localhost:5068/api/admin/employees';
+        const API_BASE_URL = API_URL.replace(/\/api\/admin\/employees$/, '');
+        const IMAGE_BASE_URL = `${API_BASE_URL}/imageEmployees`;
+        let currentPage = 1;
+        let pageSize = 10;
+        let deleteEmployeeId = '';
+        let searchDebounceTimer = null;
+        const SEARCH_DEBOUNCE_DELAY = 300;
+
+        let rolesList = [];
+        let provincesList = [];
+        let communesList = [];
+        let provincesPromise = null;
+        const communesCache = {};
+        let currentCommuneList = [];
+
+        function normalizeText(text) {
+            if (!text) return '';
+            return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        }
+
+        function extractAddressParts(address) {
+            if (!address) return {};
+            const parts = address.split(',')
+                .map(part => part.trim())
+                .filter(part => part.length > 0);
+
+            if (parts.length >= 3) {
+                return {
+                    detail: parts[0],
+                    communeName: parts[parts.length - 2],
+                    provinceName: parts[parts.length - 1]
+                };
+            }
+
+            if (parts.length === 2) {
+                return {
+                    detail: parts[0],
+                    provinceName: parts[1]
+                };
+            }
+
+            return {
+                detail: parts[0] || address
+            };
+        }
+
+        function resetCommuneInput() {
+            $('#communeCode').val('').prop('disabled', true);
+            $('#communeCodeValue').val('');
+            $('#communeCode').closest('.input-group-outline').removeClass('is-filled');
+        }
+
+        $(document).ready(function() {
+            loadEmployees();
+            loadRoles();
+            loadProvinces();
+
+            // Tìm kiếm tự động theo tên
+            $('#searchInput').on('input', function() {
+                triggerAutoSearch();
+            });
+
+            // Tìm kiếm tự động theo trạng thái active
+            $('#activeFilter').on('change', function() {
+                triggerAutoSearch();
+            });
+
+            // Reset class edit-mode khi modal đóng
+            $('#employeeModal').on('hidden.bs.modal', function() {
+                $('#dateOfBirth').closest('.input-group-outline').removeClass('edit-mode');
+            });
+
+            // Xử lý label cho Material Dashboard inputs (định nghĩa ở phạm vi global)
+            window.updateInputLabels = function() {
+                $('.input-group-outline input, .input-group-outline select').each(function() {
+                    const $input = $(this);
+                    const $group = $input.closest('.input-group-outline');
+                    const value = $input.val();
+                    
+                    if (value && value.trim() !== '') {
+                        $group.addClass('is-filled');
+                    } else {
+                        $group.removeClass('is-filled');
+                    }
+                });
+            };
+
+            // Xử lý khi input thay đổi
+            $(document).on('input change', '.input-group-outline input, .input-group-outline select', function() {
+                const $input = $(this);
+                const $group = $input.closest('.input-group-outline');
+                const value = $input.val();
+                
+                if (value && value.trim() !== '') {
+                    $group.addClass('is-filled');
+                } else {
+                    $group.removeClass('is-filled');
+                }
+            });
+
+            // Xử lý riêng cho input date để đảm bảo attribute value được cập nhật
+            $(document).on('change input', 'input[type="date"]', function() {
+                const $input = $(this);
+                const value = $input.val();
+                // Đảm bảo attribute value được cập nhật để CSS selector hoạt động
+                if (value && value.trim() !== '') {
+                    $input.attr('value', value).attr('data-has-input', 'true');
+                } else {
+                    $input.removeAttr('value');
+                    // Chỉ xóa data-has-input nếu không còn focus (người dùng đã rời khỏi input)
+                    if (!$input.is(':focus')) {
+                        $input.removeAttr('data-has-input');
+                    }
+                }
+            });
+
+            // Khi focus vào input date, set attribute để hiển thị dd/mm/yyyy ngay khi bắt đầu nhập
+            $(document).on('focus', 'input[type="date"]', function() {
+                const $input = $(this);
+                // Nếu chưa có value, set data-has-input để hiển thị dd/mm/yyyy khi bắt đầu nhập
+                if (!$input.attr('value')) {
+                    $input.attr('data-has-input', 'true');
+                }
+            });
+
+            // Khi blur khỏi input date, nếu không có value thì xóa data-has-input
+            $(document).on('blur', 'input[type="date"]', function() {
+                const $input = $(this);
+                const value = $input.val();
+                if (!value || value.trim() === '') {
+                    $input.removeAttr('data-has-input');
+                }
+            });
+
+            // Xử lý khi focus vào input
+            $(document).on('focus', '.input-group-outline input, .input-group-outline select', function() {
+                $(this).closest('.input-group-outline').addClass('is-focused');
+            });
+
+            // Xử lý khi blur khỏi input
+            $(document).on('blur', '.input-group-outline input, .input-group-outline select', function() {
+                const $input = $(this);
+                const $group = $input.closest('.input-group-outline');
+                $group.removeClass('is-focused');
+                
+                const value = $input.val();
+                if (value && value.trim() !== '') {
+                    $group.addClass('is-filled');
+                } else {
+                    $group.removeClass('is-filled');
+                }
+            });
+
+            // Lưu độ dài mật khẩu khi người dùng nhập
+            $('#password').on('input', function() {
+                const length = $(this).val().length;
+                $(this).data('password-length', length);
+                // Đánh dấu password đã được thay đổi
+                $(this).data('password-changed', true);
+                // Nếu đang edit và người dùng bắt đầu nhập, đổi về type="password"
+                const isEditMode = $('#isEditMode').val() === 'true';
+                if (isEditMode && $(this).attr('type') === 'text' && length > 0) {
+                    // Kiểm tra xem có phải toàn dấu * không
+                    const value = $(this).val();
+                    if (value && value.length > 0 && !value.match(/^\*+$/)) {
+                        // Người dùng đang nhập mật khẩu mới, đổi về type="password"
+                        $(this).attr('type', 'password');
+                    }
+                }
+            });
+            
+            // Khi focus vào password field trong chế độ edit, nếu đang hiển thị dấu *, clear và đổi về password
+            $('#password').on('focus', function() {
+                const isEditMode = $('#isEditMode').val() === 'true';
+                if (isEditMode && $(this).attr('type') === 'text') {
+                    const value = $(this).val();
+                    if (value && value.match(/^\*+$/)) {
+                        // Đang hiển thị dấu *, clear và đổi về password để người dùng nhập mới
+                        const savedLength = value.length; // Lưu độ dài dấu * hiện tại
+                        $(this).attr('type', 'password').val('').data('password-length', 0).data('saved-star-length', savedLength).data('password-changed', false);
+                    }
+                }
+            });
+            
+            // Khi blur khỏi password field trong chế độ edit, nếu không có giá trị mới, hiển thị lại dấu *
+            $('#password').on('blur', function() {
+                const isEditMode = $('#isEditMode').val() === 'true';
+                if (isEditMode && $(this).attr('type') === 'password') {
+                    const value = $(this).val();
+                    const passwordChanged = $(this).data('password-changed');
+                    // Nếu không có giá trị hoặc giá trị rỗng, hiển thị lại dấu * và đánh dấu chưa thay đổi
+                    if (!value || value.trim() === '') {
+                        const savedLength = parseInt($(this).data('saved-star-length')) || parseInt($(this).data('password-length')) || 8;
+                        $(this).attr('type', 'text').val('*'.repeat(savedLength)).data('password-length', savedLength).data('password-changed', false);
+                    }
+                    // Nếu có giá trị nhưng chưa được đánh dấu là đã thay đổi, vẫn giữ nguyên (trường hợp hiếm)
+                }
+            });
+        });
+
+        function triggerAutoSearch() {
+            currentPage = 1;
+            if (searchDebounceTimer) {
+                clearTimeout(searchDebounceTimer);
+            }
+            searchDebounceTimer = setTimeout(() => {
+                loadEmployees();
+            }, SEARCH_DEBOUNCE_DELAY);
+        }
+
+        // Load danh sách vai trò
+        function loadRoles() {
+            $.ajax({
+                url: `${API_URL}/roles`,
+                type: 'GET',
+                success: function(roles) {
+                    rolesList = roles;
+                    populateRolesCombo();
+                },
+                error: function(xhr) {
+                    console.error('Lỗi khi tải danh sách vai trò:', xhr);
+                    showNotification('Lỗi khi tải danh sách vai trò', 'error');
+                }
+            });
+        }
+
+        // Load danh sách tỉnh/thành
+        function loadProvinces(force = false) {
+            if (provincesPromise && !force) {
+                return provincesPromise;
+            }
+
+            provincesPromise = $.ajax({
+                url: `${API_URL}/provinces`,
+                type: 'GET'
+            }).then(function(provinces) {
+                provincesList = provinces || [];
+                initializeProvinceAutocomplete();
+                return provincesList;
+            }).catch(function(xhr) {
+                console.error('Lỗi khi tải danh sách tỉnh/thành:', xhr);
+                showNotification('Lỗi khi tải danh sách tỉnh/thành', 'error');
+                provincesList = [];
+                initializeProvinceAutocomplete();
+                return provincesList;
+            });
+
+            return provincesPromise;
+        }
+
+        // Load danh sách phường/xã theo tỉnh/thành
+        function loadCommunes(provinceCode, force = false) {
+            if (!provinceCode) {
+                resetCommuneInput();
+                const deferred = $.Deferred();
+                deferred.resolve([]);
+                return deferred.promise();
+            }
+
+            if (communesCache[provinceCode] && !force) {
+                const cached = communesCache[provinceCode];
+                cached.then && cached.then(function(list) {
+                    communesList = list || [];
+                    initializeCommuneAutocomplete();
+                });
+                return cached;
+            }
+
+            const request = $.ajax({
+                url: `${API_URL}/provinces/${provinceCode}/communes`,
+                type: 'GET'
+            }).then(function(communes) {
+                communesList = communes || [];
+                $('#communeCode').prop('disabled', false);
+                initializeCommuneAutocomplete();
+                communesCache[provinceCode] = $.Deferred().resolve(communesList).promise();
+                return communesList;
+            }).catch(function(xhr) {
+                console.error('Lỗi khi tải danh sách phường/xã:', xhr);
+                showNotification('Lỗi khi tải danh sách phường/xã', 'error');
+                communesList = [];
+                $('#communeCode').prop('disabled', true);
+                communesCache[provinceCode] = $.Deferred().resolve([]).promise();
+                return [];
+            });
+
+            communesCache[provinceCode] = request;
+            return request;
+        }
+
+        // Populate combobox vai trò (lưu danh sách để dùng cho autocomplete)
+        function populateRolesCombo(selectedId = '') {
+            // Lưu danh sách roles để dùng cho autocomplete
+            window.allRolesForSelect = rolesList || [];
+            
+            const roleInput = $('#roleId');
+            const roleValue = $('#roleIdValue');
+            
+            // Nếu có selectedId, set giá trị
+            if (selectedId) {
+                const role = rolesList.find(r => r.roleId === selectedId);
+                if (role) {
+                    roleInput.val(role.roleName || role.roleId);
+                    roleValue.val(role.roleId);
+                    roleInput.closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    roleInput.val('');
+                    roleValue.val('');
+                    roleInput.closest('.input-group-outline').removeClass('is-filled');
+                }
+            } else {
+                roleInput.val('');
+                roleValue.val('');
+                roleInput.closest('.input-group-outline').removeClass('is-filled');
+            }
+            
+            // Khởi tạo autocomplete cho roles
+            initializeRolesAutocomplete();
+        }
+
+        // Khởi tạo autocomplete cho roles
+        function initializeRolesAutocomplete() {
+            const roleInput = $('#roleId');
+            const roleValue = $('#roleIdValue');
+            const dropdown = $('#roleIdDropdown');
+            let selectedIndex = -1;
+            let filteredRoles = [];
+
+            function showDropdown(roles) {
+                if (!roles || roles.length === 0) {
+                    dropdown.html('<div class="autocomplete-item" style="color: #6c757d; cursor: default;">Không tìm thấy vai trò</div>').show();
+                    selectedIndex = -1;
+                    return;
+                }
+
+                let html = '';
+                roles.forEach((role, index) => {
+                    const roleName = role.roleName || role.roleId;
+                    const roleNameEscaped = (roleName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    html += `<div class="autocomplete-item" data-index="${index}" data-role-id="${role.roleId}" data-role-name="${roleNameEscaped}">${roleName}</div>`;
+                });
+                dropdown.html(html).show();
+                selectedIndex = -1;
+            }
+
+            function updateSelectedItem() {
+                $('#roleIdDropdown .autocomplete-item').removeClass('selected');
+                if (selectedIndex >= 0 && selectedIndex < filteredRoles.length) {
+                    $('#roleIdDropdown .autocomplete-item').eq(selectedIndex).addClass('selected');
+                }
+            }
+
+            // Xử lý khi gõ
+            roleInput.off('input.roles').on('input.roles', function() {
+                const searchTerm = $(this).val().toLowerCase().trim();
+                
+                // Cập nhật class is-filled
+                if (searchTerm) {
+                    $(this).closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    $(this).closest('.input-group-outline').removeClass('is-filled');
+                }
+                
+                if (searchTerm === '') {
+                    dropdown.hide();
+                    roleValue.val('');
+                    return;
+                }
+
+                const allRoles = window.allRolesForSelect || [];
+                filteredRoles = allRoles.filter(role => {
+                    const roleName = (role.roleName || role.roleId || '').toLowerCase();
+                    return roleName.includes(searchTerm);
+                });
+
+                showDropdown(filteredRoles);
+            });
+
+            // Xử lý khi click vào item
+            $(document).off('click.roles-item').on('click.roles-item', '#roleIdDropdown .autocomplete-item', function() {
+                const roleId = $(this).data('role-id');
+                const roleName = $(this).data('role-name');
+                
+                if (roleId && roleName) {
+                    roleInput.val(roleName);
+                    roleValue.val(roleId);
+                    roleInput.closest('.input-group-outline').addClass('is-filled');
+                    dropdown.hide();
+                }
+            });
+
+            // Xử lý phím tắt
+            roleInput.off('keydown.roles').on('keydown.roles', function(e) {
+                if (dropdown.is(':visible') && filteredRoles.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        selectedIndex = Math.min(selectedIndex + 1, filteredRoles.length - 1);
+                        updateSelectedItem();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        selectedIndex = Math.max(selectedIndex - 1, -1);
+                        updateSelectedItem();
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (selectedIndex >= 0 && selectedIndex < filteredRoles.length) {
+                            const role = filteredRoles[selectedIndex];
+                            roleInput.val(role.roleName || role.roleId);
+                            roleValue.val(role.roleId);
+                            roleInput.closest('.input-group-outline').addClass('is-filled');
+                            dropdown.hide();
+                        }
+                    } else if (e.key === 'Escape') {
+                        dropdown.hide();
+                        selectedIndex = -1;
+                    }
+                }
+            });
+
+            // Ẩn dropdown khi click ra ngoài
+            $(document).off('click.roles-close').on('click.roles-close', function(e) {
+                if (!$(e.target).closest('#roleId').closest('.autocomplete-wrapper').length) {
+                    dropdown.hide();
+                    selectedIndex = -1;
+                }
+            });
+
+            // Xử lý khi focus vào input
+            roleInput.off('focus.roles').on('focus.roles', function() {
+                $(this).closest('.input-group-outline').addClass('is-filled');
+                
+                const val = $(this).val().trim();
+                if (val) {
+                    $(this).trigger('input.roles');
+                } else {
+                    const allRoles = window.allRolesForSelect || [];
+                    if (allRoles.length > 0) {
+                        filteredRoles = allRoles;
+                        showDropdown(filteredRoles);
+                    }
+                }
+            });
+
+            // Xử lý khi blur
+            roleInput.off('blur.roles').on('blur.roles', function() {
+                const val = $(this).val().trim();
+                if (!val) {
+                    $(this).closest('.input-group-outline').removeClass('is-filled');
+                }
+            });
+
+            // Xử lý khi click vào input
+            roleInput.off('click.roles').on('click.roles', function() {
+                $(this).closest('.input-group-outline').addClass('is-filled');
+                
+                const val = $(this).val().trim();
+                if (val) {
+                    $(this).trigger('input.roles');
+                } else {
+                    const allRoles = window.allRolesForSelect || [];
+                    if (allRoles.length > 0) {
+                        filteredRoles = allRoles;
+                        showDropdown(filteredRoles);
+                    }
+                }
+            });
+        }
+
+        // Khởi tạo autocomplete cho tỉnh/thành
+        function initializeProvinceAutocomplete() {
+            const provinceInput = $('#provinceCode');
+            const provinceValue = $('#provinceCodeValue');
+            const dropdown = $('#provinceCodeDropdown');
+            let selectedIndex = -1;
+            let filteredProvinces = [];
+
+            function showDropdown(provinces) {
+                if (!provinces || provinces.length === 0) {
+                    dropdown.html('<div class="autocomplete-item" style="color: #6c757d; cursor: default;">Không tìm thấy tỉnh/thành</div>').show();
+                    selectedIndex = -1;
+                    return;
+                }
+
+                let html = '';
+                provinces.forEach((province, index) => {
+                    const provinceName = province.name || province.code;
+                    const provinceNameEscaped = (provinceName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    html += `<div class="autocomplete-item" data-index="${index}" data-province-code="${province.code}" data-province-name="${provinceNameEscaped}">${provinceName}</div>`;
+                });
+                dropdown.html(html).show();
+                selectedIndex = -1;
+            }
+
+            function updateSelectedItem() {
+                $('#provinceCodeDropdown .autocomplete-item').removeClass('selected');
+                if (selectedIndex >= 0 && selectedIndex < filteredProvinces.length) {
+                    $('#provinceCodeDropdown .autocomplete-item').eq(selectedIndex).addClass('selected');
+                }
+            }
+
+            // Xử lý khi gõ
+            provinceInput.off('input.province').on('input.province', function() {
+                const searchTerm = $(this).val().toLowerCase().trim();
+                
+                if (searchTerm) {
+                    $(this).closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    $(this).closest('.input-group-outline').removeClass('is-filled');
+                }
+                
+                if (searchTerm === '') {
+                    dropdown.hide();
+                    provinceValue.val('');
+                    loadCommunes(''); // Clear communes khi xóa tỉnh/thành
+                    return;
+                }
+
+                filteredProvinces = provincesList.filter(province => {
+                    const provinceName = (province.name || province.code || '').toLowerCase();
+                    return provinceName.includes(searchTerm);
+                });
+
+                showDropdown(filteredProvinces);
+            });
+
+            // Xử lý khi click vào item
+            $(document).off('click.province-item').on('click.province-item', '#provinceCodeDropdown .autocomplete-item', function() {
+                const provinceCode = $(this).data('province-code');
+                const provinceName = $(this).data('province-name');
+                
+                if (provinceCode && provinceName) {
+                    provinceInput.val(provinceName);
+                    provinceValue.val(provinceCode);
+                    provinceInput.closest('.input-group-outline').addClass('is-filled');
+                    dropdown.hide();
+                    
+                    // Load communes khi chọn tỉnh/thành
+                    loadCommunes(provinceCode);
+                }
+            });
+
+            // Xử lý phím tắt
+            provinceInput.off('keydown.province').on('keydown.province', function(e) {
+                if (dropdown.is(':visible') && filteredProvinces.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        selectedIndex = Math.min(selectedIndex + 1, filteredProvinces.length - 1);
+                        updateSelectedItem();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        selectedIndex = Math.max(selectedIndex - 1, -1);
+                        updateSelectedItem();
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (selectedIndex >= 0 && selectedIndex < filteredProvinces.length) {
+                            const province = filteredProvinces[selectedIndex];
+                            provinceInput.val(province.name || province.code);
+                            provinceValue.val(province.code);
+                            provinceInput.closest('.input-group-outline').addClass('is-filled');
+                            dropdown.hide();
+                            loadCommunes(province.code);
+                        }
+                    } else if (e.key === 'Escape') {
+                        dropdown.hide();
+                        selectedIndex = -1;
+                    }
+                }
+            });
+
+            // Ẩn dropdown khi click ra ngoài
+            $(document).off('click.province-close').on('click.province-close', function(e) {
+                if (!$(e.target).closest('#provinceCode').closest('.autocomplete-wrapper').length) {
+                    dropdown.hide();
+                    selectedIndex = -1;
+                }
+            });
+
+            // Xử lý khi focus vào input
+            provinceInput.off('focus.province').on('focus.province', function() {
+                $(this).closest('.input-group-outline').addClass('is-filled');
+                
+                const val = $(this).val().trim();
+                if (val) {
+                    $(this).trigger('input.province');
+                } else {
+                    if (provincesList.length > 0) {
+                        filteredProvinces = provincesList;
+                        showDropdown(filteredProvinces);
+                    }
+                }
+            });
+
+            // Xử lý khi blur
+            provinceInput.off('blur.province').on('blur.province', function() {
+                const val = $(this).val().trim();
+                if (!val) {
+                    $(this).closest('.input-group-outline').removeClass('is-filled');
+                }
+            });
+        }
+
+        // Khởi tạo autocomplete cho phường/xã
+        function initializeCommuneAutocomplete() {
+            const communeInput = $('#communeCode');
+            const communeValue = $('#communeCodeValue');
+            const dropdown = $('#communeCodeDropdown');
+            let selectedIndex = -1;
+            let filteredCommunes = [];
+
+            function showDropdown(communes) {
+                if (!communes || communes.length === 0) {
+                    dropdown.html('<div class="autocomplete-item" style="color: #6c757d; cursor: default;">Không tìm thấy phường/xã</div>').show();
+                    selectedIndex = -1;
+                    return;
+                }
+
+                let html = '';
+                communes.forEach((commune, index) => {
+                    const communeName = commune.name || commune.code;
+                    const communeNameEscaped = (communeName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    html += `<div class="autocomplete-item" data-index="${index}" data-commune-code="${commune.code}" data-commune-name="${communeNameEscaped}">${communeName}</div>`;
+                });
+                dropdown.html(html).show();
+                selectedIndex = -1;
+            }
+
+            function updateSelectedItem() {
+                $('#communeCodeDropdown .autocomplete-item').removeClass('selected');
+                if (selectedIndex >= 0 && selectedIndex < filteredCommunes.length) {
+                    $('#communeCodeDropdown .autocomplete-item').eq(selectedIndex).addClass('selected');
+                }
+            }
+
+            // Xử lý khi gõ
+            communeInput.off('input.commune').on('input.commune', function() {
+                const searchTerm = $(this).val().toLowerCase().trim();
+                
+                if (searchTerm) {
+                    $(this).closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    $(this).closest('.input-group-outline').removeClass('is-filled');
+                }
+                
+                if (searchTerm === '') {
+                    dropdown.hide();
+                    communeValue.val('');
+                    return;
+                }
+
+                filteredCommunes = communesList.filter(commune => {
+                    const communeName = (commune.name || commune.code || '').toLowerCase();
+                    return communeName.includes(searchTerm);
+                });
+
+                showDropdown(filteredCommunes);
+            });
+
+            // Xử lý khi click vào item
+            $(document).off('click.commune-item').on('click.commune-item', '#communeCodeDropdown .autocomplete-item', function() {
+                const communeCode = $(this).data('commune-code');
+                const communeName = $(this).data('commune-name');
+                
+                if (communeCode && communeName) {
+                    communeInput.val(communeName);
+                    communeValue.val(communeCode);
+                    communeInput.closest('.input-group-outline').addClass('is-filled');
+                    dropdown.hide();
+                }
+            });
+
+            // Xử lý phím tắt
+            communeInput.off('keydown.commune').on('keydown.commune', function(e) {
+                if (dropdown.is(':visible') && filteredCommunes.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        selectedIndex = Math.min(selectedIndex + 1, filteredCommunes.length - 1);
+                        updateSelectedItem();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        selectedIndex = Math.max(selectedIndex - 1, -1);
+                        updateSelectedItem();
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (selectedIndex >= 0 && selectedIndex < filteredCommunes.length) {
+                            const commune = filteredCommunes[selectedIndex];
+                            communeInput.val(commune.name || commune.code);
+                            communeValue.val(commune.code);
+                            communeInput.closest('.input-group-outline').addClass('is-filled');
+                            dropdown.hide();
+                        }
+                    } else if (e.key === 'Escape') {
+                        dropdown.hide();
+                        selectedIndex = -1;
+                    }
+                }
+            });
+
+            // Ẩn dropdown khi click ra ngoài
+            $(document).off('click.commune-close').on('click.commune-close', function(e) {
+                if (!$(e.target).closest('#communeCode').closest('.autocomplete-wrapper').length) {
+                    dropdown.hide();
+                    selectedIndex = -1;
+                }
+            });
+
+            // Xử lý khi focus vào input
+            communeInput.off('focus.commune').on('focus.commune', function() {
+                $(this).closest('.input-group-outline').addClass('is-filled');
+                
+                const val = $(this).val().trim();
+                if (val) {
+                    $(this).trigger('input.commune');
+                } else {
+                    if (communesList.length > 0) {
+                        filteredCommunes = communesList;
+                        showDropdown(filteredCommunes);
+                    }
+                }
+            });
+
+            // Xử lý khi blur
+            communeInput.off('blur.commune').on('blur.commune', function() {
+                const val = $(this).val().trim();
+                if (!val) {
+                    $(this).closest('.input-group-outline').removeClass('is-filled');
+                }
+            });
+        }
+
+        // Load danh sách nhân viên
+        function loadEmployees(page = currentPage) {
+            currentPage = page;
+            const searchTerm = $('#searchInput').val().trim();
+            const activeFilter = $('#activeFilter').val();
+
+            const dataParams = {
+                pageNumber: currentPage,
+                pageSize: pageSize,
+                searchTerm: searchTerm
+            };
+
+            // Chỉ thêm active vào params nếu có giá trị
+            if (activeFilter !== '') {
+                dataParams.active = activeFilter === 'true';
+            }
+
+            $.ajax({
+                url: API_URL,
+                type: 'GET',
+                data: dataParams,
+                success: function(response) {
+                    try {
+                        // Kiểm tra response hợp lệ
+                        if (!response) {
+                            console.error('Response rỗng từ server');
+                            showNotification('Không nhận được dữ liệu từ server', 'error');
+                            displayEmployees([]);
+                            return;
+                        }
+
+                        // Tính toán các thuộc tính phân trang nếu chưa có
+                        if (!response.totalPages) {
+                            response.totalPages = Math.ceil((response.totalItems || 0) / (response.pageSize || pageSize));
+                        }
+                        if (response.hasPreviousPage === undefined) {
+                            response.hasPreviousPage = (response.pageNumber || currentPage) > 1;
+                        }
+                        if (response.hasNextPage === undefined) {
+                            response.hasNextPage = (response.pageNumber || currentPage) < response.totalPages;
+                        }
+                        
+                        displayEmployees(response.items || []);
+                        displayPagination(response);
+                        updatePageInfo(response);
+                    } catch (error) {
+                        console.error('Lỗi khi xử lý dữ liệu:', error);
+                        showNotification('Lỗi khi xử lý dữ liệu nhân viên', 'error');
+                        displayEmployees([]);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Lỗi khi tải nhân viên:', {
+                        status: status,
+                        error: error,
+                        responseText: xhr.responseText,
+                        statusCode: xhr.status
+                    });
+                    
+                    let errorMessage = 'Lỗi khi tải dữ liệu nhân viên';
+                    if (xhr.status === 0) {
+                        errorMessage = 'Không thể kết nối đến server. Vui lòng kiểm tra lại kết nối.';
+                    } else if (xhr.status === 500) {
+                        errorMessage = 'Lỗi server. Vui lòng thử lại sau.';
+                    } else if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMessage = xhr.responseJSON.message;
+                    }
+                    
+                    showNotification(errorMessage, 'error');
+                    displayEmployees([]);
+                }
+            });
+        }
+
+        // Hiển thị nhân viên
+        function displayEmployees(employees) {
+            const tbody = $('#employeeTableBody');
+            tbody.empty();
+
+            if (employees.length === 0) {
+                tbody.append(`
+                    <tr>
+                        <td colspan="5" class="text-center text-secondary py-4">
+                            Không có nhân viên nào
+                        </td>
+                    </tr>
+                `);
+                return;
+            }
+
+            $.each(employees, function(index, employee) {
+                const avatar = employee.avatar ? `${IMAGE_BASE_URL}/${employee.avatar}` : `${API_BASE_URL}/image/avatar.jpg`;
+                const dateOfBirth = employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString('vi-VN') : '-';
+                const phoneNumber = employee.phoneNumber || '-';
+                const email = employee.email || '-';
+                const username = employee.username || '-';
+                const isActive = employee.active !== false; // Mặc định true nếu không có giá trị
+                const activeBadge = isActive 
+                    ? '<span class="badge bg-gradient-success">Đang hoạt động</span>' 
+                    : '<span class="badge bg-gradient-danger">Đã khóa</span>';
+                const employeeNameEscaped = (employee.employeeName || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+                // Nút thao tác khác nhau tùy theo active
+                let actionButtons = '';
+                if (isActive) {
+                    // Nhân viên đang hoạt động: có nút Xem, Sửa, Xóa
+                    actionButtons = `
+                        <button class="btn btn-info action-btn" onclick='viewEmployee("${employee.employeeId}")' title="Xem">
+                            <i class="material-icons text-sm">visibility</i>
+                        </button>
+                        <button class="btn btn-warning action-btn" onclick='editEmployee("${employee.employeeId}")' title="Sửa">
+                            <i class="material-icons text-sm">edit</i>
+                        </button>
+                        <button class="btn btn-danger action-btn" onclick='deleteEmployee("${employee.employeeId}", "${employeeNameEscaped}")' title="Khóa">
+                            <i class="material-icons text-sm">delete</i>
+                        </button>
+                    `;
+                } else {
+                    // Nhân viên đã khóa: có nút Xem, Khôi phục
+                    actionButtons = `
+                        <button class="btn btn-info action-btn" onclick='viewEmployee("${employee.employeeId}")' title="Xem">
+                            <i class="material-icons text-sm">visibility</i>
+                        </button>
+                        <button class="btn btn-success action-btn" onclick='restoreEmployee("${employee.employeeId}", "${employeeNameEscaped}")' title="Khôi phục">
+                            <i class="material-icons text-sm">restore</i>
+                        </button>
+                    `;
+                }
+
+                tbody.append(`
+                    <tr style="height: 80px;" class="${!isActive ? 'table-secondary' : ''}">
+                        <td style="vertical-align: middle;">
+                            <div class="d-flex px-2 py-1">
+                                <div>
+                                    <img src="${avatar}" class="employee-image me-3" alt="${employee.employeeName}" onerror="this.src='${API_BASE_URL}/image/avatar.jpg'">
+                                </div>
+                                <div class="d-flex flex-column justify-content-center" style="min-width: 0; flex: 1;">
+                                    <h6 class="mb-0 text-sm" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${employee.employeeName}</h6>
+                                    <p class="text-xs text-secondary mb-0">${employee.employeeId}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td style="vertical-align: middle;">
+                            <p class="text-xs font-weight-bold mb-0" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${phoneNumber}</p>
+                            <p class="text-xs text-secondary mb-0" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${email}</p>
+                            ${activeBadge}
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold">${dateOfBirth}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; max-width: 100%;">${username}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;" class="table-actions">
+                            ${actionButtons}
+                        </td>
+                    </tr>
+                `);
+            });
+        }
+
+        // Hiển thị phân trang
+        function displayPagination(response) {
+            const pagination = $('#pagination');
+            pagination.empty();
+
+            if (response.totalPages <= 1) return;
+
+            // Nút Previous
+            pagination.append(`
+                <li class="page-item ${response.hasPreviousPage ? '' : 'disabled'}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadEmployees(${currentPage - 1})">
+                        <i class="material-icons text-sm">chevron_left</i>
+                    </a>
+                </li>
+            `);
+
+            // Các trang
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(response.totalPages, currentPage + 2);
+
+            if (startPage > 1) {
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadEmployees(1)">1</a></li>`);
+                if (startPage > 2) {
+                    pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                pagination.append(`
+                    <li class="page-item ${i === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="javascript:void(0)" onclick="loadEmployees(${i})">${i}</a>
+                    </li>
+                `);
+            }
+
+            if (endPage < response.totalPages) {
+                if (endPage < response.totalPages - 1) {
+                    pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadEmployees(${response.totalPages})">${response.totalPages}</a></li>`);
+            }
+
+            // Nút Next
+            pagination.append(`
+                <li class="page-item ${response.hasNextPage ? '' : 'disabled'}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadEmployees(${currentPage + 1})">
+                        <i class="material-icons text-sm">chevron_right</i>
+                    </a>
+                </li>
+            `);
+        }
+
+        // Cập nhật thông tin trang
+        function updatePageInfo(response) {
+            const start = (response.pageNumber - 1) * response.pageSize + 1;
+            const end = Math.min(response.pageNumber * response.pageSize, response.totalItems);
+            $('#pageInfo').text(`Hiển thị ${start} - ${end} trong tổng số ${response.totalItems} nhân viên`);
+        }
+
+        // Thiết lập chế độ xem/chỉnh sửa
+        function setViewMode(isViewMode) {
+            const modalContent = $('#employeeModal .modal-content');
+            const passwordInput = $('#password');
+            
+            if (isViewMode) {
+                // Thêm class view-mode để áp dụng CSS
+                modalContent.addClass('view-mode');
+                
+                // Ẩn dropdown autocomplete
+                $('#roleIdDropdown').hide();
+                
+                // Disable tất cả inputs và selects trong form
+                $('#employeeForm input:not([type="hidden"]):not([type="file"]), #employeeForm select').prop('disabled', true);
+                $('#employeeForm input[type="file"]').prop('disabled', true).css('pointer-events', 'none');
+                
+                // Xử lý password: đổi sang text và hiển thị dấu * với độ dài thực
+                const passwordLength = parseInt(passwordInput.data('password-length')) || 8; // Mặc định 8 ký tự nếu không có
+                if (passwordLength > 0) {
+                    passwordInput.attr('type', 'text').val('*'.repeat(passwordLength));
+                } else {
+                    passwordInput.attr('type', 'text').val('');
+                }
+                
+                // Ẩn nút lưu
+                $('.modal-footer .btn-primary').hide();
+            } else {
+                // Xóa class view-mode
+                modalContent.removeClass('view-mode');
+                
+                // Enable tất cả inputs và selects trong form (trừ employeeId nếu đang edit)
+                $('#employeeForm input:not([type="hidden"]):not([type="file"]), #employeeForm select').each(function() {
+                    // Giữ nguyên trạng thái disabled của employeeId nếu đang edit
+                    if ($(this).attr('id') === 'employeeId' && $('#isEditMode').val() === 'true') {
+                        return; // Không enable employeeId khi edit
+                    }
+                    $(this).prop('disabled', false);
+                });
+                
+                // Đổi password về type="password" và clear giá trị
+                // Nhưng nếu đang edit và có mật khẩu (có username), hiển thị dấu * ban đầu
+                const isEditMode = $('#isEditMode').val() === 'true';
+                const hasUsername = $('#username').val() && $('#username').val().trim() !== '';
+                if (isEditMode && hasUsername) {
+                    // Hiển thị dấu * khi đang edit (người dùng có thể focus để nhập mới)
+                    const passwordLength = parseInt(passwordInput.data('password-length')) || 8;
+                    passwordInput.attr('type', 'text').val('*'.repeat(passwordLength));
+                } else {
+                    passwordInput.attr('type', 'password').val('');
+                }
+                
+                $('#employeeForm input[type="file"]').prop('disabled', false).css('pointer-events', 'auto');
+                
+                // Hiện nút lưu
+                $('.modal-footer .btn-primary').show();
+            }
+        }
+
+        // Thêm nhân viên mới
+        function addEmployee() {
+            $('#isEditMode').val('false');
+            $('#employeeModalLabel').text('Thêm nhân viên');
+            
+            // Reset form
+            $('#employeeForm')[0].reset();
+            $('#imagePreview').hide();
+            $('#errorMessage').hide();
+            
+            // Reset password field
+            $('#password').attr('type', 'password').val('').data('password-length', 0).data('password-changed', false).removeData('saved-star-length');
+            
+            // Xóa class edit-mode và attribute value, data-has-input khỏi input date (để ẩn dd/mm/yyyy)
+            $('#dateOfBirth').closest('.input-group-outline').removeClass('edit-mode');
+            $('#dateOfBirth').removeAttr('value').removeAttr('data-has-input');
+            
+            // Populate combobox (không có giá trị selected)
+            populateRolesCombo('');
+            
+            // Reset địa chỉ
+            $('#provinceCode').val('');
+            $('#provinceCodeValue').val('');
+            $('#provinceCode').closest('.input-group-outline').removeClass('is-filled');
+            $('#communeCode').val('');
+            $('#communeCodeValue').val('');
+            $('#communeCode').prop('disabled', true);
+            $('#communeCode').closest('.input-group-outline').removeClass('is-filled');
+            $('#addressDetail').val('');
+            communesList = [];
+            
+            // Lấy mã nhân viên tự động
+            $.ajax({
+                url: `${API_URL}/next-id`,
+                type: 'GET',
+                success: function(response) {
+                    if (response && response.employeeId) {
+                        $('#employeeId').val(response.employeeId);
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Lỗi khi lấy mã nhân viên:', xhr);
+                    // Vẫn cho phép thêm nhân viên, mã sẽ được tạo tự động ở backend
+                }
+            });
+            
+            // Enable tất cả inputs
+            setViewMode(false);
+            
+            // Cập nhật label sau khi modal hiển thị
+            setTimeout(function() {
+                updateInputLabels();
+            }, 100);
+            
+            const modal = new bootstrap.Modal(document.getElementById('employeeModal'));
+            modal.show();
+        }
+
+        // Xem chi tiết nhân viên
+        function viewEmployee(employeeId) {
+            $.ajax({
+                url: `${API_URL}/${employeeId}`,
+                type: 'GET',
+                success: function(employee) {
+                    // Load tất cả dữ liệu cần thiết trước khi hiển thị
+                    Promise.all([
+                        // Load roles nếu chưa có
+                        rolesList && rolesList.length > 0 ? Promise.resolve(rolesList) : 
+                            $.ajax({ url: `${API_URL}/roles`, type: 'GET' }).then(function(roles) {
+                                rolesList = roles || [];
+                                return rolesList;
+                            }),
+                        // Load provinces
+                        loadProvinces()
+                    ]).then(function([roles, provinces]) {
+                        // Tìm tên vai trò
+                        let roleName = '-';
+                        if (employee.roleId) {
+                            const role = rolesList.find(r => r.roleId === employee.roleId);
+                            roleName = role ? (role.roleName || role.roleId) : employee.roleId;
+                        }
+
+                        // Tìm tên tỉnh/thành và phường/xã
+                        let provinceName = '';
+                        let communeName = '';
+                        const fallbackAddress = extractAddressParts(employee.address);
+                        
+                        if (employee.provinceCode) {
+                            const province = provincesList.find(p => p.code === employee.provinceCode);
+                            provinceName = province ? (province.name || province.code) : 
+                                (fallbackAddress.provinceName || employee.provinceCode);
+                        } else if (fallbackAddress.provinceName) {
+                            provinceName = fallbackAddress.provinceName;
+                        }
+
+                        if (employee.communeCode && employee.provinceCode) {
+                            return loadCommunes(employee.provinceCode).then(function(communes) {
+                                const commune = communesList.find(c => c.code === employee.communeCode);
+                                communeName = commune ? (commune.name || commune.code) : 
+                                    (fallbackAddress.communeName || employee.communeCode);
+                                return { provinceName, communeName, branchesName, roleName };
+                            });
+                        } else {
+                            communeName = fallbackAddress.communeName || '';
+                            return Promise.resolve({ provinceName, communeName, roleName });
+                        }
+                    }).then(function({ provinceName, communeName, roleName }) {
+                        const avatar = employee.avatar ? `${IMAGE_BASE_URL}/${employee.avatar}` : `${API_BASE_URL}/image/avatar.jpg`;
+                        const dateOfBirth = employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString('vi-VN') : '-';
+                        const activeBadge = employee.active !== false 
+                            ? '<span class="badge bg-gradient-success">Đang hoạt động</span>' 
+                            : '<span class="badge bg-gradient-danger">Đã khóa</span>';
+
+                        // Xây dựng địa chỉ đầy đủ
+                        let fullAddress = '';
+                        if (employee.addressDetail) {
+                            fullAddress = employee.addressDetail;
+                        }
+                        if (communeName) {
+                            fullAddress += (fullAddress ? ', ' : '') + communeName;
+                        }
+                        if (provinceName) {
+                            fullAddress += (fullAddress ? ', ' : '') + provinceName;
+                        }
+                        if (!fullAddress && employee.address) {
+                            fullAddress = employee.address;
+                        }
+                        if (!fullAddress) {
+                            fullAddress = '-';
+                        }
+
+                        let html = `
+                            <div class="row mb-2">
+                                <div class="col-md-3 text-center">
+                                    <img src="${avatar}" class="img-fluid rounded" style="max-height: 200px;" alt="${employee.employeeName || ''}" onerror="this.src='${API_BASE_URL}/image/avatar.jpg'">
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="row mb-2">
+                                        <div class="col-md-6">
+                                            <strong>Mã nhân viên:</strong> ${employee.employeeId || '-'}
+                                        </div>
+                                        <div class="col-md-6">
+                                            <strong>Tên nhân viên:</strong> ${employee.employeeName || '-'}
+                                        </div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div class="col-md-6">
+                                            <strong>Ngày sinh:</strong> ${dateOfBirth}
+                                        </div>
+                                        <div class="col-md-6">
+                                            <strong>Trạng thái:</strong> ${activeBadge}
+                                        </div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div class="col-md-6">
+                                            <strong>Số điện thoại:</strong> ${employee.phoneNumber || '-'}
+                                        </div>
+                                        <div class="col-md-6">
+                                            <strong>Email:</strong> ${employee.email || '-'}
+                                        </div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div class="col-md-6">
+                                            <strong>Vai trò:</strong> ${roleName}
+                                        </div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div class="col-md-6">
+                                            <strong>Tài khoản:</strong> ${employee.username || '-'}
+                                        </div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div class="col-md-12">
+                                            <strong>Địa chỉ:</strong> ${fullAddress}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+
+                        $('#viewEmployeeModalBody').html(html);
+                        const modal = new bootstrap.Modal(document.getElementById('viewEmployeeModal'));
+                        modal.show();
+                    }).catch(function(error) {
+                        console.error('Error loading employee details:', error);
+                        showNotification('Lỗi khi tải thông tin chi tiết nhân viên', 'error');
+                    });
+                },
+                error: function(xhr) {
+                    console.error('Error loading employee for view:', xhr);
+                    showNotification('Lỗi khi tải thông tin nhân viên', 'error');
+                }
+            });
+        }
+
+        // Sửa nhân viên
+        function editEmployee(employeeId) {
+            $.ajax({
+                url: `${API_URL}/${employeeId}`,
+                type: 'GET',
+                success: function(employee) {
+                    $('#isEditMode').val('true');
+                    $('#employeeModalLabel').text('Cập nhật nhân viên');
+                    
+                    // Reset form trước
+                    $('#employeeForm')[0].reset();
+                    
+                    // Thêm class edit-mode vào input date (để hiển thị dd/mm/yyyy)
+                    $('#dateOfBirth').closest('.input-group-outline').addClass('edit-mode');
+                    
+                    // Fill form với dữ liệu
+                    fillFormWithEmployee(employee, false);
+                    
+                    // Disable employeeId (không cho sửa mã) - set readonly
+                    $('#employeeId').prop('disabled', false).prop('readonly', true);
+                    
+                    // Enable edit mode (không phải view mode) - gọi sau khi fill form
+                    setTimeout(function() {
+                        setViewMode(false);
+                        // Nếu nhân viên có username và có độ dài mật khẩu, hiển thị dấu * với độ dài thực
+                        if (employee.username && employee.passwordLength && employee.passwordLength > 0) {
+                            const passwordInput = $('#password');
+                            passwordInput.attr('type', 'text').val('*'.repeat(employee.passwordLength));
+                        }
+                        
+                    }, 150);
+                    
+                    const modal = new bootstrap.Modal(document.getElementById('employeeModal'));
+                    modal.show();
+                },
+                error: function(xhr) {
+                    console.error('Error loading employee:', xhr);
+                    showNotification('Lỗi khi tải thông tin nhân viên', 'error');
+                }
+            });
+        }
+
+        // Điền dữ liệu vào form
+        function fillFormWithEmployee(employee, viewOnly) {
+            // Reset form trước
+            $('#employeeForm')[0].reset();
+            
+            // Fill basic info
+            $('#employeeId').val(employee.employeeId || '');
+            $('#employeeName').val(employee.employeeName || '');
+            
+            // Format date for input[type="date"]
+            const $dateOfBirth = $('#dateOfBirth');
+            if (employee.dateOfBirth) {
+                const date = new Date(employee.dateOfBirth);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const dateValue = `${year}-${month}-${day}`;
+                $dateOfBirth.val(dateValue).attr('value', dateValue);
+            } else {
+                $dateOfBirth.val('').removeAttr('value');
+            }
+            
+            $('#phoneNumber').val(employee.phoneNumber || '');
+            $('#email').val(employee.email || '');
+            $('#addressDetail').val(employee.addressDetail || '');
+            $('#username').val(employee.username || '');
+            
+            // Populate combobox với giá trị đã chọn (hiển thị tên, value là mã)
+            populateRolesCombo(employee.roleId || '');
+            
+            const fallbackAddress = extractAddressParts(employee.address);
+            if (!employee.addressDetail && fallbackAddress.detail) {
+                $('#addressDetail').val(fallbackAddress.detail);
+            }
+
+            let selectedProvinceCode = employee.provinceCode || '';
+            let selectedCommuneCode = employee.communeCode || '';
+            const provinceInput = $('#provinceCode');
+            const provinceValue = $('#provinceCodeValue');
+            const communeInput = $('#communeCode');
+            const communeValue = $('#communeCodeValue');
+
+            provinceValue.val(selectedProvinceCode);
+            communeValue.val(selectedCommuneCode);
+
+            loadProvinces().then(function() {
+                let provinceDisplay = '';
+                let foundProvince = false;
+
+                // Ưu tiên tìm theo mã nếu có
+                if (selectedProvinceCode) {
+                    const province = provincesList.find(p => p.code === selectedProvinceCode);
+                    if (province) {
+                        provinceDisplay = province.name || province.code;
+                        foundProvince = true;
+                    } else {
+                        // Nếu có mã nhưng không tìm thấy, thử tìm theo tên từ address
+                        if (fallbackAddress.provinceName) {
+                            const normalizedFallback = normalizeText(fallbackAddress.provinceName);
+                            const matchByName = provincesList.find(p => {
+                                const normalizedName = normalizeText(p.name || '');
+                                return normalizedName === normalizedFallback || 
+                                       normalizedName.includes(normalizedFallback) ||
+                                       normalizedFallback.includes(normalizedName);
+                            });
+                            if (matchByName) {
+                                selectedProvinceCode = matchByName.code;
+                                provinceValue.val(selectedProvinceCode);
+                                provinceDisplay = matchByName.name || matchByName.code;
+                                foundProvince = true;
+                            } else {
+                                // Nếu vẫn không tìm thấy, hiển thị tên từ address
+                                provinceDisplay = fallbackAddress.provinceName || selectedProvinceCode;
+                            }
+                        } else {
+                            // Nếu không có tên từ address, hiển thị mã
+                            provinceDisplay = selectedProvinceCode;
+                        }
+                    }
+                }
+                
+                // Nếu chưa tìm được, thử tìm theo tên từ address
+                if (!foundProvince && fallbackAddress.provinceName) {
+                    const normalizedFallback = normalizeText(fallbackAddress.provinceName);
+                    const matchByName = provincesList.find(p => {
+                        const normalizedName = normalizeText(p.name || '');
+                        return normalizedName === normalizedFallback || 
+                               normalizedName.includes(normalizedFallback) ||
+                               normalizedFallback.includes(normalizedName);
+                    });
+                    if (matchByName) {
+                        selectedProvinceCode = matchByName.code;
+                        provinceValue.val(selectedProvinceCode);
+                        provinceDisplay = matchByName.name || matchByName.code;
+                        foundProvince = true;
+                    } else {
+                        // Nếu không tìm thấy, hiển thị tên từ address
+                        provinceDisplay = fallbackAddress.provinceName;
+                    }
+                }
+
+                if (provinceDisplay) {
+                    provinceInput.val(provinceDisplay);
+                    provinceInput.closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    provinceInput.val('');
+                    provinceInput.closest('.input-group-outline').removeClass('is-filled');
+                }
+
+                // Load communes nếu có mã tỉnh/thành
+                if (selectedProvinceCode) {
+                    return loadCommunes(selectedProvinceCode);
+                }
+
+                // Nếu không có mã tỉnh/thành, vẫn thử load communes nếu có tên tỉnh/thành
+                if (fallbackAddress.provinceName && !selectedProvinceCode) {
+                    // Không thể load communes mà không có mã tỉnh/thành
+                    resetCommuneInput();
+                    const deferred = $.Deferred();
+                    deferred.resolve([]);
+                    return deferred.promise();
+                }
+
+                resetCommuneInput();
+                const deferred = $.Deferred();
+                deferred.resolve([]);
+                return deferred.promise();
+            }).then(function(communes) {
+                let communeDisplay = '';
+                const communeList = communes || communesList || [];
+                let foundCommune = false;
+
+                // Ưu tiên tìm theo mã nếu có
+                if (selectedCommuneCode) {
+                    const commune = communeList.find(c => c.code === selectedCommuneCode);
+                    if (commune) {
+                        communeDisplay = commune.name || commune.code;
+                        foundCommune = true;
+                    } else {
+                        // Nếu có mã nhưng không tìm thấy, thử tìm theo tên từ address
+                        if (fallbackAddress.communeName) {
+                            const normalizedFallback = normalizeText(fallbackAddress.communeName);
+                            const matchByName = communeList.find(c => {
+                                const normalizedName = normalizeText(c.name || '');
+                                return normalizedName === normalizedFallback || 
+                                       normalizedName.includes(normalizedFallback) ||
+                                       normalizedFallback.includes(normalizedName);
+                            });
+                            if (matchByName) {
+                                selectedCommuneCode = matchByName.code;
+                                communeValue.val(selectedCommuneCode);
+                                communeDisplay = matchByName.name || matchByName.code;
+                                foundCommune = true;
+                            } else {
+                                // Nếu vẫn không tìm thấy, hiển thị tên từ address
+                                communeDisplay = fallbackAddress.communeName || selectedCommuneCode;
+                            }
+                        } else {
+                            // Nếu không có tên từ address, hiển thị mã
+                            communeDisplay = selectedCommuneCode;
+                        }
+                    }
+                }
+                
+                // Nếu chưa tìm được, thử tìm theo tên từ address
+                if (!foundCommune && fallbackAddress.communeName) {
+                    const normalizedFallback = normalizeText(fallbackAddress.communeName);
+                    const matchByName = communeList.find(c => {
+                        const normalizedName = normalizeText(c.name || '');
+                        return normalizedName === normalizedFallback || 
+                               normalizedName.includes(normalizedFallback) ||
+                               normalizedFallback.includes(normalizedName);
+                    });
+                    if (matchByName) {
+                        selectedCommuneCode = matchByName.code;
+                        communeValue.val(selectedCommuneCode);
+                        communeDisplay = matchByName.name || matchByName.code;
+                        foundCommune = true;
+                    } else {
+                        // Nếu không tìm thấy, hiển thị tên từ address
+                        communeDisplay = fallbackAddress.communeName;
+                    }
+                }
+
+                if (communeDisplay) {
+                    communeInput.val(communeDisplay);
+                    communeInput.closest('.input-group-outline').addClass('is-filled');
+                    if (selectedCommuneCode) {
+                        communeValue.val(selectedCommuneCode);
+                    }
+                } else {
+                    resetCommuneInput();
+                }
+            }).catch(function(err) {
+                console.error('Không thể load địa chỉ nhân viên:', err);
+                // Vẫn hiển thị giá trị từ address nếu có
+                if (fallbackAddress.provinceName) {
+                    $('#provinceCode').val(fallbackAddress.provinceName);
+                    $('#provinceCode').closest('.input-group-outline').addClass('is-filled');
+                }
+                if (fallbackAddress.communeName) {
+                    $('#communeCode').val(fallbackAddress.communeName);
+                    $('#communeCode').closest('.input-group-outline').addClass('is-filled');
+                }
+            });
+            
+            // Không fill password vì lý do bảo mật
+            // Sử dụng độ dài mật khẩu từ API (passwordLength) hoặc mặc định 8
+            const passwordLength = employee.passwordLength || 8;
+            $('#password').val('').data('password-length', passwordLength).data('password-changed', false).data('saved-star-length', passwordLength);
+            
+            // Nếu đang ở chế độ xem hoặc sửa và nhân viên có username (có mật khẩu)
+            // thì hiển thị dấu * ngay lập tức với độ dài thực
+            if (viewOnly || $('#isEditMode').val() === 'true') {
+                if (employee.username && passwordLength > 0) {
+                    // Có username và có độ dài mật khẩu, hiển thị dấu * với độ dài thực
+                    setTimeout(function() {
+                        const passwordInput = $('#password');
+                        passwordInput.attr('type', 'text').val('*'.repeat(passwordLength)).data('password-changed', false);
+                    }, 100);
+                }
+            }
+            
+            // Trigger change để update is-filled class
+            $('#email').trigger('change');
+
+            // Add is-filled class to input groups with values
+            setTimeout(function() {
+                if (typeof updateInputLabels === 'function') {
+                    updateInputLabels();
+                }
+            }, 100);
+
+            // Load avatar
+            if (employee.avatar) {
+                const avatarUrl = `${IMAGE_BASE_URL}/${employee.avatar}`;
+                $('#imagePreview').attr('src', avatarUrl).show();
+            } else {
+                $('#imagePreview').hide();
+            }
+            
+            // Set view mode SAU KHI render (chỉ set nếu viewOnly, không set khi edit)
+            if (viewOnly) {
+                // Disable form inputs
+                $('#employeeForm input:not([type="hidden"]):not([type="file"]), #employeeForm select').prop('disabled', true);
+                $('#employeeForm input[type="file"]').prop('disabled', true).css('pointer-events', 'none');
+                $('.modal-footer .btn-primary').hide();
+                // Clear file inputs khi view
+                $('#avatarFile').val('');
+            }
+            
+            // Clear avatar file input (luôn clear)
+            $('#avatarFile').val('');
+
+            $('#errorMessage').hide();
+        }
+
+        // Preview ảnh
+        function previewImage(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    $('#imagePreview').attr('src', e.target.result).show();
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // Lưu nhân viên (thêm mới hoặc cập nhật)
+        function saveEmployee() {
+            // Clear error message
+            $('#errorMessage').hide();
+            
+            const isEdit = $('#isEditMode').val() === 'true';
+            const employeeId = $('#employeeId').val().trim();
+
+            const employeeName = $('#employeeName').val().trim();
+            if (!employeeName) {
+                showError('Vui lòng nhập tên nhân viên');
+                $('#employeeName').focus();
+                return;
+            }
+
+            const formData = new FormData();
+            
+            // Gửi EmployeeId nếu đang thêm mới (đã được generate tự động)
+            if (!isEdit) {
+                const empId = $('#employeeId').val().trim();
+                if (empId) {
+                    formData.append('EmployeeId', empId);
+                }
+            }
+            
+            formData.append('EmployeeName', employeeName);
+            formData.append('DateOfBirth', $('#dateOfBirth').val() || '');
+            formData.append('PhoneNumber', $('#phoneNumber').val() || '');
+            formData.append('Email', $('#email').val() || '');
+            formData.append('ProvinceCode', $('#provinceCodeValue').val() || '');
+            formData.append('CommuneCode', $('#communeCodeValue').val() || '');
+            formData.append('AddressDetail', $('#addressDetail').val() || '');
+            formData.append('Username', $('#username').val() || '');
+            formData.append('RoleId', $('#roleIdValue').val() || '');
+            
+            // Chỉ gửi password nếu có giá trị thực sự (không phải dấu *) và đã được thay đổi
+            const password = $('#password').val();
+            const passwordChanged = $('#password').data('password-changed');
+            const passwordInput = $('#password');
+            const isPasswordType = passwordInput.attr('type') === 'password';
+            
+            // Chỉ gửi password nếu:
+            // 1. Đang thêm mới (không phải edit) và có giá trị
+            // 2. HOẶC đang edit và:
+            //    - Input đang ở type="password" (người dùng đã nhập mật khẩu mới)
+            //    - HOẶC password đã được thay đổi (passwordChanged = true) và không phải toàn dấu *
+            //    - VÀ có giá trị thực sự
+            if (!isEdit) {
+                // Thêm mới: gửi password nếu có giá trị
+                if (password && password.trim() !== '') {
+                    formData.append('Password', password);
+                }
+            } else {
+                // Sửa: chỉ gửi password nếu:
+                // - Input đang ở type="password" (người dùng đã nhập mật khẩu mới thực sự)
+                // - HOẶC password đã được thay đổi và không phải toàn dấu *
+                if (isPasswordType && password && password.trim() !== '') {
+                    // Input đang ở type="password" nghĩa là người dùng đã nhập mật khẩu mới
+                    formData.append('Password', password);
+                } else if (passwordChanged && password && !password.match(/^\*+$/) && password.trim() !== '') {
+                    // Password đã được thay đổi và không phải dấu *
+                    formData.append('Password', password);
+                }
+                // Nếu không thỏa điều kiện trên, không gửi password -> server sẽ giữ nguyên mật khẩu cũ
+            }
+
+            const avatarFile = $('#avatarFile')[0].files[0];
+            if (avatarFile) {
+                formData.append('AvatarFile', avatarFile);
+            }
+
+            let url, method;
+            if (isEdit) {
+                if (!employeeId) {
+                    showError('Không tìm thấy mã nhân viên');
+                    return;
+                }
+                url = `${API_URL}/${employeeId}`;
+                method = 'PUT';
+            } else {
+                url = API_URL;
+                method = 'POST';
+            }
+
+            $.ajax({
+                url: url,
+                type: method,
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    const message = isEdit ? 'Cập nhật nhân viên thành công' : 'Thêm nhân viên thành công';
+                    showNotification(message, 'success');
+                    
+                    // Cập nhật passwordLength nếu có trong response
+                    if (response && response.passwordLength !== undefined) {
+                        $('#password').data('password-length', response.passwordLength);
+                    } else if (password && password.length > 0) {
+                        // Nếu không có trong response, sử dụng độ dài password vừa nhập
+                        $('#password').data('password-length', password.length);
+                    }
+                    
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('employeeModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                    loadEmployees();
+                },
+                error: function(xhr) {
+                    console.error('Error saving employee:', xhr);
+                    console.error('Status:', xhr.status);
+                    console.error('Status Text:', xhr.statusText);
+                    console.error('Response Text:', xhr.responseText);
+                    console.error('Response JSON:', xhr.responseJSON);
+                    
+                    let message = isEdit ? 'Có lỗi xảy ra khi cập nhật nhân viên' : 'Có lỗi xảy ra khi thêm nhân viên';
+                    let errorDetails = '';
+                    
+                    if (xhr.responseJSON) {
+                        if (xhr.responseJSON.message) {
+                            message = xhr.responseJSON.message;
+                        }
+                        if (xhr.responseJSON.error) {
+                            errorDetails += '<br><small style="color: #dc3545;">' + xhr.responseJSON.error + '</small>';
+                        }
+                        if (xhr.responseJSON.details) {
+                            errorDetails += '<br><small style="color: #6c757d; font-size: 0.8em;">' + 
+                                xhr.responseJSON.details.substring(0, 500).replace(/\n/g, '<br>') + '</small>';
+                        }
+                        if (xhr.responseJSON.errors) {
+                            const errors = xhr.responseJSON.errors;
+                            const errorMessages = Object.values(errors).flat();
+                            errorDetails += '<br>' + errorMessages.join('<br>');
+                        }
+                    } else if (xhr.responseText) {
+                        try {
+                            const errorObj = JSON.parse(xhr.responseText);
+                            message = errorObj.message || errorObj.error || message;
+                            if (errorObj.details) {
+                                errorDetails += '<br><small style="color: #6c757d;">' + 
+                                    errorObj.details.substring(0, 300) + '</small>';
+                            }
+                        } catch (e) {
+                            errorDetails = '<br><small>' + xhr.responseText.substring(0, 200) + '</small>';
+                        }
+                    }
+                    
+                    if (xhr.status) {
+                        errorDetails += '<br><small style="color: #6c757d;">HTTP Status: ' + xhr.status + 
+                            (xhr.statusText ? ' ' + xhr.statusText : '') + '</small>';
+                    }
+                    
+                    showError(message + errorDetails);
+                    // Scroll to error message
+                    if ($('#errorMessage').length > 0) {
+                        $('#errorMessage')[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                }
+            });
+        }
+
+        // Xóa nhân viên (khóa nhân viên - set active = false)
+        function deleteEmployee(employeeId, employeeName) {
+            deleteEmployeeId = employeeId;
+            const employeeNameEscaped = employeeName.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            $('#deleteEmployeeName').html(employeeNameEscaped);
+            $('#deleteModalLabel').text('Xác nhận khóa');
+            $('#deleteModalMessage').html(`Bạn có chắc chắn muốn khóa nhân viên <strong>${employeeNameEscaped}</strong>?`);
+            const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+            modal.show();
+        }
+
+        // Xác nhận xóa (khóa nhân viên)
+        function confirmDelete() {
+            $.ajax({
+                url: `${API_URL}/${deleteEmployeeId}`,
+                type: 'DELETE',
+                success: function(response) {
+                    showNotification('Đã khóa nhân viên thành công', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+                    loadEmployees();
+                },
+                error: function(xhr) {
+                    let message = 'Có lỗi xảy ra khi khóa nhân viên';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showNotification(message, 'error');
+                }
+            });
+        }
+
+        // Khôi phục nhân viên (set active = true)
+        function restoreEmployee(employeeId, employeeName) {
+            if (!confirm(`Bạn có chắc chắn muốn khôi phục nhân viên "${employeeName}"?\nNhân viên sẽ được hiển thị lại trong danh sách đang hoạt động.`)) {
+                return;
+            }
+
+            $.ajax({
+                url: `${API_URL}/${employeeId}/restore`,
+                type: 'POST',
+                success: function(response) {
+                    showNotification('Khôi phục nhân viên thành công', 'success');
+                    loadEmployees();
+                },
+                error: function(xhr) {
+                    let message = 'Có lỗi xảy ra khi khôi phục nhân viên';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showNotification(message, 'error');
+                }
+            });
+        }
+
+        // Hiển thị thông báo
+        function showNotification(message, type) {
+            const bgColor = type === 'success' ? 'bg-gradient-success' : 'bg-gradient-danger';
+            const notification = $(`
+                <div class="alert ${bgColor} text-white alert-dismissible fade show position-fixed" 
+                     style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `);
+            $('body').append(notification);
+            setTimeout(() => notification.alert('close'), 3000);
+        }
+
+        // Hiển thị lỗi trong modal
+        function showError(message) {
+            $('#errorMessage').html(message).show();
+        }
+
+        // Reset khi đóng modal
+        $(document).on('hidden.bs.modal', '#employeeModal', function() {
+            // Xóa class view-mode
+            $('#employeeModal .modal-content').removeClass('view-mode');
+            
+            // Reset file inputs
+            $('#avatarFile').val('');
+            
+            // Clear previews
+            $('#imagePreview').hide();
+            
+            // Reset autocomplete dropdowns
+            $('#branchesIdDropdown').hide();
+            $('#roleIdDropdown').hide();
+            $('#provinceCodeDropdown').hide();
+            $('#communeCodeDropdown').hide();
+            
+            // Reset form
+            $('#employeeForm')[0].reset();
+            // Reset password về type="password" và clear data
+            $('#password').attr('type', 'password').val('').data('password-length', 0).data('password-changed', false).removeData('saved-star-length');
+            // Reset input date: xóa attribute value và data-has-input để ẩn dd/mm/yyyy
+            $('#dateOfBirth').removeAttr('value').removeAttr('data-has-input');
+            $('#errorMessage').hide();
+            
+            // Reset autocomplete inputs
+            $('#branchesId').val('');
+            $('#branchesIdValue').val('');
+            $('#roleId').val('');
+            $('#roleIdValue').val('');
+            $('#provinceCode').val('');
+            $('#provinceCodeValue').val('');
+            $('#communeCode').val('');
+            $('#communeCodeValue').val('');
+            $('#communeCode').prop('disabled', true);
+            $('#addressDetail').val('');
+            communesList = [];
+            
+            // Reset combobox về giá trị mặc định
+            populateBranchesCombo('');
+            populateRolesCombo('');
+            
+            // Remove is-filled classes và cập nhật labels
+            $('.input-group-outline').removeClass('is-filled is-focused');
+            if (typeof updateInputLabels === 'function') {
+                setTimeout(function() {
+                    updateInputLabels();
+                }, 50);
+            }
+            
+            // Enable all controls để sẵn sàng cho lần mở tiếp theo
+            $('#employeeForm input:not([type="hidden"]), #employeeForm select').prop('disabled', false);
+            $('#employeeForm input[type="file"]').prop('disabled', false).css('pointer-events', 'auto');
+            $('.modal-footer .btn-primary').show();
+        });
+    </script>
+}
+
+<style>
+    /* Fix Modal hiển thị giữa main content và cho phép scroll */
+    .modal {
+        padding-left: 250px !important; /* Offset bằng với chiều rộng sidebar */
+        overflow-y: auto !important;
+    }
+    
+    .modal-dialog {
+        margin: 1.75rem auto;
+        max-height: calc(100vh - 3.5rem);
+    }
+    
+    .modal-content {
+        max-height: calc(100vh - 3.5rem);
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .modal-body {
+        max-height: calc(100vh - 250px);
+        overflow-y: auto;
+        flex: 1 1 auto;
+    }
+    
+    .modal-header, .modal-footer {
+        flex-shrink: 0;
+    }
+    
+    /* Responsive cho modal trên màn hình nhỏ */
+    @@media (max-width: 1200px) {
+        .modal {
+            padding-left: 200px !important;
+        }
+    }
+    
+    @@media (max-width: 992px) {
+        .modal {
+            padding-left: 0 !important;
+        }
+    }
+
+    /* Bảng chính */
+    .table-responsive {
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .table {
+        margin-bottom: 0;
+        background-color: #fff;
+    }
+
+    .table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .table thead th {
+        color: #fff !important;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 1rem 0.75rem !important;
+        border: none;
+        font-size: 1.3125rem;
+        text-align: center;
+    }
+
+    .table tbody tr {
+        transition: all 0.3s ease;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .table tbody tr:hover {
+        background-color: #f8f9fa;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .table tbody tr:last-child {
+        border-bottom: none;
+    }
+
+    .table tbody tr.table-secondary {
+        background-color: #f8f9fa;
+        opacity: 0.7;
+    }
+
+    .employee-image {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 50%;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s ease;
+    }
+
+    .employee-image:hover {
+        transform: scale(1.05);
+    }
+
+    .action-btn {
+        padding: 0.375rem 0.625rem;
+        font-size: 0.75rem;
+        margin: 0 0.125rem;
+        border-radius: 0.375rem;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .modal-lg {
+        max-width: 800px;
+    }
+
+    .preview-image {
+        max-width: 200px;
+        max-height: 200px;
+        margin-top: 10px;
+        border-radius: 8px;
+    }
+
+    .table-actions {
+        white-space: nowrap;
+    }
+
+    /* Fix lỗi cột bị lệch khi đổi trang */
+    #employeeTableBody tr {
+        height: 80px;
+    }
+
+    #employeeTableBody tr td {
+        vertical-align: middle !important;
+        padding: 1rem 0.75rem !important;
+        border: none;
+    }
+
+    #employeeTableBody tr td:first-child {
+        width: 25%;
+        min-width: 200px;
+    }
+
+    #employeeTableBody tr td:nth-child(2) {
+        width: 20%;
+        min-width: 150px;
+    }
+
+    #employeeTableBody tr td:nth-child(3) {
+        width: 15%;
+        min-width: 100px;
+    }
+
+    #employeeTableBody tr td:nth-child(4) {
+        width: 15%;
+        min-width: 100px;
+    }
+
+    #employeeTableBody tr td:nth-child(5) {
+        width: 25%;
+        min-width: 150px;
+    }
+
+    /* Badge styling */
+    .badge {
+        padding: 0.5rem 0.75rem;
+        font-weight: 500;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+    }
+
+    /* Empty state */
+    .table tbody tr td[colspan] {
+        padding: 3rem 1rem !important;
+        text-align: center;
+        color: #6c757d;
+        font-style: italic;
+    }
+
+    /* Ẩn placeholder mờ trong input password */
+    #password::placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    #password::-webkit-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    #password::-moz-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    #password:-ms-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    /* Ẩn text mờ trong select (combobox) khi chưa chọn */
+    #branchesId option:first-child,
+    #roleId option:first-child {
+        color: transparent !important;
+    }
+
+    #branchesId:invalid,
+    #roleId:invalid {
+        color: #495057;
+    }
+
+    #branchesId option:not(:first-child),
+    #roleId option:not(:first-child) {
+        color: #495057;
+    }
+
+    /* Xử lý đặc biệt cho input date - ẩn label trống */
+    .input-group-outline:has(input[type="date"]) .form-label:empty {
+        display: none;
+    }
+
+    .input-group-outline input[type="date"] {
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+
+    /* Ẩn placeholder dd/mm/yyyy trong input date */
+    input[type="date"]::placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]::-webkit-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]::-moz-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]:-ms-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    /* Ẩn text placeholder mặc định của input date (dd/mm/yyyy) khi KHÔNG có dữ liệu và KHÔNG đang nhập */
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input])::-webkit-datetime-edit,
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input]):invalid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input]):valid::-webkit-datetime-edit {
+        color: transparent !important;
+    }
+
+    /* Hiển thị dd/mm/yyyy khi CÓ dữ liệu ngày được nhập vào (có attribute value) hoặc đang nhập (có data-has-input) */
+    .input-group-outline input[type="date"][value]::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][value]:valid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]:invalid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]:valid::-webkit-datetime-edit {
+        color: #495057 !important;
+    }
+
+    /* Autocomplete styling */
+    .autocomplete-wrapper {
+        width: 100%;
+        display: block;
+    }
+
+    /* Đảm bảo input-group-outline có autocomplete-wrapper có độ rộng đúng */
+    .input-group.input-group-outline.autocomplete-wrapper {
+        width: 100% !important;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+    }
+
+    /* Đảm bảo input trong input-group-outline.autocomplete-wrapper có style giống các input khác */
+    .input-group.input-group-outline.autocomplete-wrapper .form-control {
+        width: 100% !important;
+        max-width: 100% !important;
+        border: none;
+        border-bottom: 1px solid #d2d6da;
+        border-left: 1px solid #d2d6da;
+        border-right: 1px solid #d2d6da;
+        border-radius: 0;
+        padding-left: 0;
+        padding-right: 0;
+        background: transparent;
+        background-image: none;
+        box-shadow: none;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        flex: 1 1 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .input-group.input-group-outline.autocomplete-wrapper .form-control:focus {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+        box-shadow: none;
+        outline: 0;
+    }
+
+    .input-group.input-group-outline.autocomplete-wrapper.is-filled .form-control {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+    }
+
+    .input-group.input-group-outline.autocomplete-wrapper.is-focused .form-control {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+        box-shadow: none;
+    }
+
+    /* Đảm bảo input trong autocomplete-wrapper con (nếu có cấu trúc khác) */
+    .input-group-outline .autocomplete-wrapper {
+        width: 100%;
+        display: block;
+    }
+
+    /* Đảm bảo input trong autocomplete-wrapper có style giống các input khác */
+    .input-group-outline .autocomplete-wrapper .form-control {
+        width: 100% !important;
+        max-width: 100% !important;
+        border: none;
+        border-bottom: 1px solid #d2d6da;
+        border-left: 1px solid #d2d6da;
+        border-right: 1px solid #d2d6da;
+        border-radius: 0;
+        padding-left: 0;
+        padding-right: 0;
+        background: transparent;
+        background-image: none;
+        box-shadow: none;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        box-sizing: border-box;
+    }
+
+    .input-group-outline .autocomplete-wrapper .form-control:focus {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+        box-shadow: none;
+        outline: 0;
+    }
+
+    .input-group-outline.is-filled .autocomplete-wrapper .form-control {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+    }
+
+    .input-group-outline.is-focused .autocomplete-wrapper .form-control {
+        border-bottom-color: #e91e63;
+        border-left-color: #e91e63;
+        border-right-color: #e91e63;
+        box-shadow: none;
+    }
+
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: #fff;
+        border: 1px solid #d2d6da;
+        border-radius: 0.375rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1000;
+        margin-top: 2px;
+        display: none;
+    }
+
+    .autocomplete-item {
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom: none;
+    }
+
+    .autocomplete-item:hover,
+    .autocomplete-item.selected {
+        background-color: #f8f9fa;
+        color: #667eea;
+    }
+
+    .autocomplete-item:first-child {
+        border-top-left-radius: 0.375rem;
+        border-top-right-radius: 0.375rem;
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom-left-radius: 0.375rem;
+        border-bottom-right-radius: 0.375rem;
+    }
+
+    /* Autocomplete trong modal */
+    .modal .autocomplete-dropdown {
+        z-index: 1055;
+    }
+
+    .modal .autocomplete-wrapper {
+        z-index: 1;
+    }
+
+    /* Select2 styling */
+    .select2-container--bootstrap-5 .select2-selection {
+        min-height: 40px;
+        border: 1px solid #d2d6da;
+        border-radius: 0.375rem;
+    }
+
+    .select2-container--bootstrap-5 .select2-selection--single {
+        height: 40px;
+    }
+
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+        line-height: 38px;
+        padding-left: 0.75rem;
+    }
+
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
+        height: 38px;
+    }
+
+    .select2-dropdown {
+        border: 1px solid #d2d6da;
+        border-radius: 0.375rem;
+    }
+
+    .select2-search--dropdown .select2-search__field {
+        border: 1px solid #d2d6da;
+        border-radius: 0.375rem;
+        padding: 0.5rem;
+    }
+
+    /* Select2 dropdown trong modal */
+    .modal .select2-container {
+        z-index: 9999;
+    }
+
+    .modal .select2-dropdown {
+        z-index: 10000;
+    }
+</style>

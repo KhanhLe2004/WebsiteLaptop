@@ -1,0 +1,266 @@
+﻿:root {
+    --primary: #81C408;
+    --primary-dark: #6fb106;
+    --muted: #bbaea3;
+    --card-bg: #ffffff;
+    --surface: #faf7f3;
+    --shadow: 0 8px 30px rgba(13,13,13,0.06);
+    --rounded: 24px;
+}
+
+html, body {
+    height: 100%;
+}
+
+body {
+    font-family: "Open Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background: linear-gradient(180deg, #faf9f6 0%, #fff 100%);
+    color: #333;
+}
+
+.auth-split {
+    min-height: 100vh;
+}
+
+.auth-left {
+    background-image: url('img/login-left.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .auth-left::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+    }
+
+    .auth-left .left-content {
+        position: relative;
+        z-index: 1;
+        max-width: 520px;
+        padding: 3rem;
+        color: #6b5a4a;
+    }
+
+.auth-card {
+    background: var(--card-bg);
+    border-radius: var(--rounded);
+    box-shadow: var(--shadow);
+    padding: 2.5rem;
+    max-width: 520px;
+    width: 100%;
+}
+
+.avatar-circle {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: inline-grid;
+    place-items: center;
+    background: linear-gradient(180deg, rgba(129,196,8,0.12), rgba(129,196,8,0.06));
+    border: 3px solid rgba(129,196,8,0.12);
+    margin: 0 auto 1rem auto;
+    color: var(--primary-dark);
+}
+
+h1.h-welcome {
+    font-family: "Raleway", sans-serif;
+    font-weight: 700;
+    font-size: 24px;
+    color: #4b3b31;
+    margin-bottom: .25rem;
+    color: #81C408;
+}
+
+.sub-muted {
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 1rem;
+}
+
+.form-control {
+    border-radius: 10px;
+    padding: .8rem 1rem;
+    border: 1px solid rgba(41, 60, 4, 0.08);
+}
+
+    .form-control:focus {
+        outline: none;
+        box-shadow: 0 0 0 4px rgba(129,196,8,0.07);
+        border-color: var(--primary-dark);
+    }
+
+.btn-primary-accent {
+    background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+    border: none;
+    color: #fff;
+    border-radius: 10px;
+    padding: .8rem 1rem;
+    font-weight: 600;
+}
+
+.text-success-note {
+    background: #f0fff0;
+    border: 1px solid rgba(129,196,8,0.12);
+    color: #2f6f1a;
+    padding: .85rem 1rem;
+    border-radius: 10px;
+    margin-top: .75rem;
+}
+
+/* Cụ thể cho login.html */
+.avatar-circle.login-avatar {
+    width: 72px;
+    height: 72px;
+    box-shadow: 0 8px 20px rgba(129,196,8,0.09);
+}
+
+h1.h-welcome.login-welcome {
+    font-size: 28px;
+    color: #81C408;
+    margin-bottom: .25rem;
+}
+
+.sub-muted.login-muted {
+    margin-bottom: 1.25rem;
+}
+
+.form-control.login-input {
+    border-radius: 12px;
+    padding: .9rem 1.1rem;
+    background: linear-gradient(180deg,#fff,#fff);
+}
+
+.form-control:focus.login-focus {
+    box-shadow: 0 0 0 4px rgba(129,196,8,0.08);
+}
+
+.input-error {
+    border-color: #e07a5f !important;
+}
+
+.text-muted-small {
+    color: #c7b8ae;
+    font-size: 13px;
+}
+
+.btn-sign {
+    background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+    border: none;
+    color: #fff;
+    border-radius: 12px;
+    padding: .9rem 1.25rem;
+    box-shadow: 0 8px 20px rgba(129,196,8,0.12);
+    font-weight: 600;
+}
+
+.btn-social {
+    border-radius: 10px;
+    border: 1px solid rgba(129,196,8,0.12);
+    padding: .55rem 1rem;
+    background: #fff;
+}
+
+.divider {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: #c9bfb5;
+    font-size: 14px;
+}
+
+    .divider::before, .divider::after {
+        content: "";
+        height: 1px;
+        background: #eee;
+        flex: 1;
+    }
+
+footer.small-note {
+    color: #b79d85;
+    font-size: 13px;
+    text-align: center;
+    margin-top: .8rem;
+}
+
+.form-check-input:checked {
+    background-color: #81C408 !important;
+    border-color: #81C408 !important;
+}
+
+/* Cụ thể cho register.html */
+.auth-card.register-card {
+    padding: 2.25rem;
+}
+
+.avatar-circle.register-avatar {
+    width: 64px;
+    height: 64px;
+}
+
+.eye-btn {
+    border-radius: 10px;
+    margin-left: .5rem;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.06);
+    padding: .45rem .55rem;
+}
+
+.small-note.register-note {
+    color: #9e8e7f;
+    font-size: 14px;
+    text-align: center;
+    margin-top: .7rem;
+}
+
+.form-check-input.register-check {
+    border-color: #81C408 !important;
+}
+
+.form-check-input:checked.register-checked {
+    background-color: #81C408 !important;
+    border-color: #81C408 !important;
+}
+
+/* Responsive chung - Đã sửa cú pháp media query */
+@media (max-width: 991.98px) {
+    .auth-left {
+        min-height: 30vh;
+    }
+
+        .auth-left .left-content {
+            display: none;
+        }
+
+    .auth-card {
+        margin: 0 1.25rem;
+    }
+
+    .auth-left.responsive-overlay::before {
+        background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.7));
+    }
+
+    .auth-split.responsive-padding {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+
+    .auth-left.register-responsive {
+        min-height: 28vh;
+    }
+
+    .auth-card.register-margin {
+        margin: 0 1rem;
+    }
+}
+
+.small-note {
+    display: flex !important;
+    justify-content: center !important;
+    padding-top: 5%;
+}

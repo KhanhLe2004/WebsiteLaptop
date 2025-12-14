@@ -1,0 +1,1342 @@
+@{
+    ViewData["Title"] = "Shop";
+    Layout = "~/Views/Shared/_LayoutShop.cshtml";
+}
+
+<!-- Fruits Shop Start-->
+<div class="container-fluid fruite py-5">
+    <div class="container py-5">
+        <div class="py-5"></div>
+
+        <div class="row g-4">
+            <div class="col-9"></div>
+            <div class="col-xl-3">
+                <div class="bg-light ps-3 py-3 rounded d-flex justify-content-between mb-4">
+                    <label for="sortSelect">Sắp xếp theo:</label>
+                    <select id="sortSelect" name="sortSelect" class="border-0 form-select-sm bg-light me-3">
+                        <option value="price">Giá tăng dần</option>
+                        <option value="price_desc">Giá giảm dần</option>
+                        <option value="name">Tên A-Z</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- SIDEBAR -->
+            <div class="col-lg-3">
+                <!-- shop-sidebar: sticky + internal scroll -->
+                <div class="shop-sidebar bg-white p-3 rounded shadow-sm">
+                    <div class="row g-4">
+                        <!-- Brand Filter -->
+                        <div class="col-lg-12">
+                            <div class="mb-3">
+                                <h4>Hãng</h4>
+                                <ul class="list-unstyled fruite-categorie" id="brandFilter">
+                                    <!-- Brands will be loaded here -->
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Price Filter -->
+                        <div class="col-lg-12">
+                            <div class="mb-3">
+                                <h4 class="mb-2">Mức giá</h4>
+                                <ul class="list-unstyled fruite-categorie" id="priceFilter">
+                                    <li>
+                                        <div class="d-flex align-items-center mb-2">
+                                            <input type="checkbox" class="form-check-input me-2 price-checkbox" id="price-under-10" value="under-10">
+                                            <label for="price-under-10" class="mb-0">Dưới 10 triệu</label>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <div class="d-flex align-items-center mb-2">
+                                            <input type="checkbox" class="form-check-input me-2 price-checkbox" id="price-10-15" value="10-15">
+                                            <label for="price-10-15" class="mb-0">Từ 10 - 15 triệu</label>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <div class="d-flex align-items-center mb-2">
+                                            <input type="checkbox" class="form-check-input me-2 price-checkbox" id="price-15-20" value="15-20">
+                                            <label for="price-15-20" class="mb-0">Từ 15 - 20 triệu</label>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <div class="d-flex align-items-center mb-2">
+                                            <input type="checkbox" class="form-check-input me-2 price-checkbox" id="price-20-25" value="20-25">
+                                            <label for="price-20-25" class="mb-0">Từ 20 - 25 triệu</label>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <div class="d-flex align-items-center mb-2">
+                                            <input type="checkbox" class="form-check-input me-2 price-checkbox" id="price-25-30" value="25-30">
+                                            <label for="price-25-30" class="mb-0">Từ 25 - 30 triệu</label>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <div class="d-flex align-items-center mb-2">
+                                            <input type="checkbox" class="form-check-input me-2 price-checkbox" id="price-over-30" value="over-30">
+                                            <label for="price-over-30" class="mb-0">Trên 30 triệu</label>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- RAM Filter -->
+                        <div class="col-lg-12">
+                            <div class="mb-3">
+                                <h4>RAM</h4>
+                                <ul class="list-unstyled fruite-categorie" id="ramFilter">
+                                    <!-- RAM options will be loaded here -->
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Storage Filter -->
+                        <div class="col-lg-12">
+                            <div class="mb-3">
+                                <h4>Ổ cứng</h4>
+                                <ul class="list-unstyled fruite-categorie" id="storageFilter">
+                                    <!-- Storage options will be loaded here -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- .shop-sidebar end -->
+            </div>
+
+            <!-- PRODUCTS -->
+            <div class="col-lg-9">
+                <div id="searchResultHeader" class="mb-4" style="display: none;">
+                    <h4 class="text-primary">
+                        <i class="fa fa-search me-2"></i>Kết quả tìm kiếm cho: <span id="searchKeyword" class="fw-bold"></span>
+                    </h4>
+                    <p class="text-muted" id="searchResultCount"></p>
+                </div>
+                
+                <div class="row g-4 justify-content-center" id="productsContainer">
+                    <!-- Products will be loaded here -->
+                </div>
+
+                <!-- Pagination (hidden by default - you said you don't want pagination; kept for fallback) -->
+                <div class="pagination d-flex justify-content-center mt-5" id="paginationContainer" style="display:none;">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Fruits Shop End-->
+
+<!-- Inline CSS: do NOT create a Styles section (layout doesn't render it). -->
+<style>
+    /* Keep Bootstrap grid untouched. Only style the sidebar to be sticky and scrollable internally. */
+
+    /* Make sidebar sticky and scrollable without changing grid widths */
+    .shop-sidebar {
+        position: sticky;
+        top: 100px; /* adjust if header height differs */
+        max-height: calc(100vh - 120px); /* viewport minus header margin */
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-right: 8px;
+        background: transparent;
+    }
+
+    /* Give inner container (the white rounded box) scrollable look */
+    .shop-sidebar > .row {
+        margin: 0;
+    }
+
+    /* Ensure product cards keep standard bootstrap widths */
+    #productsContainer .fruite-item {
+        height: 100%;
+    }
+
+    /* Make sure images inside product cards don't overflow */
+    .fruite-img img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        display: block;
+    }
+
+    /* Small spacing for filters inside sidebar */
+    .shop-sidebar h4 {
+        font-size: 16px;
+        margin-bottom: 12px;
+    }
+
+    /* Responsive: on small screens sidebar becomes normal stacked block */
+    @@media (max-width: 991.98px) {
+        .shop-sidebar {
+            position: static;
+            max-height: none;
+            overflow: visible;
+            margin-bottom: 18px;
+            top: auto;
+        }
+    }
+
+    /* Optional: subtle shadow / background for the inner filter card */
+    .shop-sidebar {
+        background: none;
+    }
+    .shop-sidebar .mb-3 > ul > li { margin-bottom: 6px; }
+
+    /* Toast Notification Styles */
+    .toast-container {
+        z-index: 9999;
+    }
+    
+    .toast-notification {
+        min-width: 300px;
+        max-width: 400px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 10px;
+        background-color: #ffffff;
+    }
+    
+    .toast-notification .toast-header {
+        font-weight: 600;
+    }
+    
+    .toast-notification .toast-body {
+        padding: 0.75rem;
+    }
+    
+    .toast-success .toast-header {
+        background-color: #28a745 !important;
+    }
+    
+    .toast-danger .toast-header {
+        background-color: #dc3545 !important;
+    }
+    
+    .toast-warning .toast-header {
+        background-color: #ffc107 !important;
+        color: #000 !important;
+    }
+    
+    .toast-info .toast-header {
+        background-color: #17a2b8 !important;
+    }
+</style>
+
+@section Scripts {
+                <script>
+                    // API base
+                    const apiBase = "http://localhost:5068/";
+                    const defaultProductImage = "/imageProducts/default-laptop.jpg";
+                    const backendImageBase = apiBase + "imageProducts/";
+
+                    function buildImageUrl(fileName) {
+                        if (!fileName || typeof fileName !== "string" || !fileName.trim()) {
+                            return defaultProductImage;
+                        }
+                        return backendImageBase + encodeURIComponent(fileName.trim());
+                    }
+
+                    function normalizeForApi(value) {
+                        if (!value) return '';
+                        return value.toString().trim().replace(/\s+/g, '').replace(/\//g, '').toUpperCase();
+                    }
+
+                    // filter state
+                    let filters = {
+                        brands: [],
+                        priceRanges: [], // Array of {min, max} objects
+                        ram: [],
+                        storage: [],
+                        sortBy: 'price',
+                        search: '', // Search keyword
+                        productName: '', // Product name filter from category
+                        page: 1,
+                        // Set large pageSize so server returns all matched items (no client-side pagination)
+                        pageSize: 100000
+                    };
+
+                    let priceRange = { min: 0, max: 0 };
+                    let allBrands = [];
+                    let allRamOptions = [];
+                    let allStorageOptions = [];
+                    let searchResults = []; // Lưu kết quả tìm kiếm để filter
+
+                    // Initialize
+                    $(document).ready(function() {
+                        // Kiểm tra URL có các tham số không - nếu có thì ưu tiên URL
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const hasBrandIdInURL = urlParams.has('brandId');
+                        const hasProductNameInURL = urlParams.has('productName');
+                        const hasBrandsInURL = urlParams.has('brands');
+                        const hasSearchInURL = urlParams.has('search');
+                        
+                        if (hasBrandIdInURL || hasProductNameInURL || hasBrandsInURL || hasSearchInURL) {
+                            // Nếu URL có bất kỳ tham số nào, ưu tiên URL
+                            restoreFiltersFromURL();
+                            // Xóa brands và productName khỏi sessionStorage để tránh conflict (nhưng giữ search nếu có)
+                            try {
+                                const savedFilters = sessionStorage.getItem('shopFilters');
+                                if (savedFilters) {
+                                    const parsed = JSON.parse(savedFilters);
+                                    if (parsed) {
+                                        if (!hasSearchInURL) {
+                                            parsed.brands = [];
+                                            parsed.productName = '';
+                                        } else {
+                                            // Nếu có search, chỉ xóa brands và productName, giữ các filter khác
+                                            parsed.brands = [];
+                                            parsed.productName = '';
+                                        }
+                                        sessionStorage.setItem('shopFilters', JSON.stringify(parsed));
+                                    }
+                                }
+                            } catch (e) {
+                                // Silent error handling
+                            }
+                        } else {
+                            // Nếu không có tham số nào trong URL (tức là "Tất cả sản phẩm")
+                            // Xóa brands và productName khỏi filters và sessionStorage
+                            filters.brands = [];
+                            filters.productName = '';
+                            filters.search = '';
+                            try {
+                                const savedFilters = sessionStorage.getItem('shopFilters');
+                                if (savedFilters) {
+                                    const parsed = JSON.parse(savedFilters);
+                                    if (parsed) {
+                                        parsed.brands = [];
+                                        parsed.productName = '';
+                                        parsed.search = '';
+                                        sessionStorage.setItem('shopFilters', JSON.stringify(parsed));
+                                    }
+                                }
+                            } catch (e) {
+                                // Silent error handling
+                            }
+                            // Restore các filter khác từ sessionStorage (price, RAM, storage, sort)
+                            restoreFiltersFromSessionStorage();
+                        }
+                        
+                        loadFilters();
+                        
+                        // Handle browser back/forward navigation
+                        window.addEventListener('popstate', function(event) {
+                            // Kiểm tra URL có các tham số không
+                            const urlParams = new URLSearchParams(window.location.search);
+                            const hasBrandIdInURL = urlParams.has('brandId');
+                            const hasProductNameInURL = urlParams.has('productName');
+                            const hasBrandsInURL = urlParams.has('brands');
+                            const hasSearchInURL = urlParams.has('search');
+                            
+                            if (hasBrandIdInURL || hasProductNameInURL || hasBrandsInURL || hasSearchInURL) {
+                                // Nếu URL có bất kỳ tham số nào, ưu tiên URL
+                                restoreFiltersFromURL();
+                            } else {
+                                // Nếu không có, restore từ sessionStorage
+                                restoreFiltersFromSessionStorage();
+                                // Nếu sessionStorage rỗng, mới restore từ URL
+                                if (filters.brands.length === 0 && filters.priceRanges.length === 0 && 
+                                    filters.ram.length === 0 && filters.storage.length === 0 && !filters.productName && !filters.search) {
+                                    restoreFiltersFromURL();
+                                }
+                            }
+                            
+                            restoreCheckboxStates();
+                            loadProducts();
+                        });
+                        
+                        // Clear all filters when navigating away
+                        function clearAllFiltersOnExit() {
+                            // Xóa tất cả filters
+                            filters.brands = [];
+                            filters.priceRanges = [];
+                            filters.ram = [];
+                            filters.storage = [];
+                            filters.sortBy = 'price';
+                            filters.search = '';
+                            filters.productName = '';
+                            searchResults = [];
+                            
+                            // Xóa tất cả filters khỏi sessionStorage
+                            try {
+                                sessionStorage.removeItem('shopFilters');
+                            } catch (e) {
+                                // Silent error handling
+                            }
+                        }
+                        
+                        // Clear all filters before navigating away
+                        window.addEventListener('beforeunload', function() {
+                            clearAllFiltersOnExit();
+                        });
+                        
+                        // Xóa tất cả filters khi click vào các link navigation (trừ link trong cùng trang Shop)
+                        $(document).on('click', 'a[href]', function(e) {
+                            const href = $(this).attr('href');
+                            // Nếu link không phải là link trong cùng trang Shop hoặc là link đến trang khác
+                            if (href && !href.startsWith('#') && !href.startsWith('javascript:') && 
+                                !href.includes('/Home/Shop') && !href.includes('/Home/ProductDetail')) {
+                                clearAllFiltersOnExit();
+                            }
+                        });
+                        
+                        // Attach price checkbox handler (delegated to handle dynamic inputs)
+                        $(document).on('change', '.price-checkbox', function() {
+                            updatePriceFromCheckboxes();
+                            filters.page = 1;
+                            saveFiltersToSessionStorage(); // Save filters when changed
+                            loadProducts();
+                        });
+
+                        // sort change
+                        $('#sortSelect').on('change', function() {
+                            filters.sortBy = $(this).val();
+                            filters.page = 1;
+                            saveFiltersToSessionStorage(); // Save filters when changed
+                            // Nếu đang có search, apply filter vào search results, ngược lại load products bình thường
+                            if (filters.search && filters.search.trim() && searchResults.length > 0) {
+                                applyFiltersToSearchResults();
+                            } else {
+                                loadProducts();
+                            }
+                        });
+
+                        // Delegated handlers for brand/ram/storage -- filter change triggers loadProducts
+                        $(document).on('change', '.brand-checkbox', function() {
+                            updateBrandFilters();
+                        });
+                        $(document).on('change', '.ram-checkbox', function() {
+                            updateRamFilters();
+                        });
+                        $(document).on('change', '.storage-checkbox', function() {
+                            updateStorageFilters();
+                        });
+                        
+                        // Khi có search, filter change sẽ apply filter vào search results
+                        // Thay vì gọi lại API search
+                    });
+
+                    // Load filter options from API
+                    function loadFilters() {
+                        $.ajax({
+                            type: 'GET',
+                            url: apiBase + "api/products/shop/filters",
+                            dataType: 'json',
+                            success: function(data) {
+                                allBrands = data.brands || [];
+                                priceRange = data.priceRange || { min: 0, max: 0 };
+                                allRamOptions = data.ramOptions || [];
+                                allStorageOptions = data.storageOptions || [];
+
+                                renderBrandFilters();
+                                renderRamFilters();
+                                renderStorageFilters();
+
+                                // Restore checkbox states from URL parameters
+                                restoreCheckboxStates();
+
+                                // load products with restored filters
+                                loadProducts();
+                            },
+                            error: function(xhr, status, error) {
+                                // Restore checkbox states even if API fails
+                                restoreCheckboxStates();
+                                // fallback: still try loadProducts (will request all)
+                                loadProducts();
+                            }
+                        });
+                    }
+
+                    // Render brand list
+                    function renderBrandFilters() {
+                        let html = '';
+                        allBrands.forEach(function(brand) {
+                            html += '<li>';
+                            html += '  <div class="d-flex align-items-center mb-2">';
+                            html += '    <input type="checkbox" class="form-check-input me-2 brand-checkbox" id="brand-' + brand.brandId + '" value="' + brand.brandId + '">';
+                            html += '    <label for="brand-' + brand.brandId + '" class="mb-0">' + (brand.brandName || brand.brandId) + '</label>';
+                            html += '  </div>';
+                            html += '</li>';
+                        });
+                        $('#brandFilter').html(html);
+                    }
+
+                    // Render ram list
+                    function renderRamFilters() {
+                        let html = '';
+                        allRamOptions.forEach(function(ram) {
+                            let id = 'ram-' + ram.replace(/\s/g, '-');
+                            html += '<li>';
+                            html += '  <div class="d-flex align-items-center mb-2">';
+                            html += '    <input type="checkbox" class="form-check-input me-2 ram-checkbox" id="' + id + '" value="' + ram + '">';
+                            html += '    <label for="' + id + '" class="mb-0">' + ram + '</label>';
+                            html += '  </div>';
+                            html += '</li>';
+                        });
+                        $('#ramFilter').html(html);
+                    }
+
+                    // Render storage list
+                    function renderStorageFilters() {
+                        let html = '';
+                        allStorageOptions.forEach(function(storage) {
+                            let id = 'storage-' + storage.replace(/\s/g, '-').replace(/\//g, '-');
+                            html += '<li>';
+                            html += '  <div class="d-flex align-items-center mb-2">';
+                            html += '    <input type="checkbox" class="form-check-input me-2 storage-checkbox" id="' + id + '" value="' + storage + '">';
+                            html += '    <label for="' + id + '" class="mb-0">' + storage + '</label>';
+                            html += '  </div>';
+                            html += '</li>';
+                        });
+                        $('#storageFilter').html(html);
+                    }
+
+                    // Update brand filters
+                    function updateBrandFilters() {
+                        filters.brands = [];
+                        $('.brand-checkbox:checked').each(function() {
+                            filters.brands.push($(this).val());
+                        });
+                        filters.page = 1;
+                        saveFiltersToSessionStorage(); // Save filters when changed
+                        // Nếu đang có search, apply filter vào search results, ngược lại load products bình thường
+                        if (filters.search && filters.search.trim() && searchResults.length > 0) {
+                            applyFiltersToSearchResults();
+                        } else {
+                            loadProducts();
+                        }
+                    }
+
+                    // Update ram filters
+                    function updateRamFilters() {
+                        filters.ram = [];
+                        $('.ram-checkbox:checked').each(function() {
+                            filters.ram.push($(this).val());
+                        });
+                        filters.page = 1;
+                        saveFiltersToSessionStorage(); // Save filters when changed
+                        // Nếu đang có search, apply filter vào search results, ngược lại load products bình thường
+                        if (filters.search && filters.search.trim() && searchResults.length > 0) {
+                            applyFiltersToSearchResults();
+                        } else {
+                            loadProducts();
+                        }
+                    }
+
+                    // Update storage filters
+                    function updateStorageFilters() {
+                        filters.storage = [];
+                        $('.storage-checkbox:checked').each(function() {
+                            // CHANGED: store normalized value to match server-side normalization logic
+                            filters.storage.push(normalizeForApi($(this).val()));
+                        });
+                        filters.page = 1;
+                        saveFiltersToSessionStorage(); // Save filters when changed
+                        // Nếu đang có search, apply filter vào search results, ngược lại load products bình thường
+                        if (filters.search && filters.search.trim() && searchResults.length > 0) {
+                            applyFiltersToSearchResults();
+                        } else {
+                            loadProducts();
+                        }
+                    }
+
+                    // Update price ranges from checked boxes
+                    function updatePriceFromCheckboxes() {
+                        filters.priceRanges = [];
+
+                        $('.price-checkbox:checked').each(function() {
+                            let v = $(this).val();
+                            if (v === 'under-10') {
+                                filters.priceRanges.push({ min: 0, max: 10000000 });
+                            } else if (v === '10-15') {
+                                filters.priceRanges.push({ min: 10000000, max: 15000000 });
+                            } else if (v === '15-20') {
+                                filters.priceRanges.push({ min: 15000000, max: 20000000 });
+                            } else if (v === '20-25') {
+                                filters.priceRanges.push({ min: 20000000, max: 25000000 });
+                            } else if (v === '25-30') {
+                                filters.priceRanges.push({ min: 25000000, max: 30000000 });
+                            } else if (v === 'over-30') {
+                                filters.priceRanges.push({ min: 30000000, max: 1000000000 }); // Use large number for max
+                            }
+                        });
+                        // Nếu đang có search, apply filter vào search results, ngược lại load products bình thường
+                        if (filters.search && filters.search.trim() && searchResults.length > 0) {
+                            applyFiltersToSearchResults();
+                        } else {
+                            loadProducts();
+                        }
+                    }
+
+                    // Save filters to sessionStorage (nhưng không lưu search và productName)
+                    function saveFiltersToSessionStorage() {
+                        try {
+                            // Tạo copy của filters nhưng không bao gồm search và productName
+                            const filtersToSave = {
+                                brands: filters.brands || [],
+                                priceRanges: filters.priceRanges || [],
+                                ram: filters.ram || [],
+                                storage: filters.storage || [],
+                                sortBy: filters.sortBy || 'price'
+                                // Không lưu search và productName
+                            };
+                            sessionStorage.setItem('shopFilters', JSON.stringify(filtersToSave));
+                        } catch (e) {
+                            // Silent error handling
+                        }
+                    }
+
+                    // Restore filters from sessionStorage
+                    function restoreFiltersFromSessionStorage() {
+                        try {
+                            // Lưu search và productName từ URL trước khi reset (nếu có)
+                            const urlParams = new URLSearchParams(window.location.search);
+                            const searchFromURL = urlParams.get('search') || '';
+                            const productNameFromURL = urlParams.get('productName') || '';
+                            
+                            const savedFilters = sessionStorage.getItem('shopFilters');
+                            if (savedFilters) {
+                                const parsed = JSON.parse(savedFilters);
+                                if (parsed) {
+                                    // Reset filters first
+                                    filters.brands = [];
+                                    filters.priceRanges = [];
+                                    filters.ram = [];
+                                    filters.storage = [];
+                                    filters.sortBy = 'price';
+                                    // Chỉ reset search và productName nếu không có trong URL
+                                    if (!searchFromURL) {
+                                        filters.search = '';
+                                    }
+                                    if (!productNameFromURL) {
+                                        filters.productName = '';
+                                    }
+                                    
+                                    // Restore from sessionStorage (nhưng KHÔNG restore search và productName)
+                                    filters.brands = parsed.brands || [];
+                                    filters.priceRanges = parsed.priceRanges || [];
+                                    filters.ram = parsed.ram || [];
+                                    filters.storage = parsed.storage || [];
+                                    filters.sortBy = parsed.sortBy || 'price';
+                                    // Không restore search và productName - luôn lấy từ URL nếu có
+                                    
+                                    // Restore search và productName từ URL nếu có
+                                    if (searchFromURL) {
+                                        filters.search = searchFromURL;
+                                    }
+                                    if (productNameFromURL) {
+                                        filters.productName = productNameFromURL;
+                                    }
+                                }
+                            } else {
+                                // Nếu không có savedFilters, vẫn cần restore search và productName từ URL nếu có
+                                if (searchFromURL) {
+                                    filters.search = searchFromURL;
+                                }
+                                if (productNameFromURL) {
+                                    filters.productName = productNameFromURL;
+                                }
+                            }
+                        } catch (e) {
+                            // Silent error handling
+                        }
+                    }
+
+                    // Save filters to URL parameters (not used for filter changes, only for ProductDetail links)
+                    function saveFiltersToURL() {
+                        const urlParams = new URLSearchParams();
+                        
+                        if (filters.brands.length > 0) {
+                            urlParams.set('brands', filters.brands.join(','));
+                        }
+                        
+                        if (filters.priceRanges.length > 0) {
+                            const priceRangesStr = filters.priceRanges.map(r => {
+                                const min = r.min || 0;
+                                const max = (r.max === null || r.max === undefined) ? 1000000000 : r.max;
+                                return min + '-' + max;
+                            }).join(',');
+                            urlParams.set('priceRanges', priceRangesStr);
+                        }
+                        
+                        if (filters.ram.length > 0) {
+                            urlParams.set('ram', filters.ram.join(','));
+                        }
+                        
+                        if (filters.storage.length > 0) {
+                            urlParams.set('storage', filters.storage.join(','));
+                        }
+                        
+                        if (filters.sortBy && filters.sortBy !== 'price') {
+                            urlParams.set('sortBy', filters.sortBy);
+                        }
+                        
+                        const newUrl = window.location.pathname + (urlParams.toString() ? ('?' + urlParams.toString()) : '');
+                        window.history.replaceState({ filters: filters }, '', newUrl);
+                    }
+
+                    // Restore filters from URL parameters
+                    function restoreFiltersFromURL() {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        
+                        // Reset filters first
+                        filters.brands = [];
+                        filters.priceRanges = [];
+                        filters.ram = [];
+                        filters.storage = [];
+                        filters.sortBy = 'price';
+                        filters.search = '';
+                        filters.productName = '';
+                        
+                        // Check for search query parameter (chỉ lấy từ URL, không restore từ sessionStorage)
+                        const searchParam = urlParams.get('search');
+                        if (searchParam) {
+                            filters.search = searchParam;
+                        }
+                        
+                        // Restore productName từ URL (từ danh mục)
+                        const productNameParam = urlParams.get('productName');
+                        if (productNameParam) {
+                            filters.productName = productNameParam;
+                        }
+                        
+                        // Restore brands - ưu tiên brandId (từ danh mục), sau đó mới đến brands (từ filter)
+                        const brandIdParam = urlParams.get('brandId');
+                        if (brandIdParam) {
+                            filters.brands = [brandIdParam]; // Chỉ lấy brandId từ URL
+                        } else {
+                            // Nếu không có brandId, mới kiểm tra brands
+                            const brandsParam = urlParams.get('brands');
+                            if (brandsParam) {
+                                filters.brands = brandsParam.split(',').filter(b => b);
+                            }
+                            // Nếu không có brandId và không có brands trong URL (tức là "Tất cả sản phẩm")
+                            // Không set filters.brands ở đây - sẽ được set trong loadFilters sau khi allBrands được load
+                        }
+                        
+                        // Restore price ranges
+                        const priceRangesParam = urlParams.get('priceRanges');
+                        if (priceRangesParam) {
+                            filters.priceRanges = [];
+                            priceRangesParam.split(',').forEach(rangeStr => {
+                                const parts = rangeStr.split('-');
+                                if (parts.length === 2) {
+                                    const min = parseInt(parts[0]);
+                                    let max = parts[1] === '' ? 1000000000 : parseInt(parts[1]);
+                                    if (isNaN(max)) max = 1000000000; // Default to large number if max is invalid
+                                    if (!isNaN(min)) {
+                                        filters.priceRanges.push({ min: min, max: max });
+                                    }
+                                }
+                            });
+                        }
+                        
+                        // Restore RAM
+                        const ramParam = urlParams.get('ram');
+                        if (ramParam) {
+                            filters.ram = ramParam.split(',').filter(r => r);
+                        }
+                        
+                        // Restore storage
+                        const storageParam = urlParams.get('storage');
+                        if (storageParam) {
+                            filters.storage = storageParam.split(',').filter(s => s);
+                        }
+                        
+                        // Restore sort
+                        const sortByParam = urlParams.get('sortBy');
+                        if (sortByParam) {
+                            filters.sortBy = sortByParam;
+                        }
+                    }
+
+                    // Restore checkbox states from filters
+                    function restoreCheckboxStates() {
+                        // Uncheck all brand checkboxes first
+                        $('.brand-checkbox').prop('checked', false);
+                        
+                        // Restore brand checkboxes theo filters.brands (chỉ tích chọn những brand có trong filters.brands)
+                        filters.brands.forEach(brandId => {
+                            $('#brand-' + brandId).prop('checked', true);
+                        });
+                        
+                        // Uncheck all price checkboxes first
+                        $('.price-checkbox').prop('checked', false);
+                        // Restore price checkboxes
+                        filters.priceRanges.forEach(range => {
+                            if (range.min === 0 && range.max === 10000000) {
+                                $('#price-under-10').prop('checked', true);
+                            } else if (range.min === 10000000 && range.max === 15000000) {
+                                $('#price-10-15').prop('checked', true);
+                            } else if (range.min === 15000000 && range.max === 20000000) {
+                                $('#price-15-20').prop('checked', true);
+                            } else if (range.min === 20000000 && range.max === 25000000) {
+                                $('#price-20-25').prop('checked', true);
+                            } else if (range.min === 25000000 && range.max === 30000000) {
+                                $('#price-25-30').prop('checked', true);
+                            } else if (range.min === 30000000 && (range.max === null || range.max === 1000000000 || range.max >= 1000000000)) {
+                                $('#price-over-30').prop('checked', true);
+                            }
+                        });
+                        
+                        // Uncheck all RAM checkboxes first
+                        $('.ram-checkbox').prop('checked', false);
+                        // Restore RAM checkboxes
+                        filters.ram.forEach(ram => {
+                            const ramId = 'ram-' + ram.replace(/\s/g, '-');
+                            $('#' + ramId).prop('checked', true);
+                        });
+                        
+                        // Uncheck all storage checkboxes first
+                        $('.storage-checkbox').prop('checked', false);
+                        // Restore storage checkboxes
+                        filters.storage.forEach(storage => {
+                            // Need to find matching checkbox by comparing normalized values
+                            $('.storage-checkbox').each(function() {
+                                if (normalizeForApi($(this).val()) === storage) {
+                                    $(this).prop('checked', true);
+                                }
+                            });
+                        });
+                        
+                        // Restore sort select
+                        if (filters.sortBy) {
+                            $('#sortSelect').val(filters.sortBy);
+                        }
+                    }
+
+                    // Filter products based on current filters
+                    function filterProducts(products) {
+                        if (!products || products.length === 0) return [];
+                        
+                        let filtered = products;
+                        
+                        // Filter by brands
+                        if (filters.brands.length > 0) {
+                            filtered = filtered.filter(p => {
+                                const brandId = (p.brand || p.Brand || {}).brandId || (p.brand || p.Brand || {}).BrandId || '';
+                                return filters.brands.includes(brandId);
+                            });
+                        }
+                        
+                        // Filter by price ranges
+                        if (filters.priceRanges.length > 0) {
+                            filtered = filtered.filter(p => {
+                                const price = p.sellingPrice || p.SellingPrice || 0;
+                                return filters.priceRanges.some(range => {
+                                    return price >= (range.min || 0) && price <= (range.max || 1000000000);
+                                });
+                            });
+                        }
+                        
+                        // Filter by RAM
+                        if (filters.ram.length > 0) {
+                            filtered = filtered.filter(p => {
+                                // Kiểm tra trong RamOptions (array) hoặc Ram (string)
+                                const ramOptions = p.ramOptions || p.RamOptions || [];
+                                const ram = p.ram || p.Ram || '';
+                                
+                                // Nếu có RamOptions array, kiểm tra trong đó
+                                if (Array.isArray(ramOptions) && ramOptions.length > 0) {
+                                    return filters.ram.some(filterRam => {
+                                        return ramOptions.some(productRam => {
+                                            return normalizeForApi(productRam) === normalizeForApi(filterRam);
+                                        });
+                                    });
+                                }
+                                // Nếu không có array, kiểm tra Ram string
+                                if (ram) {
+                                    return filters.ram.some(filterRam => {
+                                        return normalizeForApi(ram) === normalizeForApi(filterRam);
+                                    });
+                                }
+                                return false;
+                            });
+                        }
+                        
+                        // Filter by Storage
+                        if (filters.storage.length > 0) {
+                            filtered = filtered.filter(p => {
+                                // Kiểm tra trong StorageOptions (array) hoặc Storage (string)
+                                const storageOptions = p.storageOptions || p.StorageOptions || [];
+                                const storage = p.storage || p.Storage || '';
+                                
+                                // Nếu có StorageOptions array, kiểm tra trong đó
+                                if (Array.isArray(storageOptions) && storageOptions.length > 0) {
+                                    return filters.storage.some(filterStorage => {
+                                        return storageOptions.some(productStorage => {
+                                            return normalizeForApi(productStorage) === filterStorage;
+                                        });
+                                    });
+                                }
+                                // Nếu không có array, kiểm tra Storage string
+                                if (storage) {
+                                    return filters.storage.some(filterStorage => {
+                                        return normalizeForApi(storage) === filterStorage;
+                                    });
+                                }
+                                return false;
+                            });
+                        }
+                        
+                        // Sort products
+                        if (filters.sortBy === 'price') {
+                            filtered.sort((a, b) => {
+                                const priceA = a.sellingPrice || a.SellingPrice || 0;
+                                const priceB = b.sellingPrice || b.SellingPrice || 0;
+                                return priceA - priceB;
+                            });
+                        } else if (filters.sortBy === 'price_desc') {
+                            filtered.sort((a, b) => {
+                                const priceA = a.sellingPrice || a.SellingPrice || 0;
+                                const priceB = b.sellingPrice || b.SellingPrice || 0;
+                                return priceB - priceA;
+                            });
+                        } else if (filters.sortBy === 'name') {
+                            filtered.sort((a, b) => {
+                                const nameA = (a.productName || a.ProductName || '').toLowerCase();
+                                const nameB = (b.productName || b.ProductName || '').toLowerCase();
+                                return nameA.localeCompare(nameB);
+                            });
+                        }
+                        
+                        return filtered;
+                    }
+
+                    // Build params and call API to load products
+                    function loadProducts() {
+                        // Hiển thị/ẩn header tìm kiếm
+                        const searchHeader = $('#searchResultHeader');
+                        const searchKeyword = $('#searchKeyword');
+                        const searchResultCount = $('#searchResultCount');
+                        
+                        // Nếu có search keyword, gọi API search và áp dụng filter
+                        if (filters.search && filters.search.trim()) {
+                            const searchTerm = filters.search.trim();
+                            searchHeader.show();
+                            searchKeyword.text(searchTerm);
+                            
+                            // Kiểm tra xem đã có kết quả search chưa (tránh gọi API nhiều lần khi chỉ thay đổi filter)
+                            if (searchResults.length === 0 || searchResults[0]?.lastSearchTerm !== searchTerm) {
+                                $.ajax({
+                                    type: 'GET',
+                                    url: apiBase + "api/ListProductAPI/search?keyword=" + encodeURIComponent(searchTerm) + "&limit=100",
+                                    dataType: 'json',
+                                    success: function(products) {
+                                        const productList = Array.isArray(products) ? products : [];
+                                        // Lưu kết quả search với từ khóa
+                                        searchResults = productList.map(p => ({ ...p, lastSearchTerm: searchTerm }));
+                                        applyFiltersToSearchResults();
+                                    },
+                                    error: function(xhr, status, error) {
+                                        searchResultCount.html('<span class="text-danger">Lỗi khi tìm kiếm sản phẩm</span>');
+                                        $('#productsContainer').html('<div class="col-12"><p class="text-center text-danger">Không thể tải sản phẩm. Vui lòng thử lại sau.</p></div>');
+                                    }
+                                });
+                            } else {
+                                // Đã có kết quả search, chỉ cần apply filter lại
+                                applyFiltersToSearchResults();
+                            }
+                            return;
+                        }
+                        
+                        // Nếu không có search, xóa kết quả search
+                        searchResults = [];
+                        searchHeader.hide();
+                        
+                        let params = {
+                            page: filters.page || 1,
+                            pageSize: filters.pageSize || 100000,
+                            sortBy: filters.sortBy || 'price'
+                        };
+
+                        // Chỉ thêm brandIds nếu có brands được chọn
+                        if (filters.brands.length > 0) {
+                            params.brandIds = filters.brands.join(',');
+                        }
+                        
+                        // Thêm productName vào params nếu có
+                        if (filters.productName && filters.productName.trim()) {
+                            params.productName = filters.productName.trim();
+                        }
+                        
+                        // Build priceRanges parameter
+                        if (filters.priceRanges.length > 0) {
+                            const priceRangesStr = filters.priceRanges.map(r => {
+                                // Ensure both min and max are valid numbers
+                                const min = r.min || 0;
+                                const max = (r.max === null || r.max === undefined) ? 1000000000 : r.max;
+                                return min + '-' + max;
+                            }).join(',');
+                            params.priceRanges = priceRangesStr;
+                        }
+
+                        if (filters.ram.length > 0) {
+                            const normalizedRam = filters.ram.map(normalizeForApi).filter(Boolean);
+                            if (normalizedRam.length > 0) params.ramOptions = normalizedRam.join(',');
+                        }
+
+                        if (filters.storage.length > 0) {
+                            const normalizedStorage = filters.storage.map(normalizeForApi).filter(Boolean);
+                            if (normalizedStorage.length > 0) params.storageOptions = normalizedStorage.join(',');
+                        }
+
+                        $.ajax({
+                            type: 'GET',
+                            url: apiBase + "api/products/shop/search",
+                            data: params,
+                            dataType: 'json',
+                            success: function(data) {
+                                if (data && data.products) {
+                                    renderProducts(data.products || []);
+                                } else {
+                                    $('#productsContainer').html('<div class="col-12"><p class="text-center">Không có sản phẩm nào.</p></div>');
+                                }
+                            },
+                            error: function(xhr, status, error) {
+                                // Show a friendly message inside products area (keeps sidebar visible)
+                                let errText = 'Không thể tải sản phẩm. Vui lòng thử lại sau.';
+                                try {
+                                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                                        errText += ' — ' + xhr.responseJSON.message;
+                                    }
+                                } catch (e) {}
+                                $('#productsContainer').html('<div class="col-12"><p class="text-center text-danger">' + errText + '</p></div>');
+                            }
+                        });
+                    }
+                    
+                    // Áp dụng filter vào kết quả search
+                    function applyFiltersToSearchResults() {
+                        const searchHeader = $('#searchResultHeader');
+                        const searchKeyword = $('#searchKeyword');
+                        const searchResultCount = $('#searchResultCount');
+                        
+                        if (searchResults.length === 0) {
+                            searchResultCount.html('<span class="text-danger">Không tìm thấy sản phẩm nào</span>');
+                            $('#productsContainer').html('<div class="col-12"><p class="text-center">Không có sản phẩm nào.</p></div>');
+                            return;
+                        }
+                        
+                        // Áp dụng filter
+                        const filtered = filterProducts(searchResults);
+                        
+                        // Cập nhật số lượng kết quả
+                        const searchTerm = filters.search.trim();
+                        if (filtered.length > 0) {
+                            if (filtered.length === searchResults.length) {
+                                searchResultCount.text(`Tìm thấy ${filtered.length} sản phẩm`);
+                            } else {
+                                searchResultCount.html(`Tìm thấy <strong>${filtered.length}</strong> sản phẩm`);
+                            }
+                        } else {
+                            searchResultCount.html(`Không có sản phẩm nào phù hợp với bộ lọc`);
+                        }
+                        
+                        renderProducts(filtered);
+                    }
+
+                    // Render product cards
+                    function renderProducts(products) {
+                        if (!products || products.length === 0) {
+                            $('#productsContainer').html('<div class="col-12"><p class="text-center">Không có sản phẩm nào.</p></div>');
+                            return;
+                        }
+
+                        let html = '';
+                        products.forEach(function(product) {
+                            const pid = product.productId || product.ProductId || '';
+                            const pname = product.productName || product.ProductName || 'Chưa có tên';
+                            const pmodel = product.productModel || product.ProductModel || '';
+                            const avatar = buildImageUrl(product.avatar || product.Avatar);
+                            const brandObj = product.brand || product.Brand || {};
+                            const brandName = brandObj.brandName || brandObj.BrandName || 'Laptop';
+
+                            // Prefer MinConfigPrice when available, otherwise use SellingPrice
+                            let displayPrice = product.sellingPrice || product.SellingPrice || 0;
+
+                            let price = 'Liên hệ';
+                            let originalPrice = '';
+
+                            if (displayPrice > 0) {
+                                try {
+                                    price = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(displayPrice);
+                                } catch (e) {
+                                    price = displayPrice.toString() + ' VND';
+                                }
+                            }
+
+                            const originalVal = product.originalSellingPrice ?? product.OriginalSellingPrice;
+                            if (originalVal && originalVal > displayPrice) {
+                                try {
+                                    originalPrice = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(originalVal);
+                                    originalPrice = '<span class="text-muted text-decoration-line-through me-2" style="font-size: 0.9em;">' + originalPrice + '</span>';
+                                } catch (e) {
+                                    originalPrice = '<span class="text-muted text-decoration-line-through me-2" style="font-size: 0.9em;">' + originalVal + ' VND</span>';
+                                }
+                            }
+
+                            // Save current filters to sessionStorage before navigating
+                            saveFiltersToSessionStorage();
+                            
+                            // Build product detail URL with filter parameters
+                            const urlParams = new URLSearchParams();
+                            urlParams.set('id', pid);
+                            
+                            // Add filter parameters to preserve state when navigating back
+                            if (filters.brands.length > 0) {
+                                urlParams.set('brands', filters.brands.join(','));
+                            }
+                            if (filters.priceRanges.length > 0) {
+                                const priceRangesStr = filters.priceRanges.map(r => {
+                                    const min = r.min || 0;
+                                    const max = (r.max === null || r.max === undefined) ? 1000000000 : r.max;
+                                    return min + '-' + max;
+                                }).join(',');
+                                urlParams.set('priceRanges', priceRangesStr);
+                            }
+                            if (filters.ram.length > 0) {
+                                urlParams.set('ram', filters.ram.join(','));
+                            }
+                            if (filters.storage.length > 0) {
+                                urlParams.set('storage', filters.storage.join(','));
+                            }
+                            if (filters.sortBy && filters.sortBy !== 'price') {
+                                urlParams.set('sortBy', filters.sortBy);
+                            }
+                            
+                            const productDetailUrl = '/Home/ProductDetail?' + urlParams.toString();
+
+                            html += '<div class="col-md-6 col-lg-6 col-xl-4">';
+                            html += '  <div class="rounded position-relative fruite-item">';
+                            html += '    <div class="fruite-img" style="cursor: pointer;" onclick="window.location.href=\'' + productDetailUrl + '\'">';
+                            html += '      <img src="' + avatar + '" class="img-fluid w-100 rounded-top" alt="' + pname + '">';
+                            html += '    </div>';
+                            html += '    <div class="text-white bg-secondary px-3 py-1 rounded position-absolute" style="top: 10px; left: 10px;">' + brandName + '</div>';
+                            html += '    <div class="p-4 border border-secondary border-top-0 rounded-bottom">';
+                            html += '      <h4><a href="' + productDetailUrl + '" class="text-dark text-decoration-none">' + pname + '</a></h4>';
+                            html += '      <p>' + pmodel + '</p>';
+                            html += '      <div class="d-flex align-items-center flex-wrap gap-2 mb-3">';
+                            html += '        ' + originalPrice;
+                            html += '        <span class="text-dark fs-5 fw-bold mb-0">' + price + '</span>';
+                            html += '      </div>';
+                            html += '      <div class="d-flex gap-2 justify-content-center">';
+                            html += '        <a href="' + productDetailUrl + '" class="btn border border-secondary rounded-pill px-3 text-primary">';
+                            html += '          <i class="fa fa-eye me-2 text-primary"></i> Xem chi tiết';
+                            html += '        </a>';
+                            html += '        <a href="#" class="btn border border-secondary rounded-circle d-flex align-items-center justify-content-center btn-compare" data-product-id="' + pid + '" data-product-name="' + pname + '" title="So sánh sản phẩm" style="width: 40px; height: 40px; padding: 0;">';
+                            html += '          <i class="fa fa-balance-scale text-primary"></i>';
+                            html += '        </a>';
+                            html += '      </div>';
+                            html += '    </div>';
+                            html += '  </div>';
+                            html += '</div>';
+                        });
+
+                        $('#productsContainer').html(html);
+
+                        // Compare buttons (delegation)
+                        $('#productsContainer .btn-compare').off('click').on('click', function (e) {
+                            e.preventDefault();
+                            const productId = $(this).data('product-id');
+                            const productName = $(this).data('product-name');
+                            if (productId) {
+                                addToCompare(productId, productName);
+                            }
+                        });
+                    }
+
+                    // Comparison functions
+                    function getCompareList() {
+                        try {
+                            const compareStr = sessionStorage.getItem('compareProducts');
+                            return compareStr ? JSON.parse(compareStr) : [];
+                        } catch (e) {
+                            return [];
+                        }
+                    }
+
+                    function saveCompareList(products) {
+                        sessionStorage.setItem('compareProducts', JSON.stringify(products));
+                        if (typeof window.updateCompareBadge === 'function') {
+                            window.updateCompareBadge();
+                        } else {
+                            updateCompareBadgeLocal();
+                        }
+                    }
+
+                    function addToCompare(productId, productName) {
+                        if (!productId) {
+                            showToast('warning', 'Không tìm thấy ID sản phẩm');
+                            return;
+                        }
+
+                        let compareList = getCompareList();
+                        
+                        // Check if product already in compare list
+                        if (compareList.some(p => p.id === productId)) {
+                            showToast('warning', 'Sản phẩm này đã có trong danh sách so sánh!');
+                            return;
+                        }
+
+                        // Check if compare list is full (max 2 products)
+                        if (compareList.length >= 2) {
+                            showConfirmDialog(
+                                'Danh sách so sánh đã đầy (tối đa 2 sản phẩm). Bạn có muốn xóa sản phẩm đầu tiên và thêm sản phẩm mới không?',
+                                function() {
+                                    let updatedList = getCompareList();
+                                    if (updatedList.length >= 2) {
+                                        updatedList.shift();
+                                    }
+                                    updatedList.push({ id: productId, name: productName });
+                                    saveCompareList(updatedList);
+                                    
+                                    if (typeof window.updateCompareBadge === 'function') {
+                                        window.updateCompareBadge();
+                                    } else {
+                                        updateCompareBadgeLocal();
+                                    }
+                                    
+                                    showToast('success', 'Đã thêm vào danh sách so sánh! Đang mở bảng so sánh...');
+                                    
+                                    setTimeout(function() {
+                                        if (typeof window.openCompareModal === 'function') {
+                                            window.openCompareModal();
+                                        }
+                                    }, 500);
+                                }
+                            );
+                            return;
+                        }
+
+                        if (compareList.length < 2) {
+                            compareList.push({ id: productId, name: productName });
+                            saveCompareList(compareList);
+                            
+                            if (typeof window.updateCompareBadge === 'function') {
+                                window.updateCompareBadge();
+                            } else {
+                                updateCompareBadgeLocal();
+                            }
+                            
+                            if (compareList.length === 2) {
+                                showToast('success', 'Đã thêm vào danh sách so sánh! Đang mở bảng so sánh...');
+                                setTimeout(function() {
+                                    if (typeof window.openCompareModal === 'function') {
+                                        window.openCompareModal();
+                                    }
+                                }, 500);
+                            } else {
+                                showToast('success', 'Đã thêm vào danh sách so sánh! Thêm 1 sản phẩm nữa để so sánh.');
+                            }
+                        }
+                    }
+
+                    function updateCompareBadgeLocal() {
+                        const compareList = getCompareList();
+                        const badge = document.getElementById('compareBadge');
+                        if (badge) {
+                            if (compareList.length > 0) {
+                                badge.textContent = compareList.length;
+                                badge.style.display = 'flex';
+                            } else {
+                                badge.style.display = 'none';
+                            }
+                        }
+                    }
+
+                    // Toast notification function
+                    function showToast(type, message) {
+                        const toastId = 'toast-' + Date.now();
+                        const iconMap = {
+                            'success': '<i class="fa fa-check-circle me-2"></i>',
+                            'danger': '<i class="fa fa-times-circle me-2"></i>',
+                            'warning': '<i class="fa fa-exclamation-triangle me-2"></i>',
+                            'info': '<i class="fa fa-info-circle me-2"></i>'
+                        };
+                        const icon = iconMap[type] || '';
+                        
+                        const toastHtml = `
+                            <div id="${toastId}" class="toast-notification toast-${type}" role="alert" aria-live="assertive" aria-atomic="true">
+                                <div class="toast-header bg-${type === 'danger' ? 'danger' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info'} text-white">
+                                    ${icon}
+                                    <strong class="me-auto">Thông báo</strong>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                                </div>
+                                <div class="toast-body">
+                                    ${message}
+                                </div>
+                            </div>
+                        `;
+                        
+                        if ($('#toast-container').length === 0) {
+                            $('body').append('<div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>');
+                        }
+                        
+                        $('#toast-container').append(toastHtml);
+                        
+                        const toastElement = document.getElementById(toastId);
+                        if (toastElement) {
+                            const toast = new bootstrap.Toast(toastElement, {
+                                autohide: true,
+                                delay: 4000
+                            });
+                            toast.show();
+                            
+                            toastElement.addEventListener('hidden.bs.toast', function() {
+                                $(this).remove();
+                            });
+                        }
+                    }
+
+                    // Confirm dialog function
+                    function showConfirmDialog(message, onConfirm, onCancel) {
+                        const confirmId = 'confirm-dialog-' + Date.now();
+                        const confirmHtml = `
+                            <div class="modal fade" id="${confirmId}" tabindex="-1" aria-labelledby="confirmDialogLabel" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header bg-warning text-dark">
+                                            <h5 class="modal-title" id="confirmDialogLabel">
+                                                <i class="fa fa-exclamation-triangle me-2"></i>Xác nhận
+                                            </h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <p class="mb-0">${message}</p>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                                            <button type="button" class="btn btn-primary" id="confirmBtn">Xác nhận</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        
+                        $('.confirm-dialog-modal').remove();
+                        
+                        $('body').append(confirmHtml);
+                        const $modal = $(`#${confirmId}`).addClass('confirm-dialog-modal');
+                        const modal = new bootstrap.Modal($modal[0]);
+                        
+                        $modal.find('#confirmBtn').on('click', function() {
+                            modal.hide();
+                            if (onConfirm && typeof onConfirm === 'function') {
+                                onConfirm();
+                            }
+                        });
+                        
+                        $modal.on('hidden.bs.modal', function() {
+                            if (onCancel && typeof onCancel === 'function') {
+                                onCancel();
+                            }
+                            $(this).remove();
+                        });
+                        
+                        modal.show();
+                    }
+                </script>
+}

@@ -1,0 +1,642 @@
+﻿
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="utf-8">
+        <title>TenTech - Laptop chính hãng</title>
+        <meta content="width=device-width, initial-scale=1.0" name="viewport">
+        <meta content="" name="keywords">
+        <meta content="" name="description">
+
+        <!-- Google Web Fonts -->
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&family=Raleway:wght@600;800&display=swap" rel="stylesheet"> 
+
+        <!-- Icon Font Stylesheet -->
+        <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.4/css/all.css"/>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.4.1/font/bootstrap-icons.css" rel="stylesheet">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+
+        <!-- Libraries Stylesheet -->
+        <link href="../LaptopFe/lib/lightbox/css/lightbox.min.css" rel="stylesheet">
+        <link href="../LaptopFe/lib/owlcarousel/assets/owl.carousel.min.css" rel="stylesheet">
+
+
+        <!-- Customized Bootstrap Stylesheet -->
+        <link href="../LaptopFe/css/bootstrap.min.css" rel="stylesheet">
+
+        <!-- Template Stylesheet -->
+        <link href="../LaptopFe/css/style.css" rel="stylesheet">
+
+        @* insert icon *@
+        <link rel="shortcut icon" href="~/LaptopFe/img/TenTech-icon.ico" type="image/x-icon" />
+
+        <style>
+            /* Toast Notification Styles */
+            .toast-container {
+                z-index: 9999;
+            }
+            
+            .toast-notification {
+                min-width: 300px;
+                max-width: 400px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                margin-bottom: 10px;
+                background-color: #ffffff;
+            }
+            
+            .toast-notification .toast-header {
+                font-weight: 600;
+            }
+            
+            .toast-notification .toast-body {
+                padding: 0.75rem;
+            }
+            
+            .toast-success .toast-header {
+                background-color: #28a745 !important;
+            }
+            
+            .toast-danger .toast-header {
+                background-color: #dc3545 !important;
+            }
+            
+            .toast-warning .toast-header {
+                background-color: #ffc107 !important;
+                color: #000 !important;
+            }
+            
+            .toast-info .toast-header {
+                background-color: #17a2b8 !important;
+            }
+        </style>
+
+    </head>
+
+    <body>
+
+        <!-- Spinner Start -->
+        <div id="spinner" class="show w-100 vh-100 bg-white position-fixed translate-middle top-50 start-50  d-flex align-items-center justify-content-center">
+            <div class="spinner-grow text-primary" role="status"></div>
+        </div>
+        <!-- Spinner End -->
+
+
+        @await Html.PartialAsync("_Header")
+
+
+        <!-- Hero Start -->
+        <div class="container-fluid p-0 pt-1 px-5 pb-0 mb-5 hero-header">
+            <div class="container p-0">
+                <div class="row g-5 py-3 px-0">
+                    <!-- Sidebar Start -->
+                    <div class="col-lg-4">
+
+                        <!-- START hero__categories style -->
+                        <div class="hero__categories position-relative">
+                            <div class="hero__categories__all d-flex align-items-center gap-2" id="categoriesToggle" aria-expanded="false" role="button" tabindex="0">
+                                <i class="fa fa-bars text-primary"></i>
+                                <span>Danh mục</span>
+                                <i class="fa fa-angle-down ms-auto text-muted toggle-caret"></i>
+                            </div>
+
+                            <ul class="hero__categories__list list-unstyled m-0 p-0 mt-2 shadow-sm" id="categoriesList" aria-labelledby="categoriesToggle">
+                            </ul>
+                        </div>
+                    <!-- </div> -->
+                    </div>
+                    <!-- Sidebar End -->
+                    
+    
+                    <div class="col-lg-8">
+                        <div id="carouselId" class="carousel slide position-relative" data-bs-ride="carousel">
+                            <div class="carousel-inner rounded" role="listbox">
+                                <div class="carousel-item active rounded">
+                                    <img src="../LaptopFe/img/banner-4.png" class="img-fluid w-100 rounded" style="height: 55vh; object-fit: cover;" alt="First slide">
+                                    <a href="/Home/Shop" class="btn px-4 py-2 text-white rounded">MUA NGAY</a>
+                                </div>
+                                <div class="carousel-item rounded">
+                                    <img src="../LaptopFe/img/banner-1.jpg" class="img-fluid w-100 rounded" style="height: 55vh; object-fit: cover;" alt="Second slide">
+                                    <a href="/Home/Shop" class="btn px-4 py-2 text-white rounded">MUA NGAY</a>
+                                </div>
+                                <div class="carousel-item rounded">
+                                    <img src="../LaptopFe/img/banner-3.jpg" class="img-fluid w-100 rounded" style="height: 55vh; object-fit: cover;" alt="Second slide">
+                                    <a href="/Home/Shop" class="btn px-4 py-2 text-white rounded">MUA NGAY</a>
+                                </div>
+                            </div>
+                            <button class="carousel-control-prev" type="button" data-bs-target="#carouselId" data-bs-slide="prev">
+                                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                <span class="visually-hidden">Previous</span>
+                            </button>
+                            <button class="carousel-control-next" type="button" data-bs-target="#carouselId" data-bs-slide="next">
+                                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                <span class="visually-hidden">Next</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Hero End -->
+
+
+
+        <!-- Fruits Shop Start-->
+        <div class="container-fluid fruite pt-5">
+            <div class="container pt-0 pb-5">
+                <div class="tab-class text-center">
+                    <div class="row g-4">
+                        <div class="text-center pb-3">
+                            <h1>Sản phẩm</h1>
+                        </div>
+                    </div>
+                    <div class="tab-content">
+                        <div id="tab-1" class="tab-pane fade show p-0 active">
+                            @RenderBody()
+                        </div>
+                    </div>
+                </div>      
+            </div>
+        </div>
+        <!-- Fruits Shop End-->
+
+
+        <!-- Bestsaler Product Start -->
+        <div class="container-fluid pt-0">
+            <div class="container py-5 pt-0">
+                <div class="row g-4">
+                    <div class="text-center pb-3">
+                        <h1>Sản phẩm bán chạy</h1>
+                    </div>
+                </div>
+                <div id="bestsellerProducts" class="row g-4">
+                    <!-- Bestseller products sẽ được load bằng JavaScript -->
+                    <div class="col-12 text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Đang tải...</span>
+                        </div>
+                        <p class="mt-2">Đang tải sản phẩm bán chạy...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Bestsaler Product End -->
+
+
+
+        @await Html.PartialAsync("_Footer")
+
+        <!-- Back to Top -->
+        <a href="#" class="btn btn-primary border-3 border-primary rounded-circle back-to-top"><i class="fa fa-arrow-up"></i></a>   
+
+        
+    <!-- JavaScript Libraries -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../LaptopFe/lib/easing/easing.min.js"></script>
+    <script src="../LaptopFe/lib/waypoints/waypoints.min.js"></script>
+    <script src="../LaptopFe/lib/lightbox/js/lightbox.min.js"></script>
+    <script src="../LaptopFe/lib/owlcarousel/owl.carousel.min.js"></script>
+
+    <!-- Template Javascript -->
+    <script src="../LaptopFe/js/main.js"></script>
+    <script>
+        (function () {
+            var apiBase = "http://localhost:5068/";
+            var $list = $('#categoriesList');
+            if ($list.length === 0) return;
+
+            // Toggle dropdown behavior
+            $('#categoriesToggle').on('click keypress', function (e) {
+                if (e.type === 'click' || (e.type === 'keypress' && (e.which === 13 || e.which === 32))) {
+                    $('#categoriesList').toggleClass('show');
+                    var expanded = $(this).attr('aria-expanded') === 'true';
+                    $(this).attr('aria-expanded', (!expanded).toString());
+                    $(this).find('.toggle-caret').toggleClass('fa-angle-down fa-angle-up');
+                }
+            });
+
+            // Load brands and product names from products list (client grouping)
+            $.ajax({
+                type: 'GET',
+                url: apiBase + "api/ListProductAPI/all",
+                dataType: 'json',
+                success: function (data) {
+                    // Group by brandId
+                    var brandMap = {};
+                    (data || []).forEach(function (p) {
+                        var bId = (p.brandId || '').trim();
+                        var bName = (p.brand && p.brand.brandName) ? p.brand.brandName : (bId || 'Khác');
+                        if (!brandMap[bId]) {
+                            brandMap[bId] = { brandId: bId, brandName: bName, productNames: new Set() };
+                        }
+                        if (p.productName) {
+                            brandMap[bId].productNames.add(p.productName);
+                        }
+                    });
+
+                    var brands = Object.values(brandMap).filter(function (b) { return (b.brandId || '').length > 0; });
+                    // Build list - bắt đầu với "Tất cả sản phẩm"
+                    var html = '<li><a href="/Home/Shop" class="h6 px-5 py-3 rounded bg-white mb-2"><i class="fas fa-th text-primary me-2"></i>Tất cả sản phẩm</a></li>';
+                    brands.forEach(function (b) {
+                        var productNames = Array.from(b.productNames).sort();
+                        if (productNames.length > 0) {
+                            html += '<li>';
+                            html += '  <div class="dropdown category-dropdown">';
+                            html += '    <a href="/Home/Shop?brandId=' + encodeURIComponent(b.brandId) + '" class="h6 px-5 py-3 rounded bg-white mb-2 dropdown-toggle d-flex align-items-center justify-content-between js-has-sub" aria-expanded="false">';
+                            html += '      <span><i class="fas fa-laptop text-primary me-2"></i>' + (b.brandName || b.brandId) + '</span>';
+                            html += '      <i class="fas fa-angle-right text-primary toggle-submenu"></i>';
+                            html += '    </a>';
+                            html += '    <div class="dropdown-menu m-0 bg-secondary rounded-0 category-submenu">';
+                            productNames.forEach(function (pn) {
+                                html += '      <a class="dropdown-item" href="/Home/Shop?brandId=' + encodeURIComponent(b.brandId) + '&productName=' + encodeURIComponent(pn) + '">' + pn + '</a>';
+                            });
+                            html += '    </div>';
+                            html += '  </div>';
+                            html += '</li>';
+                        } else {
+                            html += '<li><a href="/Home/Shop?brandId=' + encodeURIComponent(b.brandId) + '" class="h6 px-5 py-3 rounded bg-white mb-2"><i class="fas fa-laptop text-primary me-2"></i>' + (b.brandName || b.brandId) + '</a></li>';
+                        }
+                    });
+                    $list.html(html);
+
+                    // Handle submenu toggle hover
+                    $list.on('mouseenter', '.category-dropdown', function () {
+                        $(this).find('.category-submenu').addClass('show').css('display', 'block');
+                    }).on('mouseleave', '.category-dropdown', function () {
+                        $(this).find('.category-submenu').removeClass('show').css('display', 'none');
+                    });
+                },
+                error: function () {
+                    // Fallback content
+                    $list.html('<li><span class="d-block px-5 py-3 text-muted">Không thể tải danh mục</span></li>');
+                }
+            });
+
+            // Load bestseller products
+            function loadBestsellerProducts() {
+                console.log('Loading bestseller products from:', apiBase + "api/products/bestsellers?count=8&days=90");
+                
+                $.ajax({
+                    type: 'GET',
+                    url: apiBase + "api/products/bestsellers?count=8&days=90",
+                    dataType: 'json',
+                    timeout: 10000, // 10 second timeout
+                    success: function (data) {
+                        console.log('Bestseller products success:', data);
+                        renderBestsellerProducts(data || []);
+                    },
+                    error: function (xhr, status, error) {
+                        console.error('Bestseller API Error Details:');
+                        console.error('Status:', status);
+                        console.error('Error:', error);
+                        console.error('Response:', xhr.responseText);
+                        console.error('Status Code:', xhr.status);
+                        
+                        let errorMessage = 'Không thể tải sản phẩm bán chạy.';
+                        
+                        if (xhr.status === 0) {
+                            errorMessage = 'Không thể kết nối đến server. Kiểm tra kết nối mạng.';
+                        } else if (xhr.status === 404) {
+                            errorMessage = 'API không tìm thấy. Kiểm tra URL API.';
+                        } else if (xhr.status === 500) {
+                            errorMessage = 'Lỗi server nội bộ. Kiểm tra logs server.';
+                        } else if (status === 'timeout') {
+                            errorMessage = 'Timeout khi tải dữ liệu. Server phản hồi chậm.';
+                        }
+                        
+                        $('#bestsellerProducts').html(`
+                            <div class="col-12 text-center">
+                                <p class="text-danger">${errorMessage}</p>
+                                <button class="btn btn-outline-primary btn-sm" onclick="loadBestsellerProducts()">Thử lại</button>
+                                <button class="btn btn-outline-secondary btn-sm ms-2" onclick="testApiConnection()">Test API</button>
+                            </div>
+                        `);
+                    }
+                });
+            }
+
+            // Test API connection
+            function testApiConnection() {
+                console.log('Testing API connection...');
+                $.ajax({
+                    type: 'GET',
+                    url: apiBase + "api/products/test",
+                    dataType: 'json',
+                    success: function (data) {
+                        console.log('API Test Success:', data);
+                        alert('API hoạt động bình thường!\nSố sản phẩm: ' + data.data.totalProducts + '\nSố hóa đơn: ' + data.data.totalInvoices);
+                    },
+                    error: function (xhr, status, error) {
+                        console.error('API Test Failed:', xhr.responseText);
+                        alert('API Test thất bại!\nStatus: ' + xhr.status + '\nError: ' + error);
+                    }
+                });
+            }
+
+            function renderBestsellerProducts(products) {
+                const container = $('#bestsellerProducts');
+                
+                if (!products || products.length === 0) {
+                    container.html('<div class="col-12 text-center"><p class="text-muted">Chưa có sản phẩm bán chạy gần đây.</p></div>');
+                    return;
+                }
+
+                let html = '';
+                products.forEach(function (product, index) {
+                    // Build image URL
+                    let imageUrl = "/image/default-laptop.jpg";
+                    if (product.avatar && product.avatar.trim()) {
+                        imageUrl = apiBase + "imageProducts/" + encodeURIComponent(product.avatar.trim());
+                    }
+
+                    // Format price
+                    let price = 'Liên hệ';
+                    if (product.sellingPrice != null && product.sellingPrice !== undefined) {
+                        try {
+                            price = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(product.sellingPrice);
+                        } catch (e) {
+                            price = product.sellingPrice.toString() + ' VND';
+                        }
+                    }
+
+                    // Original price (strike-through) if applicable
+                    let originalPriceHtml = '';
+                    if (product.originalSellingPrice != null && product.originalSellingPrice !== undefined &&
+                        product.sellingPrice != null && product.sellingPrice !== undefined &&
+                        product.originalSellingPrice > product.sellingPrice) {
+                        try {
+                            const formattedOriginal = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(product.originalSellingPrice);
+                            originalPriceHtml = `<span class="text-muted text-decoration-line-through me-2" style="font-size: 0.8em;">${formattedOriginal}</span>`;
+                        } catch (e) {
+                            originalPriceHtml = `<span class="text-muted text-decoration-line-through me-2" style="font-size: 0.8em;">${product.originalSellingPrice.toString()} VND</span>`;
+                        }
+                    }
+
+                    const brandName = (product.brand && product.brand.brandName) ? product.brand.brandName : 'Laptop';
+                    const productDetailUrl = '/Home/ProductDetail?id=' + encodeURIComponent(product.productId || '');
+                    // const soldBadge = product.totalSold > 0 ? `<div class="position-absolute bg-danger text-white px-2 py-1 rounded" style="top: 10px; right: 10px; font-size: 0.8em;">Đã bán: ${product.totalSold}</div>` : '';
+
+                    html += `
+                        <div class="col-lg-3 col-md-6 col-sm-6 col-12">
+                            <div class="rounded position-relative fruite-item">
+                                <div class="fruite-img" style="cursor: pointer;" data-href="${productDetailUrl}">
+                                    <img src="${imageUrl}" class="img-fluid w-100 rounded-top" alt="${product.productName || ''}" style="height: 200px; object-fit: cover;">
+                                </div>
+                                <div class="text-white bg-secondary px-3 py-1 rounded position-absolute" style="top: 10px; left: 10px;">${brandName}</div>
+                                
+                                <div class="p-4 border border-secondary border-top-0 rounded-bottom">
+                                    <div class="text-center mb-2">
+                                        <h4><a href="${productDetailUrl}" class="text-dark text-decoration-none">${product.productName || 'Chưa có tên'}</a></h4>
+                                        <p class="text-muted mb-0">${product.productModel || ''}</p>
+                                    </div>
+                                    <div class="d-flex flex-column align-items-center">
+                                        <div class="d-flex align-items-center flex-wrap gap-2 mb-3">
+                                            ${originalPriceHtml}
+                                            <span class="text-dark fs-5 fw-bold mb-0">${price}</span>
+                                        </div>
+                                        <div class="d-flex gap-2">
+                                            <a href="${productDetailUrl}" class="btn border border-secondary rounded-pill px-3 text-primary">
+                                                <i class="fa fa-eye me-2 text-primary"></i> Xem chi tiết
+                                            </a>
+                                            <a href="#" class="btn border border-secondary rounded-circle d-flex align-items-center justify-content-center btn-compare" data-product-id="${product.productId || ''}" data-product-name="${product.productName || ''}" title="So sánh sản phẩm" style="width: 40px; height: 40px; padding: 0;">
+                                                <i class="fa fa-balance-scale text-primary"></i>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                container.html(html);
+
+                // Make images clickable
+                container.find('.fruite-img').off('click').on('click', function () {
+                    const href = $(this).data('href');
+                    if (href) window.location.href = href;
+                });
+
+                // Compare buttons (delegation)
+                container.find('.btn-compare').off('click').on('click', function (e) {
+                    e.preventDefault();
+                    const productId = $(this).data('product-id');
+                    const productName = $(this).data('product-name');
+                    if (productId) {
+                        addToCompare(productId, productName);
+                    }
+                });
+            }
+
+            // Comparison functions
+            function getCompareList() {
+                try {
+                    const compareStr = sessionStorage.getItem('compareProducts');
+                    return compareStr ? JSON.parse(compareStr) : [];
+                } catch (e) {
+                    return [];
+                }
+            }
+
+            function saveCompareList(products) {
+                sessionStorage.setItem('compareProducts', JSON.stringify(products));
+                if (typeof window.updateCompareBadge === 'function') {
+                    window.updateCompareBadge();
+                } else {
+                    updateCompareBadgeLocal();
+                }
+            }
+
+            function addToCompare(productId, productName) {
+                if (!productId) {
+                    showToast('warning', 'Không tìm thấy ID sản phẩm');
+                    return;
+                }
+
+                let compareList = getCompareList();
+                
+                // Check if product already in compare list
+                if (compareList.some(p => p.id === productId)) {
+                    showToast('warning', 'Sản phẩm này đã có trong danh sách so sánh!');
+                    return;
+                }
+
+                // Check if compare list is full (max 2 products)
+                if (compareList.length >= 2) {
+                    showConfirmDialog(
+                        'Danh sách so sánh đã đầy (tối đa 2 sản phẩm). Bạn có muốn xóa sản phẩm đầu tiên và thêm sản phẩm mới không?',
+                        function() {
+                            let updatedList = getCompareList();
+                            if (updatedList.length >= 2) {
+                                updatedList.shift();
+                            }
+                            updatedList.push({ id: productId, name: productName });
+                            saveCompareList(updatedList);
+                            
+                            if (typeof window.updateCompareBadge === 'function') {
+                                window.updateCompareBadge();
+                            } else {
+                                updateCompareBadgeLocal();
+                            }
+                            
+                            showToast('success', 'Đã thêm vào danh sách so sánh! Đang mở bảng so sánh...');
+                            
+                            setTimeout(function() {
+                                if (typeof window.openCompareModal === 'function') {
+                                    window.openCompareModal();
+                                }
+                            }, 500);
+                        }
+                    );
+                    return;
+                }
+
+                if (compareList.length < 2) {
+                    compareList.push({ id: productId, name: productName });
+                    saveCompareList(compareList);
+                    
+                    if (typeof window.updateCompareBadge === 'function') {
+                        window.updateCompareBadge();
+                    } else {
+                        updateCompareBadgeLocal();
+                    }
+                    
+                    if (compareList.length === 2) {
+                        showToast('success', 'Đã thêm vào danh sách so sánh! Đang mở bảng so sánh...');
+                        setTimeout(function() {
+                            if (typeof window.openCompareModal === 'function') {
+                                window.openCompareModal();
+                            }
+                        }, 500);
+                    } else {
+                        showToast('success', 'Đã thêm vào danh sách so sánh! Thêm 1 sản phẩm nữa để so sánh.');
+                    }
+                }
+            }
+
+            function updateCompareBadgeLocal() {
+                const compareList = getCompareList();
+                const badge = document.getElementById('compareBadge');
+                if (badge) {
+                    if (compareList.length > 0) {
+                        badge.textContent = compareList.length;
+                        badge.style.display = 'flex';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+            }
+
+            // Toast notification function
+            function showToast(type, message) {
+                const toastId = 'toast-' + Date.now();
+                const iconMap = {
+                    'success': '<i class="fa fa-check-circle me-2"></i>',
+                    'danger': '<i class="fa fa-times-circle me-2"></i>',
+                    'warning': '<i class="fa fa-exclamation-triangle me-2"></i>',
+                    'info': '<i class="fa fa-info-circle me-2"></i>'
+                };
+                const icon = iconMap[type] || '';
+                
+                const toastHtml = `
+                    <div id="${toastId}" class="toast-notification toast-${type}" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="toast-header bg-${type === 'danger' ? 'danger' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info'} text-white">
+                            ${icon}
+                            <strong class="me-auto">Thông báo</strong>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-body">
+                            ${message}
+                        </div>
+                    </div>
+                `;
+                
+                if ($('#toast-container').length === 0) {
+                    $('body').append('<div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>');
+                }
+                
+                $('#toast-container').append(toastHtml);
+                
+                const toastElement = document.getElementById(toastId);
+                if (toastElement) {
+                    const toast = new bootstrap.Toast(toastElement, {
+                        autohide: true,
+                        delay: 4000
+                    });
+                    toast.show();
+                    
+                    toastElement.addEventListener('hidden.bs.toast', function() {
+                        $(this).remove();
+                    });
+                }
+            }
+
+            // Confirm dialog function
+            function showConfirmDialog(message, onConfirm, onCancel) {
+                const confirmId = 'confirm-dialog-' + Date.now();
+                const confirmHtml = `
+                    <div class="modal fade" id="${confirmId}" tabindex="-1" aria-labelledby="confirmDialogLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header bg-warning text-dark">
+                                    <h5 class="modal-title" id="confirmDialogLabel">
+                                        <i class="fa fa-exclamation-triangle me-2"></i>Xác nhận
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p class="mb-0">${message}</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                                    <button type="button" class="btn btn-primary" id="confirmBtn">Xác nhận</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                $('.confirm-dialog-modal').remove();
+                
+                $('body').append(confirmHtml);
+                const $modal = $(`#${confirmId}`).addClass('confirm-dialog-modal');
+                const modal = new bootstrap.Modal($modal[0]);
+                
+                $modal.find('#confirmBtn').on('click', function() {
+                    modal.hide();
+                    if (onConfirm && typeof onConfirm === 'function') {
+                        onConfirm();
+                    }
+                });
+                
+                $modal.on('hidden.bs.modal', function() {
+                    if (onCancel && typeof onCancel === 'function') {
+                        onCancel();
+                    }
+                    $(this).remove();
+                });
+                
+                modal.show();
+            }
+
+            // Load bestseller products when page loads
+            loadBestsellerProducts();
+        })();
+    </script>
+
+    <!-- Chat AI Widget -->
+    @await Html.PartialAsync("~/Views/Chat/_ChatAIWedget.cshtml")
+    
+    <!-- Chat Widget -->
+    @await Html.PartialAsync("~/Views/Chat/_ChatWidget.cshtml")
+    <link rel="stylesheet" href="~/css/chatbot.css" asp-append-version="true" />
+    <script src="~/js/chatbot.js" asp-append-version="true"></script>
+
+    @RenderSection("Scripts", required: false)
+</body>
+
+</html>

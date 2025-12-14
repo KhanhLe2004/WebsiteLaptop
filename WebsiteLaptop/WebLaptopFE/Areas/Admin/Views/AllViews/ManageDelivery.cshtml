@@ -1,0 +1,824 @@
+﻿@{
+    ViewData["Title"] = "Quản lý vận chuyển";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card my-4">
+                <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                    <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
+                        <h6 class="text-white text-capitalize ps-3 mb-0">Quản lý vận chuyển</h6>
+                    </div>
+                </div>
+                <div class="card-body px-3 pb-2">
+                    <!-- Bộ lọc và tìm kiếm -->
+                    <div class="row mb-3 g-2 align-items-end">
+                        <div class="col-lg-4 col-md-6">
+                            <div class="input-group input-group-outline">
+                                <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm đơn hàng...">
+                            </div>
+                        </div>
+                        <div class="col-lg-2 col-md-3">
+                            <select id="statusFilter" class="form-select">
+                                <option value="">Tất cả trạng thái</option>
+                                <option value="Chờ vận chuyển">Chờ vận chuyển</option>
+                                <option value="Đang vận chuyển">Đang vận chuyển</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-2 col-md-3">
+                            <div class="input-group input-group-outline">
+                                <label class="form-label">Từ ngày</label>
+                                <input type="date" id="dateFromInput" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-lg-2 col-md-3">
+                            <div class="input-group input-group-outline">
+                                <label class="form-label">Đến ngày</label>
+                                <input type="date" id="dateToInput" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-lg-1 col-md-3 d-flex align-items-end">
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearDateFilters()" title="Xóa bộ lọc ngày" style="height: 40px; min-width: 40px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                                <i class="material-icons" style="font-size: 18px;">clear</i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Bảng đơn hàng -->
+                    <div class="table-responsive p-0">
+                        <table class="table align-items-center mb-0" style="table-layout: fixed; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 12%;">Mã đơn hàng</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 15%;">Khách hàng</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 10%;">Số điện thoại</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 10%;">Trạng thái</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 10%;">Tổng tiền</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 10%;">Ngày tạo</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 13%;">Địa chỉ giao hàng</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 10%;">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="deliveryTableBody">
+                                <!-- Dữ liệu sẽ được load bằng AJAX -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Phân trang -->
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <p class="text-sm mb-0" id="pageInfo">Đang tải...</p>
+                        </div>
+                        <div class="col-md-6">
+                            <nav aria-label="Page navigation">
+                                <ul class="pagination justify-content-end mb-0" id="pagination">
+                                    <!-- Phân trang sẽ được tạo bằng JavaScript -->
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xem chi tiết -->
+<div class="modal fade" id="viewModal" tabindex="-1" aria-labelledby="viewModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-info">
+                <h5 class="modal-title text-white" id="viewModalLabel">Chi tiết đơn hàng</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="viewModalBody">
+                <!-- Nội dung sẽ được load bằng JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Cập nhật trạng thái -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-warning">
+                <h5 class="modal-title text-white" id="statusModalLabel">Cập nhật trạng thái</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="statusForm">
+                    <input type="hidden" id="statusInvoiceId" value="">
+                    <input type="hidden" id="currentStatus" value="">
+                    <div class="input-group input-group-outline mb-3">
+                        <label class="form-label">Trạng thái *</label>
+                        <select class="form-control" id="statusSelect" required>
+                            <option value=""></option>
+                            <option value="Chờ vận chuyển">Chờ vận chuyển</option>
+                            <option value="Đang vận chuyển">Đang vận chuyển</option>
+                            <option value="Hoàn thành">Hoàn thành</option>
+                        </select>
+                    </div>
+                    <div class="text-danger mb-3" id="statusErrorMessage" style="display:none;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" onclick="saveStatus()">
+                    <i class="material-icons text-sm">save</i> Lưu
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const API_URL = 'http://localhost:5068/api/admin/deliveries';
+        let currentPage = 1;
+        let pageSize = 10;
+        let searchDebounceTimer = null;
+        const SEARCH_DEBOUNCE_DELAY = 300;
+        const currentEmployeeId = @Html.Raw(Json.Serialize(ViewBag.EmployeeId ?? ""));
+        const currentEmployeeName = @Html.Raw(Json.Serialize(ViewBag.EmployeeName ?? ""));
+
+        $(document).ready(function() {
+            loadDeliveries();
+
+            // Tìm kiếm tự động
+            $('#searchInput').on('input', function() {
+                triggerAutoSearch();
+            });
+
+            // Lọc theo trạng thái
+            $('#statusFilter').on('change', function() {
+                currentPage = 1;
+                loadDeliveries();
+            });
+
+            // Xử lý label cho Material Dashboard inputs
+            window.updateInputLabels = function() {
+                $('.input-group-outline input, .input-group-outline select').each(function() {
+                    const $input = $(this);
+                    const value = $input.val();
+                    if (value && value.trim() !== '') {
+                        $input.closest('.input-group-outline').addClass('is-filled');
+                    } else {
+                        $input.closest('.input-group-outline').removeClass('is-filled');
+                    }
+                });
+            };
+
+            $(document).on('input change', '.input-group-outline input, .input-group-outline select', function() {
+                const $input = $(this);
+                const value = $input.val();
+                if (value && value.trim() !== '') {
+                    $input.closest('.input-group-outline').addClass('is-filled');
+                } else {
+                    $input.closest('.input-group-outline').removeClass('is-filled');
+                }
+            });
+
+            $(document).on('focus', '.input-group-outline input, .input-group-outline select', function() {
+                $(this).closest('.input-group-outline').addClass('is-focused');
+            });
+
+            $(document).on('blur', '.input-group-outline input, .input-group-outline select', function() {
+                const $input = $(this);
+                const $group = $input.closest('.input-group-outline');
+                $group.removeClass('is-focused');
+                const value = $input.val();
+                if (value && value.trim() !== '') {
+                    $group.addClass('is-filled');
+                } else {
+                    $group.removeClass('is-filled');
+                }
+            });
+        });
+
+        function triggerAutoSearch() {
+            currentPage = 1;
+            if (searchDebounceTimer) {
+                clearTimeout(searchDebounceTimer);
+            }
+            searchDebounceTimer = setTimeout(() => {
+                loadDeliveries();
+            }, SEARCH_DEBOUNCE_DELAY);
+        }
+
+        // Hàm xóa bộ lọc ngày
+        function clearDateFilters() {
+            $('#dateFromInput').val('').removeAttr('value').removeAttr('data-has-input');
+            $('#dateToInput').val('').removeAttr('value').removeAttr('data-has-input');
+            updateInputLabels();
+            triggerAutoSearch();
+        }
+
+        // Xử lý input date để hiển thị dd/mm/yyyy khi có giá trị
+        $(document).on('input change', 'input[type="date"]', function() {
+            const $input = $(this);
+            const value = $input.val();
+            if (value && value.trim() !== '') {
+                $input.attr('value', value).attr('data-has-input', 'true');
+            } else {
+                $input.removeAttr('value').removeAttr('data-has-input');
+            }
+        });
+
+        // Xử lý khi focus vào input date
+        $(document).on('focus', 'input[type="date"]', function() {
+            const $input = $(this);
+            const value = $input.val();
+            if (value && value.trim() !== '') {
+                $input.attr('data-has-input', 'true');
+            }
+        });
+
+        // Xử lý khi blur khỏi input date
+        $(document).on('blur', 'input[type="date"]', function() {
+            const $input = $(this);
+            const value = $input.val();
+            if (!value || value.trim() === '') {
+                $input.removeAttr('data-has-input');
+            } else {
+                $input.attr('value', value).attr('data-has-input', 'true');
+            }
+        });
+
+        // Event listeners cho date filters
+        $('#dateFromInput, #dateToInput').on('change', function() {
+            triggerAutoSearch();
+        });
+
+        // Load danh sách đơn hàng
+        function loadDeliveries(page = currentPage) {
+            currentPage = page;
+            const searchTerm = $('#searchInput').val().trim();
+            const statusFilter = $('#statusFilter').val();
+            const dateFrom = $('#dateFromInput').val();
+            const dateTo = $('#dateToInput').val();
+
+            const dataParams = {
+                pageNumber: currentPage,
+                pageSize: pageSize,
+                searchTerm: searchTerm,
+                status: statusFilter || null
+            };
+
+            if (dateFrom) {
+                dataParams.dateFrom = dateFrom;
+            }
+            if (dateTo) {
+                dataParams.dateTo = dateTo;
+            }
+
+            $.ajax({
+                url: API_URL,
+                type: 'GET',
+                data: dataParams,
+                success: function(response) {
+                    displayDeliveries(response.items);
+                    displayPagination(response);
+                    updatePageInfo(response);
+                },
+                error: function(xhr) {
+                    console.error('Lỗi khi tải đơn hàng:', xhr);
+                    showNotification('Lỗi khi tải dữ liệu đơn hàng', 'error');
+                }
+            });
+        }
+
+        // Hiển thị đơn hàng
+        function displayDeliveries(deliveries) {
+            const tbody = $('#deliveryTableBody');
+            tbody.empty();
+
+            if (deliveries.length === 0) {
+                tbody.append(`
+                    <tr>
+                        <td colspan="8" class="text-center text-secondary py-4">
+                            Không có đơn hàng nào
+                        </td>
+                    </tr>
+                `);
+                return;
+            }
+
+            $.each(deliveries, function(index, delivery) {
+                const timeCreate = delivery.timeCreate ? new Date(delivery.timeCreate).toLocaleString('vi-VN') : '-';
+                const totalAmount = delivery.totalAmount ? formatCurrency(delivery.totalAmount) : '0';
+                const deliveryAddress = delivery.deliveryAddress || '-';
+                const customerPhone = delivery.customerPhone || '-';
+                const status = delivery.status || 'Chờ vận chuyển';
+                const statusBadge = getStatusBadge(status);
+                const canUpdate = status === 'Chờ vận chuyển' || status === 'Đang vận chuyển';
+
+                tbody.append(`
+                    <tr>
+                        <td style="vertical-align: middle;">
+                            <span class="text-xs font-weight-bold">${delivery.saleInvoiceId}</span>
+                        </td>
+                        <td style="vertical-align: middle;">
+                            <span class="text-xs font-weight-bold">${delivery.customerName || '-'}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold">${customerPhone}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            ${statusBadge}
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold">${totalAmount}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold">${timeCreate}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;">
+                            <span class="text-xs font-weight-bold" title="${deliveryAddress}">${deliveryAddress.length > 30 ? deliveryAddress.substring(0, 30) + '...' : deliveryAddress}</span>
+                        </td>
+                        <td style="vertical-align: middle; text-align: center;" class="table-actions">
+                            <button class="btn btn-info action-btn" onclick='viewDelivery("${delivery.saleInvoiceId}")' title="Xem">
+                                <i class="material-icons text-sm">visibility</i>
+                            </button>
+                            ${canUpdate ? `
+                            <button class="btn btn-success action-btn" onclick='updateStatus("${delivery.saleInvoiceId}", "${status}")' title="Cập nhật trạng thái">
+                                <i class="material-icons text-sm">local_shipping</i>
+                            </button>
+                            ` : ''}
+                        </td>
+                    </tr>
+                `);
+            });
+        }
+
+        // Hiển thị phân trang
+        function displayPagination(response) {
+            const pagination = $('#pagination');
+            pagination.empty();
+
+            if (response.totalPages <= 1) return;
+
+            pagination.append(`
+                <li class="page-item ${response.hasPreviousPage ? '' : 'disabled'}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadDeliveries(${currentPage - 1})">
+                        <i class="material-icons text-sm">chevron_left</i>
+                    </a>
+                </li>
+            `);
+
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(response.totalPages, currentPage + 2);
+
+            if (startPage > 1) {
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadDeliveries(1)">1</a></li>`);
+                if (startPage > 2) {
+                    pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                pagination.append(`
+                    <li class="page-item ${i === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="javascript:void(0)" onclick="loadDeliveries(${i})">${i}</a>
+                    </li>
+                `);
+            }
+
+            if (endPage < response.totalPages) {
+                if (endPage < response.totalPages - 1) {
+                    pagination.append(`<li class="page-item disabled"><a class="page-link">...</a></li>`);
+                }
+                pagination.append(`<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadDeliveries(${response.totalPages})">${response.totalPages}</a></li>`);
+            }
+
+            pagination.append(`
+                <li class="page-item ${response.hasNextPage ? '' : 'disabled'}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadDeliveries(${currentPage + 1})">
+                        <i class="material-icons text-sm">chevron_right</i>
+                    </a>
+                </li>
+            `);
+        }
+
+        // Cập nhật thông tin trang
+        function updatePageInfo(response) {
+            const start = (response.pageNumber - 1) * response.pageSize + 1;
+            const end = Math.min(response.pageNumber * response.pageSize, response.totalItems);
+            $('#pageInfo').text(`Hiển thị ${start} - ${end} trong tổng số ${response.totalItems} đơn hàng`);
+        }
+
+        // Xem chi tiết đơn hàng
+        function viewDelivery(invoiceId) {
+            $.ajax({
+                url: `${API_URL}/${invoiceId}`,
+                type: 'GET',
+                success: function(invoice) {
+                    let html = `
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Mã đơn hàng:</strong> ${invoice.saleInvoiceId}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Ngày tạo:</strong> ${invoice.timeCreate ? new Date(invoice.timeCreate).toLocaleString('vi-VN') : '-'}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Khách hàng:</strong> ${invoice.customerName || '-'}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Số điện thoại:</strong> ${invoice.customerPhone || '-'}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Nhân viên:</strong> ${invoice.employeeName || '-'}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Trạng thái:</strong> ${getStatusBadge(invoice.status || 'Chờ vận chuyển')}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Phí giao hàng:</strong> +${formatCurrency(invoice.deliveryFee || 0)}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Khuyến mại:</strong> -${formatCurrency(invoice.discount || 0)}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Tổng tiền:</strong> ${formatCurrency(invoice.totalAmount || 0)}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Phương thức thanh toán:</strong> ${invoice.paymentMethod || '-'}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <strong>Địa chỉ giao hàng:</strong> ${invoice.deliveryAddress || '-'}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Nhân viên giao hàng:</strong> ${invoice.employeeShipName || '-'}
+                            </div>
+                        </div>
+                        <hr>
+                        <h6>Chi tiết đơn hàng:</h6>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-sm" style="font-size: 0.875rem;">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 30%;">Sản phẩm</th>
+                                        <th style="width: 25%;">Thông số</th>
+                                        <th style="width: 10%;" class="text-center">Số lượng</th>
+                                        <th style="width: 15%;" class="text-end">Đơn giá</th>
+                                        <th style="width: 20%;" class="text-end">Thành tiền</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                        `;
+
+                    if (invoice.details && invoice.details.length > 0) {
+                        invoice.details.forEach(function(detail) {
+                            const subtotal = (detail.quantity || 0) * (detail.unitPrice || 0);
+                            const productName = detail.productName || detail.ProductName || '';
+                            const productModel = detail.productModel || detail.ProductModel || '';
+                            const productDisplay = productModel ? `${productName} | ${productModel}` : productName || detail.productId || '-';
+                            html += `
+                                <tr>
+                                    <td>${productDisplay}</td>
+                                    <td>${detail.specifications || '-'}</td>
+                                    <td class="text-center">${detail.quantity || 0}</td>
+                                    <td class="text-end">${formatCurrency(detail.unitPrice || 0)}</td>
+                                    <td class="text-end">${formatCurrency(subtotal)}</td>
+                                </tr>
+                            `;
+                        });
+                    } else {
+                        html += '<tr><td colspan="5" class="text-center">Không có chi tiết</td></tr>';
+                    }
+
+                    html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+
+                    $('#viewModalBody').html(html);
+                    const modal = new bootstrap.Modal(document.getElementById('viewModal'));
+                    modal.show();
+                },
+                error: function(xhr) {
+                    console.error('Error loading delivery:', xhr);
+                    showNotification('Lỗi khi tải thông tin đơn hàng', 'error');
+                }
+            });
+        }
+
+        // Cập nhật trạng thái
+        function updateStatus(invoiceId, currentStatus) {
+            // Kiểm tra nếu trạng thái là "Hoàn thành" thì không cho cập nhật
+            if (currentStatus === 'Hoàn thành') {
+                showNotification('Không thể cập nhật trạng thái cho đơn hàng đã hoàn thành', 'error');
+                return;
+            }
+            
+            $('#statusInvoiceId').val(invoiceId);
+            // Lưu trạng thái ban đầu để kiểm tra sau
+            $('#statusSelect').data('original-status', currentStatus);
+            $('#statusSelect').val(currentStatus).trigger('change');
+            $('#statusErrorMessage').hide();
+            
+            // Enable select và nút lưu
+            $('#statusSelect').prop('disabled', false);
+            $('.modal-footer .btn-primary').prop('disabled', false);
+
+            const modal = new bootstrap.Modal(document.getElementById('statusModal'));
+            modal.show();
+        }
+
+        // Lưu trạng thái
+        function saveStatus() {
+            $('#statusErrorMessage').hide();
+
+            const invoiceId = $('#statusInvoiceId').val();
+            const status = $('#statusSelect').val();
+
+            if (!invoiceId || !status) {
+                showStatusError('Vui lòng chọn trạng thái');
+                return;
+            }
+
+            // Kiểm tra nếu trạng thái ban đầu là "Hoàn thành" thì không cho cập nhật
+            const originalStatus = $('#statusSelect').data('original-status');
+            if (originalStatus === 'Hoàn thành') {
+                showStatusError('Không thể cập nhật trạng thái cho đơn hàng đã hoàn thành');
+                return;
+            }
+
+            $.ajax({
+                url: `${API_URL}/${invoiceId}/status`,
+                type: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify({ 
+                    status: status,
+                    employeeId: currentEmployeeId || null
+                }),
+                success: function(response) {
+                    showNotification('Cập nhật trạng thái thành công', 'success');
+                    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('statusModal'));
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                    loadDeliveries();
+                },
+                error: function(xhr) {
+                    console.error('Error updating status:', xhr);
+                    let message = 'Có lỗi xảy ra khi cập nhật trạng thái';
+                    // Ưu tiên lấy message từ responseJSON
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    } 
+                    // Nếu không có responseJSON, thử parse responseText
+                    else if (xhr.responseText) {
+                        try {
+                            const response = JSON.parse(xhr.responseText);
+                            if (response && response.message) {
+                                message = response.message;
+                            }
+                        } catch (e) {
+                            // Nếu không parse được, giữ message mặc định
+                        }
+                    }
+                    showStatusError(message);
+                }
+            });
+        }
+        
+        // Lấy badge trạng thái
+        function getStatusBadge(status) {
+            const badges = {
+                'Chờ vận chuyển': '<span class="badge bg-gradient-secondary">Chờ vận chuyển</span>',
+                'Đang vận chuyển': '<span class="badge bg-gradient-dark">Đang vận chuyển</span>',
+                'Hoàn thành': '<span class="badge bg-gradient-success">Hoàn thành</span>'
+            };
+            return badges[status] || '<span class="badge bg-gradient-secondary">' + status + '</span>';
+        }
+
+        // Hiển thị thông báo
+        function showNotification(message, type) {
+            const bgColor = type === 'success' ? 'bg-gradient-success' : 'bg-gradient-danger';
+            const notification = $(
+                `<div class="alert ${bgColor} text-white alert-dismissible fade show position-fixed" 
+                     style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>`
+            );
+            $('body').append(notification);
+            setTimeout(() => notification.alert('close'), 3000);
+        }
+
+        // Hiển thị lỗi trong modal trạng thái
+        function showStatusError(message) {
+            $('#statusErrorMessage').html(message).show();
+        }
+
+        // Format tiền tệ
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+        }
+
+        // Reset khi đóng modal
+        $(document).on('hidden.bs.modal', '#statusModal', function() {
+            $('#statusForm')[0].reset();
+            $('#statusInvoiceId').val('');
+            $('#statusSelect').val('');
+            $('#statusSelect').removeData('original-status');
+            $('#statusErrorMessage').hide();
+            
+            $('.input-group-outline').removeClass('is-filled is-focused');
+        });
+    </script>
+}
+
+<style>
+    /* Fix Modal hiển thị giữa main content và cho phép scroll */
+    .modal {
+        padding-left: 250px !important; /* Offset bằng với chiều rộng sidebar */
+        overflow-y: auto !important;
+    }
+    
+    .modal-dialog {
+        margin: 1.75rem auto;
+        max-height: calc(100vh - 3.5rem);
+    }
+    
+    .modal-content {
+        max-height: calc(100vh - 3.5rem);
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .modal-body {
+        max-height: calc(100vh - 250px);
+        overflow-y: auto;
+        flex: 1 1 auto;
+    }
+    
+    .modal-header, .modal-footer {
+        flex-shrink: 0;
+    }
+    
+    /* Responsive cho modal trên màn hình nhỏ */
+    @@media (max-width: 1200px) {
+        .modal {
+            padding-left: 200px !important;
+        }
+    }
+    
+    @@media (max-width: 992px) {
+        .modal {
+            padding-left: 0 !important;
+        }
+    }
+
+    /* Bảng chính */
+    .table-responsive {
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .table {
+        margin-bottom: 0;
+        background-color: #fff;
+    }
+
+    .table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .table thead th {
+        color: #fff !important;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 1rem 0.75rem !important;
+        border: none;
+        font-size: 1.3125rem;
+        text-align: center;
+    }
+
+    .table tbody tr {
+        transition: all 0.3s ease;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .table tbody tr:hover {
+        background-color: #f8f9fa;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .table tbody tr:last-child {
+        border-bottom: none;
+    }
+
+    .action-btn {
+        padding: 0.375rem 0.625rem;
+        font-size: 0.75rem;
+        margin: 0 0.125rem;
+        border-radius: 0.375rem;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .table-actions {
+        white-space: nowrap;
+    }
+
+    #deliveryTableBody tr td {
+        vertical-align: middle !important;
+        padding: 1rem 0.75rem !important;
+        border: none;
+    }
+
+    /* Badge styling */
+    .badge {
+        padding: 0.5rem 0.75rem;
+        font-weight: 500;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+    }
+
+    /* Empty state */
+    .table tbody tr td[colspan] {
+        padding: 3rem 1rem !important;
+        text-align: center;
+        color: #6c757d;
+        font-style: italic;
+    }
+
+    /* Xử lý đặc biệt cho input date - ẩn label trống */
+    .input-group-outline:has(input[type="date"]) .form-label:empty {
+        display: none;
+    }
+
+    .input-group-outline input[type="date"] {
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+
+    /* Ẩn placeholder dd/mm/yyyy trong input date */
+    input[type="date"]::placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]::-webkit-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]::-moz-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    input[type="date"]:-ms-input-placeholder {
+        color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    /* Ẩn text placeholder mặc định của input date (dd/mm/yyyy) khi KHÔNG có dữ liệu và KHÔNG đang nhập */
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input])::-webkit-datetime-edit,
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input]):invalid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"]:not([value]):not([data-has-input]):valid::-webkit-datetime-edit {
+        color: transparent !important;
+    }
+
+    /* Hiển thị dd/mm/yyyy khi CÓ dữ liệu ngày được nhập vào (có attribute value) hoặc đang nhập (có data-has-input) */
+    .input-group-outline input[type="date"][value]::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][value]:valid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]:invalid::-webkit-datetime-edit,
+    .input-group-outline input[type="date"][data-has-input]:valid::-webkit-datetime-edit {
+        color: #495057 !important;
+    }
+</style>

@@ -1,0 +1,118 @@
+@startuml
+
+hide footbox
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 12
+skinparam maxMessageSize 500
+skinparam ParticipantPadding 100
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam ActorBackgroundColor transparent
+skinparam ParticipantBackgroundColor transparent
+skinparam SequenceGroupBackgroundColor transparent
+skinparam SequenceBoxBackgroundColor transparent
+skinparam NoteBackgroundColor transparent
+
+skinparam SequenceActivationBorderColor black
+skinparam ActorBorderColor black
+skinparam ParticipantBorderColor black
+skinparam ArrowColor black
+skinparam roundcorner 0
+
+actor "Chủ cửa hàng" as OWNER
+participant "Frontend (Admin Web)" as FE
+participant "ManageEmployeeAPIController" as API
+participant "Address API" as ADDR_API
+database "Database" as DB
+
+' 1) Mở màn quản lý
+OWNER -> FE : Chọn "Quản lý nhân viên"
+FE -> API : GET /api/admin/employees
+API -> DB : SELECT employees (filter, pagination)
+DB --> API : employeeList
+API --> FE : 200 OK + list
+FE --> OWNER : Hiển thị danh sách
+
+' 2) Thao tác: Thêm / Sửa / Xóa(ẩn)
+alt Thêm nhân viên
+  OWNER -> FE : Nhập thông tin\nNhấn "Lưu"
+  FE -> API : POST /api/admin/employees
+  API -> API : Validate + Check username/email exists
+  alt Hợp lệ
+    API -> API : GenerateEmployeeId()
+    opt Có RoleId
+      API -> DB : SELECT Role WHERE RoleId
+      DB --> API : role exists
+    end
+    opt Có ProvinceCode
+      API -> ADDR_API : GET /provinces (lấy tên tỉnh)
+      ADDR_API --> API : provinceName
+    end
+    opt Có CommuneCode
+      API -> ADDR_API : GET /provinces/{code}/communes (lấy tên phường)
+      ADDR_API --> API : communeName
+    end
+    opt Có ảnh
+      API -> API : SaveImageAsync(AvatarFile)  (lưu file)
+    end
+    API -> API : BuildFullAddress + SerializeAddress
+    API -> DB : INSERT Employees
+    API -> API : LogHistory("Thêm nhân viên")
+    API --> FE : 201 Created + EmployeeDTO
+    FE --> OWNER : Thông báo "Thành công"\nReload
+  else Không hợp lệ
+    API --> FE : 400 + errors
+    FE --> OWNER : "Vui lòng nhập lại"
+  end
+
+else Cập nhật nhân viên
+  OWNER -> FE : Chọn nhân viên\nSửa\nNhấn "Lưu"
+  FE -> API : PUT /api/admin/employees/{id}
+  API -> DB : SELECT employee WHERE id
+  API -> API : Validate + Check username/email exists
+  alt Hợp lệ
+    opt Có RoleId
+      API -> DB : SELECT Role WHERE RoleId
+      DB --> API : role exists
+    end
+    opt Có ảnh mới
+      API -> API : DeleteImage(oldAvatar)
+      API -> API : SaveImageAsync(newAvatarFile)
+    end
+    opt Xóa ảnh
+      API -> API : DeleteImage(avatar)
+    end
+    opt Có ProvinceCode
+      API -> ADDR_API : GET /provinces (lấy tên tỉnh)
+      ADDR_API --> API : provinceName
+    end
+    opt Có CommuneCode
+      API -> ADDR_API : GET /provinces/{code}/communes (lấy tên phường)
+      ADDR_API --> API : communeName
+    end
+    API -> API : BuildFullAddress + SerializeAddress
+    API -> DB : UPDATE Employees
+    API -> API : LogHistory("Sửa nhân viên")
+    API --> FE : 200 OK
+    FE --> OWNER : "Thành công"\nReload
+  else Không hợp lệ
+    API --> FE : 400 + errors
+    FE --> OWNER : "Vui lòng nhập lại"
+  end
+
+else Xóa nhân viên (Ẩn)
+  OWNER -> FE : Chọn Delete
+  FE -> API : DELETE /api/admin/employees/{id}
+  activate API
+  API -> DB : SELECT employee by id
+  API -> DB : UPDATE Employees SET Active=0
+  API -> API : LogHistory("Hide")
+  API --> FE : 200 OK
+  deactivate API
+end
+
+FE --> OWNER : Hiển thị danh sách
+
+@enduml
+

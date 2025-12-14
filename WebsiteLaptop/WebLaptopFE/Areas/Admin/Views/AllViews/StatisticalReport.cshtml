@@ -1,0 +1,1857 @@
+﻿@{
+    ViewData["Title"] = "Báo cáo thống kê";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-0">Thống Kê & Báo Cáo</h4>
+                    <p class="text-sm text-secondary mb-0">Tổng quan chi tiết về hoạt động kinh doanh của bạn</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-success btn-sm" onclick="exportOverviewToExcel()">
+                        <i class="material-icons text-sm">file_download</i> Xuất Excel Tổng Quan
+                    </button>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="exportOverviewToPdf()">
+                        <i class="material-icons text-sm">picture_as_pdf</i> Xuất PDF Tổng Quan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overview Statistics Cards - Hàng 1 -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body bg-gradient-primary border-radius-lg">
+                    <div class="d-flex align-items-center">
+                        <div class="icon icon-shape bg-white shadow text-center border-radius-md">
+                            <i class="material-icons text-primary text-lg opacity-10">attach_money</i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">TỔNG DOANH THU</p>
+                                <h5 class="font-weight-bolder mb-0 text-white" id="totalRevenue">0 VNĐ</h5>
+                                <p class="text-xs mb-0 text-white opacity-8">Đơn hoàn thành</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body bg-gradient-success border-radius-lg">
+                    <div class="d-flex align-items-center">
+                        <div class="icon icon-shape bg-white shadow text-center border-radius-md">
+                            <i class="material-icons text-success text-lg opacity-10">shopping_bag</i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">TỔNG ĐƠN HÀNG</p>
+                                <h5 class="font-weight-bolder mb-0 text-white" id="totalOrders">0</h5>
+                                <p class="text-xs mb-0 text-white opacity-8">Tất cả trạng thái</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body bg-gradient-warning border-radius-lg">
+                    <div class="d-flex align-items-center">
+                        <div class="icon icon-shape bg-white shadow text-center border-radius-md">
+                            <i class="material-icons text-warning text-lg opacity-10">list_alt</i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">GIÁ TRỊ TB/ĐƠN</p>
+                                <h5 class="font-weight-bolder mb-0 text-white" id="averageOrderValue">0 VNĐ</h5>
+                                <p class="text-xs mb-0 text-white opacity-8">Đơn hoàn thành</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body bg-gradient-info border-radius-lg">
+                    <div class="d-flex align-items-center">
+                        <div class="icon icon-shape bg-white shadow text-center border-radius-md">
+                            <i class="material-icons text-info text-lg opacity-10">inventory_2</i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">SP TB/ĐƠN HÀNG</p>
+                                <h5 class="font-weight-bolder mb-0 text-white" id="averageProductsPerOrder">0</h5>
+                                <p class="text-xs mb-0 text-white opacity-8">Đơn hoàn thành</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overview Statistics Cards - Hàng 2 -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body bg-gradient-dark border-radius-lg">
+                    <div class="d-flex align-items-center">
+                        <div class="icon icon-shape bg-white shadow text-center border-radius-md">
+                            <i class="material-icons text-dark text-lg opacity-10">input</i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">SL NHẬP HÀNG</p>
+                                <h5 class="font-weight-bolder mb-0 text-white" id="totalImportedQuantity">0</h5>
+                                <p class="text-xs mb-0 text-white opacity-8">Tổng số lượng</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body bg-gradient-secondary border-radius-lg">
+                    <div class="d-flex align-items-center">
+                        <div class="icon icon-shape bg-white shadow text-center border-radius-md">
+                            <i class="material-icons text-secondary text-lg opacity-10">inventory</i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">SL TỒN KHO</p>
+                                <h5 class="font-weight-bolder mb-0 text-white" id="totalStockQuantity">0</h5>
+                                <p class="text-xs mb-0 text-white opacity-8">Tất cả cấu hình</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body bg-gradient-danger border-radius-lg">
+                    <div class="d-flex align-items-center">
+                        <div class="icon icon-shape bg-white shadow text-center border-radius-md">
+                            <i class="material-icons text-danger text-lg opacity-10">trending_up</i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">PHIẾU NHẬP</p>
+                                <h5 class="font-weight-bolder mb-0 text-white" id="totalImportInvoices">0</h5>
+                                <p class="text-xs mb-0 text-white opacity-8">Tổng số phiếu</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body bg-gradient-light border-radius-lg">
+                    <div class="d-flex align-items-center">
+                        <div class="icon icon-shape bg-white shadow text-center border-radius-md">
+                            <i class="material-icons text-light text-lg opacity-10">output</i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-white text-uppercase font-weight-bold">PHIẾU XUẤT</p>
+                                <h5 class="font-weight-bolder mb-0 text-white" id="totalExportInvoices">0</h5>
+                                <p class="text-xs mb-0 text-white opacity-8">Tổng số phiếu</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bar Charts Row - 3 biểu đồ cột cạnh nhau -->
+    <div class="row mb-4">
+        <div class="col-lg-4 col-md-4 mb-4 mb-md-0">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header pb-0 pt-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Doanh Thu Theo Tháng - Năm <span id="currentYear">2025</span></h6>
+                        <div class="d-flex gap-2">
+                            <select class="form-select form-select-sm" id="yearSelect" style="width: auto;">
+                                <option value="2023">2023</option>
+                                <option value="2024">2024</option>
+                                <option value="2025" selected>2025</option>
+                            </select>
+                            <button type="button" class="btn btn-success btn-sm" onclick="exportRevenueByMonthToExcel()" title="Xuất Excel">
+                                <i class="material-icons text-sm">file_download</i>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="exportRevenueByMonthToPdf()" title="Xuất PDF">
+                                <i class="material-icons text-sm">picture_as_pdf</i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="revenueChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 col-md-4 mb-4 mb-md-0">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header pb-0 pt-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Top 5 Sản Phẩm Bán Chạy</h6>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-success btn-sm" onclick="exportTopProductsToExcel()" title="Xuất Excel">
+                                <i class="material-icons text-sm">file_download</i>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="exportTopProductsToPdf()" title="Xuất PDF">
+                                <i class="material-icons text-sm">picture_as_pdf</i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="topProductsChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 col-md-4">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header pb-0 pt-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Số Tiền Nhập Hàng Theo Tháng - Năm <span id="currentImportYear">2025</span></h6>
+                        <div class="d-flex gap-2">
+                            <select class="form-select form-select-sm" id="importYearSelect" style="width: auto;">
+                                <option value="2023">2023</option>
+                                <option value="2024">2024</option>
+                                <option value="2025" selected>2025</option>
+                            </select>
+                            <button type="button" class="btn btn-success btn-sm" onclick="exportImportAmountByMonthToExcel()" title="Xuất Excel">
+                                <i class="material-icons text-sm">file_download</i>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="exportImportAmountByMonthToPdf()" title="Xuất PDF">
+                                <i class="material-icons text-sm">picture_as_pdf</i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="importAmountChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pie Charts Row -->
+    <div class="row mb-4">
+        <div class="col-lg-4 col-md-4 mb-4 mb-md-0">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header pb-0 pt-3">
+                    <h6 class="mb-0">Thống Kê Trạng Thái Đơn Hàng</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="orderStatusChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 col-md-4 mb-4 mb-md-0">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header pb-0 pt-3">
+                    <h6 class="mb-0">Thống Kê Trạng Thái Xuất Hàng</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="exportStatusChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 col-md-4">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header pb-0 pt-3">
+                    <h6 class="mb-0">Thống Kê Bảo Hành & Sửa Chữa</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="warrantyChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Revenue by Brand Chart -->
+    <div class="row mb-4">
+        <div class="col-md-6 mb-4 mb-md-0">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header pb-0 pt-3">
+                    <h6 class="mb-0">Doanh Thu Theo Thương Hiệu</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="revenueByBrandChart" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header pb-0 pt-3">
+                    <h6 class="mb-0">Doanh Thu Theo Phương Thức Thanh Toán</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="paymentMethodChart" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import vs Export Chart and Sales by Employee Chart -->
+    <div class="row mb-4">
+        <div class="col-md-6 mb-4 mb-md-0">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header pb-0 pt-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">So Sánh Nhập và Xuất Hàng - Năm <span id="currentCompareYear">2025</span></h6>
+                        <div class="d-flex gap-2">
+                            <select class="form-select form-select-sm" id="compareYearSelect" style="width: auto;">
+                                <option value="2023">2023</option>
+                                <option value="2024">2024</option>
+                                <option value="2025" selected>2025</option>
+                            </select>
+                            <button type="button" class="btn btn-success btn-sm" onclick="exportImportVsExportToExcel()" title="Xuất Excel">
+                                <i class="material-icons text-sm">file_download</i>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="exportImportVsExportToPdf()" title="Xuất PDF">
+                                <i class="material-icons text-sm">picture_as_pdf</i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="importVsExportChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header pb-0 pt-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Doanh Số Theo Nhân Viên</h6>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-success btn-sm" onclick="exportSalesByEmployeeToExcel()" title="Xuất Excel">
+                                <i class="material-icons text-sm">file_download</i>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="exportSalesByEmployeeToPdf()" title="Xuất PDF">
+                                <i class="material-icons text-sm">picture_as_pdf</i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="salesByEmployeeChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Customers and Supplier Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-6 mb-4 mb-md-0">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header pb-0 pt-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Top 5 Khách Hàng</h6>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-success btn-sm" onclick="exportTopCustomersToExcel()" title="Xuất Excel">
+                                <i class="material-icons text-sm">file_download</i>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="exportTopCustomersToPdf()" title="Xuất PDF">
+                                <i class="material-icons text-sm">picture_as_pdf</i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body px-0 pt-0">
+                    <div class="table-responsive p-0">
+                        <table class="table align-items-center mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 10%;">#</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 40%;">Tên Khách Hàng</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 20%;">Số Đơn</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 30%;">Tổng Chi Tiêu</th>
+                                </tr>
+                            </thead>
+                            <tbody id="topCustomersTableBody">
+                                <tr>
+                                    <td colspan="4" class="text-center py-4">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header pb-0 pt-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Thống Kê Nhà Cung Cấp</h6>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-success btn-sm" onclick="exportSupplierStatisticsToExcel()" title="Xuất Excel">
+                                <i class="material-icons text-sm">file_download</i>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="exportSupplierStatisticsToPdf()" title="Xuất PDF">
+                                <i class="material-icons text-sm">picture_as_pdf</i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body px-0 pt-0">
+                    <div class="table-responsive p-0">
+                        <table class="table align-items-center mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 50%;">Nhà Cung Cấp</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 25%;">Số Lần Nhập</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 25%;">Tổng Giá Trị</th>
+                                </tr>
+                            </thead>
+                            <tbody id="supplierStatsTableBody">
+                                <tr>
+                                    <td colspan="3" class="text-center py-4">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Sales Details Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header pb-0 pt-3">
+                    <h6 class="mb-0">Chi Tiết Sản Phẩm Bán Chạy</h6>
+                </div>
+                <div class="card-body px-0 pt-0">
+                    <div class="table-responsive p-0">
+                        <table class="table align-items-center mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 5%;">#</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 30%;">TÊN SẢN PHẨM</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 15%;">DANH MỤC</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="width: 15%;">THƯƠNG HIỆU</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 12%;">GIÁ</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 10%;">ĐÃ BÁN</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 13%;">DOANH THU</th>
+                                </tr>
+                            </thead>
+                            <tbody id="productSalesTableBody">
+                                <tr>
+                                    <td colspan="7" class="text-center py-4">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <script>
+        // API Base URL - Thay đổi theo cấu hình của bạn
+        // Backend chạy ở http://localhost:5068 hoặc https://localhost:7027
+        const API_BASE_URL = 'http://localhost:5068/api/admin/statistical-report';
+        
+        // Hàm thử kết nối với nhiều URL nếu cần
+        async function tryFetch(url) {
+            let lastError = null;
+            
+            // Thử URL đầu tiên
+            try {
+                const response = await fetch(url);
+                if (response.ok) {
+                    return await response.json();
+                } else {
+                    lastError = new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    console.warn(`Response not OK from ${url}:`, lastError.message);
+                }
+            } catch (error) {
+                lastError = error;
+                console.warn(`Failed to fetch from ${url}:`, error.message);
+            }
+            
+            // Thử HTTPS nếu HTTP không hoạt động
+            if (url.startsWith('http://')) {
+                const httpsUrl = url.replace('http://', 'https://').replace(':5068', ':7027');
+                try {
+                    const response = await fetch(httpsUrl);
+                    if (response.ok) {
+                        return await response.json();
+                    } else {
+                        lastError = new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        console.warn(`Response not OK from ${httpsUrl}:`, lastError.message);
+                    }
+                } catch (e) {
+                    lastError = e;
+                    console.warn(`Failed to fetch from ${httpsUrl}:`, e.message);
+                }
+            }
+            
+            throw new Error('Không thể kết nối đến API server. Vui lòng kiểm tra backend đã chạy ở http://localhost:5068 hoặc https://localhost:7027 chưa.');
+        }
+        
+        // Charts instances
+        let revenueChart = null;
+        let topProductsChart = null;
+        let orderStatusChart = null;
+        let exportStatusChart = null;
+        let warrantyChart = null;
+        let importAmountChart = null;
+
+        // Format number with commas
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+
+        // Format currency
+        function formatCurrency(amount) {
+            return formatNumber(Math.round(amount)) + ' VNĐ';
+        }
+
+        // Get badge class based on rank
+        function getRankBadgeClass(rank) {
+            if (rank === 1) return 'badge bg-gradient-warning';
+            if (rank === 2) return 'badge bg-gradient-secondary';
+            if (rank === 3) return 'badge bg-gradient-danger';
+            return 'badge bg-gradient-dark';
+        }
+
+        // Load Overview Statistics
+        async function loadOverviewStatistics() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/overview`);
+                
+                document.getElementById('totalRevenue').textContent = formatCurrency(data.totalRevenue || 0);
+                document.getElementById('totalOrders').textContent = formatNumber(data.totalOrders || 0);
+                document.getElementById('averageOrderValue').textContent = formatCurrency(data.averageOrderValue || 0);
+                document.getElementById('averageProductsPerOrder').textContent = (data.averageProductsPerOrder || 0).toFixed(2);
+            } catch (error) {
+                console.error('Error loading overview statistics:', error);
+                document.getElementById('totalRevenue').textContent = 'Lỗi kết nối';
+                document.getElementById('totalOrders').textContent = 'Lỗi kết nối';
+                document.getElementById('averageOrderValue').textContent = 'Lỗi kết nối';
+                document.getElementById('averageProductsPerOrder').textContent = 'Lỗi kết nối';
+            }
+        }
+
+        // Load Import Statistics
+        async function loadImportStatistics() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/import-statistics`);
+                
+                document.getElementById('totalImportedQuantity').textContent = formatNumber(data.totalImportedQuantity || 0);
+                document.getElementById('totalImportInvoices').textContent = formatNumber(data.totalImportInvoices || 0);
+            } catch (error) {
+                console.error('Error loading import statistics:', error);
+                document.getElementById('totalImportedQuantity').textContent = 'Lỗi kết nối';
+                document.getElementById('totalImportInvoices').textContent = 'Lỗi kết nối';
+            }
+        }
+
+        // Load Stock Statistics
+        async function loadStockStatistics() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/stock-statistics`);
+                
+                document.getElementById('totalStockQuantity').textContent = formatNumber(data.totalStockQuantity || 0);
+            } catch (error) {
+                console.error('Error loading stock statistics:', error);
+                document.getElementById('totalStockQuantity').textContent = 'Lỗi kết nối';
+            }
+        }
+
+        // Load Export Statistics
+        async function loadExportStatistics() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/export-statistics`);
+                
+                document.getElementById('totalExportInvoices').textContent = formatNumber(data.totalExportInvoices || 0);
+            } catch (error) {
+                console.error('Error loading export statistics:', error);
+                document.getElementById('totalExportInvoices').textContent = 'Lỗi kết nối';
+            }
+        }
+
+        // Load Revenue by Month
+        async function loadRevenueByMonth(year = 2025) {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/revenue-by-month?year=${year}`);
+                
+                document.getElementById('currentYear').textContent = year;
+
+                const months = data.map(item => item.monthName);
+                const revenues = data.map(item => item.revenue);
+
+                if (revenueChart) {
+                    revenueChart.destroy();
+                }
+
+                const ctx = document.getElementById('revenueChart').getContext('2d');
+                revenueChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: months,
+                        datasets: [{
+                            label: 'Doanh thu (VNĐ)',
+                            data: revenues,
+                            backgroundColor: 'rgba(25, 118, 210, 0.8)',
+                            borderColor: 'rgba(25, 118, 210, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return 'Doanh thu: ' + formatCurrency(context.parsed.y);
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        if (value >= 1000000000) {
+                                            return (value / 1000000000).toFixed(1) + ' Tỷ';
+                                        } else if (value >= 1000000) {
+                                            return (value / 1000000).toFixed(1) + ' Tr';
+                                        }
+                                        return formatNumber(value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading revenue by month:', error);
+                // Hiển thị thông báo lỗi trên chart
+                const ctx = document.getElementById('revenueChart').getContext('2d');
+                if (revenueChart) {
+                    revenueChart.destroy();
+                }
+                // Tạo chart trống với thông báo lỗi
+                revenueChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'],
+                        datasets: [{
+                            label: 'Không có dữ liệu',
+                            data: []
+                        }]
+                    }
+                });
+            }
+        }
+
+        // Load Top Products
+        async function loadTopProducts() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/top-products?top=5`);
+
+                const productNames = data.map(item => item.productName || 'Chưa có tên');
+                const quantities = data.map(item => item.totalSold || 0);
+
+                if (topProductsChart) {
+                    topProductsChart.destroy();
+                }
+
+                const ctx = document.getElementById('topProductsChart').getContext('2d');
+                topProductsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: productNames,
+                        datasets: [{
+                            label: 'Số lượng',
+                            data: quantities,
+                            backgroundColor: [
+                                'rgba(25, 118, 210, 0.8)',
+                                'rgba(46, 125, 50, 0.8)',
+                                'rgba(237, 108, 2, 0.8)',
+                                'rgba(2, 136, 209, 0.8)',
+                                'rgba(63, 81, 181, 0.8)'
+                            ],
+                            borderColor: [
+                                'rgba(25, 118, 210, 1)',
+                                'rgba(46, 125, 50, 1)',
+                                'rgba(237, 108, 2, 1)',
+                                'rgba(2, 136, 209, 1)',
+                                'rgba(63, 81, 181, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        indexAxis: 'y',
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return 'Số lượng: ' + formatNumber(context.parsed.x);
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return formatNumber(value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading top products:', error);
+                const ctx = document.getElementById('topProductsChart').getContext('2d');
+                if (topProductsChart) {
+                    topProductsChart.destroy();
+                }
+                topProductsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Không có dữ liệu',
+                            data: []
+                        }]
+                    }
+                });
+            }
+        }
+
+        // Load Import Amount by Month
+        async function loadImportAmountByMonth(year = 2025) {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/import-amount-by-month?year=${year}`);
+                
+                document.getElementById('currentImportYear').textContent = year;
+
+                const months = data.map(item => item.monthName);
+                const amounts = data.map(item => item.amount);
+
+                if (importAmountChart) {
+                    importAmountChart.destroy();
+                }
+
+                const ctx = document.getElementById('importAmountChart').getContext('2d');
+                importAmountChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: months,
+                        datasets: [{
+                            label: 'Số tiền nhập hàng (VNĐ)',
+                            data: amounts,
+                            backgroundColor: 'rgba(255, 152, 0, 0.8)',
+                            borderColor: 'rgba(255, 152, 0, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return 'Số tiền nhập: ' + formatCurrency(context.parsed.y);
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        if (value >= 1000000000) {
+                                            return (value / 1000000000).toFixed(1) + ' Tỷ';
+                                        } else if (value >= 1000000) {
+                                            return (value / 1000000).toFixed(1) + ' Tr';
+                                        }
+                                        return formatNumber(value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading import amount by month:', error);
+                // Hiển thị thông báo lỗi trên chart
+                const ctx = document.getElementById('importAmountChart').getContext('2d');
+                if (importAmountChart) {
+                    importAmountChart.destroy();
+                }
+                // Tạo chart trống với thông báo lỗi
+                importAmountChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'],
+                        datasets: [{
+                            label: 'Không có dữ liệu',
+                            data: []
+                        }]
+                    }
+                });
+            }
+        }
+
+        // Load Product Sales Details
+        async function loadProductSalesDetails() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/product-sales-details?top=5`);
+
+                const tbody = document.getElementById('productSalesTableBody');
+                
+                if (data.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="text-center py-4 text-secondary">Không có dữ liệu</td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                tbody.innerHTML = data.map(item => {
+                    const badgeClass = getRankBadgeClass(item.rank);
+                    return `
+                        <tr>
+                            <td>
+                                <div class="text-center">
+                                    <span class="${badgeClass} text-white">${item.rank}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex px-2 py-1">
+                                    <div class="d-flex flex-column justify-content-center">
+                                        <h6 class="mb-0 text-sm">${item.productName || 'Chưa có tên'}</h6>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <p class="text-xs font-weight-bold mb-0">${item.category || 'Chưa phân loại'}</p>
+                            </td>
+                            <td>
+                                <p class="text-xs font-weight-bold mb-0">${item.brandName || 'Không xác định'}</p>
+                            </td>
+                            <td class="align-middle text-center text-sm">
+                                <span class="text-secondary text-xs font-weight-bold">${formatCurrency(item.price || 0)}</span>
+                            </td>
+                            <td class="align-middle text-center text-sm">
+                                <span class="text-secondary text-xs font-weight-bold">${formatNumber(item.totalSold || 0)}</span>
+                            </td>
+                            <td class="align-middle text-center text-sm">
+                                <span class="text-success text-xs font-weight-bold">${formatCurrency(item.totalRevenue || 0)}</span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error('Error loading product sales details:', error);
+                document.getElementById('productSalesTableBody').innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center py-4">
+                            <p class="text-danger mb-1">Không thể kết nối đến API server</p>
+                            <p class="text-xs text-secondary mb-0">Vui lòng đảm bảo backend đang chạy ở http://localhost:5068 hoặc https://localhost:7027</p>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Load Order Status Statistics (Pie Chart)
+        async function loadOrderStatusChart() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/orders-by-status`);
+
+                if (orderStatusChart) {
+                    orderStatusChart.destroy();
+                }
+
+                const ctx = document.getElementById('orderStatusChart').getContext('2d');
+                
+                const labels = data.map(item => item.status || 'Không xác định');
+                const counts = data.map(item => item.count || 0);
+                
+                // Hàm lấy màu theo trạng thái
+                function getStatusColor(status) {
+                    const statusColors = {
+                        'Chờ xử lý': 'rgba(255, 152, 0, 0.8)',      // Cam
+                        'Đang xử lý': 'rgba(33, 150, 243, 0.8)',    // Xanh biển
+                        'Chờ vận chuyển': 'rgba(199, 21, 133, 0.8)', // Xám
+                        'Đang vận chuyển': 'rgba(66, 66, 66, 0.8)', // Đen
+                        'Hoàn thành': 'rgba(76, 175, 80, 0.8)',     // Xanh lá
+                        'Đã hủy': 'rgba(244, 67, 54, 0.8)',         // Đỏ
+                    };
+                    return statusColors[status] || 'rgba(158, 158, 158, 0.8)'; // Xám mặc định
+                }
+                
+                // Tạo mảng màu sắc theo thứ tự labels
+                const colors = labels.map(label => getStatusColor(label));
+
+                orderStatusChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: counts,
+                            backgroundColor: colors,
+                            borderColor: colors.map(color => color.replace('0.8', '1')),
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    padding: 20,
+                                    usePointStyle: true
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                        return `${context.label}: ${context.parsed} đơn (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading order status chart:', error);
+                const ctx = document.getElementById('orderStatusChart').getContext('2d');
+                if (orderStatusChart) {
+                    orderStatusChart.destroy();
+                }
+                orderStatusChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Không có dữ liệu'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['rgba(200, 200, 200, 0.5)']
+                        }]
+                    }
+                });
+            }
+        }
+
+        // Load Export Status Statistics (Pie Chart)
+        async function loadExportStatusChart() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/exports-by-status`);
+
+                if (exportStatusChart) {
+                    exportStatusChart.destroy();
+                }
+
+                const ctx = document.getElementById('exportStatusChart').getContext('2d');
+                
+                const labels = data.map(item => item.status || 'Không xác định');
+                const counts = data.map(item => item.count || 0);
+                
+                // Hàm lấy màu theo trạng thái xuất hàng
+                function getExportStatusColor(status) {
+                    const statusColors = {
+                        'Chờ xử lý': 'rgba(255, 152, 0, 0.8)',      // Cam
+                        'chờ xử lý': 'rgba(255, 152, 0, 0.8)',      // Cam                      
+                        'Đang xử lý': 'rgba(33, 150, 243, 0.8)',    // Xanh biển
+                        'đang xử lý': 'rgba(33, 150, 243, 0.8)',    // Xanh biển
+                        'Hoàn thành': 'rgba(76, 175, 80, 0.8)',     // Xanh lá
+                        'hoàn thành': 'rgba(76, 175, 80, 0.8)',     // Xanh lá                     
+                        'Đã hủy': 'rgba(244, 67, 54, 0.8)',         // Đỏ
+                        'đã hủy': 'rgba(244, 67, 54, 0.8)',         // Đỏ
+                    };
+                    return statusColors[status] || 'rgba(158, 158, 158, 0.8)'; // Xám mặc định
+                }
+                
+                // Tạo mảng màu sắc theo thứ tự labels
+                const colors = labels.map(label => getExportStatusColor(label));
+
+                exportStatusChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: counts,
+                            backgroundColor: colors,
+                            borderColor: colors.map(color => color.replace('0.8', '1')),
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    padding: 20,
+                                    usePointStyle: true
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                        return `${context.label}: ${context.parsed} phiếu (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading export status chart:', error);
+                const ctx = document.getElementById('exportStatusChart').getContext('2d');
+                if (exportStatusChart) {
+                    exportStatusChart.destroy();
+                }
+                exportStatusChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Không có dữ liệu'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['rgba(200, 200, 200, 0.5)']
+                        }]
+                    }
+                });
+            }
+        }
+
+        // Load Warranty Statistics (Pie Chart)
+        async function loadWarrantyChart() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/warranty-statistics`);
+
+                if (warrantyChart) {
+                    warrantyChart.destroy();
+                }
+
+                const ctx = document.getElementById('warrantyChart').getContext('2d');
+                
+                const labels = data.warrantyByType.map(item => item.type || 'Không xác định');
+                const counts = data.warrantyByType.map(item => item.count || 0);
+                
+                // Màu sắc cho bảo hành
+                const colors = [
+                    'rgba(76, 175, 80, 0.8)',    // Xanh lá - Bảo hành
+                    'rgba(255, 152, 0, 0.8)',    // Cam - Sửa chữa
+                    'rgba(63, 81, 181, 0.8)',    // Xanh tím
+                    'rgba(233, 30, 99, 0.8)',    // Hồng
+                    'rgba(96, 125, 139, 0.8)'    // Xanh xám
+                ];
+
+                warrantyChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: counts,
+                            backgroundColor: colors.slice(0, labels.length),
+                            borderColor: colors.slice(0, labels.length).map(color => color.replace('0.8', '1')),
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    padding: 20,
+                                    usePointStyle: true
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                        const item = data.warrantyByType[context.dataIndex];
+                                        return [
+                                            `${context.label}: ${context.parsed} yêu cầu (${percentage}%)`,
+                                            `Chi phí: ${formatCurrency(item.totalAmount || 0)}`
+                                        ];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading warranty chart:', error);
+                const ctx = document.getElementById('warrantyChart').getContext('2d');
+                if (warrantyChart) {
+                    warrantyChart.destroy();
+                }
+                warrantyChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Không có dữ liệu'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['rgba(200, 200, 200, 0.5)']
+                        }]
+                    }
+                });
+            }
+        }
+
+        // Year select change handler
+        document.getElementById('yearSelect').addEventListener('change', function() {
+            loadRevenueByMonth(parseInt(this.value));
+        });
+
+        // Import year select change handler
+        document.getElementById('importYearSelect').addEventListener('change', function() {
+            loadImportAmountByMonth(parseInt(this.value));
+        });
+
+        // Compare year select change handler
+        document.getElementById('compareYearSelect').addEventListener('change', function() {
+            loadImportVsExport(parseInt(this.value));
+        });
+
+        // Load Revenue by Brand Chart
+        async function loadRevenueByBrandChart() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/revenue-by-brand`);
+
+                if (revenueByBrandChart && typeof revenueByBrandChart.destroy === 'function') {
+                    revenueByBrandChart.destroy();
+                }
+
+                const ctx = document.getElementById('revenueByBrandChart').getContext('2d');
+                
+                if (!data || data.length === 0) {
+                    revenueByBrandChart = new Chart(ctx, {
+                        type: 'pie',
+                        data: {
+                            labels: ['Không có dữ liệu'],
+                            datasets: [{
+                                data: [1],
+                                backgroundColor: ['rgba(200, 200, 200, 0.5)']
+                            }]
+                        }
+                    });
+                    return;
+                }
+                
+                const labels = data.map(item => item.brandName || 'Không xác định');
+                const revenues = data.map(item => item.totalRevenue || 0);
+                
+                // Màu sắc cho các thương hiệu
+                const colors = [
+                    'rgba(25, 118, 210, 0.8)',   // Xanh dương
+                    'rgba(46, 125, 50, 0.8)',   // Xanh lá
+                    'rgba(237, 108, 2, 0.8)',    // Cam
+                    'rgba(2, 136, 209, 0.8)',   // Xanh biển
+                    'rgba(63, 81, 181, 0.8)',   // Xanh tím
+                    'rgba(233, 30, 99, 0.8)',   // Hồng
+                    'rgba(96, 125, 139, 0.8)',  // Xanh xám
+                    'rgba(255, 152, 0, 0.8)'    // Vàng cam
+                ];
+
+                revenueByBrandChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: revenues,
+                            backgroundColor: colors.slice(0, labels.length),
+                            borderColor: colors.slice(0, labels.length).map(color => color.replace('0.8', '1')),
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    padding: 15,
+                                    usePointStyle: true
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
+                                        return `${context.label}: ${formatCurrency(context.parsed)} (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading revenue by brand chart:', error);
+                const ctx = document.getElementById('revenueByBrandChart').getContext('2d');
+                if (revenueByBrandChart && typeof revenueByBrandChart.destroy === 'function') {
+                    revenueByBrandChart.destroy();
+                }
+                revenueByBrandChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Lỗi tải dữ liệu'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['rgba(200, 200, 200, 0.5)']
+                        }]
+                    }
+                });
+            }
+        }
+
+        // Load Payment Method Chart
+        async function loadPaymentMethodChart() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/revenue-by-payment-method`);
+
+                if (paymentMethodChart && typeof paymentMethodChart.destroy === 'function') {
+                    paymentMethodChart.destroy();
+                }
+
+                const ctx = document.getElementById('paymentMethodChart').getContext('2d');
+                
+                if (!data || data.length === 0) {
+                    paymentMethodChart = new Chart(ctx, {
+                        type: 'pie',
+                        data: {
+                            labels: ['Không có dữ liệu'],
+                            datasets: [{
+                                data: [1],
+                                backgroundColor: ['rgba(200, 200, 200, 0.5)']
+                            }]
+                        }
+                    });
+                    return;
+                }
+                
+                const labels = data.map(item => item.paymentMethod || 'Không xác định');
+                const revenues = data.map(item => item.totalRevenue || 0);
+                
+                const colors = [
+                    'rgba(76, 175, 80, 0.8)',    // Xanh lá
+                    'rgba(33, 150, 243, 0.8)',   // Xanh biển
+                    'rgba(255, 152, 0, 0.8)',    // Cam
+                    'rgba(233, 30, 99, 0.8)',    // Hồng
+                    'rgba(63, 81, 181, 0.8)'    // Xanh tím
+                ];
+
+                paymentMethodChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: revenues,
+                            backgroundColor: colors.slice(0, labels.length),
+                            borderColor: colors.slice(0, labels.length).map(color => color.replace('0.8', '1')),
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    padding: 15,
+                                    usePointStyle: true
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
+                                        return `${context.label}: ${formatCurrency(context.parsed)} (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading payment method chart:', error);
+                const ctx = document.getElementById('paymentMethodChart').getContext('2d');
+                if (paymentMethodChart && typeof paymentMethodChart.destroy === 'function') {
+                    paymentMethodChart.destroy();
+                }
+                paymentMethodChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Lỗi tải dữ liệu'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['rgba(200, 200, 200, 0.5)']
+                        }]
+                    }
+                });
+            }
+        }
+
+        // Load Import vs Export Chart
+        async function loadImportVsExport(year = 2025) {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/import-vs-export?year=${year}`);
+                
+                document.getElementById('currentCompareYear').textContent = year;
+
+                if (!data || data.length === 0) {
+                    if (importVsExportChart && typeof importVsExportChart.destroy === 'function') {
+                        importVsExportChart.destroy();
+                    }
+                    const ctx = document.getElementById('importVsExportChart').getContext('2d');
+                    importVsExportChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'],
+                            datasets: [
+                                {
+                                    label: 'Nhập hàng',
+                                    data: [],
+                                    borderColor: 'rgba(200, 200, 200, 0.5)'
+                                },
+                                {
+                                    label: 'Xuất hàng',
+                                    data: [],
+                                    borderColor: 'rgba(200, 200, 200, 0.5)'
+                                }
+                            ]
+                        }
+                    });
+                    return;
+                }
+
+                const months = data.map(item => item.monthName);
+                const importAmounts = data.map(item => item.importAmount || 0);
+                const exportAmounts = data.map(item => item.exportAmount || 0);
+
+                if (importVsExportChart && typeof importVsExportChart.destroy === 'function') {
+                    importVsExportChart.destroy();
+                }
+
+                const ctx = document.getElementById('importVsExportChart').getContext('2d');
+                importVsExportChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: months,
+                        datasets: [
+                            {
+                                label: 'Nhập hàng',
+                                data: importAmounts,
+                                borderColor: 'rgba(255, 152, 0, 1)',
+                                backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4
+                            },
+                            {
+                                label: 'Xuất hàng',
+                                data: exportAmounts,
+                                borderColor: 'rgba(25, 118, 210, 1)',
+                                backgroundColor: 'rgba(25, 118, 210, 0.1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: ${formatCurrency(context.parsed.y)}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        if (value >= 1000000000) {
+                                            return (value / 1000000000).toFixed(1) + ' Tỷ';
+                                        } else if (value >= 1000000) {
+                                            return (value / 1000000).toFixed(1) + ' Tr';
+                                        }
+                                        return formatNumber(value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading import vs export chart:', error);
+                const ctx = document.getElementById('importVsExportChart').getContext('2d');
+                if (importVsExportChart && typeof importVsExportChart.destroy === 'function') {
+                    importVsExportChart.destroy();
+                }
+                importVsExportChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Lỗi tải dữ liệu'],
+                        datasets: [{
+                            label: 'Lỗi',
+                            data: [0],
+                            borderColor: 'rgba(200, 200, 200, 0.5)'
+                        }]
+                    }
+                });
+            }
+        }
+
+        // Load Sales by Employee Chart
+        async function loadSalesByEmployeeChart() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/sales-by-employee`);
+
+                if (salesByEmployeeChart && typeof salesByEmployeeChart.destroy === 'function') {
+                    salesByEmployeeChart.destroy();
+                }
+
+                const ctx = document.getElementById('salesByEmployeeChart').getContext('2d');
+                
+                if (!data || data.length === 0) {
+                    salesByEmployeeChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['Không có dữ liệu'],
+                            datasets: [{
+                                label: 'Doanh số (VNĐ)',
+                                data: [0],
+                                backgroundColor: 'rgba(200, 200, 200, 0.5)'
+                            }]
+                        }
+                    });
+                    return;
+                }
+                
+                const labels = data.map(item => item.employeeName || 'Không xác định');
+                const revenues = data.map(item => item.totalRevenue || 0);
+
+                salesByEmployeeChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Doanh số (VNĐ)',
+                            data: revenues,
+                            backgroundColor: 'rgba(46, 125, 50, 0.8)',
+                            borderColor: 'rgba(46, 125, 50, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        indexAxis: 'y',
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return 'Doanh số: ' + formatCurrency(context.parsed.x);
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        if (value >= 1000000000) {
+                                            return (value / 1000000000).toFixed(1) + ' Tỷ';
+                                        } else if (value >= 1000000) {
+                                            return (value / 1000000).toFixed(1) + ' Tr';
+                                        }
+                                        return formatNumber(value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading sales by employee chart:', error);
+                const ctx = document.getElementById('salesByEmployeeChart').getContext('2d');
+                if (salesByEmployeeChart && typeof salesByEmployeeChart.destroy === 'function') {
+                    salesByEmployeeChart.destroy();
+                }
+                salesByEmployeeChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Lỗi tải dữ liệu'],
+                        datasets: [{
+                            label: 'Doanh số (VNĐ)',
+                            data: [0],
+                            backgroundColor: 'rgba(200, 200, 200, 0.5)'
+                        }]
+                    }
+                });
+            }
+        }
+
+        // Load Top Customers
+        async function loadTopCustomers() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/top-customers?top=5`);
+
+                const tbody = document.getElementById('topCustomersTableBody');
+                
+                if (data.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="text-center py-4 text-secondary">Không có dữ liệu</td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                tbody.innerHTML = data.map((item, index) => {
+                    const rank = index + 1;
+                    const badgeClass = rank <= 3 ? `badge bg-gradient-${rank === 1 ? 'warning' : rank === 2 ? 'secondary' : 'danger'}` : 'badge bg-gradient-dark';
+                    return `
+                        <tr>
+                            <td>
+                                <div class="text-center">
+                                    <span class="${badgeClass} text-white">${rank}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex px-2 py-1">
+                                    <div class="d-flex flex-column justify-content-center">
+                                        <h6 class="mb-0 text-sm">${item.customerName || 'Không xác định'}</h6>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="align-middle text-center text-sm">
+                                <span class="text-secondary text-xs font-weight-bold">${formatNumber(item.totalOrders || 0)}</span>
+                            </td>
+                            <td class="align-middle text-center text-sm">
+                                <span class="text-success text-xs font-weight-bold">${formatCurrency(item.totalSpent || 0)}</span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading top customers:', error);
+                document.getElementById('topCustomersTableBody').innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center py-4">
+                            <p class="text-danger mb-0">Không thể tải dữ liệu</p>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Load Supplier Statistics
+        async function loadSupplierStatistics() {
+            try {
+                const data = await tryFetch(`${API_BASE_URL}/supplier-statistics`);
+
+                const tbody = document.getElementById('supplierStatsTableBody');
+                
+                if (data.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="3" class="text-center py-4 text-secondary">Không có dữ liệu</td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                tbody.innerHTML = data.map(item => {
+                    return `
+                        <tr>
+                            <td>
+                                <div class="d-flex px-2 py-1">
+                                    <div class="d-flex flex-column justify-content-center">
+                                        <h6 class="mb-0 text-sm">${item.supplierName || 'Không xác định'}</h6>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="align-middle text-center text-sm">
+                                <span class="text-secondary text-xs font-weight-bold">${formatNumber(item.totalImports || 0)}</span>
+                            </td>
+                            <td class="align-middle text-center text-sm">
+                                <span class="text-success text-xs font-weight-bold">${formatCurrency(item.totalAmount || 0)}</span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading supplier statistics:', error);
+                document.getElementById('supplierStatsTableBody').innerHTML = `
+                    <tr>
+                        <td colspan="3" class="text-center py-4">
+                            <p class="text-danger mb-0">Không thể tải dữ liệu</p>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Export functions
+        function exportOverviewToExcel() {
+            window.open(`${API_BASE_URL}/overview/export-excel`, '_blank');
+        }
+
+        function exportOverviewToPdf() {
+            window.open(`${API_BASE_URL}/overview/export-pdf`, '_blank');
+        }
+
+        function exportRevenueByMonthToExcel() {
+            const year = document.getElementById('yearSelect').value;
+            window.open(`${API_BASE_URL}/revenue-by-month/export-excel?year=${year}`, '_blank');
+        }
+
+        function exportRevenueByMonthToPdf() {
+            const year = document.getElementById('yearSelect').value;
+            window.open(`${API_BASE_URL}/revenue-by-month/export-pdf?year=${year}`, '_blank');
+        }
+
+        function exportTopProductsToExcel() {
+            window.open(`${API_BASE_URL}/top-products/export-excel?top=5`, '_blank');
+        }
+
+        function exportTopProductsToPdf() {
+            window.open(`${API_BASE_URL}/top-products/export-pdf?top=5`, '_blank');
+        }
+
+        function exportTopCustomersToExcel() {
+            window.open(`${API_BASE_URL}/top-customers/export-excel?top=5`, '_blank');
+        }
+
+        function exportTopCustomersToPdf() {
+            window.open(`${API_BASE_URL}/top-customers/export-pdf?top=5`, '_blank');
+        }
+
+        function exportSalesByEmployeeToExcel() {
+            window.open(`${API_BASE_URL}/sales-by-employee/export-excel`, '_blank');
+        }
+
+        function exportSalesByEmployeeToPdf() {
+            window.open(`${API_BASE_URL}/sales-by-employee/export-pdf`, '_blank');
+        }
+
+        function exportImportAmountByMonthToExcel() {
+            const year = document.getElementById('importYearSelect').value;
+            window.open(`${API_BASE_URL}/import-amount-by-month/export-excel?year=${year}`, '_blank');
+        }
+
+        function exportImportAmountByMonthToPdf() {
+            const year = document.getElementById('importYearSelect').value;
+            window.open(`${API_BASE_URL}/import-amount-by-month/export-pdf?year=${year}`, '_blank');
+        }
+
+        function exportImportVsExportToExcel() {
+            const year = document.getElementById('compareYearSelect').value;
+            window.open(`${API_BASE_URL}/import-vs-export/export-excel?year=${year}`, '_blank');
+        }
+
+        function exportImportVsExportToPdf() {
+            const year = document.getElementById('compareYearSelect').value;
+            window.open(`${API_BASE_URL}/import-vs-export/export-pdf?year=${year}`, '_blank');
+        }
+
+        function exportSupplierStatisticsToExcel() {
+            window.open(`${API_BASE_URL}/supplier-statistics/export-excel`, '_blank');
+        }
+
+        function exportSupplierStatisticsToPdf() {
+            window.open(`${API_BASE_URL}/supplier-statistics/export-pdf`, '_blank');
+        }
+
+        // Initialize all data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadOverviewStatistics();
+            loadImportStatistics();
+            loadStockStatistics();
+            loadExportStatistics();
+            loadRevenueByMonth(2025);
+            loadImportAmountByMonth(2025);
+            loadImportVsExport(2025);
+            loadTopProducts();
+            loadProductSalesDetails();
+            loadOrderStatusChart();
+            loadExportStatusChart();
+            loadWarrantyChart();
+            loadRevenueByBrandChart();
+            loadPaymentMethodChart();
+            loadSalesByEmployeeChart();
+            loadTopCustomers();
+            loadSupplierStatistics();
+        });
+    </script>
+
+    <style>
+        .icon {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .numbers h5 {
+            font-size: 1.5rem;
+            word-break: break-word;
+            line-height: 1.2;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card {
+            border-radius: 1rem;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-body {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            min-height: 120px;
+            padding: 1.5rem !important;
+        }
+
+        .card-header {
+            background-color: transparent;
+            border-bottom: 1px solid rgba(0,0,0,.125);
+        }
+
+        /* Đảm bảo tất cả các card trong row có cùng chiều cao */
+        .row.mb-4 > div[class*="col-"] {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .row.mb-4 > div[class*="col-"] > .card {
+            height: 100%;
+        }
+
+        .table thead th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .table tbody tr {
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+
+        /* Đảm bảo text trong card không làm card bị giãn */
+        .numbers {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .numbers p {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    </style>
+}
