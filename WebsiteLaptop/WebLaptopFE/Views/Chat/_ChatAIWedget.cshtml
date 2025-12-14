@@ -836,6 +836,7 @@
                             
                             products.push({
                                 name: name,
+                                productModel: '', // Model đã được ghép vào name
                                 price: price,
                                 detailUrl: link,
                                 imageUrl: image
@@ -1194,16 +1195,17 @@
         
         displayProducts.forEach((product, index) => {
             const productId = product.productId || product.ProductId;
-            const productName = product.name || product.Name || product.productName || product.ProductName;
+            // Backend đã ghép ProductName và ProductModel vào Name rồi, chỉ cần dùng Name
+            const displayName = product.name || product.Name || product.productName || product.ProductName || '';
             const price = product.price || product.Price || product.sellingPrice || product.SellingPrice;
             const imageUrl = product.imageUrl || product.ImageUrl;
             const detailUrl = product.detailUrl || product.DetailUrl || `/Home/ProductDetail?id=${productId}`;
             
             html += `
                 <div class="product-item">
-                    ${imageUrl ? `<img src="${imageUrl}" alt="${productName}" class="product-image" onerror="this.src='/imageProducts/default.jpg'">` : ''}
+                    ${imageUrl ? `<img src="${imageUrl}" alt="${displayName}" class="product-image" onerror="this.src='/imageProducts/default.jpg'">` : ''}
                     <div class="product-info">
-                        <div class="product-name">${productName}</div>
+                        <div class="product-name">${displayName}</div>
                         <div class="product-price">${formatPrice(price)}</div>
                         <a href="${detailUrl}" class="product-detail-btn" target="_blank">
                             Xem chi tiết →

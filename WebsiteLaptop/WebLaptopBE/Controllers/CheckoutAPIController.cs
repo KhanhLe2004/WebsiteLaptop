@@ -621,14 +621,6 @@ namespace WebLaptopBE.Controllers
         {
             try
             {
-                // Log VNPay callback parameters for debugging
-                System.Diagnostics.Debug.WriteLine("=== VNPay Callback ===");
-                foreach (var param in Request.Query)
-                {
-                    System.Diagnostics.Debug.WriteLine($"{param.Key}: {param.Value}");
-                }
-                System.Diagnostics.Debug.WriteLine("=====================");
-
                 var response = _vnPayService.PaymentExecute(Request.Query);
                 
                 if (response.Success && response.VnPayResponseCode == "00")
@@ -656,7 +648,6 @@ namespace WebLaptopBE.Controllers
                         }
                         catch (Exception ex)
                         {
-                            System.Diagnostics.Debug.WriteLine($"Error deserializing pending order: {ex.Message}");
                             pendingOrderJson = null;
                         }
                     }
@@ -711,7 +702,6 @@ namespace WebLaptopBE.Controllers
                                         }
                                         catch (Exception emailEx)
                                         {
-                                            System.Diagnostics.Debug.WriteLine($"Email sending failed: {emailEx.Message}");
                                             // Không chặn luồng chính nếu email thất bại
                                         }
 
@@ -721,7 +711,6 @@ namespace WebLaptopBE.Controllers
                                     else
                                     {
                                         // Tạo đơn hàng thất bại - chuyển về trang lỗi
-                                        System.Diagnostics.Debug.WriteLine($"Order creation failed: {orderResult.ErrorMessage}");
                                         return Redirect($"{GetFrontendUrl()}/Cart/Checkout?error=order-creation-failed&message={Uri.EscapeDataString(orderResult.ErrorMessage)}");
                                     }
                                 }
@@ -729,7 +718,6 @@ namespace WebLaptopBE.Controllers
                         }
                         catch (Exception ex)
                         {
-                            System.Diagnostics.Debug.WriteLine($"Error processing VNPay callback: {ex.Message}");
                         }
                     }
                     
@@ -746,13 +734,6 @@ namespace WebLaptopBE.Controllers
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"VNPay callback error: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
-                if (ex.InnerException != null)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Inner exception: {ex.InnerException.Message}");
-                }
-                
                 var errorMessage = Uri.EscapeDataString($"Lỗi xử lý callback: {ex.Message}");
                 return Redirect($"{GetFrontendUrl()}/Cart/Checkout?error=payment-error&message={errorMessage}");
             }

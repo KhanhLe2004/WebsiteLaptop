@@ -1,8 +1,6 @@
 ﻿using System.Globalization;
-using System.Net.Sockets;
 using System.Net;
 using System.Security.Cryptography;
-using System.Security.Policy;
 using System.Text;
 
 namespace WebLaptopBE.Models.VnPay
@@ -50,10 +48,14 @@ namespace WebLaptopBE.Models.VnPay
             var querystring = data.ToString();
             
             // Tạo chuỗi để ký (loại bỏ ký tự '&' cuối cùng)
-            var signData = querystring;
-            if (signData.Length > 0)
+            string signData;
+            if (querystring.Length > 0 && querystring.EndsWith("&"))
             {
-                signData = signData.Remove(signData.Length - 1, 1);
+                signData = querystring.Substring(0, querystring.Length - 1);
+            }
+            else
+            {
+                signData = querystring;
             }
 
             // Tạo chữ ký HMAC SHA512
@@ -61,11 +63,6 @@ namespace WebLaptopBE.Models.VnPay
             
             // Tạo URL cuối cùng
             var finalUrl = baseUrl + "?" + querystring + "vnp_SecureHash=" + vnpSecureHash;
-
-            // Log để debug (chỉ trong development)
-            #if DEBUG
-            VnPayLogger.LogPaymentRequest(_requestData, signData, vnpSecureHash, finalUrl);
-            #endif
 
             return finalUrl;
         }
@@ -77,15 +74,6 @@ namespace WebLaptopBE.Models.VnPay
             var rspRaw = GetResponseData();
             var myChecksum = Utils.HmacSHA512(secretKey, rspRaw);
             var isValid = myChecksum.Equals(inputHash, StringComparison.InvariantCultureIgnoreCase);
-
-            // Log để debug (chỉ trong development)
-            #if DEBUG
-            VnPayLogger.LogPaymentResponse(_responseData, rspRaw, inputHash, myChecksum, isValid);
-            if (!isValid)
-            {
-                VnPayLogger.CompareSignatures(inputHash, myChecksum, "Received", "Calculated");
-            }
-            #endif
 
             return isValid;
         }
@@ -124,7 +112,7 @@ namespace WebLaptopBE.Models.VnPay
             // Loại bỏ ký tự '&' cuối cùng
             if (data.Length > 0)
             {
-                data.Remove(data.Length - 1, 1);
+                data.Length--;
             }
 
             return data.ToString();
@@ -150,89 +138,6 @@ namespace WebLaptopBE.Models.VnPay
             }
 
             return hash.ToString();
-        }
-
-
-        // Cải thiện để đảm bảo IPv4 theo chuẩn VNPay
-        public static string GetIpAddress(HttpContext context)
-        {
-            try
-            {
-                // Kiểm tra header X-Forwarded-For trước (cho trường hợp có proxy/load balancer)
-                var forwardedFor = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-                if (!string.IsNullOrEmpty(forwardedFor))
-                {
-                    var firstIp = forwardedFor.Split(',')[0].Trim();
-                    if (IsValidIPv4(firstIp))
-                    {
-                        return firstIp;
-                    }
-                }
-
-                // Kiểm tra X-Real-IP header
-                var realIp = context.Request.Headers["X-Real-IP"].FirstOrDefault();
-                if (!string.IsNullOrEmpty(realIp) && IsValidIPv4(realIp))
-                {
-                    return realIp;
-                }
-
-                // Lấy từ RemoteIpAddress
-                var remoteIpAddress = context.Connection.RemoteIpAddress;
-                if (remoteIpAddress != null)
-                {
-                    // Nếu là IPv6, cố gắng chuyển đổi sang IPv4
-                    if (remoteIpAddress.AddressFamily == AddressFamily.InterNetworkV6)
-                    {
-                        // Nếu là IPv6 mapped IPv4 (::ffff:192.168.1.1)
-                        if (remoteIpAddress.IsIPv4MappedToIPv6)
-                        {
-                            return remoteIpAddress.MapToIPv4().ToString();
-                        }
-
-                        // Cố gắng resolve sang IPv4
-                        try
-                        {
-                            var hostEntry = Dns.GetHostEntry(remoteIpAddress);
-                            var ipv4Address = hostEntry.AddressList
-                                .FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
-                            
-                            if (ipv4Address != null)
-                            {
-                                return ipv4Address.ToString();
-                            }
-                        }
-                        catch
-                        {
-                            // Ignore DNS resolution errors
-                        }
-                    }
-                    else if (remoteIpAddress.AddressFamily == AddressFamily.InterNetwork)
-                    {
-                        var ipString = remoteIpAddress.ToString();
-                        if (IsValidIPv4(ipString))
-                        {
-                            return ipString;
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error getting IP address: {ex.Message}");
-            }
-
-            // Fallback to localhost IPv4
-            return "127.0.0.1";
-        }
-
-        // Helper method để validate IPv4
-        private static bool IsValidIPv4(string ipString)
-        {
-            if (string.IsNullOrWhiteSpace(ipString))
-                return false;
-
-            return IPAddress.TryParse(ipString, out IPAddress address) && 
-                   address.AddressFamily == AddressFamily.InterNetwork;
         }
     }
 

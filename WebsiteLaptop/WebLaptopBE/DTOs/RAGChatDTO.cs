@@ -65,6 +65,7 @@ public class ProductSuggestion
 {
     public string ProductId { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    public string? ProductModel { get; set; }
     public decimal Price { get; set; }
     public string? ImageUrl { get; set; }
     public string? DetailUrl { get; set; }

@@ -360,22 +360,16 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     }
                     catch (JsonException jsonEx)
                     {
-                        Console.WriteLine($"Error parsing configurations JSON: {jsonEx.Message}");
-                        Console.WriteLine($"ConfigurationsJson: {dto.ConfigurationsJson}");
                         // Không throw để không fail toàn bộ request
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error saving configurations: {ex.Message}");
-                        Console.WriteLine($"ConfigurationsJson: {dto.ConfigurationsJson}");
-                        Console.WriteLine($"Stack trace: {ex.StackTrace}");
                         // Không throw để không fail toàn bộ request
                     }
                 }
                 else
                 {
-                    // Log để debug nếu ConfigurationsJson không được gửi
-                    Console.WriteLine("CreateProduct: ConfigurationsJson is null or empty");
+                    // ConfigurationsJson không được gửi
                 }
 
                 // Xử lý Product Images
@@ -405,7 +399,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                                 }
                                 catch (Exception ex)
                                 {
-                                    Console.WriteLine($"Error processing image file {imageFile.FileName}: {ex.Message}");
                                     // Tiếp tục xử lý các file khác
                                 }
                             }
@@ -418,7 +411,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error saving product images: {ex.Message}");
                     // Không throw để không fail toàn bộ request
                 }
 
@@ -436,7 +428,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error creating product: {ex.Message}");
                 return StatusCode(500, new { message = "Lỗi khi tạo sản phẩm", error = ex.Message });
             }
         }
@@ -528,7 +519,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error deleting configurations: {ex.Message}");
                     }
                 }
 
@@ -624,7 +614,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error processing configurations: {ex.Message}");
                         // Không throw để không fail toàn bộ request
                     }
                 }
@@ -652,7 +641,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error deleting images: {ex.Message}");
                     }
                 }
 
@@ -681,12 +669,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"Error processing image file {imageFile.FileName}: {ex.Message}");
-                                Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                                if (ex.InnerException != null)
-                                {
-                                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
-                                }
                                 // Tiếp tục xử lý các file khác
                             }
                         }
@@ -740,7 +722,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error hiding product: {ex.Message}");
                 return StatusCode(500, new { message = "Lỗi khi ẩn sản phẩm", error = ex.Message });
             }
         }
@@ -773,7 +754,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error restoring product: {ex.Message}");
                 return StatusCode(500, new { message = "Lỗi khi khôi phục sản phẩm", error = ex.Message });
             }
         }

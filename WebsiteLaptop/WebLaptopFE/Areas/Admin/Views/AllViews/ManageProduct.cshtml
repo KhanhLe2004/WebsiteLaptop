@@ -369,7 +369,6 @@
                     initializeBrandFilterAutocomplete();
                 },
                 error: function(xhr) {
-                    console.error('Lỗi khi tải thương hiệu:', xhr);
                 }
             });
         }
@@ -719,7 +718,6 @@
                     updatePageInfo(response);
                 },
                 error: function(xhr) {
-                    console.error('Lỗi khi tải sản phẩm:', xhr);
                     showNotification('Lỗi khi tải dữ liệu sản phẩm', 'error');
                 }
             });
@@ -945,7 +943,6 @@
                     }
                 },
                 error: function(xhr) {
-                    console.error('Error getting next product ID:', xhr);
                     // Nếu API lỗi, vẫn có thể tự nhập (remove readonly)
                     $('#productId').prop('readonly', false);
                 }
@@ -1182,7 +1179,6 @@
                     modal.show();
                 },
                 error: function(xhr) {
-                    console.error('Error loading product:', xhr);
                     showNotification('Lỗi khi tải thông tin sản phẩm', 'error');
                 }
             });
@@ -1237,7 +1233,6 @@
                     modal.show();
                 },
                 error: function(xhr) {
-                    console.error('Error loading product:', xhr);
                     showNotification('Lỗi khi tải thông tin sản phẩm', 'error');
                 }
             });
@@ -1473,7 +1468,6 @@
                     if (configsToSend.length > 0) {
                         const configsJson = JSON.stringify(configsToSend);
                         formData.append('ConfigurationsJson', configsJson);
-                        console.log('Create - ConfigurationsJson:', configsJson);
                     }
                 }
             }
@@ -1484,12 +1478,10 @@
                     if (imageObj && imageObj.file) {
                         // Validate file type
                         if (!imageObj.file.type || !imageObj.file.type.startsWith('image/')) {
-                            console.warn('Skipping invalid file type:', imageObj.file.name, imageObj.file.type);
                             return;
                         }
                         // Validate file size (max 10MB để khớp với backend)
                         if (imageObj.file.size > 10 * 1024 * 1024) {
-                            console.warn('Skipping file too large:', imageObj.file.name, 'Size:', imageObj.file.size);
                             return;
                         }
                         formData.append('ImageFiles', imageObj.file, imageObj.file.name);

@@ -130,13 +130,6 @@ builder.Services.AddScoped<IntentDetectionPlugin>();
 // 9. Input Validation Service - Validate input từ người dùng
 builder.Services.AddScoped<WebLaptopBE.AI.Services.IInputValidationService, WebLaptopBE.AI.Services.InputValidationService>();
 
-// 10. Conversation State Service - Quản lý state của conversation (guided chat)
-builder.Services.AddSingleton<IConversationStateService, ConversationStateService>();
-
-// 11. Guided Chat Service - Chatbot với guided conversation (button options)
-builder.Services.AddScoped<IGuidedChatService, GuidedChatService>();
-
-builder.Services.AddScoped<IEnhancedProductService, EnhancedProductService>();
 
 var app = builder.Build();
 

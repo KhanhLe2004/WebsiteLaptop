@@ -533,15 +533,11 @@ namespace WebLaptopBE.Controllers
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine($"[BESTSELLER] Starting with count={count}, days={days}");
-                
                 // Đơn giản hóa: Trước tiên thử lấy sản phẩm bán chạy từ dữ liệu có sẵn
                 var startDate = DateTime.Now.AddDays(-days);
-                System.Diagnostics.Debug.WriteLine($"[BESTSELLER] Start date: {startDate}");
 
                 // Bước 1: Kiểm tra xem có dữ liệu bán hàng không
                 var hasSalesData = _db.SaleInvoiceDetails.Any();
-                System.Diagnostics.Debug.WriteLine($"[BESTSELLER] Has sales data: {hasSalesData}");
 
                 List<object> bestsellerProducts = new List<object>();
 
@@ -560,8 +556,6 @@ namespace WebLaptopBE.Controllers
                                           sid.Product != null &&
                                           sid.Product.Active == true)
                             .ToList(); // Materialize first to avoid complex SQL
-
-                        System.Diagnostics.Debug.WriteLine($"[BESTSELLER] Found {salesData.Count} sales records");
 
                         if (salesData.Any())
                         {
@@ -606,7 +600,6 @@ namespace WebLaptopBE.Controllers
                     }
                     catch (Exception salesEx)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[BESTSELLER] Sales query error: {salesEx.Message}");
                         // Fallback to latest products if sales query fails
                     }
                 }
@@ -614,8 +607,6 @@ namespace WebLaptopBE.Controllers
                 // Nếu không có dữ liệu bán hàng hoặc query thất bại, lấy sản phẩm mới nhất
                 if (!bestsellerProducts.Any())
                 {
-                    System.Diagnostics.Debug.WriteLine("[BESTSELLER] Falling back to latest products");
-                    
                     var latestProducts = _db.Products
                         .AsNoTracking()
                         .Include(p => p.Brand)
@@ -651,14 +642,10 @@ namespace WebLaptopBE.Controllers
                     bestsellerProducts = latestProducts.Cast<object>().ToList();
                 }
 
-                System.Diagnostics.Debug.WriteLine($"[BESTSELLER] Returning {bestsellerProducts.Count} products");
                 return Ok(bestsellerProducts);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[BESTSELLER] Error: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"[BESTSELLER] Stack trace: {ex.StackTrace}");
-                
                 return StatusCode(500, new
                 {
                     message = "Lỗi khi lấy danh sách sản phẩm bán chạy gần đây nhất",
@@ -704,12 +691,5 @@ namespace WebLaptopBE.Controllers
             }
         }
 
-        private static string NormalizeSpecString(string? s)
-        {
-            if (string.IsNullOrWhiteSpace(s)) return string.Empty;
-            var cleaned = Regex.Replace(s.Trim(), @"\s+", " ");
-            cleaned = cleaned.Replace(" ", "").ToUpperInvariant();
-            return cleaned;
-        }
     }
 }

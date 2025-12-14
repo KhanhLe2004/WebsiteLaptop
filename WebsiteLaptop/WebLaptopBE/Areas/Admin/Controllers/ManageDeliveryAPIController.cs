@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
@@ -205,61 +205,6 @@ namespace WebLaptopBE.Areas.Admin.Controllers
             }
         }
 
-        // GET: api/admin/deliveries/inventory/total
-        // Lấy tổng số lượng tồn kho
-        [HttpGet("inventory/total")]
-        public async Task<ActionResult<int>> GetTotalInventory()
-        {
-            try
-            {
-                var totalQuantity = await _context.ProductConfigurations
-                    .Where(pc => pc.Quantity.HasValue)
-                    .SumAsync(pc => pc.Quantity.Value);
-
-                return Ok(new { totalQuantity });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Lỗi khi lấy tổng số lượng tồn kho", error = ex.Message });
-            }
-        }
-
-        // GET: api/admin/deliveries/inventory/low-stock
-        // Lấy danh sách sản phẩm có số lượng <= 3
-        [HttpGet("inventory/low-stock")]
-        public async Task<ActionResult<List<LowStockProductDTO>>> GetLowStockProducts()
-        {
-            try
-            {
-                var lowStockProducts = await _context.ProductConfigurations
-                    .Include(pc => pc.Product)
-                        .ThenInclude(p => p!.Brand)
-                    .Where(pc => pc.Quantity.HasValue && pc.Quantity.Value <= 3)
-                    .Select(pc => new LowStockProductDTO
-                    {
-                        ProductId = pc.ProductId ?? "",
-                        ProductName = pc.Product != null ? pc.Product.ProductName : "",
-                        ProductModel = pc.Product != null ? pc.Product.ProductModel : "",
-                        BrandName = pc.Product != null && pc.Product.Brand != null ? pc.Product.Brand.BrandName : "",
-                        ConfigurationId = pc.ConfigurationId ?? "",
-                        Cpu = pc.Cpu ?? "",
-                        Ram = pc.Ram ?? "",
-                        Rom = pc.Rom ?? "",
-                        Card = pc.Card ?? "",
-                        Quantity = pc.Quantity ?? 0
-                    })
-                    .OrderBy(p => p.Quantity)
-                    .ThenBy(p => p.ProductName)
-                    .ToListAsync();
-
-                return Ok(lowStockProducts);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Lỗi khi lấy danh sách sản phẩm tồn kho thấp", error = ex.Message });
-            }
-        }
-
         // PUT: api/admin/deliveries/{id}/status
         // Cập nhật trạng thái đơn hàng sang "Đang vận chuyển"
         [HttpPut("{id}/status")]
@@ -381,20 +326,5 @@ namespace WebLaptopBE.Areas.Admin.Controllers
     {
         public string Status { get; set; } = null!;
         public string? EmployeeId { get; set; }
-    }
-
-    // DTO cho sản phẩm tồn kho thấp
-    public class LowStockProductDTO
-    {
-        public string ProductId { get; set; } = null!;
-        public string ProductName { get; set; } = "";
-        public string ProductModel { get; set; } = "";
-        public string BrandName { get; set; } = "";
-        public string ConfigurationId { get; set; } = "";
-        public string Cpu { get; set; } = "";
-        public string Ram { get; set; } = "";
-        public string Rom { get; set; } = "";
-        public string Card { get; set; } = "";
-        public int Quantity { get; set; }
     }
 }

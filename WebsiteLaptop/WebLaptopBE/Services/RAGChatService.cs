@@ -54,8 +54,6 @@ public class RAGChatService : IRAGChatService
 
     public async Task<RAGChatResponse> ProcessUserMessageAsync(string userMessage, string? customerId = null)
     {
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        
         try
         {
             _logger.LogInformation("Processing RAG chat message: {Message}", userMessage);
@@ -75,6 +73,126 @@ public class RAGChatService : IRAGChatService
                 };
             }
 
+            // Bước 0.5: Kiểm tra brand được hỏi TRƯỚC KHI search để phát hiện brand không có sản phẩm
+            string? unavailableBrandInfo = null;
+            var searchTermLower = userMessage.ToLower();
+            var allBrandKeywords = new Dictionary<string, string[]>
+            {
+                { "dell", new[] { "dell" } },
+                { "lenovo", new[] { "lenovo" } },
+                { "hp", new[] { "hp", "hewlett packard" } },
+                { "asus", new[] { "asus", "rog" } },
+                { "apple", new[] { "apple", "macbook", "mac", "iphone" } },
+                { "samsung", new[] { "samsung", "galaxy" } },
+                { "acer", new[] { "acer" } },
+                { "msi", new[] { "msi" } },
+                { "gigabyte", new[] { "gigabyte", "giga" } },
+                { "sony", new[] { "sony", "vaio" } },
+                { "huawei", new[] { "huawei", "matebook" } },
+                { "xiaomi", new[] { "xiaomi", "mi" } },
+                { "lg", new[] { "lg" } },
+                { "toshiba", new[] { "toshiba" } },
+                { "fujitsu", new[] { "fujitsu" } }
+            };
+            
+            // Phát hiện brand được hỏi trong câu và kiểm tra xem có trong database không
+            // QUAN TRỌNG: Chỉ set unavailableBrandInfo khi brand KHÔNG có trong database hoặc không có sản phẩm
+            foreach (var brandPair in allBrandKeywords)
+            {
+                var brandName = brandPair.Key;
+                var keywords = brandPair.Value;
+                
+                // Nếu câu hỏi có chứa brand này (kiểm tra từng keyword)
+                bool brandMentioned = false;
+                foreach (var keyword in keywords)
+                {
+                    if (searchTermLower.Contains(keyword))
+                    {
+                        brandMentioned = true;
+                        break;
+                    }
+                }
+                
+                if (brandMentioned)
+                {
+                    _logger.LogInformation("Detected brand mention in query: {BrandName}", brandName);
+                    
+                    // Kiểm tra xem brand này có trong database không
+                    try
+                    {
+                        var dbContext = _serviceProvider.GetService<Data.WebLaptopTenTechContext>();
+                        if (dbContext != null)
+                        {
+                            // Tìm brand trong database (so sánh không phân biệt hoa thường)
+                            // QUAN TRỌNG: So sánh chính xác brand name (không dùng Contains để tránh false positive)
+                            var brandEntity = await dbContext.Brands
+                                .FirstOrDefaultAsync(b => b.BrandName != null && 
+                                    b.BrandName.ToLower().Trim() == brandName.ToLower().Trim());
+                            
+                            // Nếu không tìm thấy chính xác, thử tìm bằng Contains (nhưng ưu tiên chính xác)
+                            if (brandEntity == null)
+                            {
+                                brandEntity = await dbContext.Brands
+                                    .FirstOrDefaultAsync(b => b.BrandName != null && 
+                                        (b.BrandName.ToLower().Trim().Contains(brandName.ToLower().Trim()) ||
+                                         brandName.ToLower().Trim().Contains(b.BrandName.ToLower().Trim())));
+                            }
+                            
+                            // Nếu brand không tồn tại trong database → cửa hàng không kinh doanh
+                            if (brandEntity == null)
+                            {
+                                unavailableBrandInfo = brandName;
+                                _logger.LogWarning("⚠️⚠️⚠️ Brand '{BrandName}' NOT FOUND in database - store does NOT sell this brand. Setting unavailableBrandInfo = '{UnavailableBrand}'. AI will be informed to tell customer store does not sell this brand.", brandName, unavailableBrandInfo);
+                                break; // Dừng lại khi tìm thấy brand không có
+                            }
+                            else
+                            {
+                                // Brand có trong database, kiểm tra xem có sản phẩm active không
+                                var hasProducts = await dbContext.Products
+                                    .AnyAsync(p => p.BrandId == brandEntity.BrandId && p.Active == true);
+                                
+                                if (!hasProducts)
+                                {
+                                    unavailableBrandInfo = brandEntity.BrandName ?? brandName;
+                                    _logger.LogInformation("Brand '{BrandName}' exists but has NO active products - store does not sell this brand", unavailableBrandInfo);
+                                    break; // Dừng lại khi tìm thấy brand không có sản phẩm
+                                }
+                                else
+                                {
+                                    // Brand có trong database và có sản phẩm → brand có sẵn
+                                    _logger.LogInformation("Brand '{BrandName}' is AVAILABLE with products", brandEntity.BrandName);
+                                    // Không set unavailableBrandInfo, tiếp tục tìm kiếm bình thường
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error checking brand availability: {BrandName} - {ErrorMessage}", brandName, ex.Message);
+                        // Nếu có lỗi khi kiểm tra brand, giả sử brand không có để an toàn
+                        // Nhưng chỉ set nếu đã detect brand được mention
+                        if (brandMentioned)
+                        {
+                            unavailableBrandInfo = brandName;
+                            _logger.LogWarning("⚠️ Error checking brand '{BrandName}' - assuming unavailable for safety", brandName);
+                            break;
+                        }
+                    }
+                    
+                    // Nếu đã xác định brand không có, dừng lại
+                    if (!string.IsNullOrEmpty(unavailableBrandInfo))
+                    {
+                        break; // Dừng lại khi đã xác định brand không có
+                    }
+                }
+            }
+            
+            // Log kết quả kiểm tra brand
+            if (!string.IsNullOrEmpty(unavailableBrandInfo))
+            {
+                _logger.LogWarning("⚠️⚠️⚠️ Final result: Brand '{BrandName}' is UNAVAILABLE - store does NOT sell this brand. Will SKIP product search and inform AI.", unavailableBrandInfo);
+            }
+
             // Bước 1 & 2: Parallelize products và policies search với timeout tổng
             List<VectorSearchResult> productResults = new List<VectorSearchResult>();
             List<VectorSearchResult> policyResults = new List<VectorSearchResult>();
@@ -82,11 +200,36 @@ public class RAGChatService : IRAGChatService
             // Detect use case từ userMessage để optimize search
             var detectedUseCase = DetectUseCaseFromMessage(userMessage);
 
+            // QUAN TRỌNG: Nếu brand không có sản phẩm, SKIP product search hoàn toàn
+            Task<List<VectorSearchResult>> productSearchTask;
+            if (!string.IsNullOrEmpty(unavailableBrandInfo))
+            {
+                // Brand không có sản phẩm → không cần search, trả về empty list ngay
+                _logger.LogWarning("⚠️ Brand '{BrandName}' is unavailable - SKIPPING product search completely", unavailableBrandInfo);
+                productSearchTask = Task.FromResult(new List<VectorSearchResult>());
+            }
+            else
+            {
+                // Brand có sản phẩm → search bình thường
+                productSearchTask = SearchProductsWithFallbackAsync(userMessage);
+            }
+            
+            // QUAN TRỌNG: Nếu brand không có sản phẩm, SKIP policy search hoàn toàn
+            Task<List<VectorSearchResult>> policySearchTask;
+            if (!string.IsNullOrEmpty(unavailableBrandInfo))
+            {
+                // Brand không có sản phẩm → không cần search policy, trả về empty list ngay
+                _logger.LogWarning("⚠️ Brand '{BrandName}' is unavailable - SKIPPING policy search completely", unavailableBrandInfo);
+                policySearchTask = Task.FromResult(new List<VectorSearchResult>());
+            }
+            else
+            {
+                // Brand có sản phẩm → search policy bình thường
+                policySearchTask = _qdrantVectorService.SearchPoliciesAsync(userMessage, topK: 3);
+            }
+            
             // Chạy song song products và policies search với timeout tổng 8 giây
             using var searchCts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
-            
-            var productSearchTask = SearchProductsWithFallbackAsync(userMessage);
-            var policySearchTask = _qdrantVectorService.SearchPoliciesAsync(userMessage, topK: 3);
 
             try
             {
@@ -113,8 +256,8 @@ public class RAGChatService : IRAGChatService
                     }
                 }
                 
-                _logger.LogInformation("Found {ProductCount} product results and {PolicyCount} policy results in {ElapsedMs}ms", 
-                    productResults?.Count ?? 0, policyResults?.Count ?? 0, stopwatch.ElapsedMilliseconds);
+                _logger.LogInformation("Found {ProductCount} product results and {PolicyCount} policy results", 
+                    productResults?.Count ?? 0, policyResults?.Count ?? 0);
             }
             catch (Exception ex)
             {
@@ -142,19 +285,70 @@ public class RAGChatService : IRAGChatService
                 }
             }
 
-            // Nếu không lấy được policy từ Qdrant, fallback sang bộ policy mặc định (không cần vector DB)
-            if (policyResults == null || policyResults.Count == 0)
+            // QUAN TRỌNG: Nếu brand không có sản phẩm, KHÔNG gọi GetFallbackPolicies
+            // Chỉ gọi GetFallbackPolicies khi brand có sản phẩm
+            if (string.IsNullOrEmpty(unavailableBrandInfo))
             {
-                policyResults = GetFallbackPolicies(userMessage);
-                if (policyResults.Count > 0)
+                // Nếu không lấy được policy từ Qdrant, fallback sang bộ policy mặc định (không cần vector DB)
+                if (policyResults == null || policyResults.Count == 0)
                 {
-                    _logger.LogWarning("Using fallback policies because Qdrant policy search returned no results");
+                    policyResults = GetFallbackPolicies(userMessage);
+                    if (policyResults.Count > 0)
+                    {
+                        _logger.LogWarning("Using fallback policies because Qdrant policy search returned no results");
+                    }
                 }
             }
+            else
+            {
+                // Brand không có sản phẩm → đảm bảo policyResults rỗng
+                policyResults = new List<VectorSearchResult>();
+                _logger.LogWarning("⚠️ Brand '{BrandName}' is unavailable - ensuring policyResults is empty, will NOT call GetFallbackPolicies", unavailableBrandInfo);
+            }
 
+            // Bước 3: Đảm bảo productResults và policyResults rỗng nếu brand không có sản phẩm
+            // QUAN TRỌNG: Phải clear cả productResults và policyResults TRƯỚC khi build context
+            if (!string.IsNullOrEmpty(unavailableBrandInfo))
+            {
+                productResults = new List<VectorSearchResult>(); // Clear results để AI biết không có sản phẩm
+                policyResults = new List<VectorSearchResult>(); // Clear policy results để AI không hiển thị chính sách
+                _logger.LogWarning("⚠️⚠️⚠️ Brand '{BrandName}' is UNAVAILABLE - ensuring productResults and policyResults are empty. AI MUST respond that store does NOT sell this brand, WITHOUT showing policies or suggesting products.", unavailableBrandInfo);
+            }
+            
             // Bước 3: Build context từ search results (có thể include use case info)
-            var productContext = BuildProductContext(productResults, detectedUseCase);
-            var policyContext = BuildPolicyContext(policyResults);
+            // QUAN TRỌNG: Log để debug
+            if (!string.IsNullOrEmpty(unavailableBrandInfo))
+            {
+                _logger.LogWarning("⚠️⚠️⚠️ Building context with unavailableBrandInfo = '{BrandName}'. ProductContext will contain 'CỬA HÀNG KHÔNG KINH DOANH' message.", unavailableBrandInfo);
+            }
+            
+            var productContext = BuildProductContext(productResults, detectedUseCase, unavailableBrandInfo);
+            
+            // QUAN TRỌNG: Nếu brand không có sản phẩm, KHÔNG hiển thị policy context
+            // Chỉ trả lời ngắn gọn rằng sản phẩm không được kinh doanh
+            string policyContext;
+            if (!string.IsNullOrEmpty(unavailableBrandInfo))
+            {
+                policyContext = ""; // Clear policy context khi sản phẩm không được kinh doanh
+                _logger.LogWarning("⚠️ Brand '{BrandName}' is unavailable - clearing policy context. AI should only respond that product is not sold, without showing policies.", unavailableBrandInfo);
+            }
+            else
+            {
+                policyContext = BuildPolicyContext(policyResults);
+            }
+            
+            // Log để debug - kiểm tra xem context có đúng không
+            if (!string.IsNullOrEmpty(unavailableBrandInfo))
+            {
+                if (productContext.Contains("CỬA HÀNG KHÔNG KINH DOANH"))
+                {
+                    _logger.LogWarning("✅ ProductContext correctly contains 'CỬA HÀNG KHÔNG KINH DOANH' message. AI should respond correctly without showing policies.");
+                }
+                else
+                {
+                    _logger.LogError("❌ ERROR: ProductContext does NOT contain 'CỬA HÀNG KHÔNG KINH DOANH' message even though unavailableBrandInfo = '{BrandName}'. This is a bug!", unavailableBrandInfo);
+                }
+            }
 
             // Bước 4: Tạo prompt cho LLM
             var systemPrompt = BuildSystemPrompt();
@@ -181,53 +375,74 @@ public class RAGChatService : IRAGChatService
                 
                 response = await llmTask;
                 llmSucceeded = !string.IsNullOrEmpty(response);
-                _logger.LogInformation("Generated response from LLM in {ElapsedMs}ms, length: {Length}", 
-                    stopwatch.ElapsedMilliseconds, response?.Length ?? 0);
+                _logger.LogInformation("Generated response from LLM, length: {Length}", 
+                    response?.Length ?? 0);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error calling Semantic Kernel/OpenAI: {ErrorType} - {ErrorMessage}", 
                     ex.GetType().Name, ex.Message);
                 
-                // GRACEFUL DEGRADATION: Tạo response từ dữ liệu có sẵn thay vì fail hoàn toàn
-                response = BuildFallbackResponse(userMessage, productResults, policyResults);
+                // QUAN TRỌNG: Nếu brand không có sản phẩm, trả lời trực tiếp không cần LLM
+                if (!string.IsNullOrEmpty(unavailableBrandInfo))
+                {
+                    var brandDisplayName = char.ToUpper(unavailableBrandInfo[0]) + unavailableBrandInfo.Substring(1).ToLower();
+                    response = $"Em xin lỗi, hiện tại cửa hàng TenTech không kinh doanh laptop {brandDisplayName} ạ.";
+                    llmSucceeded = true; // Đánh dấu là đã có response
+                    _logger.LogWarning("⚠️ LLM failed but brand is unavailable - using direct response without LLM");
+                }
+                else
+                {
+                    // GRACEFUL DEGRADATION: Tạo response từ dữ liệu có sẵn thay vì fail hoàn toàn
+                    response = BuildFallbackResponse(userMessage, productResults, policyResults);
+                }
             }
 
             // Bước 6: Parse suggested products từ productResults
-            // QUAN TRỌNG: Luôn parse suggested products để hiển thị cho khách hàng
+            // QUAN TRỌNG: Nếu brand không có sản phẩm, KHÔNG parse suggested products
             List<ProductDTO>? productDTOs = null;
-            try
+            if (string.IsNullOrEmpty(unavailableBrandInfo))
             {
-                productDTOs = await ParseSuggestedProductsAsync(productResults);
-                
-                // Nếu không parse được từ vector results, thử fallback search từ SQL
-                if (productDTOs == null || productDTOs.Count == 0)
+                // Chỉ parse suggested products khi brand có sản phẩm
+                try
                 {
-                    _logger.LogInformation("No products parsed from vector results, trying SQL fallback");
-                    var sqlProducts = await FallbackSearchFromSqlAsync(userMessage);
-                    if (sqlProducts != null && sqlProducts.Count > 0)
+                    productDTOs = await ParseSuggestedProductsAsync(productResults);
+                    
+                    // Nếu không parse được từ vector results, thử fallback search từ SQL
+                    if (productDTOs == null || productDTOs.Count == 0)
                     {
-                        productDTOs = sqlProducts;
-                        _logger.LogInformation("SQL fallback found {Count} products", productDTOs.Count);
+                        _logger.LogInformation("No products parsed from vector results, trying SQL fallback");
+                        var sqlProducts = await FallbackSearchFromSqlAsync(userMessage);
+                        if (sqlProducts != null && sqlProducts.Count > 0)
+                        {
+                            productDTOs = sqlProducts;
+                            _logger.LogInformation("SQL fallback found {Count} products", productDTOs.Count);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error parsing suggested products, will try SQL fallback");
+                    // Thử fallback search từ SQL nếu parse fail
+                    try
+                    {
+                        var sqlProducts = await FallbackSearchFromSqlAsync(userMessage);
+                        if (sqlProducts != null && sqlProducts.Count > 0)
+                        {
+                            productDTOs = sqlProducts;
+                        }
+                    }
+                    catch (Exception fallbackEx)
+                    {
+                        _logger.LogError(fallbackEx, "SQL fallback also failed");
                     }
                 }
             }
-            catch (Exception ex)
+            else
             {
-                _logger.LogWarning(ex, "Error parsing suggested products, will try SQL fallback");
-                // Thử fallback search từ SQL nếu parse fail
-                try
-                {
-                    var sqlProducts = await FallbackSearchFromSqlAsync(userMessage);
-                    if (sqlProducts != null && sqlProducts.Count > 0)
-                    {
-                        productDTOs = sqlProducts;
-                    }
-                }
-                catch (Exception fallbackEx)
-                {
-                    _logger.LogError(fallbackEx, "SQL fallback also failed");
-                }
+                // Brand không có sản phẩm → không parse suggested products
+                productDTOs = null;
+                _logger.LogWarning("⚠️ Brand '{BrandName}' is unavailable - SKIPPING suggested products parsing. Will NOT suggest any products.", unavailableBrandInfo);
             }
 
             // Convert ProductDTO to ProductSuggestion
@@ -316,6 +531,12 @@ PHONG CÁCH GIAO TIẾP:
       - Nếu có sản phẩm của thương hiệu đó trong danh sách → Đề xuất NGAY các sản phẩm đó
       - Highlight các sản phẩm phù hợp với yêu cầu
       - Không hỏi lại nếu đã có sản phẩm trong danh sách
+   ✅ Khi khách hỏi về MODEL/SERIES CỤ THỂ (ví dụ: 'HP Omen', 'Dell XPS', 'ASUS ROG', 'Lenovo ThinkPad'): 
+      - QUAN TRỌNG: Ưu tiên đề xuất các sản phẩm có tên/model chứa đúng model/series đó
+      - Nếu có sản phẩm đúng model/series trong danh sách → CHỈ đề xuất các sản phẩm đó, KHÔNG đề xuất các model khác của cùng thương hiệu
+      - Ví dụ: Khách hỏi 'HP Omen' → CHỈ đề xuất laptop HP Omen, KHÔNG đề xuất HP Pavilion, HP EliteBook, v.v.
+      - Ví dụ: Khách hỏi 'Dell XPS' → CHỈ đề xuất laptop Dell XPS, KHÔNG đề xuất Dell Inspiron, Dell Vostro, v.v.
+      - Nếu không có sản phẩm đúng model/series → Thông báo rõ ràng và đề xuất các model tương tự hoặc hỏi khách có muốn xem các model khác không
    ✅ Khi khách hỏi về giá rẻ (ví dụ: 'máy rẻ', 'laptop giá rẻ'):
       - Nếu có sản phẩm giá rẻ trong danh sách → Đề xuất NGAY các sản phẩm đó (sắp xếp từ rẻ nhất)
       - Highlight giá cả và giá trị nhận được
@@ -356,20 +577,42 @@ PHONG CÁCH GIAO TIẾP:
    ✅ Đề xuất giải pháp: 'Anh/chị có thể liên hệ hotline hoặc đến cửa hàng để được tư vấn trực tiếp'
    ✅ Không bịa thông tin, không hứa hẹn những gì không chắc chắn
 
-4. KHI TRẢ LỜI VỀ CHÍNH SÁCH (QUAN TRỌNG - ĐỌC KỸ):
+4. KHI CỬA HÀNG KHÔNG KINH DOANH SẢN PHẨM (⚠️⚠️⚠️ CỰC KỲ QUAN TRỌNG - ĐỌC KỸ):
+   ⚠️⚠️⚠️ NẾU trong 'THÔNG TIN SẢN PHẨM CÓ SẴN' có thông báo '⚠️⚠️⚠️ CỬA HÀNG KHÔNG KINH DOANH' hoặc 'CỬA HÀNG KHÔNG KINH DOANH':
+      → ĐÂY KHÔNG PHẢI là trường hợp 'không tìm thấy sản phẩm phù hợp'
+      → ĐÂY LÀ tình huống cửa hàng KHÔNG KINH DOANH brand đó (ví dụ: Acer, Apple, Samsung, MSI, Gigabyte)
+      → BẮT BUỘC phải trả lời NGAY, rõ ràng, lịch sự theo ĐÚNG format trong context
+      → KHÔNG được bịa sản phẩm, KHÔNG được nói mơ hồ như 'có thể có' hoặc 'để em kiểm tra'
+      → KHÔNG được đề xuất sản phẩm từ brand không có trong kho
+      → ⚠️⚠️⚠️ QUAN TRỌNG: KHÔNG được hiển thị thông tin chính sách bảo hành, bảo mật, hoặc bất kỳ thông tin nào khác
+      → CHỈ trả lời ngắn gọn rằng sản phẩm không được kinh doanh, theo ĐÚNG format trong context
+      → PHẢI trả lời theo ĐÚNG format trong context, KHÔNG tự ý thay đổi
+      → Ví dụ format: 'Em xin lỗi, hiện tại cửa hàng TenTech không kinh doanh laptop [tên brand] ạ.'
+   ⚠️⚠️⚠️ LƯU Ý: Nếu context có thông báo 'CỬA HÀNG KHÔNG KINH DOANH', bạn PHẢI trả lời theo ĐÚNG format trong context, KHÔNG được tự ý thay đổi, KHÔNG được bịa sản phẩm, và KHÔNG được hiển thị thông tin chính sách
+
+5. KHI TRẢ LỜI VỀ CHÍNH SÁCH (QUAN TRỌNG - ĐỌC KỸ):
    ✅ HIỂN THỊ FULL TEXT CHÍNH SÁCH từ context được cung cấp - KHÔNG tóm tắt, KHÔNG rút gọn
    ✅ Nếu có nhiều chính sách liên quan, hiển thị TẤT CẢ các chính sách đó
    ✅ Giữ nguyên cấu trúc, định dạng, và nội dung chi tiết của chính sách
    ✅ Giải thích thêm nếu khách hàng yêu cầu, nhưng vẫn phải hiển thị full text trước
    ✅ Đề cập đến thông tin liên hệ (địa chỉ, hotline, email) nếu có trong chính sách
 
-5. KHI SO SÁNH SẢN PHẨM:
+6. KHI SO SÁNH SẢN PHẨM:
    ✅ So sánh khách quan, không thiên vị
    ✅ Nêu rõ điểm mạnh/yếu của từng sản phẩm
    ✅ Đưa ra lời khuyên dựa trên nhu cầu cụ thể của khách hàng
    ✅ Giải thích tại sao sản phẩm này phù hợp hơn sản phẩm kia trong trường hợp cụ thể
 
 📝 ĐỊNH DẠNG TRẢ LỜI:
+- KHI HIỂN THỊ SẢN PHẨM: PHẢI hiển thị đầy đủ thông tin theo format sau (QUAN TRỌNG):
+  + Tên sản phẩm: Hiển thị TÊN SẢN PHẨM KÈM MODEL (nếu có model trong context)
+  + Ví dụ: Nếu context có Dell Alienware và model 16X Aurora AC2025 thì hiển thị: **Dell Alienware 16X Aurora AC2025**
+  + Thương hiệu: Hiển thị Thương hiệu: [tên brand]
+  + Giá: Hiển thị Giá: [giá] VND
+  + Format đúng: 
+    • **Dell Alienware 16X Aurora AC2025**
+      Thương hiệu: Dell
+      Giá: 68,990,000 VND
 - Sử dụng bullet points (•) cho danh sách sản phẩm hoặc thông tin quan trọng
 - In đậm tên sản phẩm hoặc thông tin quan trọng (dùng **text**)
 - Chia đoạn rõ ràng, không viết dài dòng một đoạn
@@ -387,15 +630,19 @@ Bot: 'Chào anh/chị! Em rất vui được tư vấn về laptop Dell cho anh/
 
 Em đã tìm thấy một số laptop Dell phù hợp trong kho hàng:
 
-• **Dell Inspiron 15 3520** - 15,900,000 VND
+• **Dell Alienware 16X Aurora AC2025**
+  Thương hiệu: Dell
+  Giá: 68,990,000 VND
+  Cấu hình: Intel Core i7, 16GB RAM, 512GB SSD, RTX 4060
+  Phù hợp: Gaming, đồ họa, hiệu năng cao
+  Điểm nổi bật: Card đồ họa mạnh, màn hình 240Hz
+
+• **Dell Inspiron 15 3520**
+  Thương hiệu: Dell
+  Giá: 15,900,000 VND
   Cấu hình: Intel Core i5, 8GB RAM, 256GB SSD
   Phù hợp: Văn phòng, học tập, công việc hàng ngày
   Điểm nổi bật: Giá tốt, hiệu năng ổn định
-
-• **Dell Vostro 15 3510** - 18,500,000 VND
-  Cấu hình: Intel Core i5, 8GB RAM, 512GB SSD
-  Phù hợp: Văn phòng chuyên nghiệp
-  Điểm nổi bật: Ổ cứng lớn, bền bỉ
 
 Anh/chị có thể xem chi tiết từng sản phẩm bên dưới hoặc cho em biết thêm về nhu cầu sử dụng để em tư vấn chính xác hơn ạ!'
 
@@ -457,7 +704,11 @@ Anh/chị có thắc mắc gì về chính sách bảo hành không ạ?'
         // Phân tích intent từ userMessage
         var intent = DetectIntent(userMessage);
         var clarificationNeeded = NeedsClarification(userMessage, productContext);
-        var hasProducts = !productContext.Contains("Không tìm thấy");
+        // hasProducts = false nếu không có sản phẩm HOẶC brand không có sản phẩm
+        // QUAN TRỌNG: Kiểm tra cả "CỬA HÀNG KHÔNG KINH DOANH" (có 1, 2, hoặc 3 dấu cảnh báo)
+        var hasProducts = !productContext.Contains("Không tìm thấy") && 
+                         !productContext.Contains("CỬA HÀNG KHÔNG KINH DOANH") &&
+                         !productContext.Contains("KHÔNG CÓ trong kho hàng");
         var hasPolicies = !policyContext.Contains("Không tìm thấy");
         
         var prompt = $@"Câu hỏi của khách hàng: {userMessage}
@@ -467,16 +718,43 @@ Anh/chị có thắc mắc gì về chính sách bảo hành không ạ?'
 {(clarificationNeeded ? "- ⚠️ CẦN LÀM RÕ: Câu hỏi này cần được làm rõ thêm. Hãy đặt câu hỏi một cách tự nhiên để hiểu rõ nhu cầu của khách hàng (nhu cầu sử dụng, ngân sách, thương hiệu yêu thích)." : "- ✅ Câu hỏi đã đủ rõ ràng")}
 
 📦 THÔNG TIN SẢN PHẨM CÓ SẴN:
-{(hasProducts ? productContext : "⚠️ Không tìm thấy sản phẩm phù hợp trong kho hàng. Hãy hỏi khách hàng về nhu cầu cụ thể để tìm kiếm tốt hơn.")}
+{(productContext.Contains("CỬA HÀNG KHÔNG KINH DOANH") ? productContext : (hasProducts ? productContext : "⚠️ Không tìm thấy sản phẩm phù hợp trong kho hàng. Hãy hỏi khách hàng về nhu cầu cụ thể để tìm kiếm tốt hơn."))}
+
+⚠️⚠️⚠️⚠️⚠️ CỰC KỲ QUAN TRỌNG - ĐỌC KỸ: Nếu trong 'THÔNG TIN SẢN PHẨM CÓ SẴN' có thông báo '⚠️⚠️⚠️ CỬA HÀNG KHÔNG KINH DOANH' hoặc 'CỬA HÀNG KHÔNG KINH DOANH', điều này có nghĩa là:
+- ⚠️⚠️⚠️ ĐÂY KHÔNG PHẢI là trường hợp 'không tìm thấy sản phẩm phù hợp'
+- ⚠️⚠️⚠️ ĐÂY LÀ tình huống cửa hàng KHÔNG KINH DOANH brand đó (ví dụ: Acer, Apple, Samsung, MSI, Gigabyte)
+- ⚠️⚠️⚠️ BẮT BUỘC phải trả lời NGAY, rõ ràng, lịch sự rằng cửa hàng không kinh doanh sản phẩm đó
+- ⚠️⚠️⚠️ KHÔNG được bịa sản phẩm, KHÔNG được nói mơ hồ như 'có thể có' hoặc 'để em kiểm tra'
+- ⚠️⚠️⚠️ KHÔNG được đề xuất sản phẩm từ brand không có trong kho
+- ⚠️⚠️⚠️ KHÔNG được hiển thị thông tin chính sách bảo hành, bảo mật, hoặc bất kỳ thông tin nào khác
+- ⚠️⚠️⚠️ CHỈ trả lời ngắn gọn rằng sản phẩm không được kinh doanh, theo ĐÚNG format trong context
+- ⚠️⚠️⚠️ PHẢI trả lời theo ĐÚNG format trong context, KHÔNG tự ý thay đổi
+- ⚠️⚠️⚠️ Ví dụ: Nếu khách hỏi 'máy Acer' và context có 'CỬA HÀNG KHÔNG KINH DOANH: Acer' → Trả lời: 'Em xin lỗi, hiện tại cửa hàng TenTech không kinh doanh laptop Acer ạ. Cửa hàng chúng em chuyên về các thương hiệu như Dell, Lenovo, HP, ASUS. Anh/chị có muốn em tư vấn về các sản phẩm tương tự từ các thương hiệu này không ạ?'
+- ⚠️⚠️⚠️ LƯU Ý: Nếu bạn không trả lời đúng theo format trong context, bạn đang làm sai. Hãy đọc kỹ format trong context và trả lời ĐÚNG. KHÔNG hiển thị thông tin chính sách.
+
+📋 THÔNG TIN VỀ CÁC THƯƠNG HIỆU CỬA HÀNG KINH DOANH:
+Cửa hàng TenTech hiện đang kinh doanh các thương hiệu sau:
+- **Dell**: Alienware, Inspiron, XPS
+- **Lenovo**: ThinkPad, Legion, LOQ
+- **HP**: Omen, Pavilion
+- **ASUS**: ExpertBook, TUF Gaming, ROG
+
+Nếu khách hỏi về thương hiệu khác (ví dụ: Apple, Samsung, Acer, MSI, Gigabyte), hãy trả lời rõ ràng rằng cửa hàng không kinh doanh thương hiệu đó.
 
 📋 THÔNG TIN CHÍNH SÁCH:
-{(hasPolicies ? policyContext : "⚠️ Không tìm thấy thông tin chính sách liên quan.")}
+{((productContext.Contains("CỬA HÀNG KHÔNG KINH DOANH") || string.IsNullOrEmpty(policyContext)) ? "⚠️ Không hiển thị thông tin chính sách khi sản phẩm không được kinh doanh." : (hasPolicies ? policyContext : "⚠️ Không tìm thấy thông tin chính sách liên quan."))}
 
 🎯 HƯỚNG DẪN TRẢ LỜI:
 
 {(intent == "product_search" ? @"- QUAN TRỌNG: Nếu có sản phẩm trong danh sách 'THÔNG TIN SẢN PHẨM CÓ SẴN':
   + LUÔN đề xuất NGAY các sản phẩm đó (2-10 sản phẩm tùy theo yêu cầu)
   + KHÔNG hỏi lại nếu đã có sản phẩm trong danh sách
+  + ⚠️⚠️⚠️ FORMAT HIỂN THỊ SẢN PHẨM (BẮT BUỘC): 
+    → Hiển thị TÊN SẢN PHẨM KÈM MODEL (nếu có model trong context)
+    → Ví dụ: Context có Dell Alienware và model 16X Aurora AC2025 thì hiển thị: **Dell Alienware 16X Aurora AC2025**
+    → Sau đó hiển thị: Thương hiệu: Dell và Giá: 68,990,000 VND
+    → KHÔNG được format đơn giản như • Dell Alienware - Giá: 68,990,000 VND
+    → PHẢI hiển thị đầy đủ: tên + model, thương hiệu, giá
   + Highlight các sản phẩm phù hợp với yêu cầu cụ thể của khách hàng
   + Nếu khách hỏi chung chung (ví dụ: 'laptop', 'máy tính', 'máy', 'PC', 'notebook'):
     → Đây là các từ khóa đồng nghĩa, đều có nghĩa là sản phẩm laptop
@@ -484,6 +762,7 @@ Anh/chị có thắc mắc gì về chính sách bảo hành không ạ?'
     → Giới thiệu 5-10 sản phẩm tốt nhất, đa dạng
     → Sau đó hỏi thêm về nhu cầu cụ thể
   + Nếu khách hỏi về thương hiệu (ví dụ: 'máy Dell') → chỉ đề xuất sản phẩm của thương hiệu đó
+  + Nếu khách hỏi về MODEL/SERIES CỤ THỂ (ví dụ: 'HP Omen', 'Dell XPS', 'ASUS ROG') → CHỈ đề xuất sản phẩm có tên/model chứa đúng model/series đó, KHÔNG đề xuất các model khác của cùng thương hiệu
   + Nếu khách hỏi về giá rẻ → chỉ đề xuất sản phẩm giá rẻ, sắp xếp từ rẻ nhất
   + Nếu khách hỏi về mục đích sử dụng (gaming, văn phòng, đồ họa, học tập, lập trình):
     → Đề xuất sản phẩm phù hợp với mục đích đó
@@ -492,6 +771,13 @@ Anh/chị có thắc mắc gì về chính sách bảo hành không ạ?'
   + Giải thích lý do tại sao sản phẩm phù hợp, so sánh điểm mạnh/yếu
   + Đề cập giá cả, cấu hình, và điểm nổi bật
 - Nếu không có sản phẩm: Hỏi rõ nhu cầu (mục đích sử dụng, ngân sách) để tìm kiếm tốt hơn
+- ⚠️⚠️⚠️ QUAN TRỌNG CỰC KỲ: Nếu có thông báo '⚠️ CỬA HÀNG KHÔNG KINH DOANH' trong 'THÔNG TIN SẢN PHẨM CÓ SẴN':
+  → Đây là tình huống cửa hàng KHÔNG KINH DOANH brand/sản phẩm đó (ví dụ: Acer, Apple, Samsung)
+  → BẮT BUỘC trả lời rõ ràng, lịch sự rằng cửa hàng không kinh doanh
+  → KHÔNG được bịa sản phẩm, KHÔNG được nói mơ hồ, KHÔNG được đề xuất sản phẩm từ brand không có
+  → Đề xuất các brand có sẵn (Dell, Lenovo, HP, ASUS)
+  → Trả lời theo ĐÚNG format trong context, KHÔNG tự ý thay đổi
+  → Ví dụ: Khách hỏi 'máy Acer' → Trả lời: 'Em xin lỗi, hiện tại cửa hàng TenTech không kinh doanh laptop Acer ạ. Cửa hàng chúng em chuyên về các thương hiệu như Dell, Lenovo, HP, ASUS. Anh/chị có muốn em tư vấn về các sản phẩm tương tự từ các thương hiệu này không ạ?'
 - Luôn kết thúc bằng câu hỏi mở để tiếp tục tư vấn" : "")}
 
 {(intent == "comparison" ? @"- So sánh các sản phẩm một cách khách quan, nêu rõ điểm mạnh/yếu của từng sản phẩm
@@ -744,8 +1030,36 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
     /// <summary>
     /// Build product context từ search results - Format đẹp và đầy đủ thông tin
     /// </summary>
-    private string BuildProductContext(List<VectorSearchResult> results, string? useCase = null)
+    private string BuildProductContext(List<VectorSearchResult> results, string? useCase = null, string? unavailableBrand = null)
     {
+        // Nếu có brand không có sản phẩm, thông báo rõ ràng (QUAN TRỌNG: ưu tiên cao nhất)
+        if (!string.IsNullOrEmpty(unavailableBrand))
+        {
+            // Chuẩn hóa tên brand (viết hoa chữ cái đầu)
+            var brandDisplayName = unavailableBrand;
+            if (!string.IsNullOrEmpty(brandDisplayName))
+            {
+                brandDisplayName = char.ToUpper(brandDisplayName[0]) + brandDisplayName.Substring(1).ToLower();
+            }
+            
+            return $"⚠️⚠️⚠️ CỬA HÀNG KHÔNG KINH DOANH: Thương hiệu '{brandDisplayName}' hiện KHÔNG CÓ trong kho hàng của cửa hàng TenTech.\n\n" +
+                   $"ĐÂY KHÔNG PHẢI là trường hợp 'không tìm thấy sản phẩm phù hợp', mà là cửa hàng KHÔNG KINH DOANH brand {brandDisplayName}.\n\n" +
+                   $"BẮT BUỘC: Bạn PHẢI trả lời rõ ràng, lịch sự rằng cửa hàng không kinh doanh sản phẩm {brandDisplayName}.\n\n" +
+                   $"KHÔNG được bịa sản phẩm, KHÔNG được nói mơ hồ như 'có thể có' hoặc 'để em kiểm tra'.\n\n" +
+                   $"KHÔNG được đề xuất hoặc gợi ý BẤT KỲ sản phẩm nào (kể cả từ các brand khác như Dell, Lenovo, HP, ASUS).\n\n" +
+                   $"KHÔNG được hiển thị thông tin chính sách bảo hành, bảo mật, hoặc bất kỳ thông tin nào khác.\n\n" +
+                   $"BẮT BUỘC trả lời theo format sau (SAO CHÉP NGUYÊN VĂN, KHÔNG thay đổi):\n\n" +
+                   $"'Em xin lỗi, hiện tại cửa hàng TenTech không kinh doanh laptop {brandDisplayName} ạ.'\n\n" +
+                   $"LƯU Ý CỰC KỲ QUAN TRỌNG:\n" +
+                   $"- Đây là tình huống cửa hàng KHÔNG KINH DOANH brand này\n" +
+                   $"- KHÔNG phải là không tìm thấy sản phẩm phù hợp\n" +
+                   $"- Bạn PHẢI trả lời rõ ràng rằng cửa hàng không kinh doanh\n" +
+                   $"- KHÔNG được nói mơ hồ, KHÔNG được bịa sản phẩm\n" +
+                   $"- KHÔNG được gợi ý hoặc đề xuất bất kỳ sản phẩm nào\n" +
+                   $"- KHÔNG được hiển thị thông tin chính sách\n" +
+                   $"- Trả lời theo ĐÚNG format trên, KHÔNG tự ý thay đổi";
+        }
+        
         if (results == null || results.Count == 0)
         {
             return "Không tìm thấy sản phẩm phù hợp trong kho hàng hiện tại.";
@@ -779,6 +1093,7 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
             {
                 var name = result.Metadata.GetValueOrDefault("name", "N/A")?.ToString() ?? "N/A";
                 var brand = result.Metadata.GetValueOrDefault("brand", "")?.ToString() ?? "";
+                var model = result.Metadata.GetValueOrDefault("model", "")?.ToString() ?? "";
                 var price = result.Metadata.GetValueOrDefault("price", 0);
                 var cpu = result.Metadata.GetValueOrDefault("cpu", "")?.ToString() ?? "";
                 var ram = result.Metadata.GetValueOrDefault("ram", "")?.ToString() ?? "";
@@ -802,7 +1117,14 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
                     priceValue = priceLong;
                 }
                 
-                context.AppendLine($"{index}. **{name}**");
+                // Format tên sản phẩm: nếu có model thì ghép với name
+                var displayName = name;
+                if (!string.IsNullOrEmpty(model))
+                {
+                    displayName = $"{name} {model}";
+                }
+                
+                context.AppendLine($"{index}. **{displayName}**");
                 
                 if (!string.IsNullOrEmpty(brand))
                 {
@@ -1103,6 +1425,7 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
                             {
                                 ["productId"] = p.ProductId ?? "",
                                 ["name"] = p.ProductName ?? "",
+                                ["model"] = p.ProductModel ?? "",
                                 ["price"] = p.SellingPrice ?? 0,
                                 ["brand"] = p.BrandName ?? "",
                                 ["cpu"] = firstConfig?.Cpu ?? "",
@@ -1159,6 +1482,7 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
                         {
                             ["productId"] = p.ProductId ?? "",
                             ["name"] = p.ProductName ?? "",
+                            ["model"] = p.ProductModel ?? "",
                             ["price"] = p.SellingPrice ?? 0,
                             ["brand"] = p.BrandName ?? "",
                             ["cpu"] = p.Configurations?.FirstOrDefault()?.Cpu ?? "",
@@ -1495,53 +1819,119 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
                     _logger.LogInformation("Detected GPU requirement: {Card}", criteria.Card);
             }
             
-            // 4. Extract brand names và query database để lấy BrandId thực tế
+            // 4. Extract brand names và model/series names (QUAN TRỌNG: Ưu tiên model/series trước)
             string? brandId = null;
-            var brandKeywords = new Dictionary<string, string[]>
+            string? modelSeries = null; // Lưu model/series name để search chính xác
+            
+            // Dictionary: brand -> [keywords, model/series names]
+            // DỰA TRÊN DỮ LIỆU THỰC TẾ TỪ DATABASE (test.sql)
+            // Brands có trong database: Dell (B001), Lenovo (B002), HP (B003), ASUS (B004)
+            var brandKeywords = new Dictionary<string, (string[] Keywords, string[] ModelSeries)>
             {
-                { "dell", new[] { "dell" } },
-                { "hp", new[] { "hp", "hewlett packard" } },
-                { "lenovo", new[] { "lenovo" } },
-                { "asus", new[] { "asus", "rog" } },
-                { "acer", new[] { "acer" } },
-                { "msi", new[] { "msi" } },
-                { "gigabyte", new[] { "gigabyte", "giga" } },
-                { "apple", new[] { "apple", "macbook", "mac" } },
-                { "samsung", new[] { "samsung" } }
+                { "dell", (new[] { "dell" }, new[] { "alienware", "inspiron", "xps" }) },
+                { "lenovo", (new[] { "lenovo" }, new[] { "thinkpad", "legion", "loq" }) },
+                { "hp", (new[] { "hp", "hewlett packard" }, new[] { "omen", "pavilion" }) },
+                { "asus", (new[] { "asus", "rog" }, new[] { "expertbook", "tuf gaming", "tuf", "rog" }) }
             };
             
+            // BƯỚC 1: Tìm model/series name trước (ưu tiên cao nhất)
             foreach (var brandPair in brandKeywords)
             {
                 var brandName = brandPair.Key;
-                var keywords = brandPair.Value;
+                var keywords = brandPair.Value.Keywords;
+                var modelSeriesList = brandPair.Value.ModelSeries;
                 
-                if (keywords.Any(keyword => searchTerm.Contains(keyword)))
+                // Kiểm tra xem có model/series name trong câu hỏi không
+                foreach (var model in modelSeriesList)
                 {
-                    // Query database để lấy BrandId thực tế
-                    try
+                    if (searchTerm.Contains(model))
                     {
-                        // Lấy DbContext từ service provider
-                        var dbContext = _serviceProvider.GetService<Data.WebLaptopTenTechContext>();
-                        if (dbContext != null)
+                        modelSeries = model;
+                        _logger.LogInformation("Detected model/series: {ModelSeries} for brand: {BrandName}", modelSeries, brandName);
+                        
+                        // Tìm brandId
+                        try
                         {
-                            var brandEntity = await dbContext.Brands
-                                .FirstOrDefaultAsync(b => b.BrandName != null && 
-                                    b.BrandName.ToLower().Contains(brandName));
-                            if (brandEntity != null && brandEntity.BrandId != null)
+                            var dbContext = _serviceProvider.GetService<Data.WebLaptopTenTechContext>();
+                            if (dbContext != null)
                             {
-                                brandId = brandEntity.BrandId;
-                                criteria.BrandId = brandId;
-                                _logger.LogInformation("Found brand in database: {BrandName}, BrandId: {BrandId}", 
-                                    brandEntity.BrandName, brandId);
-                    break;
+                                var brandEntity = await dbContext.Brands
+                                    .FirstOrDefaultAsync(b => b.BrandName != null && 
+                                        b.BrandName.ToLower().Contains(brandName));
+                                if (brandEntity != null && brandEntity.BrandId != null)
+                                {
+                                    brandId = brandEntity.BrandId;
+                                    criteria.BrandId = brandId;
+                                    _logger.LogInformation("Found brand in database: {BrandName}, BrandId: {BrandId}", 
+                                        brandEntity.BrandName, brandId);
+                                    break; // Đã tìm thấy model và brand, dừng lại
+                                }
                             }
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Error querying brand: {BrandName}", brandName);
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Error querying brand: {BrandName}", brandName);
+                        }
+                        break; // Đã tìm thấy model, dừng lại
                     }
                 }
+                
+                if (!string.IsNullOrEmpty(modelSeries))
+                    break; // Đã tìm thấy model, không cần tìm tiếp
+            }
+            
+            // BƯỚC 2: Nếu không tìm thấy model/series, tìm brand thông thường
+            string? detectedBrandName = null; // Lưu tên brand được detect để kiểm tra sau
+            if (string.IsNullOrEmpty(modelSeries))
+            {
+                foreach (var brandPair in brandKeywords)
+                {
+                    var brandName = brandPair.Key;
+                    var keywords = brandPair.Value.Keywords;
+                    
+                    if (keywords.Any(keyword => searchTerm.Contains(keyword)))
+                    {
+                        detectedBrandName = brandName; // Lưu tên brand được detect
+                        
+                        // Query database để lấy BrandId thực tế
+                        try
+                        {
+                            // Lấy DbContext từ service provider
+                            var dbContext = _serviceProvider.GetService<Data.WebLaptopTenTechContext>();
+                            if (dbContext != null)
+                            {
+                                var brandEntity = await dbContext.Brands
+                                    .FirstOrDefaultAsync(b => b.BrandName != null && 
+                                        b.BrandName.ToLower().Contains(brandName));
+                                if (brandEntity != null && brandEntity.BrandId != null)
+                                {
+                                    brandId = brandEntity.BrandId;
+                                    criteria.BrandId = brandId;
+                                    _logger.LogInformation("Found brand in database: {BrandName}, BrandId: {BrandId}", 
+                                        brandEntity.BrandName, brandId);
+                                    break;
+                                }
+                                else
+                                {
+                                    // Brand không tồn tại trong database
+                                    _logger.LogInformation("Brand '{BrandName}' not found in database", brandName);
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Error querying brand: {BrandName}", brandName);
+                        }
+                    }
+                }
+            }
+            
+            // BƯỚC 3: Nếu có model/series, ưu tiên search theo model/series trong tên sản phẩm
+            if (!string.IsNullOrEmpty(modelSeries))
+            {
+                // Set SearchTerm để tìm chính xác model/series trong ProductName hoặc ProductModel
+                criteria.SearchTerm = modelSeries;
+                _logger.LogInformation("Prioritizing search for model/series: {ModelSeries}", modelSeries);
             }
             
             // 4. Extract use case (gaming, văn phòng, đồ họa) để filter sản phẩm phù hợp
@@ -1616,17 +2006,40 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
             // 7. Search products với tất cả các tiêu chí đã parse
             var products = await _productService.SearchProductsAsync(criteria);
             
+            // 7.5. Nếu có model/series, ưu tiên sản phẩm có tên/model chứa đúng model/series
+            if (!string.IsNullOrEmpty(modelSeries) && products.Any())
+            {
+                var modelSeriesLower = modelSeries.ToLower();
+                var exactMatches = products.Where(p => 
+                    (!string.IsNullOrEmpty(p.ProductName) && p.ProductName.ToLower().Contains(modelSeriesLower)) ||
+                    (!string.IsNullOrEmpty(p.ProductModel) && p.ProductModel.ToLower().Contains(modelSeriesLower))
+                ).ToList();
+                
+                if (exactMatches.Any())
+                {
+                    _logger.LogInformation("Found {Count} exact model/series matches for '{ModelSeries}', prioritizing them", 
+                        exactMatches.Count, modelSeries);
+                    products = exactMatches; // Chỉ giữ lại các sản phẩm đúng model/series
+                }
+                else
+                {
+                    _logger.LogWarning("No exact model/series matches found for '{ModelSeries}', using all {Count} products", 
+                        modelSeries, products.Count);
+                }
+            }
+            
             // 8. Nếu có use case nhưng không tìm được sản phẩm → search lại với criteria relaxed
             if (!string.IsNullOrEmpty(useCase) && products.Count == 0)
             {
                 _logger.LogInformation("No products found with strict criteria for use case: {UseCase}, trying relaxed search", useCase);
                 
-                // Relax criteria: chỉ giữ brand và price nếu có, bỏ các spec filters
+                // Relax criteria: chỉ giữ brand, price, và modelSeries nếu có, bỏ các spec filters
                 var relaxedCriteria = new ProductSearchCriteria
                 {
                     BrandId = criteria.BrandId,
                     MinPrice = criteria.MinPrice,
-                    MaxPrice = criteria.MaxPrice
+                    MaxPrice = criteria.MaxPrice,
+                    SearchTerm = criteria.SearchTerm // Giữ nguyên modelSeries nếu có
                 };
                 
                 products = await _productService.SearchProductsAsync(relaxedCriteria);
@@ -1778,7 +2191,12 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
                 _logger.LogInformation("No products found with criteria for use case: {UseCase}, trying very relaxed search", useCase);
                 
                 // Search với criteria rất relaxed: chỉ filter theo use case requirements
-                var veryRelaxedCriteria = new ProductSearchCriteria();
+                // NHƯNG vẫn ưu tiên modelSeries nếu có
+                var veryRelaxedCriteria = new ProductSearchCriteria
+                {
+                    SearchTerm = criteria.SearchTerm, // Giữ nguyên modelSeries nếu có
+                    BrandId = criteria.BrandId // Giữ nguyên brand nếu có
+                };
                 
                 // Set criteria cơ bản theo use case
                 switch (useCase)
@@ -1912,13 +2330,45 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
             {
                 if (product.Metadata != null)
                 {
-                    var name = product.Metadata.GetValueOrDefault("name", "N/A");
+                    var name = product.Metadata.GetValueOrDefault("name", "N/A")?.ToString() ?? "N/A";
+                    var model = product.Metadata.GetValueOrDefault("model", "")?.ToString() ?? "";
+                    var brand = product.Metadata.GetValueOrDefault("brand", "")?.ToString() ?? "";
                     var price = product.Metadata.TryGetValue("price", out var priceObj) ? priceObj : null;
                     
-                    sb.Append($"\n• {name}");
+                    // Format tên sản phẩm: nếu có model thì ghép với name
+                    var displayName = name;
+                    if (!string.IsNullOrEmpty(model))
+                    {
+                        displayName = $"{name} {model}";
+                    }
+                    
+                    sb.Append($"\n• **{displayName}**");
+                    
+                    if (!string.IsNullOrEmpty(brand))
+                    {
+                        sb.Append($"\n  Thương hiệu: {brand}");
+                    }
+                    
                     if (price != null)
                     {
-                        sb.Append($" - Giá: {price:N0} VND");
+                        decimal priceValue = 0;
+                        if (price is decimal priceDecimal)
+                        {
+                            priceValue = priceDecimal;
+                        }
+                        else if (price is int priceInt)
+                        {
+                            priceValue = priceInt;
+                        }
+                        else if (price is long priceLong)
+                        {
+                            priceValue = priceLong;
+                        }
+                        
+                        if (priceValue > 0)
+                        {
+                            sb.Append($"\n  Giá: {priceValue:N0} VND");
+                        }
                     }
                 }
             }
@@ -2002,10 +2452,18 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
             // Lấy config đầu tiên
             var firstConfig = p.Configurations?.FirstOrDefault();
 
+            // Format tên sản phẩm: nếu có model thì ghép với name để hiển thị
+            var displayName = p.ProductName ?? "";
+            if (!string.IsNullOrEmpty(p.ProductModel))
+            {
+                displayName = $"{displayName} {p.ProductModel}";
+            }
+            
             return new ProductSuggestion
             {
                 ProductId = p.ProductId ?? "",
-                Name = p.ProductName ?? "",
+                Name = displayName, // Tên đã bao gồm model
+                ProductModel = p.ProductModel, // Vẫn giữ model riêng để frontend có thể dùng
                 Price = p.SellingPrice ?? 0,
                 ImageUrl = imageUrl,
                 DetailUrl = detailUrl,
