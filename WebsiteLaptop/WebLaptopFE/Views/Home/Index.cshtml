@@ -158,9 +158,6 @@
                                                 <a href="${productDetailUrl}" class="btn border border-secondary rounded-pill px-3 py-2 text-primary d-flex align-items-center" style="min-height: 40px;">
                                                     <i class="fa fa-eye me-2 text-primary"></i> <span>Xem chi tiết</span>
                                                 </a>
-                                                <a href="#" class="btn border border-secondary rounded-circle d-flex align-items-center justify-content-center toggle-fav" data-id="${val.productId || ''}" title="Thêm vào yêu thích" style="width: 40px; height: 40px; padding: 0;">
-                                                    <i class="far fa-heart text-primary" id="heart-${val.productId || ''}"></i>
-                                                </a>
                                                 <a href="#" class="btn border border-secondary rounded-circle d-flex align-items-center justify-content-center btn-compare" data-product-id="${val.productId || ''}" data-product-name="${val.productName || ''}" title="So sánh sản phẩm" style="width: 40px; height: 40px; padding: 0;">
                                                     <i class="fa fa-balance-scale text-primary"></i>
                                                 </a>
@@ -178,13 +175,6 @@
                     $('#displayProducts .fruite-img').off('click').on('click', function () {
                         const href = $(this).data('href');
                         if (href) window.location.href = href;
-                    });
-
-                    // Favorite buttons (delegation)
-                    $('#displayProducts .toggle-fav').off('click').on('click', function (e) {
-                        e.preventDefault();
-                        const pid = $(this).data('id');
-                        toggleFavorite(pid);
                     });
 
                     // Compare buttons (delegation)
@@ -369,13 +359,16 @@
                     searchHeader.hide();
                 }
 
+                console.log('Đang tải sản phẩm từ:', requestUrl);
                 $.ajax({
                     type: 'GET',
                     url: requestUrl,
                     dataType: 'json',
                     success: function (data) {
+                        console.log('Nhận được dữ liệu sản phẩm:', data);
                         // Expect data = array of products
                         allProducts = Array.isArray(data) ? data : (data || []);
+                        console.log('Số lượng sản phẩm:', allProducts.length);
                         
                         // Cập nhật số lượng kết quả tìm kiếm
                         if (search) {
@@ -390,31 +383,20 @@
                         buildProductsHtml(allProducts, currentPage);
                     },
                     error: function (xhr, status, error) {
-                        $('#displayProducts').html('<div class="col-12"><p class="text-center text-danger">Không thể tải sản phẩm. Vui lòng thử lại sau.</p></div>');
+                        console.error('Lỗi khi tải sản phẩm:', {
+                            status: status,
+                            error: error,
+                            statusCode: xhr.status,
+                            responseText: xhr.responseText,
+                            url: requestUrl
+                        });
+                        $('#displayProducts').html('<div class="col-12"><p class="text-center text-danger">Không thể tải sản phẩm. Vui lòng thử lại sau.</p><p class="text-center text-muted small">Lỗi: ' + (error || 'Unknown error') + '</p></div>');
                         $('#paginationContainer').hide();
                         if (search) {
                             searchResultCount.html('<span class="text-danger">Lỗi khi tìm kiếm sản phẩm</span>');
                         }
                     }
                 });
-            }
-
-            // Toggle favorite (UI only stub)
-            function toggleFavorite(productId) {
-                if (!productId) return;
-                const heartIcon = $('#heart-' + productId);
-                if (!heartIcon.length) return;
-
-                if (heartIcon.hasClass('fas')) {
-                    // remove favorite
-                    heartIcon.removeClass('fas text-danger').addClass('far');
-                    console.log('Bỏ yêu thích sản phẩm:', productId);
-                    // TODO: call API to remove favorite
-                } else {
-                    heartIcon.removeClass('far').addClass('fas text-danger');
-                    console.log('Thêm yêu thích sản phẩm:', productId);
-                    // TODO: call API to add favorite
-                }
             }
 
             // Comparison functions

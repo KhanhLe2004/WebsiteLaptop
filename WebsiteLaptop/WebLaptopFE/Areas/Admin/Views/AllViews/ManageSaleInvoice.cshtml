@@ -924,8 +924,20 @@
                 error: function(xhr) {
                     console.error('Error updating status:', xhr);
                     let message = 'Có lỗi xảy ra khi cập nhật trạng thái';
+                    // Ưu tiên lấy message từ responseJSON
                     if (xhr.responseJSON && xhr.responseJSON.message) {
                         message = xhr.responseJSON.message;
+                    } 
+                    // Nếu không có responseJSON, thử parse responseText
+                    else if (xhr.responseText) {
+                        try {
+                            const response = JSON.parse(xhr.responseText);
+                            if (response && response.message) {
+                                message = response.message;
+                            }
+                        } catch (e) {
+                            // Nếu không parse được, giữ message mặc định
+                        }
                     }
                     showStatusError(message);
                 }

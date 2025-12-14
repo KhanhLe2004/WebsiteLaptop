@@ -31,6 +31,10 @@ public class RAGChatService : IRAGChatService
     // Cache Frontend URL
     private string? _frontendUrl;
     private string FrontendUrl => _frontendUrl ??= _configuration["FrontendUrl"] ?? "http://localhost:5253";
+    
+    // Cache last search context để giữ ngữ cảnh khi "gợi ý thêm"
+    // Key: customerId hoặc sessionId, Value: (originalQuery, brandId, useCase)
+    private static readonly Dictionary<string, (string OriginalQuery, string? BrandId, string? UseCase)> _lastSearchContext = new();
 
     public RAGChatService(
         IQdrantVectorService qdrantVectorService,
@@ -73,7 +77,34 @@ public class RAGChatService : IRAGChatService
                 };
             }
 
+            // Bước 0.3: Detect intent "gợi ý thêm" hoặc "sản phẩm khác"
+            var isRequestMoreProducts = DetectMoreProductsRequest(userMessage);
+            
+            // Lấy session key để lưu context
+            var sessionKey = customerId ?? "anonymous";
+            
+            // Nếu là "gợi ý thêm" và có context từ lần trước, dùng context đó
+            string? contextBrandId = null;
+            string? contextOriginalQuery = null;
+            string originalUserMessage = userMessage; // Lưu userMessage gốc để lưu context
+            
+            if (isRequestMoreProducts && _lastSearchContext.TryGetValue(sessionKey, out var lastContext))
+            {
+                contextOriginalQuery = lastContext.OriginalQuery;
+                contextBrandId = lastContext.BrandId;
+                _logger.LogInformation("Found previous context for 'more products': BrandId={BrandId}, OriginalQuery={OriginalQuery}", 
+                    contextBrandId, contextOriginalQuery);
+                
+                // Nếu có original query, dùng nó thay vì "gợi ý thêm" để search lại
+                if (!string.IsNullOrEmpty(contextOriginalQuery))
+                {
+                    userMessage = contextOriginalQuery; // Dùng query gốc để search lại
+                    _logger.LogInformation("Using original query for search: {OriginalQuery}", contextOriginalQuery);
+                }
+            }
+            
             // Bước 0.5: Kiểm tra brand được hỏi TRƯỚC KHI search để phát hiện brand không có sản phẩm
+            // Nếu có context brand từ lần trước, ưu tiên dùng nó
             string? unavailableBrandInfo = null;
             var searchTermLower = userMessage.ToLower();
             var allBrandKeywords = new Dictionary<string, string[]>
@@ -82,14 +113,14 @@ public class RAGChatService : IRAGChatService
                 { "lenovo", new[] { "lenovo" } },
                 { "hp", new[] { "hp", "hewlett packard" } },
                 { "asus", new[] { "asus", "rog" } },
-                { "apple", new[] { "apple", "macbook", "mac", "iphone" } },
+                { "apple", new[] { "apple", "macbook", "iphone" } }, // Bỏ "mac" vì quá ngắn, dễ nhầm
                 { "samsung", new[] { "samsung", "galaxy" } },
                 { "acer", new[] { "acer" } },
                 { "msi", new[] { "msi" } },
-                { "gigabyte", new[] { "gigabyte", "giga" } },
+                { "gigabyte", new[] { "gigabyte" } }, // Bỏ "giga" vì quá ngắn
                 { "sony", new[] { "sony", "vaio" } },
                 { "huawei", new[] { "huawei", "matebook" } },
-                { "xiaomi", new[] { "xiaomi", "mi" } },
+                { "xiaomi", new[] { "xiaomi" } }, // BỎ "mi" vì quá ngắn, dễ nhầm với "gaming", "admin", v.v.
                 { "lg", new[] { "lg" } },
                 { "toshiba", new[] { "toshiba" } },
                 { "fujitsu", new[] { "fujitsu" } }
@@ -97,18 +128,25 @@ public class RAGChatService : IRAGChatService
             
             // Phát hiện brand được hỏi trong câu và kiểm tra xem có trong database không
             // QUAN TRỌNG: Chỉ set unavailableBrandInfo khi brand KHÔNG có trong database hoặc không có sản phẩm
-            foreach (var brandPair in allBrandKeywords)
+            // QUAN TRỌNG: Check các từ dài trước để tránh false positive (ví dụ: "xiaomi" trước "mi")
+            foreach (var brandPair in allBrandKeywords.OrderByDescending(x => x.Value.Max(k => k.Length)))
             {
                 var brandName = brandPair.Key;
                 var keywords = brandPair.Value;
                 
                 // Nếu câu hỏi có chứa brand này (kiểm tra từng keyword)
+                // QUAN TRỌNG: Chỉ match nếu keyword là một từ riêng biệt (word boundary) để tránh false positive
                 bool brandMentioned = false;
-                foreach (var keyword in keywords)
+                foreach (var keyword in keywords.OrderByDescending(k => k.Length)) // Check từ dài trước
                 {
-                    if (searchTermLower.Contains(keyword))
+                    // Sử dụng word boundary để tránh match với substring (ví dụ: "gaming" không match "mi")
+                    // Kiểm tra: keyword phải là một từ riêng biệt hoặc ở đầu/cuối câu
+                    var keywordLower = keyword.ToLower();
+                    var pattern = $@"\b{System.Text.RegularExpressions.Regex.Escape(keywordLower)}\b";
+                    if (System.Text.RegularExpressions.Regex.IsMatch(searchTermLower, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
                     {
                         brandMentioned = true;
+                        _logger.LogInformation("Detected brand keyword '{Keyword}' in query (using word boundary)", keyword);
                         break;
                     }
                 }
@@ -197,8 +235,17 @@ public class RAGChatService : IRAGChatService
             List<VectorSearchResult> productResults = new List<VectorSearchResult>();
             List<VectorSearchResult> policyResults = new List<VectorSearchResult>();
             
-            // Detect use case từ userMessage để optimize search
-            var detectedUseCase = DetectUseCaseFromMessage(userMessage);
+                // Detect use case từ userMessage để optimize search
+                // Nếu có context use case từ lần trước, ưu tiên dùng nó
+                string? detectedUseCase = null;
+                if (!string.IsNullOrEmpty(contextOriginalQuery) && _lastSearchContext.TryGetValue(sessionKey, out var ctx) && !string.IsNullOrEmpty(ctx.UseCase))
+                {
+                    detectedUseCase = ctx.UseCase;
+                }
+                else
+                {
+                    detectedUseCase = DetectUseCaseFromMessage(userMessage);
+                }
 
             // QUAN TRỌNG: Nếu brand không có sản phẩm, SKIP product search hoàn toàn
             Task<List<VectorSearchResult>> productSearchTask;
@@ -211,10 +258,11 @@ public class RAGChatService : IRAGChatService
             else
             {
                 // Brand có sản phẩm → search bình thường
-                productSearchTask = SearchProductsWithFallbackAsync(userMessage);
+                // Nếu là yêu cầu "gợi ý thêm", search nhiều sản phẩm hơn để có thể lấy các sản phẩm khác
+                productSearchTask = SearchProductsWithFallbackAsync(userMessage, isRequestMoreProducts);
             }
             
-            // QUAN TRỌNG: Nếu brand không có sản phẩm, SKIP policy search hoàn toàn
+            // QUAN TRỌNG: Nếu brand không có sản phẩm HOẶC là yêu cầu "gợi ý thêm", SKIP policy search hoàn toàn
             Task<List<VectorSearchResult>> policySearchTask;
             if (!string.IsNullOrEmpty(unavailableBrandInfo))
             {
@@ -222,9 +270,15 @@ public class RAGChatService : IRAGChatService
                 _logger.LogWarning("⚠️ Brand '{BrandName}' is unavailable - SKIPPING policy search completely", unavailableBrandInfo);
                 policySearchTask = Task.FromResult(new List<VectorSearchResult>());
             }
+            else if (isRequestMoreProducts)
+            {
+                // Yêu cầu "gợi ý thêm" → KHÔNG search policy, trả về empty list ngay
+                _logger.LogInformation("⚠️⚠️⚠️ 'More products' request detected - SKIPPING policy search completely. Will NOT show any policies.");
+                policySearchTask = Task.FromResult(new List<VectorSearchResult>());
+            }
             else
             {
-                // Brand có sản phẩm → search policy bình thường
+                // Brand có sản phẩm VÀ không phải yêu cầu "gợi ý thêm" → search policy bình thường
                 policySearchTask = _qdrantVectorService.SearchPoliciesAsync(userMessage, topK: 3);
             }
             
@@ -285,9 +339,9 @@ public class RAGChatService : IRAGChatService
                 }
             }
 
-            // QUAN TRỌNG: Nếu brand không có sản phẩm, KHÔNG gọi GetFallbackPolicies
-            // Chỉ gọi GetFallbackPolicies khi brand có sản phẩm
-            if (string.IsNullOrEmpty(unavailableBrandInfo))
+            // QUAN TRỌNG: Nếu brand không có sản phẩm HOẶC là yêu cầu "gợi ý thêm", KHÔNG gọi GetFallbackPolicies
+            // Chỉ gọi GetFallbackPolicies khi brand có sản phẩm VÀ không phải yêu cầu "gợi ý thêm"
+            if (string.IsNullOrEmpty(unavailableBrandInfo) && !isRequestMoreProducts)
             {
                 // Nếu không lấy được policy từ Qdrant, fallback sang bộ policy mặc định (không cần vector DB)
                 if (policyResults == null || policyResults.Count == 0)
@@ -301,18 +355,32 @@ public class RAGChatService : IRAGChatService
             }
             else
             {
-                // Brand không có sản phẩm → đảm bảo policyResults rỗng
+                // Brand không có sản phẩm HOẶC là yêu cầu "gợi ý thêm" → đảm bảo policyResults rỗng
                 policyResults = new List<VectorSearchResult>();
-                _logger.LogWarning("⚠️ Brand '{BrandName}' is unavailable - ensuring policyResults is empty, will NOT call GetFallbackPolicies", unavailableBrandInfo);
+                if (!string.IsNullOrEmpty(unavailableBrandInfo))
+                {
+                    _logger.LogWarning("⚠️ Brand '{BrandName}' is unavailable - ensuring policyResults is empty, will NOT call GetFallbackPolicies", unavailableBrandInfo);
+                }
+                if (isRequestMoreProducts)
+                {
+                    _logger.LogInformation("⚠️⚠️⚠️ 'More products' request detected - ensuring policyResults is empty, will NOT call GetFallbackPolicies");
+                }
             }
 
-            // Bước 3: Đảm bảo productResults và policyResults rỗng nếu brand không có sản phẩm
+            // Bước 3: Đảm bảo productResults và policyResults rỗng nếu brand không có sản phẩm HOẶC là yêu cầu "gợi ý thêm"
             // QUAN TRỌNG: Phải clear cả productResults và policyResults TRƯỚC khi build context
             if (!string.IsNullOrEmpty(unavailableBrandInfo))
             {
                 productResults = new List<VectorSearchResult>(); // Clear results để AI biết không có sản phẩm
                 policyResults = new List<VectorSearchResult>(); // Clear policy results để AI không hiển thị chính sách
                 _logger.LogWarning("⚠️⚠️⚠️ Brand '{BrandName}' is UNAVAILABLE - ensuring productResults and policyResults are empty. AI MUST respond that store does NOT sell this brand, WITHOUT showing policies or suggesting products.", unavailableBrandInfo);
+            }
+            
+            // QUAN TRỌNG: Nếu là yêu cầu "gợi ý thêm", đảm bảo policyResults rỗng (đã clear ở trên, nhưng double-check)
+            if (isRequestMoreProducts)
+            {
+                policyResults = new List<VectorSearchResult>(); // Clear policy results để AI không hiển thị chính sách
+                _logger.LogInformation("⚠️⚠️⚠️ 'More products' request detected - ensuring policyResults is empty. AI MUST only suggest products, NOT show policies.");
             }
             
             // Bước 3: Build context từ search results (có thể include use case info)
@@ -324,13 +392,18 @@ public class RAGChatService : IRAGChatService
             
             var productContext = BuildProductContext(productResults, detectedUseCase, unavailableBrandInfo);
             
-            // QUAN TRỌNG: Nếu brand không có sản phẩm, KHÔNG hiển thị policy context
-            // Chỉ trả lời ngắn gọn rằng sản phẩm không được kinh doanh
+            // QUAN TRỌNG: Nếu brand không có sản phẩm HOẶC là yêu cầu "gợi ý thêm", KHÔNG hiển thị policy context
+            // Chỉ trả lời ngắn gọn rằng sản phẩm không được kinh doanh HOẶC chỉ gợi ý sản phẩm
             string policyContext;
             if (!string.IsNullOrEmpty(unavailableBrandInfo))
             {
                 policyContext = ""; // Clear policy context khi sản phẩm không được kinh doanh
                 _logger.LogWarning("⚠️ Brand '{BrandName}' is unavailable - clearing policy context. AI should only respond that product is not sold, without showing policies.", unavailableBrandInfo);
+            }
+            else if (isRequestMoreProducts)
+            {
+                policyContext = ""; // Clear policy context khi yêu cầu "gợi ý thêm" - chỉ tập trung vào sản phẩm
+                _logger.LogInformation("⚠️ 'More products' request detected - clearing policy context. AI should only suggest products, not show policies.");
             }
             else
             {
@@ -352,7 +425,7 @@ public class RAGChatService : IRAGChatService
 
             // Bước 4: Tạo prompt cho LLM
             var systemPrompt = BuildSystemPrompt();
-            var userPrompt = BuildUserPrompt(userMessage, productContext, policyContext);
+            var userPrompt = BuildUserPrompt(userMessage, productContext, policyContext, isRequestMoreProducts);
 
             // Bước 5: Gọi Semantic Kernel để generate response với timeout
             string response;
@@ -391,6 +464,12 @@ public class RAGChatService : IRAGChatService
                     llmSucceeded = true; // Đánh dấu là đã có response
                     _logger.LogWarning("⚠️ LLM failed but brand is unavailable - using direct response without LLM");
                 }
+                else if (isRequestMoreProducts)
+                {
+                    // Yêu cầu "gợi ý thêm" nhưng LLM fail → đợi parse products trước, response sẽ được tạo sau
+                    response = ""; // Tạm thời để rỗng, sẽ được set sau khi có productDTOs
+                    _logger.LogWarning("⚠️ LLM failed for 'more products' request - will create response from products");
+                }
                 else
                 {
                     // GRACEFUL DEGRADATION: Tạo response từ dữ liệu có sẵn thay vì fail hoàn toàn
@@ -419,6 +498,113 @@ public class RAGChatService : IRAGChatService
                             _logger.LogInformation("SQL fallback found {Count} products", productDTOs.Count);
                         }
                     }
+                    
+                    // QUAN TRỌNG: Nếu là yêu cầu "gợi ý thêm" nhưng không tìm thấy sản phẩm, extract context và search lại
+                    if (isRequestMoreProducts && (productDTOs == null || productDTOs.Count == 0))
+                    {
+                        _logger.LogInformation("'More products' request but no products found, extracting context and searching again");
+                        
+                        // Extract brand từ productResults hiện có (nếu có)
+                        var extractedBrandId = ExtractBrandFromProductResults(productResults);
+                        
+                        // Nếu không có brand từ metadata, thử query database từ productId trong productResults
+                        if (string.IsNullOrEmpty(extractedBrandId) && productResults != null && productResults.Count > 0)
+                        {
+                            foreach (var result in productResults.Take(5))
+                            {
+                                if (result?.Metadata != null && result.Metadata.TryGetValue("productId", out var productIdObj) && productIdObj != null)
+                                {
+                                    var productId = productIdObj.ToString();
+                                    if (!string.IsNullOrEmpty(productId))
+                                    {
+                                        try
+                                        {
+                                            var dbContext = _serviceProvider.GetService<Data.WebLaptopTenTechContext>();
+                                            if (dbContext != null)
+                                            {
+                                                var productEntity = await dbContext.Products
+                                                    .AsNoTracking()
+                                                    .FirstOrDefaultAsync(p => p.ProductId == productId);
+                                                if (productEntity != null && productEntity.BrandId != null)
+                                                {
+                                                    extractedBrandId = productEntity.BrandId;
+                                                    _logger.LogInformation("Extracted brand ID {BrandId} from product ID {ProductId}", extractedBrandId, productId);
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            _logger.LogWarning(ex, "Error querying brand from productId: {ProductId}", productId);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Nếu vẫn không có brand, thử extract từ userMessage (loại bỏ các từ "gợi ý thêm")
+                        if (string.IsNullOrEmpty(extractedBrandId))
+                        {
+                            // Loại bỏ các từ "gợi ý thêm", "sản phẩm khác" khỏi userMessage để tìm brand
+                            var cleanedMessage = userMessage.ToLower()
+                                .Replace("gợi ý thêm", "")
+                                .Replace("goi y them", "")
+                                .Replace("sản phẩm khác", "")
+                                .Replace("san pham khac", "")
+                                .Replace("máy khác", "")
+                                .Replace("may khac", "")
+                                .Replace("laptop khác", "")
+                                .Replace("laptop khac", "")
+                                .Replace("xem thêm", "")
+                                .Replace("xem them", "")
+                                .Trim();
+                            
+                            if (!string.IsNullOrEmpty(cleanedMessage))
+                            {
+                                _logger.LogInformation("Trying to extract brand from cleaned message: {CleanedMessage}", cleanedMessage);
+                                var sqlProducts = await FallbackSearchFromSqlAsync(cleanedMessage);
+                                if (sqlProducts != null && sqlProducts.Count > 0)
+                                {
+                                    // Lấy brand từ sản phẩm đầu tiên
+                                    var firstProduct = sqlProducts.FirstOrDefault();
+                                    if (firstProduct != null && !string.IsNullOrEmpty(firstProduct.BrandId))
+                                    {
+                                        extractedBrandId = firstProduct.BrandId;
+                                        _logger.LogInformation("Extracted brand ID {BrandId} from cleaned message search", extractedBrandId);
+                                        // Dùng toàn bộ kết quả từ search này
+                                        productDTOs = sqlProducts.ToList();
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Nếu có brand, search lại với brand đó để giữ ngữ cảnh
+                        if (!string.IsNullOrEmpty(extractedBrandId) && (productDTOs == null || productDTOs.Count == 0))
+                        {
+                            _logger.LogInformation("Searching more products with brand {BrandId} to maintain context", extractedBrandId);
+                            var criteria = new ProductSearchCriteria
+                            {
+                                BrandId = extractedBrandId
+                            };
+                            var moreProducts = await _productService.SearchProductsAsync(criteria);
+                            if (moreProducts != null && moreProducts.Count > 0)
+                            {
+                                productDTOs = moreProducts.ToList();
+                                _logger.LogInformation("Found {Count} more products with brand {BrandId}", productDTOs.Count, extractedBrandId);
+                            }
+                        }
+                        // Nếu vẫn không có sản phẩm, fallback: search tất cả sản phẩm
+                        else if (productDTOs == null || productDTOs.Count == 0)
+                        {
+                            _logger.LogInformation("No context found, searching all products as last resort");
+                            var allProducts = await _productService.SearchProductsAsync(new ProductSearchCriteria());
+                            if (allProducts != null && allProducts.Count > 0)
+                            {
+                                productDTOs = allProducts.ToList();
+                                _logger.LogInformation("Found {Count} total products for 'more products' request", productDTOs.Count);
+                            }
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -445,8 +631,70 @@ public class RAGChatService : IRAGChatService
                 _logger.LogWarning("⚠️ Brand '{BrandName}' is unavailable - SKIPPING suggested products parsing. Will NOT suggest any products.", unavailableBrandInfo);
             }
 
+            // Xử lý yêu cầu "gợi ý thêm": Skip 5 sản phẩm đầu và lấy các sản phẩm tiếp theo
+            if (isRequestMoreProducts && productDTOs != null && productDTOs.Count > 0)
+            {
+                // Skip 5 sản phẩm đầu (đã hiển thị ở lần trước), lấy các sản phẩm tiếp theo
+                // Nếu có ít hơn 5 sản phẩm, vẫn lấy tất cả (có thể đây là lần đầu tiên hoặc không có đủ sản phẩm)
+                if (productDTOs.Count > 5)
+                {
+                    _logger.LogInformation("Detected 'more products' request, skipping first 5 products and showing next {Count} products", productDTOs.Count - 5);
+                    productDTOs = productDTOs.Skip(5).ToList();
+                }
+                else
+                {
+                    _logger.LogInformation("Detected 'more products' request, but only {Count} products available, showing all", productDTOs.Count);
+                    // Nếu có ít hơn 5 sản phẩm, vẫn hiển thị tất cả (có thể đây là lần đầu)
+                }
+            }
+            
+            // Phân bổ sản phẩm theo brand: Mỗi brand ít nhất 1 sản phẩm, tối đa 5 sản phẩm
+            if (productDTOs != null && productDTOs.Count > 0)
+            {
+                productDTOs = DistributeProductsByBrand(productDTOs, maxProducts: 5);
+            }
+            
             // Convert ProductDTO to ProductSuggestion
             // Validate and sanitize response
+            
+            // QUAN TRỌNG: Nếu là yêu cầu "gợi ý thêm" nhưng LLM fail và có sản phẩm, tạo response từ sản phẩm
+            if (isRequestMoreProducts && string.IsNullOrEmpty(response) && productDTOs != null && productDTOs.Count > 0)
+            {
+                response = $"Dạ em xin gợi ý thêm một số sản phẩm khác cho anh/chị:";
+                _logger.LogInformation("Created response for 'more products' request from {Count} products", productDTOs.Count);
+            }
+            // Nếu vẫn không có response và không có sản phẩm, dùng fallback
+            else if (string.IsNullOrEmpty(response))
+            {
+                response = BuildFallbackResponse(userMessage, productResults, policyResults);
+            }
+            
+            // Lưu context của lần search này để dùng cho lần "gợi ý thêm" tiếp theo
+            // Chỉ lưu nếu KHÔNG phải là "gợi ý thêm" (để giữ nguyên query gốc)
+            if (!isRequestMoreProducts)
+            {
+                // Extract brand và use case từ kết quả hiện tại
+                string? savedBrandId = null;
+                
+                if (productDTOs != null && productDTOs.Count > 0)
+                {
+                    // Lấy brand từ sản phẩm đầu tiên
+                    var firstProduct = productDTOs.FirstOrDefault();
+                    if (firstProduct != null && !string.IsNullOrEmpty(firstProduct.BrandId))
+                    {
+                        savedBrandId = firstProduct.BrandId;
+                    }
+                }
+                
+                // Detect use case từ userMessage
+                var savedUseCase = DetectUseCaseFromMessage(originalUserMessage);
+                
+                // Lưu context
+                _lastSearchContext[sessionKey] = (originalUserMessage, savedBrandId, savedUseCase);
+                _logger.LogInformation("Saved search context for session {SessionKey}: BrandId={BrandId}, UseCase={UseCase}, Query={Query}", 
+                    sessionKey, savedBrandId, savedUseCase, originalUserMessage);
+            }
+            
             var sanitizedResponse = SanitizeResponse(response);
             
             return new RAGChatResponse
@@ -590,7 +838,20 @@ PHONG CÁCH GIAO TIẾP:
       → Ví dụ format: 'Em xin lỗi, hiện tại cửa hàng TenTech không kinh doanh laptop [tên brand] ạ.'
    ⚠️⚠️⚠️ LƯU Ý: Nếu context có thông báo 'CỬA HÀNG KHÔNG KINH DOANH', bạn PHẢI trả lời theo ĐÚNG format trong context, KHÔNG được tự ý thay đổi, KHÔNG được bịa sản phẩm, và KHÔNG được hiển thị thông tin chính sách
 
-5. KHI TRẢ LỜI VỀ CHÍNH SÁCH (QUAN TRỌNG - ĐỌC KỸ):
+5. KHI KHÁCH YÊU CẦU 'GỢI Ý THÊM' HOẶC 'SẢN PHẨM KHÁC' (⚠️⚠️⚠️ CỰC KỲ QUAN TRỌNG):
+   ⚠️⚠️⚠️ NẾU khách hàng yêu cầu 'gợi ý thêm', 'sản phẩm khác', 'máy khác', 'laptop khác', 'xem thêm':
+      → CHỈ tập trung vào gợi ý các SẢN PHẨM MỚI, KHÁC với lần trước
+      → ⚠️⚠️⚠️ TUYỆT ĐỐI KHÔNG hiển thị thông tin chính sách bảo hành, bảo mật, hoặc bất kỳ chính sách nào
+      → ⚠️⚠️⚠️ KHÔNG nhắc lại các sản phẩm đã gợi ý trước đó
+      → ⚠️⚠️⚠️ KHÔNG đề cập đến chính sách, chỉ tập trung vào sản phẩm
+      → Trả lời ngắn gọn, tập trung vào danh sách sản phẩm mới
+      → Format hiển thị sản phẩm giống như lần trước (tên + model, thương hiệu, giá)
+      → Ví dụ: 'Dạ em xin gợi ý thêm một số sản phẩm khác cho anh/chị: [danh sách sản phẩm mới]'
+      → ⚠️⚠️⚠️ LƯU Ý: Nếu bạn hiển thị chính sách khi khách yêu cầu 'gợi ý thêm', bạn đang làm SAI. CHỈ gợi ý sản phẩm.
+
+6. KHI TRẢ LỜI VỀ CHÍNH SÁCH (QUAN TRỌNG - ĐỌC KỸ):
+   ✅ CHỈ hiển thị chính sách khi khách hàng HỎI VỀ CHÍNH SÁCH (ví dụ: 'chính sách bảo hành', 'chính sách bảo mật')
+   ✅ KHÔNG hiển thị chính sách khi khách yêu cầu 'gợi ý thêm' hoặc 'sản phẩm khác'
    ✅ HIỂN THỊ FULL TEXT CHÍNH SÁCH từ context được cung cấp - KHÔNG tóm tắt, KHÔNG rút gọn
    ✅ Nếu có nhiều chính sách liên quan, hiển thị TẤT CẢ các chính sách đó
    ✅ Giữ nguyên cấu trúc, định dạng, và nội dung chi tiết của chính sách
@@ -699,7 +960,7 @@ Anh/chị có thắc mắc gì về chính sách bảo hành không ạ?'
     /// <summary>
     /// Build user prompt với context - Có intent detection và clarification
     /// </summary>
-    private string BuildUserPrompt(string userMessage, string productContext, string policyContext)
+    private string BuildUserPrompt(string userMessage, string productContext, string policyContext, bool isRequestMoreProducts = false)
     {
         // Phân tích intent từ userMessage
         var intent = DetectIntent(userMessage);
@@ -709,7 +970,7 @@ Anh/chị có thắc mắc gì về chính sách bảo hành không ạ?'
         var hasProducts = !productContext.Contains("Không tìm thấy") && 
                          !productContext.Contains("CỬA HÀNG KHÔNG KINH DOANH") &&
                          !productContext.Contains("KHÔNG CÓ trong kho hàng");
-        var hasPolicies = !policyContext.Contains("Không tìm thấy");
+        var hasPolicies = !policyContext.Contains("Không tìm thấy") && !isRequestMoreProducts; // Không hiển thị chính sách khi yêu cầu "gợi ý thêm"
         
         var prompt = $@"Câu hỏi của khách hàng: {userMessage}
 
@@ -742,9 +1003,22 @@ Cửa hàng TenTech hiện đang kinh doanh các thương hiệu sau:
 Nếu khách hỏi về thương hiệu khác (ví dụ: Apple, Samsung, Acer, MSI, Gigabyte), hãy trả lời rõ ràng rằng cửa hàng không kinh doanh thương hiệu đó.
 
 📋 THÔNG TIN CHÍNH SÁCH:
-{((productContext.Contains("CỬA HÀNG KHÔNG KINH DOANH") || string.IsNullOrEmpty(policyContext)) ? "⚠️ Không hiển thị thông tin chính sách khi sản phẩm không được kinh doanh." : (hasPolicies ? policyContext : "⚠️ Không tìm thấy thông tin chính sách liên quan."))}
+{((productContext.Contains("CỬA HÀNG KHÔNG KINH DOANH") || string.IsNullOrEmpty(policyContext) || isRequestMoreProducts) ? 
+    (isRequestMoreProducts ? "⚠️⚠️⚠️ QUAN TRỌNG: Khách hàng yêu cầu 'GỢI Ý THÊM SẢN PHẨM' hoặc 'SẢN PHẨM KHÁC'. KHÔNG hiển thị thông tin chính sách. CHỈ tập trung vào gợi ý các sản phẩm khác." : 
+     "⚠️ Không hiển thị thông tin chính sách khi sản phẩm không được kinh doanh.") : 
+    (hasPolicies ? policyContext : "⚠️ Không tìm thấy thông tin chính sách liên quan."))}
 
 🎯 HƯỚNG DẪN TRẢ LỜI:
+
+{(isRequestMoreProducts ? @"⚠️⚠️⚠️ QUAN TRỌNG: Khách hàng yêu cầu 'GỢI Ý THÊM SẢN PHẨM' hoặc 'SẢN PHẨM KHÁC':
+  + CHỈ tập trung vào gợi ý các sản phẩm khác từ danh sách 'THÔNG TIN SẢN PHẨM CÓ SẴN'
+  + KHÔNG hiển thị thông tin chính sách bảo hành, bảo mật, hoặc bất kỳ chính sách nào
+  + KHÔNG nhắc lại các sản phẩm đã gợi ý trước đó
+  + Gợi ý các sản phẩm mới, khác với lần trước
+  + Format hiển thị sản phẩm giống như lần trước (tên + model, thương hiệu, giá)
+  + Trả lời ngắn gọn, tập trung vào sản phẩm mới
+  + Ví dụ: 'Dạ em xin gợi ý thêm một số sản phẩm khác cho anh/chị: [danh sách sản phẩm mới]'
+  + KHÔNG đề cập đến chính sách, chỉ tập trung vào sản phẩm" : "")}
 
 {(intent == "product_search" ? @"- QUAN TRỌNG: Nếu có sản phẩm trong danh sách 'THÔNG TIN SẢN PHẨM CÓ SẴN':
   + LUÔN đề xuất NGAY các sản phẩm đó (2-10 sản phẩm tùy theo yêu cầu)
@@ -793,9 +1067,11 @@ Nếu khách hỏi về thương hiệu khác (ví dụ: Apple, Samsung, Acer, M
 - Nếu có nhiều cấu hình, liệt kê giá của từng cấu hình
 - Đề cập đến giá trị nhận được so với giá bán" : "")}
 
-{(intent == "use_case_gaming" ? @"- QUAN TRỌNG: Khi khách hỏi về laptop cho GAMING:
+{(intent == "use_case_gaming" ? @"- QUAN TRỌNG: Khi khách hỏi về laptop cho GAMING (chơi game):
+  + GAMING = CẤU HÌNH CAO: Card đồ họa rời (RTX/GTX/Radeon), CPU mạnh (i7/i9/Ryzen 7/9), RAM cao (16GB+)
   + LUÔN đề xuất sản phẩm từ danh sách 'THÔNG TIN SẢN PHẨM CÓ SẴN' - KHÔNG bịa sản phẩm
-  + Nếu có sản phẩm trong danh sách → Đề xuất NGAY các sản phẩm phù hợp gaming (hoặc gần nhất)
+  + Nếu có sản phẩm trong danh sách → Đề xuất NGAY các sản phẩm có CẤU HÌNH CAO phù hợp gaming
+  + Ưu tiên sản phẩm có card rời (RTX/GTX) vì đây là yêu cầu quan trọng nhất cho gaming
   + Highlight các đặc điểm quan trọng cho gaming:
     • Card đồ họa rời (RTX, GTX) - QUAN TRỌNG cho gaming
     • CPU mạnh (i7, i9, Ryzen 7, Ryzen 9) - Xử lý game tốt
@@ -807,18 +1083,23 @@ Nếu khách hỏi về thương hiệu khác (ví dụ: Apple, Samsung, Acer, M
   + Đề cập đến giá cả và giá trị nhận được
   + Nếu không có sản phẩm gaming lý tưởng → vẫn đề xuất sản phẩm gần nhất và giải thích điểm khác biệt" : "")}
 
-{(intent == "use_case_office" ? @"- QUAN TRỌNG: Khi khách hỏi về laptop cho VĂN PHÒNG:
+{(intent == "use_case_office" ? @"- QUAN TRỌNG: Khi khách hỏi về laptop cho VĂN PHÒNG (công việc văn phòng):
+  + VĂN PHÒNG = CẤU HÌNH THẤP: Card tích hợp (KHÔNG có RTX/GTX), CPU vừa (i3/i5/Ryzen 3/5), RAM thấp-trung (4-8GB), giá thấp
   + LUÔN đề xuất sản phẩm từ danh sách 'THÔNG TIN SẢN PHẨM CÓ SẴN' - KHÔNG bịa sản phẩm
-  + Nếu có sản phẩm trong danh sách → Đề xuất NGAY các sản phẩm phù hợp văn phòng (hoặc gần nhất)
+  + Nếu có sản phẩm trong danh sách → Đề xuất NGAY các sản phẩm có CẤU HÌNH THẤP phù hợp văn phòng
+  + Ưu tiên sản phẩm KHÔNG có card rời (RTX/GTX) vì văn phòng không cần card rời, chỉ cần card tích hợp
+  + Ưu tiên sản phẩm có giá thấp (< 20 triệu) vì văn phòng thường có ngân sách hạn chế
   + Highlight các đặc điểm quan trọng cho văn phòng:
-    • CPU ổn định (i3, i5, i7, Ryzen 3, Ryzen 5, Ryzen 7) - Đủ mạnh cho công việc
-    • RAM 4GB trở lên (8GB+ tốt hơn) - Đa nhiệm tốt
-    • Pin tốt, nhẹ - Dễ mang theo
-    • Giá hợp lý - Phù hợp ngân sách văn phòng
-  + Giải thích tại sao sản phẩm phù hợp văn phòng (ví dụ: 'CPU i5 đủ mạnh cho Word, Excel, trình duyệt')
-  + So sánh các sản phẩm văn phòng với nhau
+    • CPU vừa (i3, i5, Ryzen 3, Ryzen 5) - Đủ mạnh cho Word, Excel, trình duyệt, email
+    • RAM 4-8GB - Đủ cho đa nhiệm văn phòng cơ bản
+    • Card tích hợp (KHÔNG có RTX/GTX) - Đủ dùng, tiết kiệm điện, giá rẻ hơn
+    • Pin tốt, nhẹ - Dễ mang theo, dùng cả ngày
+    • Giá hợp lý (< 20 triệu) - Phù hợp ngân sách văn phòng
+  + Giải thích tại sao sản phẩm phù hợp văn phòng (ví dụ: 'CPU i5 đủ mạnh cho Word, Excel, trình duyệt, không cần card rời')
+  + Nếu sản phẩm có card rời (RTX/GTX) → giải thích: 'Sản phẩm này có card rời, mạnh hơn cần thiết cho văn phòng, nhưng vẫn dùng được'
+  + Nếu sản phẩm có CPU cao (i7/i9) và giá cao → giải thích: 'Cấu hình này mạnh hơn cần thiết cho văn phòng, nhưng sẽ dùng mượt mà và tương lai không cần nâng cấp'
+  + So sánh các sản phẩm văn phòng với nhau, ưu tiên giá thấp và cấu hình vừa đủ
   + Đề cập đến giá cả và giá trị nhận được
-  + Nếu sản phẩm có cấu hình cao hơn cần thiết → giải thích: 'Cấu hình này mạnh hơn cần thiết cho văn phòng, nhưng sẽ dùng mượt mà và tương lai không cần nâng cấp'
   + Nếu không có sản phẩm phù hợp 100% → vẫn đề xuất sản phẩm gần nhất và giải thích" : "")}
 
 {(intent == "use_case_design" ? @"- QUAN TRỌNG: Khi khách hỏi về laptop cho ĐỒ HỌA:
@@ -958,6 +1239,39 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
         }
         
         return "product_search";
+    }
+    
+    /// <summary>
+    /// Phát hiện yêu cầu "gợi ý thêm" hoặc "sản phẩm khác"
+    /// </summary>
+    private bool DetectMoreProductsRequest(string message)
+    {
+        var messageLower = message.ToLower();
+        
+        // Các từ khóa cho yêu cầu "gợi ý thêm"
+        var moreProductKeywords = new[]
+        {
+            "gợi ý thêm", "goi y them", "gợi ý khác", "goi y khac",
+            "sản phẩm khác", "san pham khac", "máy khác", "may khac",
+            "laptop khác", "còn sản phẩm nào", "con san pham nao",
+            "sản phẩm khác nữa", "san pham khac nua", "máy khác nữa", "may khac nua",
+            "xem thêm", "xem them", "cho xem thêm", "cho xem them",
+            "còn máy nào", "con may nao", "còn laptop nào", "con laptop nao",
+            "máy khác đi", "may khac di", "laptop khác đi", "laptop khac di",
+            "gợi ý khác đi", "goi y khac di", "sản phẩm khác đi", "san pham khac di",
+            "còn cái nào", "con cai nao", "còn máy nào khác", "con may nao khac"
+        };
+        
+        foreach (var keyword in moreProductKeywords)
+        {
+            if (messageLower.Contains(keyword))
+            {
+                _logger.LogInformation("Detected 'more products' request with keyword: {Keyword}", keyword);
+                return true;
+            }
+        }
+        
+        return false;
     }
     
     /// <summary>
@@ -1386,10 +1700,14 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
     /// Search products với fallback mechanism (internal helper để parallelize)
     /// Cải thiện để xử lý tốt hơn các câu hỏi về use case (gaming, văn phòng)
     /// </summary>
-    private async Task<List<VectorSearchResult>> SearchProductsWithFallbackAsync(string userMessage)
+    private async Task<List<VectorSearchResult>> SearchProductsWithFallbackAsync(string userMessage, bool isRequestMoreProducts = false)
     {
         bool qdrantSearchFailed = false;
         List<VectorSearchResult> productResults = new List<VectorSearchResult>();
+
+        // Nếu là yêu cầu "gợi ý thêm", search nhiều sản phẩm hơn (10-15 thay vì 5)
+        int topK = isRequestMoreProducts ? 15 : 5;
+        _logger.LogInformation("Searching products with topK: {TopK} (isRequestMoreProducts: {IsRequestMore})", topK, isRequestMoreProducts);
 
         // Parse use case sớm để quyết định strategy
         var searchTerm = userMessage.ToLower();
@@ -1454,7 +1772,7 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
         // Thử search từ Qdrant (nếu chưa có kết quả từ SQL)
         try
         {
-            productResults = await _qdrantVectorService.SearchProductsAsync(userMessage, topK: 5);
+            productResults = await _qdrantVectorService.SearchProductsAsync(userMessage, topK: topK);
             _logger.LogInformation("Found {Count} product results from Qdrant", productResults?.Count ?? 0);
         }
         catch (Exception ex)
@@ -2060,41 +2378,101 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
                     switch (useCase)
                     {
                         case "gaming":
-                            // Gaming: ưu tiên card rời (RTX, GTX), nhưng cũng chấp nhận CPU mạnh
+                            // Gaming: CẤU HÌNH CAO - BẮT BUỘC phải có card rời (RTX, GTX, Radeon)
+                            // QUAN TRỌNG: Gaming laptop PHẢI có card rời, không chấp nhận card tích hợp
                             var hasGamingCard = product.Configurations?.Any(c => 
                                 !string.IsNullOrEmpty(c.Card) && 
                                 (c.Card.Contains("RTX") || c.Card.Contains("GTX") || 
-                                 c.Card.Contains("Radeon"))) ?? false;
+                                 c.Card.Contains("Radeon") || c.Card.Contains("rời"))) ?? false;
+                            
+                            // Nếu KHÔNG có card rời → KHÔNG phù hợp gaming
+                            if (!hasGamingCard)
+                            {
+                                matchesUseCase = false;
+                                break;
+                            }
+                            
+                            // CPU mạnh: i7, i9, Ryzen 7, Ryzen 9 (ưu tiên)
                             var hasGamingCpu = product.Configurations?.Any(c => 
                                 !string.IsNullOrEmpty(c.Cpu) && 
                                 (c.Cpu.Contains("i7") || c.Cpu.Contains("i9") || 
                                  c.Cpu.Contains("Ryzen 7") || c.Cpu.Contains("Ryzen 9"))) ?? false;
-                            // Relax: chấp nhận cả i5 nếu có RAM lớn
-                            var hasGamingCpuRelaxed = product.Configurations?.Any(c => 
+                            
+                            // CPU vừa: i5, Ryzen 5 (chấp nhận nếu có card rời)
+                            var hasMidCpu = product.Configurations?.Any(c => 
                                 !string.IsNullOrEmpty(c.Cpu) && 
-                                (c.Cpu.Contains("i5") || c.Cpu.Contains("Ryzen 5")) &&
+                                (c.Cpu.Contains("i5") || c.Cpu.Contains("Ryzen 5"))) ?? false;
+                            
+                            // RAM cao: 16GB trở lên (ưu tiên)
+                            var hasGamingRam = product.Configurations?.Any(c => 
                                 !string.IsNullOrEmpty(c.Ram) && 
                                 (c.Ram.Contains("16GB") || c.Ram.Contains("32GB"))) ?? false;
-                            matchesUseCase = hasGamingCard || hasGamingCpu || hasGamingCpuRelaxed;
+                            
+                            // RAM vừa: 8GB (chấp nhận nếu có card rời + CPU mạnh)
+                            var hasMidRam = product.Configurations?.Any(c => 
+                                !string.IsNullOrEmpty(c.Ram) && 
+                                c.Ram.Contains("8GB")) ?? false;
+                            
+                            // Gaming: Có card rời VÀ (CPU mạnh HOẶC (CPU vừa + RAM cao) HOẶC (CPU mạnh + RAM vừa))
+                            // Loại bỏ hoàn toàn: i3, Ryzen 3, RAM 4GB
+                            matchesUseCase = hasGamingCard && 
+                                (hasGamingCpu || (hasMidCpu && hasGamingRam) || (hasGamingCpu && hasMidRam));
+                            
+                            // Nếu có card rời + CPU vừa + RAM vừa → vẫn chấp nhận (tối thiểu cho gaming)
+                            if (!matchesUseCase && hasGamingCard && hasMidCpu && hasMidRam)
+                            {
+                                matchesUseCase = true;
+                            }
                             break;
                             
                         case "office":
-                            // Văn phòng: CPU i3 trở lên, RAM 4GB trở lên (rất relax)
-                            matchesUseCase = product.Configurations?.Any(c => 
-                                (!string.IsNullOrEmpty(c.Cpu) && 
-                                 (c.Cpu.Contains("i3") || c.Cpu.Contains("i5") || 
-                                  c.Cpu.Contains("i7") || c.Cpu.Contains("Ryzen 3") || 
-                                  c.Cpu.Contains("Ryzen 5") || c.Cpu.Contains("Ryzen 7"))) &&
-                                (!string.IsNullOrEmpty(c.Ram) && 
-                                 (c.Ram.Contains("4GB") || c.Ram.Contains("8GB") || 
-                                  c.Ram.Contains("16GB") || c.Ram.Contains("32GB")))) ?? false;
-                            // Nếu không match, vẫn chấp nhận nếu có CPU
-                            if (!matchesUseCase)
+                            // Văn phòng: CẤU HÌNH THẤP - BẮT BUỘC KHÔNG có card rời (RTX/GTX/Radeon)
+                            // QUAN TRỌNG: Văn phòng laptop KHÔNG được có card rời, chỉ card tích hợp
+                            var hasDedicatedCard = product.Configurations?.Any(c => 
+                                !string.IsNullOrEmpty(c.Card) && 
+                                (c.Card.Contains("RTX") || c.Card.Contains("GTX") || 
+                                 c.Card.Contains("Radeon") || c.Card.Contains("rời"))) ?? false;
+                            
+                            // Nếu CÓ card rời → KHÔNG phù hợp văn phòng
+                            if (hasDedicatedCard)
                             {
-                                matchesUseCase = product.Configurations?.Any(c => 
-                                    !string.IsNullOrEmpty(c.Cpu) && 
-                                    (c.Cpu.Contains("i3") || c.Cpu.Contains("i5") || 
-                                     c.Cpu.Contains("i7") || c.Cpu.Contains("Ryzen"))) ?? false;
+                                matchesUseCase = false;
+                                break;
+                            }
+                            
+                            // CPU vừa: i3, i5, Ryzen 3, Ryzen 5 (ưu tiên)
+                            var hasOfficeCpu = product.Configurations?.Any(c => 
+                                !string.IsNullOrEmpty(c.Cpu) && 
+                                (c.Cpu.Contains("i3") || c.Cpu.Contains("i5") || 
+                                 c.Cpu.Contains("Ryzen 3") || c.Cpu.Contains("Ryzen 5"))) ?? false;
+                            
+                            // CPU cao (i7/i9) chỉ chấp nhận nếu giá RẤT RẺ (< 15 triệu) - rất hiếm
+                            var hasHighCpu = product.Configurations?.Any(c => 
+                                !string.IsNullOrEmpty(c.Cpu) && 
+                                (c.Cpu.Contains("i7") || c.Cpu.Contains("i9") || 
+                                 c.Cpu.Contains("Ryzen 7") || c.Cpu.Contains("Ryzen 9"))) ?? false;
+                            var isVeryLowPrice = (product.SellingPrice ?? 0) < 15000000; // Rất rẻ
+                            
+                            // RAM thấp-trung: 4GB, 8GB (ưu tiên)
+                            var hasOfficeRam = product.Configurations?.Any(c => 
+                                !string.IsNullOrEmpty(c.Ram) && 
+                                (c.Ram.Contains("4GB") || c.Ram.Contains("8GB"))) ?? false;
+                            
+                            // RAM cao (16GB+) chỉ chấp nhận nếu giá rẻ (< 15 triệu) và CPU vừa
+                            var hasHighRam = product.Configurations?.Any(c => 
+                                !string.IsNullOrEmpty(c.Ram) && 
+                                (c.Ram.Contains("16GB") || c.Ram.Contains("32GB"))) ?? false;
+                            
+                            // Văn phòng: KHÔNG có card rời VÀ (CPU vừa + RAM thấp-trung) HOẶC (CPU cao + giá rất rẻ + RAM thấp-trung)
+                            // Loại bỏ hoàn toàn: Card rời, CPU cao + giá cao, RAM cao + giá cao
+                            matchesUseCase = !hasDedicatedCard && 
+                                ((hasOfficeCpu && hasOfficeRam) ||
+                                 (hasHighCpu && isVeryLowPrice && hasOfficeRam));
+                            
+                            // Nếu không match, chấp nhận nếu không có card rời + CPU vừa + RAM bất kỳ (fallback tối thiểu)
+                            if (!matchesUseCase && !hasDedicatedCard && hasOfficeCpu)
+                            {
+                                matchesUseCase = true; // Chấp nhận tối thiểu: không card rời + CPU vừa
                             }
                             break;
                             
@@ -2168,11 +2546,12 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
                     }
                 }
                 
-                // Nếu filter có kết quả → dùng filtered
+                // Nếu filter có kết quả → dùng filtered và SORT theo độ phù hợp
                 if (filteredProducts.Any())
                 {
-                    products = filteredProducts;
-                    _logger.LogInformation("Filtered {Count} products by use case: {UseCase}", 
+                    // Sort sản phẩm theo độ phù hợp với use case
+                    products = SortProductsByUseCase(filteredProducts, useCase);
+                    _logger.LogInformation("Filtered and sorted {Count} products by use case: {UseCase}", 
                         products.Count, useCase);
                 }
                 else
@@ -2181,8 +2560,11 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
                     // AI sẽ giải thích rằng sản phẩm có thể không phù hợp 100% nhưng vẫn có thể dùng
                     _logger.LogWarning("No products matched use case filter: {UseCase}, using all {Count} products. AI will explain suitability.", 
                         useCase, allProducts.Count);
-                    products = allProducts; // Dùng tất cả để AI có thể giải thích
+                    products = SortProductsByUseCase(allProducts, useCase); // Vẫn sort để ưu tiên sản phẩm phù hợp hơn
                 }
+                
+                // Phân bổ sản phẩm: Mỗi brand ít nhất 1 sản phẩm, tối đa 5 sản phẩm
+                products = DistributeProductsByBrand(products, maxProducts: 5);
             }
             
             // 6. Nếu không có kết quả và có use case → search lại với criteria rất relaxed
@@ -2399,10 +2781,227 @@ Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, chuyên 
         return sb.ToString();
     }
 
-    /// <summary>
-    /// Convert ProductDTO sang ProductSuggestion với URLs
-    /// </summary>
-    private List<ProductSuggestion> ConvertToProductSuggestions(List<ProductDTO> products)
+        /// <summary>
+        /// Sort sản phẩm theo độ phù hợp với use case
+        /// </summary>
+        private List<ProductDTO> SortProductsByUseCase(List<ProductDTO> products, string useCase)
+        {
+            if (string.IsNullOrEmpty(useCase) || !products.Any())
+                return products;
+            
+            return useCase switch
+            {
+                "gaming" => products.OrderByDescending(p =>
+                {
+                    var config = p.Configurations?.FirstOrDefault();
+                    int score = 0;
+                    
+                    // Card rời: +200 điểm (QUAN TRỌNG NHẤT cho gaming)
+                    if (config != null && !string.IsNullOrEmpty(config.Card) &&
+                        (config.Card.Contains("RTX") || config.Card.Contains("GTX") || 
+                         config.Card.Contains("Radeon")))
+                        score += 200;
+                    
+                    // CPU mạnh (i7/i9/Ryzen 7/9): +100 điểm
+                    if (config != null && !string.IsNullOrEmpty(config.Cpu) &&
+                        (config.Cpu.Contains("i7") || config.Cpu.Contains("i9") || 
+                         config.Cpu.Contains("Ryzen 7") || config.Cpu.Contains("Ryzen 9")))
+                        score += 100;
+                    
+                    // RAM cao (16GB+): +50 điểm
+                    if (config != null && !string.IsNullOrEmpty(config.Ram) &&
+                        (config.Ram.Contains("16GB") || config.Ram.Contains("32GB")))
+                        score += 50;
+                    
+                    // CPU vừa (i5/Ryzen 5): +20 điểm (thấp hơn nhiều so với i7/i9)
+                    if (config != null && !string.IsNullOrEmpty(config.Cpu) &&
+                        (config.Cpu.Contains("i5") || config.Cpu.Contains("Ryzen 5")))
+                        score += 20;
+                    
+                    // RAM vừa (8GB): +10 điểm (thấp hơn nhiều so với 16GB+)
+                    if (config != null && !string.IsNullOrEmpty(config.Ram) &&
+                        config.Ram.Contains("8GB"))
+                        score += 10;
+                    
+                    // Trừ điểm nếu KHÔNG có card rời (không phù hợp gaming)
+                    if (config == null || string.IsNullOrEmpty(config.Card) ||
+                        (!config.Card.Contains("RTX") && !config.Card.Contains("GTX") && 
+                         !config.Card.Contains("Radeon")))
+                        score -= 500; // Trừ rất nhiều điểm
+                    
+                    return score;
+                }).ThenByDescending(p => p.SellingPrice ?? 0).ToList(), // Gaming: giá cao hơn thường tốt hơn
+                
+                "office" => products.OrderByDescending(p =>
+                {
+                    var config = p.Configurations?.FirstOrDefault();
+                    int score = 200; // Base score cao
+                    
+                    // Trừ RẤT NHIỀU điểm nếu có card rời (KHÔNG phù hợp văn phòng)
+                    if (config != null && !string.IsNullOrEmpty(config.Card) &&
+                        (config.Card.Contains("RTX") || config.Card.Contains("GTX") || 
+                         config.Card.Contains("Radeon") || config.Card.Contains("rời")))
+                        score -= 1000; // Trừ rất nhiều điểm
+                    
+                    // Trừ điểm nếu CPU quá mạnh (i7/i9) và giá cao
+                    if (config != null && !string.IsNullOrEmpty(config.Cpu) &&
+                        (config.Cpu.Contains("i7") || config.Cpu.Contains("i9") || 
+                         config.Cpu.Contains("Ryzen 7") || config.Cpu.Contains("Ryzen 9")) &&
+                        (p.SellingPrice ?? 0) >= 15000000)
+                        score -= 100;
+                    
+                    // Cộng điểm nếu CPU vừa (i3/i5) - PHÙ HỢP văn phòng
+                    if (config != null && !string.IsNullOrEmpty(config.Cpu) &&
+                        (config.Cpu.Contains("i3") || config.Cpu.Contains("i5") || 
+                         config.Cpu.Contains("Ryzen 3") || config.Cpu.Contains("Ryzen 5")))
+                        score += 100;
+                    
+                    // Cộng điểm nếu RAM vừa (4-8GB) - PHÙ HỢP văn phòng
+                    if (config != null && !string.IsNullOrEmpty(config.Ram) &&
+                        (config.Ram.Contains("4GB") || config.Ram.Contains("8GB")))
+                        score += 80;
+                    
+                    // Trừ điểm nếu RAM quá cao (16GB+) và giá cao (không cần thiết cho văn phòng)
+                    if (config != null && !string.IsNullOrEmpty(config.Ram) &&
+                        (config.Ram.Contains("16GB") || config.Ram.Contains("32GB")) &&
+                        (p.SellingPrice ?? 0) >= 15000000)
+                        score -= 50;
+                    
+                    // Cộng điểm nếu giá thấp (< 15 triệu) - ƯU TIÊN
+                    if ((p.SellingPrice ?? 0) < 15000000)
+                        score += 150;
+                    else if ((p.SellingPrice ?? 0) < 20000000)
+                        score += 50;
+                    
+                    return score;
+                }).ThenBy(p => p.SellingPrice ?? 0).ToList(), // Ưu tiên giá thấp
+                
+                _ => products // Các use case khác: giữ nguyên thứ tự
+            };
+        }
+        
+        /// <summary>
+        /// Extract brand ID từ productResults để giữ ngữ cảnh khi "gợi ý thêm"
+        /// </summary>
+        private string? ExtractBrandFromProductResults(List<VectorSearchResult> productResults)
+        {
+            if (productResults == null || productResults.Count == 0)
+                return null;
+            
+            // Lấy brand từ sản phẩm đầu tiên trong kết quả
+            var firstProduct = productResults.FirstOrDefault();
+            if (firstProduct?.Metadata != null && firstProduct.Metadata.TryGetValue("brand", out var brandObj))
+            {
+                var brandName = brandObj?.ToString();
+                if (!string.IsNullOrEmpty(brandName))
+                {
+                    _logger.LogInformation("Extracted brand name from productResults: {BrandName}", brandName);
+                    
+                    // Convert brand name to brand ID
+                    try
+                    {
+                        var dbContext = _serviceProvider.GetService<Data.WebLaptopTenTechContext>();
+                        if (dbContext != null)
+                        {
+                            var brandEntity = dbContext.Brands
+                                .AsNoTracking()
+                                .FirstOrDefault(b => b.BrandName != null && 
+                                    b.BrandName.ToLower().Trim() == brandName.ToLower().Trim());
+                            if (brandEntity != null && brandEntity.BrandId != null)
+                            {
+                                _logger.LogInformation("Found brand ID: {BrandId} for brand name: {BrandName}", brandEntity.BrandId, brandName);
+                                return brandEntity.BrandId;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error converting brand name to brand ID: {BrandName}", brandName);
+                    }
+                }
+            }
+            
+            return null;
+        }
+        
+        /// <summary>
+        /// Phân bổ sản phẩm theo brand: Mỗi brand ít nhất 1 sản phẩm, không trùng lặp brand
+        /// </summary>
+        private List<ProductDTO> DistributeProductsByBrand(List<ProductDTO> products, int maxProducts = 5)
+        {
+            if (products == null || !products.Any())
+                return products ?? new List<ProductDTO>();
+            
+            var result = new List<ProductDTO>();
+            var brandCount = new Dictionary<string, int>(); // Đếm số sản phẩm mỗi brand
+            var brandAdded = new HashSet<string>(); // Track brand đã thêm ít nhất 1 sản phẩm
+            
+            // Bước 1: Đảm bảo mỗi brand có ít nhất 1 sản phẩm (nếu có thể)
+            foreach (var product in products)
+            {
+                var brandId = product.BrandId ?? "";
+                if (string.IsNullOrEmpty(brandId))
+                    continue;
+                
+                if (!brandAdded.Contains(brandId))
+                {
+                    result.Add(product);
+                    brandAdded.Add(brandId);
+                    brandCount[brandId] = 1;
+                    
+                    if (result.Count >= maxProducts)
+                        break;
+                }
+            }
+            
+            // Bước 2: Thêm các sản phẩm còn lại, phân bổ đều các brand (mỗi brand tối đa 2 sản phẩm)
+            foreach (var product in products)
+            {
+                if (result.Count >= maxProducts)
+                    break;
+                
+                var brandId = product.BrandId ?? "";
+                if (string.IsNullOrEmpty(brandId))
+                    continue;
+                
+                // Bỏ qua nếu sản phẩm đã được thêm
+                if (result.Contains(product))
+                    continue;
+                
+                // Thêm nếu brand chưa đủ 2 sản phẩm
+                var currentCount = brandCount.GetValueOrDefault(brandId, 0);
+                if (currentCount < 2)
+                {
+                    result.Add(product);
+                    brandCount[brandId] = currentCount + 1;
+                }
+            }
+            
+            // Bước 3: Nếu vẫn chưa đủ maxProducts, thêm các sản phẩm còn lại (không giới hạn brand)
+            if (result.Count < maxProducts)
+            {
+                foreach (var product in products)
+                {
+                    if (result.Count >= maxProducts)
+                        break;
+                    
+                    if (!result.Contains(product))
+                    {
+                        result.Add(product);
+                    }
+                }
+            }
+            
+            _logger.LogInformation("Distributed {Count} products across {BrandCount} brands", 
+                result.Count, brandAdded.Count);
+            
+            return result;
+        }
+        
+        /// <summary>
+        /// Convert ProductDTO sang ProductSuggestion với URLs
+        /// </summary>
+        private List<ProductSuggestion> ConvertToProductSuggestions(List<ProductDTO> products)
     {
         // Lấy Backend URL cho ảnh
         var httpContext = _httpContextAccessor.HttpContext;

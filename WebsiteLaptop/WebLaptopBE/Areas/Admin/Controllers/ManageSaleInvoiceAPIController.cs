@@ -1013,12 +1013,32 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 {
                     return BadRequest(new { message = "Không thể cập nhật trạng thái cho đơn hàng đã hủy" });
                 }
+
+                // Kiểm tra quyền cập nhật: Nếu đơn hàng có EmployeeId thì chỉ nhân viên đó mới được cập nhật
+                // Nếu đơn hàng có trạng thái "Chờ xử lý" và EmployeeId null thì bất cứ ai cũng có thể cập nhật
+                var currentEmployeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(saleInvoice.EmployeeId))
+                {
+                    // Đơn hàng đã có EmployeeId, chỉ nhân viên đó mới được cập nhật
+                    if (string.IsNullOrEmpty(currentEmployeeId) || currentEmployeeId != saleInvoice.EmployeeId)
+                    {
+                        return BadRequest(new { message = "Đơn hàng này không phải bạn quản lí" });
+                    }
+                }
+                // Nếu đơn hàng có trạng thái "Chờ xử lý" và EmployeeId null thì bất cứ ai cũng có thể cập nhật (không cần kiểm tra)
+                // Nếu đơn hàng không có EmployeeId (dù ở trạng thái nào) thì cũng cho phép cập nhật để gán nhân viên
+
                 // Lưu trạng thái cũ
                 string? oldStatus = saleInvoice.Status;
 
                 // Cập nhật trạng thái và nhân viên
                 saleInvoice.Status = dto.Status;
-                if (!string.IsNullOrEmpty(dto.EmployeeId))
+                // Gán EmployeeId nếu chưa có (khi nhân viên nhận đơn hàng "Chờ xử lý")
+                if (string.IsNullOrEmpty(saleInvoice.EmployeeId) && !string.IsNullOrEmpty(currentEmployeeId))
+                {
+                    saleInvoice.EmployeeId = currentEmployeeId;
+                }
+                else if (!string.IsNullOrEmpty(dto.EmployeeId) && string.IsNullOrEmpty(saleInvoice.EmployeeId))
                 {
                     saleInvoice.EmployeeId = dto.EmployeeId;
                 }

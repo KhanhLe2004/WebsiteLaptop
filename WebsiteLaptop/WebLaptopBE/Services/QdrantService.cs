@@ -5,11 +5,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace WebLaptopBE.Services;
-
-/// <summary>
-/// Service để làm việc với Qdrant (vector database)
-/// Qdrant dùng để lưu trữ và tìm kiếm policy documents bằng semantic search
-/// </summary>
 public class QdrantService : IQdrantService
 {
     private readonly HttpClient _httpClient;
@@ -17,10 +12,6 @@ public class QdrantService : IQdrantService
     private readonly IConfiguration _configuration;
     private readonly string _qdrantUrl;
     private readonly string _openAiApiKey;
-
-    /// <summary>
-    /// Constructor - Nhận các dependencies từ Dependency Injection
-    /// </summary>
     public QdrantService(
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
@@ -40,10 +31,6 @@ public class QdrantService : IQdrantService
         _httpClient.BaseAddress = new Uri(_qdrantUrl);
         _httpClient.Timeout = TimeSpan.FromSeconds(30);
     }
-
-    /// <summary>
-    /// Kiểm tra xem collection đã tồn tại chưa
-    /// </summary>
     public async Task<bool> CollectionExistsAsync(string collectionName)
     {
         try
@@ -57,11 +44,6 @@ public class QdrantService : IQdrantService
             return false;
         }
     }
-
-    /// <summary>
-    /// Tạo collection mới trong Qdrant
-    /// Collection giống như một bảng trong database, nhưng dùng để lưu vectors
-    /// </summary>
     public async Task CreateCollectionAsync(string collectionName)
     {
         try
@@ -103,11 +85,6 @@ public class QdrantService : IQdrantService
         }
     }
 
-    /// <summary>
-    /// Thêm policy document vào Qdrant
-    /// Bước 1: Tạo embedding từ text bằng OpenAI
-    /// Bước 2: Lưu embedding + metadata vào Qdrant
-    /// </summary>
     public async Task InsertPolicyAsync(string collectionName, string policyText, Dictionary<string, object> metadata)
     {
         try
@@ -159,12 +136,6 @@ public class QdrantService : IQdrantService
         }
     }
 
-    /// <summary>
-    /// Tìm kiếm policy documents dựa trên câu hỏi của user
-    /// Bước 1: Tạo embedding từ câu hỏi
-    /// Bước 2: Tìm kiếm vectors tương tự trong Qdrant
-    /// Bước 3: Trả về top K results
-    /// </summary>
     public async Task<List<PolicySearchResult>> SearchPoliciesAsync(string collectionName, string query, int limit = 3)
     {
         try
@@ -259,10 +230,6 @@ public class QdrantService : IQdrantService
         }
     }
 
-    /// <summary>
-    /// Tạo embedding từ text bằng OpenAI API
-    /// Embedding là một mảng số (vector) đại diện cho ý nghĩa của text
-    /// </summary>
     private async Task<float[]> GenerateEmbeddingAsync(string text)
     {
         try

@@ -237,6 +237,20 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     return BadRequest(new { message = "Không thể chuyển trực tiếp từ 'Chờ vận chuyển' sang 'Hoàn thành'. Vui lòng cập nhật thành 'Đang vận chuyển' trước." });
                 }
 
+                // Kiểm tra quyền cập nhật: Đối với quản lý vận chuyển, xét EmployeeShip (không xét EmployeeId)
+                // Nếu đơn hàng có EmployeeShip thì chỉ nhân viên đó mới được cập nhật
+                // Nếu đơn hàng không có EmployeeShip thì bất cứ ai cũng có thể cập nhật (để gán đơn hàng)
+                var currentEmployeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(saleInvoice.EmployeeShip))
+                {
+                    // Đơn hàng đã có EmployeeShip, chỉ nhân viên đó mới được cập nhật
+                    if (string.IsNullOrEmpty(currentEmployeeId) || currentEmployeeId != saleInvoice.EmployeeShip)
+                    {
+                        return BadRequest(new { message = "Đơn hàng này không phải bạn quản lí" });
+                    }
+                }
+                // Nếu đơn hàng không có EmployeeShip thì bất cứ ai cũng có thể cập nhật (không cần kiểm tra)
+
                 // Lưu trạng thái cũ
                 string? oldStatus = saleInvoice.Status;
 

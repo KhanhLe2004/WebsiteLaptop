@@ -1311,8 +1311,20 @@
                 error: function(xhr) {
                     console.error('Error saving warranty:', xhr);
                     let message = 'Có lỗi xảy ra khi lưu bảo hành';
+                    // Ưu tiên lấy message từ responseJSON
                     if (xhr.responseJSON && xhr.responseJSON.message) {
                         message = xhr.responseJSON.message;
+                    } 
+                    // Nếu không có responseJSON, thử parse responseText
+                    else if (xhr.responseText) {
+                        try {
+                            const response = JSON.parse(xhr.responseText);
+                            if (response && response.message) {
+                                message = response.message;
+                            }
+                        } catch (e) {
+                            // Nếu không parse được, giữ message mặc định
+                        }
                     }
                     showFormError(message);
                 }

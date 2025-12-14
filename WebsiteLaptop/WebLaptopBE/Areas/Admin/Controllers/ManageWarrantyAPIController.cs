@@ -29,7 +29,7 @@ namespace WebLaptopBE.Areas.Admin.Controllers
 
         private string? GetEmployeeId()
         {
-            return HttpContext.Request.Headers.TryGetValue("X-EmployeeId", out var employeeId) ? employeeId.ToString() : null;
+            return Request.Headers["X-Employee-Id"].FirstOrDefault();
         }
 
         // GET: api/admin/warranties
@@ -510,6 +510,20 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                     return BadRequest(new { message = "Không thể chỉnh sửa phiếu bảo hành đã hoàn thành hoặc đã hủy" });
                 }
 
+                // Kiểm tra quyền cập nhật: Nếu bảo hành có EmployeeId thì chỉ nhân viên đó mới được cập nhật
+                // Nếu bảo hành có trạng thái "Chờ xử lý" và EmployeeId null thì bất cứ ai cũng có thể cập nhật
+                var currentEmployeeId = GetEmployeeId();
+                if (!string.IsNullOrEmpty(warranty.EmployeeId))
+                {
+                    // Bảo hành đã có EmployeeId, chỉ nhân viên đó mới được cập nhật
+                    if (string.IsNullOrEmpty(currentEmployeeId) || currentEmployeeId != warranty.EmployeeId)
+                    {
+                        return BadRequest(new { message = "Đơn hàng này không phải bạn quản lí" });
+                    }
+                }
+                // Nếu bảo hành có trạng thái "Chờ xử lý" và EmployeeId null thì bất cứ ai cũng có thể cập nhật (không cần kiểm tra)
+                // Nếu bảo hành không có EmployeeId (dù ở trạng thái nào) thì cũng cho phép cập nhật để gán nhân viên
+
                 // Xử lý logic cập nhật khác nhau cho Bảo hành và Sửa chữa
                 string customerId = dto.CustomerId ?? warranty.CustomerId;
                 decimal? totalAmount = dto.TotalAmount ?? warranty.TotalAmount;
@@ -532,7 +546,15 @@ namespace WebLaptopBE.Areas.Admin.Controllers
                 // Cập nhật thông tin
                 warranty.CustomerId = customerId;
                 warranty.SerialId = type == "Sửa chữa" ? null : (dto.SerialId ?? warranty.SerialId);
-                warranty.EmployeeId = dto.EmployeeId ?? warranty.EmployeeId;
+                // Gán EmployeeId nếu chưa có (khi nhân viên nhận bảo hành "Chờ xử lý")
+                if (string.IsNullOrEmpty(warranty.EmployeeId) && !string.IsNullOrEmpty(currentEmployeeId))
+                {
+                    warranty.EmployeeId = currentEmployeeId;
+                }
+                else if (!string.IsNullOrEmpty(dto.EmployeeId))
+                {
+                    warranty.EmployeeId = dto.EmployeeId;
+                }
                 warranty.Type = type;
                 warranty.ContentDetail = dto.ContentDetail ?? warranty.ContentDetail;
                 

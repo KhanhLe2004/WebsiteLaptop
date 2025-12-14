@@ -184,6 +184,44 @@
         background: none;
     }
     .shop-sidebar .mb-3 > ul > li { margin-bottom: 6px; }
+
+    /* Toast Notification Styles */
+    .toast-container {
+        z-index: 9999;
+    }
+    
+    .toast-notification {
+        min-width: 300px;
+        max-width: 400px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 10px;
+        background-color: #ffffff;
+    }
+    
+    .toast-notification .toast-header {
+        font-weight: 600;
+    }
+    
+    .toast-notification .toast-body {
+        padding: 0.75rem;
+    }
+    
+    .toast-success .toast-header {
+        background-color: #28a745 !important;
+    }
+    
+    .toast-danger .toast-header {
+        background-color: #dc3545 !important;
+    }
+    
+    .toast-warning .toast-header {
+        background-color: #ffc107 !important;
+        color: #000 !important;
+    }
+    
+    .toast-info .toast-header {
+        background-color: #17a2b8 !important;
+    }
 </style>
 
 @section Scripts {
@@ -1084,12 +1122,12 @@
                             html += '        ' + originalPrice;
                             html += '        <span class="text-dark fs-5 fw-bold mb-0">' + price + '</span>';
                             html += '      </div>';
-                            html += '      <div class="d-flex gap-2">';
+                            html += '      <div class="d-flex gap-2 justify-content-center">';
                             html += '        <a href="' + productDetailUrl + '" class="btn border border-secondary rounded-pill px-3 text-primary">';
                             html += '          <i class="fa fa-eye me-2 text-primary"></i> Xem chi tiết';
                             html += '        </a>';
-                            html += '        <a href="#" class="btn border border-secondary rounded-pill px-3 text-primary" onclick="event.preventDefault(); toggleFavorite(\'' + pid + '\'); return false;" title="Thêm vào yêu thích">';
-                            html += '          <i class="far fa-heart" id="heart-' + pid + '"></i>';
+                            html += '        <a href="#" class="btn border border-secondary rounded-circle d-flex align-items-center justify-content-center btn-compare" data-product-id="' + pid + '" data-product-name="' + pname + '" title="So sánh sản phẩm" style="width: 40px; height: 40px; padding: 0;">';
+                            html += '          <i class="fa fa-balance-scale text-primary"></i>';
                             html += '        </a>';
                             html += '      </div>';
                             html += '    </div>';
@@ -1098,17 +1136,207 @@
                         });
 
                         $('#productsContainer').html(html);
+
+                        // Compare buttons (delegation)
+                        $('#productsContainer .btn-compare').off('click').on('click', function (e) {
+                            e.preventDefault();
+                            const productId = $(this).data('product-id');
+                            const productName = $(this).data('product-name');
+                            if (productId) {
+                                addToCompare(productId, productName);
+                            }
+                        });
                     }
 
-                    // Optional toggle favorite
-                    function toggleFavorite(productId) {
-                        if (!productId) return;
-                        let heartIcon = $('#heart-' + productId);
-                        if (heartIcon.hasClass('fas')) {
-                            heartIcon.removeClass('fas text-danger').addClass('far');
-                        } else {
-                            heartIcon.removeClass('far').addClass('fas text-danger');
+                    // Comparison functions
+                    function getCompareList() {
+                        try {
+                            const compareStr = sessionStorage.getItem('compareProducts');
+                            return compareStr ? JSON.parse(compareStr) : [];
+                        } catch (e) {
+                            return [];
                         }
+                    }
+
+                    function saveCompareList(products) {
+                        sessionStorage.setItem('compareProducts', JSON.stringify(products));
+                        if (typeof window.updateCompareBadge === 'function') {
+                            window.updateCompareBadge();
+                        } else {
+                            updateCompareBadgeLocal();
+                        }
+                    }
+
+                    function addToCompare(productId, productName) {
+                        if (!productId) {
+                            showToast('warning', 'Không tìm thấy ID sản phẩm');
+                            return;
+                        }
+
+                        let compareList = getCompareList();
+                        
+                        // Check if product already in compare list
+                        if (compareList.some(p => p.id === productId)) {
+                            showToast('warning', 'Sản phẩm này đã có trong danh sách so sánh!');
+                            return;
+                        }
+
+                        // Check if compare list is full (max 2 products)
+                        if (compareList.length >= 2) {
+                            showConfirmDialog(
+                                'Danh sách so sánh đã đầy (tối đa 2 sản phẩm). Bạn có muốn xóa sản phẩm đầu tiên và thêm sản phẩm mới không?',
+                                function() {
+                                    let updatedList = getCompareList();
+                                    if (updatedList.length >= 2) {
+                                        updatedList.shift();
+                                    }
+                                    updatedList.push({ id: productId, name: productName });
+                                    saveCompareList(updatedList);
+                                    
+                                    if (typeof window.updateCompareBadge === 'function') {
+                                        window.updateCompareBadge();
+                                    } else {
+                                        updateCompareBadgeLocal();
+                                    }
+                                    
+                                    showToast('success', 'Đã thêm vào danh sách so sánh! Đang mở bảng so sánh...');
+                                    
+                                    setTimeout(function() {
+                                        if (typeof window.openCompareModal === 'function') {
+                                            window.openCompareModal();
+                                        }
+                                    }, 500);
+                                }
+                            );
+                            return;
+                        }
+
+                        if (compareList.length < 2) {
+                            compareList.push({ id: productId, name: productName });
+                            saveCompareList(compareList);
+                            
+                            if (typeof window.updateCompareBadge === 'function') {
+                                window.updateCompareBadge();
+                            } else {
+                                updateCompareBadgeLocal();
+                            }
+                            
+                            if (compareList.length === 2) {
+                                showToast('success', 'Đã thêm vào danh sách so sánh! Đang mở bảng so sánh...');
+                                setTimeout(function() {
+                                    if (typeof window.openCompareModal === 'function') {
+                                        window.openCompareModal();
+                                    }
+                                }, 500);
+                            } else {
+                                showToast('success', 'Đã thêm vào danh sách so sánh! Thêm 1 sản phẩm nữa để so sánh.');
+                            }
+                        }
+                    }
+
+                    function updateCompareBadgeLocal() {
+                        const compareList = getCompareList();
+                        const badge = document.getElementById('compareBadge');
+                        if (badge) {
+                            if (compareList.length > 0) {
+                                badge.textContent = compareList.length;
+                                badge.style.display = 'flex';
+                            } else {
+                                badge.style.display = 'none';
+                            }
+                        }
+                    }
+
+                    // Toast notification function
+                    function showToast(type, message) {
+                        const toastId = 'toast-' + Date.now();
+                        const iconMap = {
+                            'success': '<i class="fa fa-check-circle me-2"></i>',
+                            'danger': '<i class="fa fa-times-circle me-2"></i>',
+                            'warning': '<i class="fa fa-exclamation-triangle me-2"></i>',
+                            'info': '<i class="fa fa-info-circle me-2"></i>'
+                        };
+                        const icon = iconMap[type] || '';
+                        
+                        const toastHtml = `
+                            <div id="${toastId}" class="toast-notification toast-${type}" role="alert" aria-live="assertive" aria-atomic="true">
+                                <div class="toast-header bg-${type === 'danger' ? 'danger' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info'} text-white">
+                                    ${icon}
+                                    <strong class="me-auto">Thông báo</strong>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                                </div>
+                                <div class="toast-body">
+                                    ${message}
+                                </div>
+                            </div>
+                        `;
+                        
+                        if ($('#toast-container').length === 0) {
+                            $('body').append('<div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>');
+                        }
+                        
+                        $('#toast-container').append(toastHtml);
+                        
+                        const toastElement = document.getElementById(toastId);
+                        if (toastElement) {
+                            const toast = new bootstrap.Toast(toastElement, {
+                                autohide: true,
+                                delay: 4000
+                            });
+                            toast.show();
+                            
+                            toastElement.addEventListener('hidden.bs.toast', function() {
+                                $(this).remove();
+                            });
+                        }
+                    }
+
+                    // Confirm dialog function
+                    function showConfirmDialog(message, onConfirm, onCancel) {
+                        const confirmId = 'confirm-dialog-' + Date.now();
+                        const confirmHtml = `
+                            <div class="modal fade" id="${confirmId}" tabindex="-1" aria-labelledby="confirmDialogLabel" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header bg-warning text-dark">
+                                            <h5 class="modal-title" id="confirmDialogLabel">
+                                                <i class="fa fa-exclamation-triangle me-2"></i>Xác nhận
+                                            </h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <p class="mb-0">${message}</p>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                                            <button type="button" class="btn btn-primary" id="confirmBtn">Xác nhận</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        
+                        $('.confirm-dialog-modal').remove();
+                        
+                        $('body').append(confirmHtml);
+                        const $modal = $(`#${confirmId}`).addClass('confirm-dialog-modal');
+                        const modal = new bootstrap.Modal($modal[0]);
+                        
+                        $modal.find('#confirmBtn').on('click', function() {
+                            modal.hide();
+                            if (onConfirm && typeof onConfirm === 'function') {
+                                onConfirm();
+                            }
+                        });
+                        
+                        $modal.on('hidden.bs.modal', function() {
+                            if (onCancel && typeof onCancel === 'function') {
+                                onCancel();
+                            }
+                            $(this).remove();
+                        });
+                        
+                        modal.show();
                     }
                 </script>
 }

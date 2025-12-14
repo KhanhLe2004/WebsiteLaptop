@@ -5,28 +5,16 @@ using WebLaptopBE.DTOs;
 using WebLaptopBE.Models;
 
 namespace WebLaptopBE.Services;
-
-/// <summary>
-/// Service để tìm kiếm và lấy thông tin sản phẩm từ database
-/// Service này sẽ được gọi bởi ChatOrchestrator khi user hỏi về sản phẩm
-/// </summary>
 public class ProductService : IProductService
 {
     private readonly WebLaptopTenTechContext _context;
     private readonly ILogger<ProductService> _logger;
-
-    /// <summary>
-    /// Constructor - Nhận vào DbContext và Logger từ Dependency Injection
-    /// </summary>
     public ProductService(WebLaptopTenTechContext context, ILogger<ProductService> logger)
     {
         _context = context;
         _logger = logger;
     }
 
-    /// <summary>
-    /// Tìm kiếm sản phẩm với nhiều tiêu chí
-    /// </summary>
     public async Task<List<ProductDTO>> SearchProductsAsync(ProductSearchCriteria criteria)
     {
         try
@@ -152,9 +140,6 @@ public class ProductService : IProductService
         }
     }
 
-    /// <summary>
-    /// Lấy thông tin chi tiết 1 sản phẩm theo ID
-    /// </summary>
     public async Task<ProductDTO?> GetProductByIdAsync(string productId)
     {
         try
@@ -162,7 +147,7 @@ public class ProductService : IProductService
             var product = await _context.Products
                 .Include(p => p.Brand)
                 .Include(p => p.ProductConfigurations)
-                .Include(p => p.ProductImages) // Load ProductImages
+                .Include(p => p.ProductImages) 
                 .Where(p => p.ProductId == productId && p.Active == true)
                 .Select(p => new ProductDTO
                 {
@@ -194,7 +179,7 @@ public class ProductService : IProductService
                     {
                         ImageId = pi.ImageId,
                         ProductId = pi.ProductId,
-                        ImageUrl = pi.ImageId // ImageId là tên file, sẽ build URL sau
+                        ImageUrl = pi.ImageId
                     }).ToList()
                 })
                 .FirstOrDefaultAsync();
@@ -207,19 +192,12 @@ public class ProductService : IProductService
             return null;
         }
     }
-
-    /// <summary>
-    /// Lấy danh sách sản phẩm theo thương hiệu
-    /// </summary>
     public async Task<List<ProductDTO>> GetProductsByBrandAsync(string brandId)
     {
         var criteria = new ProductSearchCriteria { BrandId = brandId };
         return await SearchProductsAsync(criteria);
     }
 
-    /// <summary>
-    /// Lấy danh sách sản phẩm trong khoảng giá
-    /// </summary>
     public async Task<List<ProductDTO>> GetProductsByPriceRangeAsync(decimal minPrice, decimal maxPrice)
     {
         var criteria = new ProductSearchCriteria 
@@ -229,10 +207,6 @@ public class ProductService : IProductService
         };
         return await SearchProductsAsync(criteria);
     }
-
-    /// <summary>
-    /// Lấy danh sách sản phẩm theo cấu hình
-    /// </summary>
     public async Task<List<ProductDTO>> GetProductsBySpecsAsync(ProductSpecs specs)
     {
         var criteria = new ProductSearchCriteria
@@ -244,11 +218,6 @@ public class ProductService : IProductService
         };
         return await SearchProductsAsync(criteria);
     }
-
-    /// <summary>
-    /// Lấy nhiều sản phẩm theo danh sách IDs (batch query để tối ưu hiệu năng)
-    /// Thay vì gọi GetProductByIdAsync nhiều lần, dùng 1 query duy nhất
-    /// </summary>
     public async Task<List<ProductDTO>> GetProductsByIdsAsync(List<string> productIds)
     {
         try
@@ -261,7 +230,7 @@ public class ProductService : IProductService
             var products = await _context.Products
                 .Include(p => p.Brand)
                 .Include(p => p.ProductConfigurations)
-                .Include(p => p.ProductImages) // Load ProductImages
+                .Include(p => p.ProductImages)
                 .Where(p => productIds.Contains(p.ProductId) && p.Active == true)
                 .Select(p => new ProductDTO
                 {
@@ -293,7 +262,7 @@ public class ProductService : IProductService
                     {
                         ImageId = pi.ImageId,
                         ProductId = pi.ProductId,
-                        ImageUrl = pi.ImageId // ImageId là tên file, sẽ build URL sau
+                        ImageUrl = pi.ImageId 
                     }).ToList()
                 })
                 .ToListAsync();

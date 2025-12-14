@@ -43,8 +43,13 @@
                         return controllerName == "ManageWarranty";
                     
                     if (roleIdMenu == "SL")
-                        return controllerName == "ManageSaleInvoice" || controllerName == "Chat";
-                    
+                        return controllerName == "ManageSaleInvoice" || controllerName == "Chat" || controllerName == "ManageCustomer";
+
+                    if (roleIdMenu == "SP")
+                        return controllerName == "ManageDelivery";
+
+                    if (roleIdMenu == "PM")
+                        return controllerName == "ManageProduct" || controllerName == "ManagePromotion";
                     return false;
                 };
                 
