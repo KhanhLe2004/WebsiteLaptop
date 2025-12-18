@@ -1,10 +1,12 @@
 💻 Laptop E-Commerce Website
 
 📌 Overview
+
 This project is a full-featured laptop e-commerce management system, developed to support online sales, inventory control, and business reporting.
 The system integrates user-facing e-commerce functions with backend management modules, enabling efficient operations across sales, inventory, maintenance, and analytics.
 
 🛠️ Technologies Used
+
 Frontend
   HTML – Page structure
   CSS – Styling and layout
@@ -18,6 +20,7 @@ Database
   SQL Server – Relational database management
 
 ✨ Key Features
+
 👤 User Functions
   User authentication and authorization
   Browse laptops with advanced search and filtering (brand, price, specifications)
