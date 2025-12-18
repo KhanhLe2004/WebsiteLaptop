@@ -71,9 +71,9 @@ Relationships between tables are enforced using primary and foreign keys to main
 
 ## 🚀 Getting Started
 ### Prerequisites
-  Visual Studio
-  SQL Server & SQL Server Management Studio (SSMS)
-  Modern web browser
+  - Visual Studio
+  - SQL Server & SQL Server Management Studio (SSMS)
+  - Modern web browser
 
 ### Installation
   1. Clone the repository: https://github.com/KhanhLe2004/WebsiteLaptop.git
