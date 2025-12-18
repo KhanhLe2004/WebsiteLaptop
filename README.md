@@ -57,15 +57,17 @@ Relationships between tables are enforced using primary and foreign keys to main
 
 ## 🔄 Data Processing & Reporting
 
-Data is collected and processed through RESTful APIs
-SQL queries are used for:
-  Sales statistics
-  Inventory status tracking
-  Repair history analysis
-  Reporting dashboards provide insights into:
-  Revenue by time period
-  Top-selling products
-  Inventory inflow and outflow
+### Data is collected and processed through RESTful APIs
+
+### SQL queries are used for:
+  - Sales statistics
+  - Inventory status tracking
+  - Repair history analysis
+
+### Reporting dashboards provide insights into:
+  - Revenue by time period
+  - Top-selling products
+  - Inventory inflow and outflow
 
 ## 🚀 Getting Started
 ### Prerequisites
